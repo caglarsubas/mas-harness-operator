@@ -1,0 +1,3 @@
+This chart runs verification only. It creates no RBAC, Service, workload deployment,
+or HarnessInstallation mutation. The receipt volume is ephemeral; an authorized
+post-OP-002 workflow must copy and admit the receipt before any apply operation.
