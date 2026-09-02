@@ -1,0 +1,244 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: harnessinstallations.harness.planeon.ai
+spec:
+  group: harness.planeon.ai
+  names:
+    kind: HarnessInstallation
+    listKind: HarnessInstallationList
+    plural: harnessinstallations
+    shortNames:
+    - hinst
+    singular: harnessinstallation
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.observedGeneration
+      name: Observed
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HarnessInstallationSpec contains tenant-approved desired
+              state only.
+            properties:
+              bundleDigest:
+                pattern: ^sha256:[0-9a-f]{64}$
+                type: string
+              desiredGeneration:
+                format: int64
+                minimum: 1
+                type: integer
+              harnessId:
+                pattern: ^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$
+                type: string
+              organizationId:
+                pattern: ^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$
+                type: string
+              profileDigest:
+                pattern: ^sha256:[0-9a-f]{64}$
+                type: string
+              releaseDigest:
+                pattern: ^sha256:[0-9a-f]{64}$
+                type: string
+              targetNamespace:
+                pattern: ^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$
+                type: string
+                x-kubernetes-validations:
+                - message: default namespace is forbidden
+                  rule: self != 'default'
+              trustRef:
+                properties:
+                  name:
+                    pattern: ^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - bundleDigest
+            - desiredGeneration
+            - harnessId
+            - organizationId
+            - profileDigest
+            - releaseDigest
+            - targetNamespace
+            - trustRef
+            type: object
+            x-kubernetes-validations:
+            - message: organizationId is immutable
+              rule: self.organizationId == oldSelf.organizationId
+            - message: harnessId is immutable
+              rule: self.harnessId == oldSelf.harnessId
+            - message: profileDigest is immutable
+              rule: self.profileDigest == oldSelf.profileDigest
+            - message: bundleDigest is immutable
+              rule: self.bundleDigest == oldSelf.bundleDigest
+            - message: releaseDigest is immutable
+              rule: self.releaseDigest == oldSelf.releaseDigest
+            - message: targetNamespace is immutable
+              rule: self.targetNamespace == oldSelf.targetNamespace
+            - message: trustRef is immutable
+              rule: self.trustRef == oldSelf.trustRef
+            - message: desiredGeneration cannot decrease
+              rule: self.desiredGeneration >= oldSelf.desiredGeneration
+          status:
+            properties:
+              conditions:
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              currentReleaseDigest:
+                pattern: ^sha256:[0-9a-f]{64}$
+                type: string
+              evidenceRefs:
+                items:
+                  properties:
+                    digest:
+                      pattern: ^sha256:[0-9a-f]{64}$
+                      type: string
+                    id:
+                      pattern: ^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$
+                      type: string
+                    kind:
+                      pattern: ^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$
+                      type: string
+                  required:
+                  - digest
+                  - id
+                  - kind
+                  type: object
+                type: array
+                x-kubernetes-list-type: set
+              lastGoodReleaseDigest:
+                pattern: ^sha256:[0-9a-f]{64}$
+                type: string
+              lastTransitionAt:
+                format: date-time
+                type: string
+              observedGeneration:
+                format: int64
+                minimum: 0
+                type: integer
+              phase:
+                description: InstallationPhase is the exact CON-005 lifecycle vocabulary.
+                enum:
+                - ABSENT
+                - PENDING
+                - PREFLIGHT
+                - VERIFYING
+                - APPLYING
+                - HEALTH_CHECKING
+                - READY
+                - BLOCKED
+                - DEGRADED
+                - FAILED
+                - UPGRADING
+                - ROLLING_BACK
+                - UNINSTALLING
+                - REMOVED
+                - RETIRED
+                - REVOKED
+                type: string
+              reasonCode:
+                pattern: ^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$
+                type: string
+            type: object
+            x-kubernetes-validations:
+            - message: condition type is not part of the closed vocabulary
+              rule: self.conditions.all(c, c.type in ['DependenciesResolved','ArtifactsVerified','Configured','Ready','Healthy','PolicyCompliant','EvidenceCurrent'])
+        required:
+        - spec
+        type: object
+        x-kubernetes-validations:
+        - message: observedGeneration cannot exceed desiredGeneration
+          rule: '!has(self.status) || !has(self.status.observedGeneration) || self.status.observedGeneration
+            <= self.spec.desiredGeneration'
+    served: true
+    storage: true
+    subresources:
+      status: {}

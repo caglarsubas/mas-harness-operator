@@ -1,0 +1,12 @@
+image: operator.local/harness-operator@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+watchNamespace: planeon-system
+replicas: 1
+leaderElect: true
+healthProbeBindAddress: 0.0.0.0:8081
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

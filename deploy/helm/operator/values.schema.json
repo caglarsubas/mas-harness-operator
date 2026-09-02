@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "healthProbeBindAddress": {
+      "enum": ["0.0.0.0:8081", "[::]:8081"]
+    },
+    "image": {
+      "pattern": "^[a-z0-9.-]+(?:/[a-z0-9._-]+)+@sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "leaderElect": {
+      "type": "boolean"
+    },
+    "replicas": {
+      "const": 1
+    },
+    "resources": {
+      "additionalProperties": false,
+      "properties": {
+        "limits": {
+          "$ref": "#/$defs/resourcePair"
+        },
+        "requests": {
+          "$ref": "#/$defs/resourcePair"
+        }
+      },
+      "required": ["requests", "limits"],
+      "type": "object"
+    },
+    "watchNamespace": {
+      "not": {"const": "default"},
+      "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$",
+      "type": "string"
+    }
+  },
+  "required": ["image", "watchNamespace", "replicas", "leaderElect", "healthProbeBindAddress", "resources"],
+  "type": "object",
+  "$defs": {
+    "resourcePair": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {"type": "string"},
+        "memory": {"type": "string"}
+      },
+      "required": ["cpu", "memory"],
+      "type": "object"
+    }
+  }
+}

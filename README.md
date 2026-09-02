@@ -1,13 +1,25 @@
 # Planeon Harness Operator
 
-This public repository is reserved for the Planeon multi-agent harness
-platform's Kubernetes and OpenShift installation operator.
+The Planeon Harness Operator is the installation boundary for the modular
+multi-agent harness platform. `OP-001` provides a namespaced
+`HarnessInstallation` API, an exact projection to the public lifecycle
+contract, and a non-mutating controller-runtime shell.
 
-Product implementation has not started on this default-branch seed. The coding
-authority, repository boundary, packet DAG, and acceptance requirements are
-published in the public [Harness Onion](https://github.com/caglarsubas/harness-onion)
-planning repository. Product changes begin with the hash-pinned `OP-001` packet
-on a dedicated branch and pull request.
+This phase does not apply tenant workloads. Bundle preflight belongs to
+`OP-002`; foundation reconciliation belongs to `OP-003`. The signed acceptance
+rail is socket-free and reports real Kubernetes envtest, deployment, runtime,
+assurance, and tenant acceptance as `NOT_RUN_ENV_UNAVAILABLE` or
+`NOT_RUN_NOT_IN_PACKET`.
 
-No hosted runtime, cloud resource, paid API, API key, remote telemetry, or
-billable package service is required.
+## Local verification
+
+Only the root-owned launcher is authoritative:
+
+```text
+GITHUB_WORKSPACE=/opt/planeon/runner-work/<checkout> /opt/planeon/bin/harness-offline-launch
+```
+
+It executes the hash-pinned packet with outbound and loopback networking
+denied. No cloud resource, hosted runner, paid API, API key, remote telemetry,
+runtime download, Actions artifact/cache/package, or registry mutation is
+required.
