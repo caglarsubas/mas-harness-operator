@@ -1,12 +1,15 @@
-# Product execution boundary
+# Sol-High product execution rules
 
-- Implement exactly one hash-pinned task packet per branch and pull request.
-- Touch only that packet's `allowedPaths`.
-- Never mount, open, copy, or modify a warm-start checkout during product work.
-- Use only the preinstalled root-owned trusted offline launcher in CI.
-- Never add hosted runners, cloud provisioning, API-key requirements, runtime
-  downloads, mutable artifact references, remote telemetry, Actions caches,
-  packages, or uploaded artifacts.
-- Keep source, CI, merge, exact-main, artifact, deployment, runtime, assurance,
-  and tenant acceptance as separate evidence states.
-- Merge only after every required ephemeral self-hosted check is green.
+1. Implement exactly one hash-pinned task packet per branch and pull request.
+2. Touch only that packet's `allowedPaths` and preserve every predecessor.
+3. Never mount, open, copy, or modify a warm-start checkout during product work.
+4. Product commands run only through the preinstalled root-owned trusted
+   launcher and closed direct-argv dispatcher.
+5. The bootstrap packet alone owns `Makefile`, `ci/run_make_target.py`, and the
+   inert `PORTING.yaml` ledger. Later packets add only their exact descriptor.
+6. Never add hosted runners, cloud provisioning, API-key requirements, runtime
+   downloads, mutable references, external telemetry, Actions caches,
+   packages, uploaded artifacts, or billable brokers.
+7. Keep source, CI, merge, exact-main, artifact, deployment, runtime, assurance,
+   and tenant acceptance as separate evidence states.
+8. Merge only after every required fresh ephemeral self-hosted check is green.

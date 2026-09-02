@@ -1,0 +1,4 @@
+Install the namespaced API definition first:
+  kubectl apply -f config/crd/harness.planeon.ai_harnessinstallations.yaml
+
+This chart creates no Namespace and no cluster-scoped RBAC.

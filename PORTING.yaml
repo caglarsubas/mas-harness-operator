@@ -1,0 +1,5 @@
+schemaVersion: harness.planeon.ai/porting-ledger/v1alpha1
+repository: mas-harness-operator
+authorizationStatus: NO_AUTHORIZATION
+authorizations: []
+copiedPaths: []

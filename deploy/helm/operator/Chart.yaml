@@ -1,0 +1,8 @@
+apiVersion: v2
+name: harness-operator
+description: Namespaced Planeon HarnessInstallation operator shell
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+annotations:
+  harness.planeon.ai/crd-install: "apply config/crd before installing this chart"

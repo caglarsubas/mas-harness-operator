@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "harness.planeon.ai/op001-environment-evidence/v1alpha1",
+  "socketFreeControllerRuntime": "PASS",
+  "realEnvtest": "NOT_RUN_ENV_UNAVAILABLE",
+  "artifactPublication": "NOT_RUN_NOT_IN_PACKET",
+  "imageBuild": "NOT_RUN_NOT_IN_PACKET",
+  "installation": "NOT_RUN_NOT_IN_PACKET",
+  "deployment": "NOT_RUN_NOT_IN_PACKET",
+  "runtime": "NOT_RUN_NOT_IN_PACKET",
+  "assurance": "NOT_RUN_NOT_IN_PACKET",
+  "tenantAcceptance": "NOT_RUN_NOT_IN_PACKET",
+  "reason": "The mandatory deny-network sandbox blocks the kube-apiserver and etcd loopback sockets required by envtest."
+}

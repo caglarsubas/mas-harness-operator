@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "harness.planeon.ai/operator-toolchain-lock/v1alpha1",
+  "planningBase": "226bad09b724e0e7f560fc5e6aa51382ef2d1e58",
+  "packet": {
+    "id": "OP-001",
+    "sha256": "9a64698615c1c1fa8ef899b50495d5249bec0a877f0e7f7a92e9058ef196b07b"
+  },
+  "contracts": {
+    "commit": "63a1af44ce0abe31075c37c3529848ebe8fe2fcb",
+    "commonSchemaSha256": "dce5d8030eea3a19694511eb26513614dcc720ef4e0d650772131b14ed58f075",
+    "harnessInstallationSchemaSha256": "f84afa6189b9c59ee5c4ad06d94e0f9eec7f3277955c450f8710c02ad832d07d",
+    "lifecycleTransitionsSha256": "17122d47f3d3cce568f117b9113f83821db3aaddba3c910afb40e068f193dffc"
+  },
+  "tools": {
+    "go": {
+      "version": "1.26.7",
+      "path": "/opt/planeon/go/1.26.7/bin/go",
+      "sha256": "9da68c657a8344623d37fc9dc048d845011736409249bc924dd9af47a61594e6",
+      "archiveSha256": "020a1e8224811be75163e920bc77e0926a1390a6aeea19bdcf23f74b9d749f6d",
+      "inventorySha256": "198db2b91046d9b5dd473a78eaad7326c1f378da65bac5bab8a4a0d3038862d1"
+    },
+    "controllerGen": {
+      "version": "0.21.0",
+      "path": "/opt/planeon/bin/controller-gen",
+      "sha256": "4f2b8ca0430239f41afc5a5e5c09325f9c2abb88d8b940ca9351d8242bdb216d"
+    },
+    "moduleCache": {
+      "path": "/opt/planeon/gomodcache/op-001",
+      "inventorySha256": "f99a2155f3c7a1ce0c2d5da3cf29b52af4cd8ff7df9640edb593188589b53a83"
+    }
+  },
+  "modules": {
+    "k8s.io/apiextensions-apiserver": "v0.36.0",
+    "k8s.io/apimachinery": "v0.36.0",
+    "sigs.k8s.io/controller-runtime": "v0.24.1"
+  }
+}
