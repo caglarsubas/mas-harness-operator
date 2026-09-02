@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Run one immutable OP-001 packet using direct argv under existing isolation."""
+"""Run one immutable operator packet using direct argv under existing isolation."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -33,6 +34,7 @@ EXPECTED_EXECUTION = {
 }
 FORBIDDEN_EXECUTABLES = {"bash", "dash", "env", "sh", "zsh"}
 FORBIDDEN_OFFLINE_TOKENS = {"add", "curl", "download", "fetch", "install", "npx", "prefetch", "pull", "sync", "wget"}
+PACKET_ID = re.compile(r"^OP-[0-9]{3}$")
 CHILD_ENV = {
     "CGO_ENABLED", "CI", "GITHUB_ACTIONS", "GITHUB_EVENT_NAME",
     "GITHUB_REPOSITORY", "GITHUB_SHA", "GITHUB_WORKSPACE", "GOCACHE",
@@ -76,6 +78,16 @@ def inline_json(text: str, field: str) -> Any:
         raise PacketError(f"packet {field} is not inline JSON") from exc
 
 
+def packet_identity(text: str) -> str:
+    ids = [line[3:].strip() for line in text.splitlines() if line.startswith("id:")]
+    repositories = [line[11:].strip() for line in text.splitlines() if line.startswith("repository:")]
+    if len(ids) != 1 or PACKET_ID.fullmatch(ids[0]) is None:
+        raise PacketError("packet id is invalid or duplicated")
+    if repositories != ["mas-harness-operator"]:
+        raise PacketError("packet repository is invalid or duplicated")
+    return ids[0]
+
+
 def command_arrays(text: str, field: str) -> list[list[str]]:
     value = inline_json(text, field)
     if not isinstance(value, list) or not 1 <= len(value) <= 32:
@@ -111,8 +123,7 @@ def main() -> int:
         raise PacketError(f"{PACKET_ENV} is required")
     packet = Path(raw_path)
     text, digest = read_packet(packet)
-    if not text.startswith("id: OP-001\nrepository: mas-harness-operator\n"):
-        raise PacketError("unexpected packet identity")
+    packet_identity(text)
     if inline_json(text, "offlineExecution") != EXPECTED_EXECUTION:
         raise PacketError("offlineExecution contract mismatch")
     prefetch = command_arrays(text, "prefetchCommands")

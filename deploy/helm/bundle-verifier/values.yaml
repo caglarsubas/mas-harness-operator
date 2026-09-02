@@ -1,0 +1,13 @@
+image: operator.local/harness-bundle-verifier@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+namespace: planeon-system
+bundleClaimName: planeon-signed-bundle
+requestConfigMapName: planeon-preflight-request
+observationConfigMapName: planeon-environment-observation
+verificationTime: "2026-09-02T12:00:00Z"
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
