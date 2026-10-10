@@ -20,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 # Acceptance runs only in the owner-operated verifier (HE-000, owner decisions VX1-VX4): any workflow file is a hosted
 # or self-hosted Actions path, and so a billing vector.
 workflows = ROOT / ".github/workflows"
-require(not workflows.exists() or not any(workflows.iterdir()), "a GitHub Actions workflow exists")
+require(not workflows.exists() or (workflows.is_dir() and not any(workflows.iterdir())), "a GitHub Actions workflow exists")
 
 containerfile = (ROOT / "Containerfile").read_text(encoding="utf-8")
 require(not re.search(r"(?m)^\s*(RUN|ADD)\s", containerfile), "Containerfile may not install or download")
@@ -32,7 +32,7 @@ for forbidden in ("curl", "wget", "docker", "podman", "kubectl", "helm", "npx", 
     require(forbidden not in serialized, f"target descriptor contains forbidden executable/token: {forbidden}")
 
 for path in sorted(ROOT.rglob("*")):
-    if not path.is_file() or ".git" in path.parts or "target" in path.parts or "__pycache__" in path.parts or path.name in {"LICENSE", "go.sum"}:
+    if not path.is_file() or {".git", "target", "__pycache__"} & set(path.relative_to(ROOT).parts) or path.name in {"LICENSE", "go.sum"}:
         continue
     if path.resolve() == Path(__file__).resolve():
         continue

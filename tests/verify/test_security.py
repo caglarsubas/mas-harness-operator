@@ -43,10 +43,17 @@ class TransportTests(unittest.TestCase):
                 transport.verify_packet_digest(packet, expected)
 
     def test_execution_contract_is_exact(self) -> None:
-        self.assertEqual(transport.EXPECTED_EXECUTION["wrapperArgv"], ["./ci/verify-offline.sh"])
-        self.assertEqual(transport.EXPECTED_EXECUTION["isolation"], "OS_ENFORCED_DENY_ALL_OUTBOUND")
-        self.assertEqual(transport.EXPECTED_EXECUTION["packetPathEnvironment"], transport.PACKET_ENVIRONMENT)
-        self.assertEqual(transport.OFFLINE_ENVIRONMENT, {"UV_OFFLINE": "1", "UV_FROZEN": "1", "UV_NO_SYNC": "1"})
+        # Equal to the installed authority's packet_fields contract, member for member.
+        self.assertEqual(transport.EXPECTED_EXECUTION, {
+            "wrapperArgv": ["./ci/verify-offline.sh"],
+            "packetPathEnvironment": "HARNESS_TASK_PACKET",
+            "packetPathMode": "HASH_PINNED_READ_ONCE_NO_CHILD_PATH",
+            "commandTransport": "ARGV_ARRAY_V1",
+            "isolation": "OS_ENFORCED_DENY_ALL_OUTBOUND",
+            "sessionScope": "SINGLE_PROCESS_TREE",
+            "prefetchOutsideSession": False,
+            "offlineEnvironment": {"UV_OFFLINE": "1", "UV_FROZEN": "1", "UV_NO_SYNC": "1"},
+        })
 
     def test_authority_paths_are_not_forwarded_and_profile_names_are(self) -> None:
         allow = transport.CHILD_ENVIRONMENT_ALLOWLIST
@@ -58,7 +65,7 @@ class TransportTests(unittest.TestCase):
 
     def test_this_suite_never_calls_the_printing_entry_points(self) -> None:
         # The verifier counts every log line starting with its evidence prefixes; the runner's run_commands() and main()
-        # print such lines, so this suite never calls them.
+        # print such lines, so this suite never calls them (a source check).
         source = Path(__file__).read_text(encoding="utf-8")
         for name in ("run_commands", "main"):
             self.assertNotIn("transport." + name + "(", source)
