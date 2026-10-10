@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/host-common", "crates/containment", "crates/broker", "crates/observer", "crates/gate", "crates/writer"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+debug = 0
+strip = "debuginfo"

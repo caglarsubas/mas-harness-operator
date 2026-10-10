@@ -1,0 +1,9 @@
+[package]
+name = "planeon-containment"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+host-common = { path = "../host-common" }

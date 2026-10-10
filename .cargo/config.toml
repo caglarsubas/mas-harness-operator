@@ -1,0 +1,11 @@
+# Read by cargo from the repository root, where every packet command runs (HE-001 design, D1).
+[net]
+offline = true
+
+[target.x86_64-unknown-linux-musl]
+linker = "host-enforcement/tools/rust-lld"
+rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
+
+[target.aarch64-unknown-linux-musl]
+linker = "host-enforcement/tools/rust-lld"
+rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
