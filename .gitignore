@@ -3,3 +3,4 @@ bin/
 coverage.out
 *.test
 *.tmp
+__pycache__/

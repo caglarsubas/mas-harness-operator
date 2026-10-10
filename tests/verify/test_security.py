@@ -17,34 +17,51 @@ SPEC.loader.exec_module(transport)
 
 
 class TransportTests(unittest.TestCase):
-    def test_operator_packet_identity_is_repository_scoped(self) -> None:
-        self.assertEqual(transport.packet_identity("id: OP-001\nrepository: mas-harness-operator\n"), "OP-001")
-        self.assertEqual(transport.packet_identity("id: OP-002\nrepository: mas-harness-operator\n"), "OP-002")
-        for invalid in (
-            "id: CTRL-001\nrepository: mas-harness-operator\n",
-            "id: OP-002\nrepository: foreign\n",
-            "id: OP-002\nid: OP-001\nrepository: mas-harness-operator\n",
-            "id: OP-002\nrepository: mas-harness-operator\nrepository: mas-harness-operator\n",
-        ):
-            with self.subTest(invalid=invalid), self.assertRaises(transport.PacketError):
-                transport.packet_identity(invalid)
+    """The adopted launcher contract (HE-000): harness-onion's runner plus the six rust-host-enforcement names."""
 
-    def test_shell_transport_and_mutated_packet_are_refused(self) -> None:
-        with self.assertRaises(transport.PacketError):
-            transport.command_arrays('commands: [["sh","-c","true"]]', "commands")
+    def test_inline_fields_are_single_json_lines(self) -> None:
+        self.assertEqual(transport.load_json_field("prefetchCommands: []\n", "prefetchCommands"), [])
+        for text in ("", "prefetchCommands: []\nprefetchCommands: []\n", "prefetchCommands: not-json\n", "prefetchCommands:\n"):
+            with self.subTest(text=text), self.assertRaises(transport.PacketTransportError):
+                transport.load_json_field(text, "prefetchCommands")
+
+    def test_shell_environment_and_online_argv_are_refused(self) -> None:
+        transport.validate_offline_argv(["go", "test", "./..."])
+        for argv in (["sh", "-c", "true"], ["/usr/bin/env", "go", "test"], ["bash"], ["go", "install", "x"],
+                     ["cargo", "fetch"], ["curl", "https://example.invalid"]):
+            with self.subTest(argv=argv), self.assertRaises(transport.PacketTransportError):
+                transport.validate_offline_argv(argv)
+
+    def test_mutated_packet_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             packet = Path(raw) / "packet.yaml"
-            packet.write_text("id: OP-002\n", encoding="utf-8")
+            packet.write_text("id: HE-000B\n", encoding="utf-8")
             expected = hashlib.sha256(packet.read_bytes()).hexdigest()
-            packet.write_text("id: OP-003\n", encoding="utf-8")
-            with self.assertRaises(transport.PacketError):
-                transport.verify_digest(packet, expected)
+            transport.verify_packet_digest(packet, expected)
+            packet.write_text("id: HE-001\n", encoding="utf-8")
+            with self.assertRaises(transport.PacketTransportError):
+                transport.verify_packet_digest(packet, expected)
 
-    def test_authority_paths_and_environment_are_not_forwarded(self) -> None:
-        self.assertNotIn(transport.PACKET_ENV, transport.CHILD_ENV)
-        self.assertNotIn("HARNESS_WARM_SOURCE_ROOTS", transport.CHILD_ENV)
-        self.assertEqual(transport.GO_ENV["GOPROXY"], "off")
-        self.assertEqual(transport.GO_ENV["GOSUMDB"], "off")
+    def test_execution_contract_is_exact(self) -> None:
+        self.assertEqual(transport.EXPECTED_EXECUTION["wrapperArgv"], ["./ci/verify-offline.sh"])
+        self.assertEqual(transport.EXPECTED_EXECUTION["isolation"], "OS_ENFORCED_DENY_ALL_OUTBOUND")
+        self.assertEqual(transport.EXPECTED_EXECUTION["packetPathEnvironment"], transport.PACKET_ENVIRONMENT)
+        self.assertEqual(transport.OFFLINE_ENVIRONMENT, {"UV_OFFLINE": "1", "UV_FROZEN": "1", "UV_NO_SYNC": "1"})
+
+    def test_authority_paths_are_not_forwarded_and_profile_names_are(self) -> None:
+        allow = transport.CHILD_ENVIRONMENT_ALLOWLIST
+        self.assertNotIn(transport.PACKET_ENVIRONMENT, allow)
+        self.assertNotIn("HARNESS_WARM_SOURCE_ROOTS", allow)
+        self.assertLessEqual({"CARGO_NET_OFFLINE", "GOFLAGS", "GOMODCACHE", "GOPROXY", "GOSUMDB", "GOTOOLCHAIN"}, allow)
+        scrubbed = transport.scrub_environment({"HARNESS_TASK_PACKET": "/x", "GOPROXY": "off", "AWS_SECRET_ACCESS_KEY": "k"})
+        self.assertEqual(scrubbed, {"GOPROXY": "off"})
+
+    def test_this_suite_never_calls_the_printing_entry_points(self) -> None:
+        # The verifier counts every log line starting with its evidence prefixes; the runner's run_commands() and main()
+        # print such lines, so this suite never calls them.
+        source = Path(__file__).read_text(encoding="utf-8")
+        for name in ("run_commands", "main"):
+            self.assertNotIn("transport." + name + "(", source)
 
 
 class SecurityTests(unittest.TestCase):

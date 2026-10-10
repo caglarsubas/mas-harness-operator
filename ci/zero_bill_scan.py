@@ -17,10 +17,10 @@ def require(condition: bool, message: str) -> None:
         errors.append(message)
 
 
-workflow = (ROOT / ".github/workflows/verify.yml").read_text(encoding="utf-8")
-require("runs-on: [self-hosted, harness-engineering, ephemeral, credential-free]" in workflow, "workflow runner labels are not closed")
-for forbidden in ("ubuntu-latest", "macos-latest", "windows-latest", "actions/cache", "actions/upload-artifact", "actions/download-artifact", "schedule:", "packages: write"):
-    require(forbidden not in workflow, f"workflow contains prohibited billing vector: {forbidden}")
+# Acceptance runs only in the owner-operated verifier (HE-000, owner decisions VX1-VX4): any workflow file is a hosted
+# or self-hosted Actions path, and so a billing vector.
+workflows = ROOT / ".github/workflows"
+require(not workflows.exists() or not any(workflows.iterdir()), "a GitHub Actions workflow exists")
 
 containerfile = (ROOT / "Containerfile").read_text(encoding="utf-8")
 require(not re.search(r"(?m)^\s*(RUN|ADD)\s", containerfile), "Containerfile may not install or download")
@@ -32,11 +32,11 @@ for forbidden in ("curl", "wget", "docker", "podman", "kubectl", "helm", "npx", 
     require(forbidden not in serialized, f"target descriptor contains forbidden executable/token: {forbidden}")
 
 for path in sorted(ROOT.rglob("*")):
-    if not path.is_file() or ".git" in path.parts or path.name in {"LICENSE", "go.sum"}:
+    if not path.is_file() or ".git" in path.parts or "target" in path.parts or "__pycache__" in path.parts or path.name in {"LICENSE", "go.sum"}:
         continue
     if path.resolve() == Path(__file__).resolve():
         continue
-    if path.suffix not in {".go", ".py", ".sh", ".yaml", ".yml", ".json"} and path.name not in {"Containerfile", "Makefile"}:
+    if path.suffix not in {".go", ".py", ".sh", ".yaml", ".yml", ".json", ".rs", ".toml"} and path.name not in {"Containerfile", "Makefile"}:
         continue
     text = path.read_text(encoding="utf-8")
     for pattern in (r"AKIA[0-9A-Z]{16}", r"(?i)(api[_-]?key|secret[_-]?key)\s*[:=]\s*['\"][^'\"]+", r"(?i)OTEL_EXPORTER_OTLP_ENDPOINT", r"(?i)LoadBalancer", r"(?i)NodePort"):
@@ -47,4 +47,4 @@ if errors:
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
     raise SystemExit(1)
-print("zero-bill scan passed: local-only tools, self-hosted CI, no paid/API-key/cloud/runtime-download path")
+print("zero-bill scan passed: local-only tools, owner-operated verifier only, no paid/API-key/cloud/runtime-download path")
