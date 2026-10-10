@@ -1,0 +1,16 @@
+id: "HE-000"
+repository: "mas-harness-operator"
+branch: "codex/he-000-verifier-adoption"
+objective: "Adopt the owner-operated verifier's launcher contract in mas-harness-operator (R10) as the repository's first packet: the four reviewed harness-onion transport files (VERIFIER-EXT section 2, with R10's runner passing the six rust-host-enforcement profile variables), the old self-hosted workflow removed, and an offline acceptance of the existing Go operator against the installed Go 1.26.7 and op-001 module cache. Owner decisions VX1-VX4 and Q-R10B (a), 2026-10-10, via the lane monitor. No product or W03 source changes."
+predecessors: []
+allowedPaths: [".github/workflows/verify.yml","ci/network_canary.py","ci/run_packet_argv.py","ci/verify-offline.sh","ci/warm-source-isolation.sh","task-packets/HE-000.yaml"]
+warmSourceAccess: "PROHIBITED_DURING_IMPLEMENTATION"
+sourceReuse: []
+prefetchCommands: []
+offlineExecution: {"wrapperArgv":["./ci/verify-offline.sh"],"packetPathEnvironment":"HARNESS_TASK_PACKET","packetPathMode":"HASH_PINNED_READ_ONCE_NO_CHILD_PATH","commandTransport":"ARGV_ARRAY_V1","isolation":"OS_ENFORCED_DENY_ALL_OUTBOUND","sessionScope":"SINGLE_PROCESS_TREE","prefetchOutsideSession":false,"offlineEnvironment":{"UV_OFFLINE":"1","UV_FROZEN":"1","UV_NO_SYNC":"1"}}
+contracts: ["This is the repository's first packet: main has no task-packets/*.yaml, so it inherits nothing, and the verifier runs it only after the owner approves this exact head commit (VERIFIER-EXT section 6). Every later packet in this repository inherits this packet's commands in order, within the 64-command cap.","ci/verify-offline.sh (778cb0fa...), ci/warm-source-isolation.sh (f717f62f...) and ci/network_canary.py (1be4a837...) are byte-identical to harness-onion main 0e74704; ci/run_packet_argv.py (2d7982b2...) is harness-onion's plus six child-environment allowlist names (CARGO_NET_OFFLINE, GOFLAGS, GOMODCACHE, GOPROXY, GOSUMDB, GOTOOLCHAIN). The runner runs the network canary before it prints any evidence line; the first command runs it again explicitly.",".github/workflows/verify.yml (the offline-verify job, also named verify) is deleted; branch protection then requires only the verifier App's verify check (owner decision VX4).","Acceptance runs inside the trusted launcher under the rust-host-enforcement profile: go vet and go test over the existing operator packages, offline (GOPROXY=off, GOTOOLCHAIN=local, GOFLAGS=-mod=readonly) against the read-only op-001 module cache. No other source file changes."]
+deliverables: ["The verifier's launcher contract in ci/, the old workflow removed, and this first packet."]
+excluded: ["Product, operator, W03 host-enforcement or Rust source; Makefile, tools.lock or module changes; other ci/ files; workflow additions; installed launcher, policy, verifier or keys; downloads; warm-source access."]
+offlineAcceptanceCommands: [["python3","-I","ci/network_canary.py"],["go","vet","./..."],["go","test","./..."]]
+expectedEvidence: ["verify from the owner-operated verifier v4: transport bound (packet header, three argv lines, no prefetch), the canary passing, go vet clean and every Go package test passing; tracked files unchanged."]
+rollback: "Revert the merge commit; the verifier then has no packet in this repository again."

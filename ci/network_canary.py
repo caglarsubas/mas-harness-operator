@@ -1,27 +1,56 @@
 #!/usr/bin/env python3
-"""Prove that the enclosing OS sandbox denies IPv4 and IPv6 networking."""
+"""Fail if an outbound TCP connection succeeds inside the offline sandbox."""
 
 from __future__ import annotations
 
 import errno
+import os
 import socket
+import sys
 
 
-def denied(family: socket.AddressFamily, address: tuple[object, ...]) -> bool:
+EXPECTED_DENIAL_ERRNOS = {
+    "darwin-sandbox": {errno.EACCES, errno.EPERM},
+    "linux-firejail": {
+        errno.EACCES,
+        errno.EPERM,
+        errno.ENETUNREACH,
+        errno.EHOSTUNREACH,
+    },
+}
+
+
+def denial_is_proven(backend: str, result: int | None) -> bool:
+    return result in EXPECTED_DENIAL_ERRNOS.get(backend, set())
+
+
+def main() -> int:
+    backend = os.environ.get("HARNESS_OFFLINE_BACKEND", "")
+    if backend not in EXPECTED_DENIAL_ERRNOS:
+        print(
+            "offline network canary refused: recognized isolation backend required",
+            file=sys.stderr,
+        )
+        return 2
     try:
-        candidate = socket.socket(family, socket.SOCK_STREAM)
-        try:
-            candidate.settimeout(0.1)
-            candidate.connect(address)
-        finally:
-            candidate.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+            client.settimeout(0.5)
+            result = client.connect_ex(("1.1.1.1", 443))
     except OSError as exc:
-        return exc.errno in {errno.EPERM, errno.EACCES}
-    return False
+        result = exc.errno
+    if denial_is_proven(backend, result):
+        print(
+            f"offline network canary: {backend} denied outbound egress "
+            f"with errno={result}"
+        )
+        return 0
+    print(
+        f"offline network canary failed: backend={backend!r} errno={result}; "
+        "OS denial was not proven",
+        file=sys.stderr,
+    )
+    return 1
 
 
-if not denied(socket.AF_INET, ("203.0.113.1", 9)):
-    raise SystemExit("offline network canary: IPv4 was not denied by the OS")
-if not denied(socket.AF_INET6, ("2001:db8::1", 9, 0, 0)):
-    raise SystemExit("offline network canary: IPv6 was not denied by the OS")
-print("offline network canary: OS denied IPv4 and IPv6 outbound egress")
+if __name__ == "__main__":
+    raise SystemExit(main())
