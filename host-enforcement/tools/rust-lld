@@ -1,0 +1,9 @@
+#!/bin/sh
+# The official rustc component ships libLLVM.dylib in <sysroot>/lib, but rust-lld's rpath is @loader_path/../lib
+# (<sysroot>/lib/rustlib/<host>/lib), so on macOS it loads only when the dylib search path names <sysroot>/lib, which
+# rustup's proxies set; set through cargo's [env] it did not reach the linker. The sysroot is the pinned, root-owned
+# toolchain (host-enforcement/toolchain.json; the gate checks these lines against it); this file is named rust-lld so
+# rustc keeps inferring the lld flavor.
+DYLD_FALLBACK_LIBRARY_PATH=/opt/planeon/toolchains/rust-1.99.0/lib
+export DYLD_FALLBACK_LIBRARY_PATH
+exec /opt/planeon/toolchains/rust-1.99.0/lib/rustlib/aarch64-apple-darwin/bin/rust-lld "$@"

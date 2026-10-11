@@ -4,3 +4,4 @@ coverage.out
 *.test
 *.tmp
 __pycache__/
+/host-enforcement/target/
