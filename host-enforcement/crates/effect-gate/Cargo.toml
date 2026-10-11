@@ -1,0 +1,9 @@
+[package]
+name = "effect-gate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+i05-protocol = { path = "../i05-protocol" }
