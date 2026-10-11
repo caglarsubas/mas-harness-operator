@@ -20,7 +20,7 @@ pub enum Datagram<'a> {
 }
 
 /// The frame refusal codes, in the contract's wording.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FrameError {
     F00,
     F01,
