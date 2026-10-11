@@ -1,12 +1,9 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help prefetch generated-check envtest-offline zero-bill
+.PHONY: help generated-check envtest-offline zero-bill
 
 help:
 	@python3 ci/run_make_target.py help
-
-prefetch:
-	@python3 ci/run_make_target.py prefetch
 
 generated-check:
 	@python3 ci/run_make_target.py generated-check
