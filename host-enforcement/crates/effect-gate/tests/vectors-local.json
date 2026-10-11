@@ -1,0 +1,2343 @@
+{
+ "evidenceClass": "R10_LOCAL",
+ "note": "R10-local vectors (HE-002 DESIGN \u00a78), not contract data. Configurations are the contract's (contracts/i05-v3/vectors.json). Expected values come from R10's own run; the independent review re-runs the pinned model (scripts/i05_gate_channel_v3.py, sha256 2c7985b5...) on the same inputs.",
+ "sameAs": [
+  [
+   "R10-L01a",
+   "R10-L01b"
+  ],
+  [
+   "R10-L01c",
+   "R10-L01d"
+  ]
+ ],
+ "transcripts": [
+  {
+   "id": "R10-L01a",
+   "intent": "I05-4: STORAGE_FAIL_AFTER {after: 0} then {after: 2}: the second replaces the first, so this behaves as R10-L01b (the SEALED record, the third attempt, fails)",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "after": 0,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "after": 2,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+     "conn": "c1",
+     "httpStatus": 201,
+     "resourceVersion": "41",
+     "type": "UPSTREAM_RESPONSE",
+     "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 2,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "verb": "GET"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {},
+    {},
+    {
+     "actionId": 1,
+     "decision": "FORWARD"
+    },
+    {
+     "classification": "DELIVERED_RESULT",
+     "relayed": true
+    },
+    {
+     "response": {
+      "reason": "STORAGE_FAILURE",
+      "result": "REFUSED"
+     }
+    },
+    {
+     "response": {
+      "reason": "NOT_ACTIVE",
+      "result": "REFUSED"
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 1,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:696e26bc70bc1c818673c351cf59a5ee44f614094a2700d91676f4cc78eb37f7",
+      "result": "OK",
+      "state": "HELD"
+     }
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "sealed": false,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "OPEN",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 1,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "CONSUMED",
+      1
+     ],
+     [
+      "TERMINAL",
+      1,
+      "DELIVERED_RESULT",
+      false,
+      {
+       "httpStatus": 201,
+       "observedResourceVersion": "41",
+       "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+       "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L01b",
+   "intent": "I05-4 reference: STORAGE_FAIL_AFTER {after: 2} alone",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "after": 2,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+     "conn": "c1",
+     "httpStatus": 201,
+     "resourceVersion": "41",
+     "type": "UPSTREAM_RESPONSE",
+     "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 2,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "verb": "GET"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {},
+    {
+     "actionId": 1,
+     "decision": "FORWARD"
+    },
+    {
+     "classification": "DELIVERED_RESULT",
+     "relayed": true
+    },
+    {
+     "response": {
+      "reason": "STORAGE_FAILURE",
+      "result": "REFUSED"
+     }
+    },
+    {
+     "response": {
+      "reason": "NOT_ACTIVE",
+      "result": "REFUSED"
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 1,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:696e26bc70bc1c818673c351cf59a5ee44f614094a2700d91676f4cc78eb37f7",
+      "result": "OK",
+      "state": "HELD"
+     }
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "sealed": false,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "OPEN",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 1,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "CONSUMED",
+      1
+     ],
+     [
+      "TERMINAL",
+      1,
+      "DELIVERED_RESULT",
+      false,
+      {
+       "httpStatus": 201,
+       "observedResourceVersion": "41",
+       "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+       "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L01c",
+   "intent": "I05-4: STORAGE_FAIL_AFTER {after: 2} then {after: 0}: behaves as R10-L01d (the CONSUMED record, the first attempt, fails and nothing is forwarded)",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "after": 2,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "after": 0,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {},
+    {},
+    {
+     "decision": "CLOSE",
+     "reason": "STORAGE_FAILURE"
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "result": "OK",
+      "resultDigest": null
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 1,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:7aa91c880e8d324404e51ac4f31e883a76bbf68233010e94f04d3238e0e2194f",
+      "result": "OK",
+      "state": "HELD"
+     }
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "sealed": true,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "OPEN",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 1,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "DENIED",
+      1
+     ],
+     [
+      "SEALED",
+      1,
+      "NOT_FORWARDED",
+      false
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L01d",
+   "intent": "I05-4 reference: STORAGE_FAIL_AFTER {after: 0} alone",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "after": 0,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {},
+    {
+     "decision": "CLOSE",
+     "reason": "STORAGE_FAILURE"
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "result": "OK",
+      "resultDigest": null
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 1,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:7aa91c880e8d324404e51ac4f31e883a76bbf68233010e94f04d3238e0e2194f",
+      "result": "OK",
+      "state": "HELD"
+     }
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "sealed": true,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "OPEN",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 1,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "DENIED",
+      1
+     ],
+     [
+      "SEALED",
+      1,
+      "NOT_FORWARDED",
+      false
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L02",
+   "intent": "Queue order (model-defined): STORAGE_FAIL_NEXT, STORAGE_FAIL_NEXT, STORAGE_FAIL_AFTER {after: 0}: the AFTER failure joins the queue behind the two NEXT failures, so EXPIRE's EXPIRED, the storage path's INVALIDATED and its DENIED records (attempts one to three) all fail and the restart's RESTARTED record (the fourth) is written",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "after": 0,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {},
+    {},
+    {
+     "denied": [
+      1
+     ]
+    },
+    {
+     "restartState": "HELD"
+    },
+    {
+     "denied": [],
+     "drain": "HELD"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "sealed": false,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "HELD"
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L02b",
+   "intent": "Queue order (model-defined): with STORAGE_FAIL_AFTER {after: 3} behind two NEXT failures the countdown runs through the failed attempts, so the DENIED record (attempt three) is written and the RESTARTED record (attempt four) fails",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "after": 3,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {},
+    {},
+    {
+     "denied": [
+      1
+     ]
+    },
+    {
+     "restartState": "HELD"
+    },
+    {
+     "denied": [],
+     "drain": "HELD"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "sealed": false,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "DENIED",
+      1
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "HELD"
+     ]
+    ],
+    "state": "HELD"
+   }
+  },
+  {
+   "id": "R10-L03",
+   "intent": "E14: after a clean close, an orderly channel end and a restart (CLOSED), EXPIRE journals EXPIRED for the bound, unexpired execution, and a drain is answered OPEN at once",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+     "conn": "c1",
+     "httpStatus": 201,
+     "resourceVersion": "41",
+     "type": "UPSTREAM_RESPONSE",
+     "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "type": "CHANNEL_LOST"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {
+     "actionId": 1,
+     "decision": "FORWARD"
+    },
+    {
+     "classification": "DELIVERED_RESULT",
+     "relayed": true
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "httpStatus": 201,
+      "observedResourceVersion": "41",
+      "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+      "result": "OK",
+      "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "result": "OK",
+      "state": "CLOSED"
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 1,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:b6a230a082c102ce0c31c2d32b3f45a82568bd095b1a571898518da6c518fce9",
+      "result": "OK",
+      "state": "CLOSED"
+     }
+    },
+    {
+     "channelEnd": "ORDERLY"
+    },
+    {
+     "restartState": "CLOSED"
+    },
+    {
+     "denied": []
+    },
+    {
+     "denied": []
+    },
+    {
+     "denied": [],
+     "drain": "OPEN"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "sealed": true,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "CLOSED",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 1,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "CONSUMED",
+      1
+     ],
+     [
+      "TERMINAL",
+      1,
+      "DELIVERED_RESULT",
+      false,
+      {
+       "httpStatus": 201,
+       "observedResourceVersion": "41",
+       "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+       "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+     ],
+     [
+      "SEALED",
+      1,
+      "DELIVERED_RESULT",
+      false
+     ],
+     [
+      "CLOSED",
+      "NORMAL_DRAIN",
+      "CLOSED"
+     ],
+     [
+      "CHANNEL_ENDED",
+      "ORDERLY"
+     ],
+     [
+      "RESTARTED",
+      "CLOSED"
+     ],
+     [
+      "EXPIRED",
+      "1111111111111111111111111111111111111111111111111111111111111111"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ]
+    ],
+    "state": "CLOSED"
+   }
+  },
+  {
+   "id": "R10-L03b",
+   "intent": "E14: a restart with an armed, unsealed action restarts HELD (the action rebuilt NOT_FORWARDED); EXPIRE then journals EXPIRED and denies nothing",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {
+     "restartState": "HELD"
+    },
+    {
+     "denied": []
+    },
+    {
+     "denied": [],
+     "drain": "HELD"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "NOT_FORWARDED",
+      "sealed": false,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ],
+     [
+      "EXPIRED",
+      "1111111111111111111111111111111111111111111111111111111111111111"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "HELD"
+     ]
+    ],
+    "state": "HELD"
+   }
+  }
+ ],
+ "byteFrames": [
+  {
+   "id": "R10-B01",
+   "intent": "canonical base frame (a broker GENERATION_STATUS)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfQ==",
+   "expect": null
+  },
+  {
+   "id": "R10-B02",
+   "intent": "a 20-deep canonical array: depth is checked after the canonical comparison (F01)",
+   "base64": "W1tbW1tbW1tbW1tbW1tbW1tbW1tdXV1dXV1dXV1dXV1dXV1dXV1dXQ==",
+   "expect": "F01 frame deeper than 16"
+  },
+  {
+   "id": "R10-B03",
+   "intent": "the same array with one space: not canonical before any depth check (F06)",
+   "base64": "W1tbW1tbW1tbWyBbW1tbW1tbW1tbXV1dXV1dXV1dXV1dXV1dXV1dXV0=",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B04",
+   "intent": "integer -0 decodes to 0 and re-encodes as 0 (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjotMH0=",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B05",
+   "intent": "float 1.5 is its own repr, passes the canonical comparison, then is refused as a float (F03)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxLjV9",
+   "expect": "F03 frame contains a non-integer number"
+  },
+  {
+   "id": "R10-B06",
+   "intent": "float 1e+16 is its own repr (F03)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxZSsxNn0=",
+   "expect": "F03 frame contains a non-integer number"
+  },
+  {
+   "id": "R10-B07",
+   "intent": "float -0.0 is its own repr (F03)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjotMC4wfQ==",
+   "expect": "F03 frame contains a non-integer number"
+  },
+  {
+   "id": "R10-B08",
+   "intent": "float 100.0 is its own repr (F03)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxMDAuMH0=",
+   "expect": "F03 frame contains a non-integer number"
+  },
+  {
+   "id": "R10-B09",
+   "intent": "float 1E5 re-encodes as 100000.0 (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxRTV9",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B10",
+   "intent": "float 1e16 re-encodes as 1e+16 (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxZTE2fQ==",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B11",
+   "intent": "float 1e400 is infinite and has no encoding (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxZTQwMH0=",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B12",
+   "intent": "float 1.0e+16 re-encodes as 1e+16 (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxLjBlKzE2fQ==",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B13",
+   "intent": "a 20-digit integer is exact and canonical; its bound is the schema's (F00)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxMjM0NTY3ODkwMTIzNDU2Nzg5MH0=",
+   "expect": "F00 frame outside the closed schema"
+  },
+  {
+   "id": "R10-B14",
+   "intent": "an integer of 4300 digits is exact and canonical; the schema refuses it (F00)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjo5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5fQ==",
+   "expect": "F00 frame outside the closed schema"
+  },
+  {
+   "id": "R10-B15",
+   "intent": "an integer of 4301 digits exceeds the decoder's digit limit (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjo5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OX0=",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B16",
+   "intent": "a duplicate whose second value is NaN: the constant is refused before the object closes (F03)",
+   "base64": "eyJhIjoxLCJhIjpOYU59",
+   "expect": "F03 frame contains a non-integer number"
+  },
+  {
+   "id": "R10-B17",
+   "intent": "a duplicate key beats the non-canonical escape (F05)",
+   "base64": "eyJhIjoiXHUwMDQxIiwiYSI6MX0=",
+   "expect": "F05 duplicate key"
+  },
+  {
+   "id": "R10-B18",
+   "intent": "a duplicate key inside an object nested 18 deep: found when the object closes, before any depth check (F05)",
+   "base64": "W1tbW1tbW1tbW1tbW1tbW1t7ImEiOjEsImEiOjJ9XV1dXV1dXV1dXV1dXV1dXV0=",
+   "expect": "F05 duplicate key"
+  },
+  {
+   "id": "R10-B19",
+   "intent": "duplicate lone-surrogate keys are still duplicates (F05)",
+   "base64": "eyJcdWQ4MDAiOjEsIlx1ZDgwMCI6Mn0=",
+   "expect": "F05 duplicate key"
+  },
+  {
+   "id": "R10-B20",
+   "intent": "a lone surrogate has no UTF-8 encoding (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY1x1ZDgwMGNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLCJkaXJlY3Rpb24iOiJCUk9LRVJfVE9fR0FURSIsImdlbmVyYXRpb24iOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwib3BlcmF0aW9uIjoiR0VORVJBVElPTl9TVEFUVVMiLCJwYXlsb2FkIjp7fSwicHJldmlvdXNEaWdlc3QiOiJzaGEyNTY6MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInNjaGVtYVZlcnNpb24iOiJwbGFuZW9uLmludGVybmFsLmVmZmVjdC1nYXRlLWZyYW1lL3YzIiwic2VxdWVuY2UiOjF9",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B21",
+   "intent": "raw DEL in a string is canonical (DEL is not escaped) and then a control character (F04)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY39jY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfQ==",
+   "expect": "F04 frame string contains a control character"
+  },
+  {
+   "id": "R10-B22",
+   "intent": "an escaped \\u007f re-encodes as raw DEL (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY1x1MDA3ZmNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLCJkaXJlY3Rpb24iOiJCUk9LRVJfVE9fR0FURSIsImdlbmVyYXRpb24iOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwib3BlcmF0aW9uIjoiR0VORVJBVElPTl9TVEFUVVMiLCJwYXlsb2FkIjp7fSwicHJldmlvdXNEaWdlc3QiOiJzaGEyNTY6MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInNjaGVtYVZlcnNpb24iOiJwbGFuZW9uLmludGVybmFsLmVmZmVjdC1nYXRlLWZyYW1lL3YzIiwic2VxdWVuY2UiOjF9",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B23",
+   "intent": "an escaped \\n is canonical and then a control character (F04)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY1xuY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYyIsImRpcmVjdGlvbiI6IkJST0tFUl9UT19HQVRFIiwiZ2VuZXJhdGlvbiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJvcGVyYXRpb24iOiJHRU5FUkFUSU9OX1NUQVRVUyIsInBheWxvYWQiOnt9LCJwcmV2aW91c0RpZ2VzdCI6InNoYTI1NjowMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic2NoZW1hVmVyc2lvbiI6InBsYW5lb24uaW50ZXJuYWwuZWZmZWN0LWdhdGUtZnJhbWUvdjMiLCJzZXF1ZW5jZSI6MX0=",
+   "expect": "F04 frame string contains a control character"
+  },
+  {
+   "id": "R10-B24",
+   "intent": "\\u000a re-encodes as \\n (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY1x1MDAwYWNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLCJkaXJlY3Rpb24iOiJCUk9LRVJfVE9fR0FURSIsImdlbmVyYXRpb24iOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwib3BlcmF0aW9uIjoiR0VORVJBVElPTl9TVEFUVVMiLCJwYXlsb2FkIjp7fSwicHJldmlvdXNEaWdlc3QiOiJzaGEyNTY6MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInNjaGVtYVZlcnNpb24iOiJwbGFuZW9uLmludGVybmFsLmVmZmVjdC1nYXRlLWZyYW1lL3YzIiwic2VxdWVuY2UiOjF9",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B25",
+   "intent": "a raw line feed inside a string is a decode error (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYwpjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfQ==",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B26",
+   "intent": "a raw 0x1f inside a string is a decode error (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYx9jY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfQ==",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B27",
+   "intent": "keys U+FF01 then U+1F600 are in code-point order: canonical, then outside the schema (F00)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6eyLvvIEiOjEsIvCfmIAiOjJ9LCJwcmV2aW91c0RpZ2VzdCI6InNoYTI1NjowMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic2NoZW1hVmVyc2lvbiI6InBsYW5lb24uaW50ZXJuYWwuZWZmZWN0LWdhdGUtZnJhbWUvdjMiLCJzZXF1ZW5jZSI6MX0=",
+   "expect": "F00 frame outside the closed schema"
+  },
+  {
+   "id": "R10-B28",
+   "intent": "keys U+1F600 then U+FF01 (RFC 8785's UTF-16 order) are not canonical here (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6eyLwn5iAIjoyLCLvvIEiOjF9LCJwcmV2aW91c0RpZ2VzdCI6InNoYTI1NjowMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic2NoZW1hVmVyc2lvbiI6InBsYW5lb24uaW50ZXJuYWwuZWZmZWN0LWdhdGUtZnJhbWUvdjMiLCJzZXF1ZW5jZSI6MX0=",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B29",
+   "intent": "a UTF-8 byte-order mark before the frame (F06)",
+   "base64": "77u/eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfQ==",
+   "expect": "F06 frame is not canonical JSON"
+  },
+  {
+   "id": "R10-B30",
+   "intent": "whitespace after the frame (F06)",
+   "base64": "eyJjaGFsbGVuZ2UiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwiZGlyZWN0aW9uIjoiQlJPS0VSX1RPX0dBVEUiLCJnZW5lcmF0aW9uIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm9wZXJhdGlvbiI6IkdFTkVSQVRJT05fU1RBVFVTIiwicGF5bG9hZCI6e30sInByZXZpb3VzRGlnZXN0Ijoic2hhMjU2OjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJzY2hlbWFWZXJzaW9uIjoicGxhbmVvbi5pbnRlcm5hbC5lZmZlY3QtZ2F0ZS1mcmFtZS92MyIsInNlcXVlbmNlIjoxfSA=",
+   "expect": "F06 frame is not canonical JSON"
+  }
+ ],
+ "agreement": [
+  {
+   "id": "R10-B31",
+   "intent": "agreement mode allows whitespace between tokens",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIiA6ICJ2MSIgLAogImtpbmQiIDogIlBvZCIgLAogIm1ldGFkYXRhIiA6IHsibmFtZXNwYWNlIiA6ICJwbGFuZW9uLXF1YWwiICwKICJuYW1lIiA6ICJwcm9iZS1wb2QiICwKICJ1aWQiIDogIjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIgLAogInJlc291cmNlVmVyc2lvbiIgOiAiNDEifX0=",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  },
+  {
+   "id": "R10-B32",
+   "intent": "agreement mode allows floats in the object",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sInNwZWMiOnsicmF0aW8iOjAuNSwiYmlnIjoxZTQwMH19",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  },
+  {
+   "id": "R10-B33",
+   "intent": "non-zero trailing bits in the last base64 quantum are accepted (as QR== decodes to A)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sInBhZCI6InAifV==",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  },
+  {
+   "id": "R10-B34",
+   "intent": "missing base64 padding is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sInBhZCI6InAifQ",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B35",
+   "intent": "text after the base64 padding is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sInBhZCI6InAifQ==QQ==",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B36",
+   "intent": "a duplicate key in the object is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sImtpbmQiOiJQb2QifQ==",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B37",
+   "intent": "NaN in the object is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sIngiOk5hTn0=",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B38",
+   "intent": "an object nested exactly 16 deep is accepted",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6e319fX19fX19fX19fX19fSwiYXBpVmVyc2lvbiI6InYxIiwia2luZCI6IlBvZCIsIm1ldGFkYXRhIjp7Im5hbWVzcGFjZSI6InBsYW5lb24tcXVhbCIsIm5hbWUiOiJwcm9iZS1wb2QiLCJ1aWQiOiIxMTExMTExMS1hYWFhLTRiYmItOGNjYy0wMDAwMDAwMDAwMDEiLCJyZXNvdXJjZVZlcnNpb24iOiI0MSJ9fQ==",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  },
+  {
+   "id": "R10-B39",
+   "intent": "an object nested 17 deep is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7IngiOnsieCI6eyJ4Ijp7fX19fX19fX19fX19fX19fSwiYXBpVmVyc2lvbiI6InYxIiwia2luZCI6IlBvZCIsIm1ldGFkYXRhIjp7Im5hbWVzcGFjZSI6InBsYW5lb24tcXVhbCIsIm5hbWUiOiJwcm9iZS1wb2QiLCJ1aWQiOiIxMTExMTExMS1hYWFhLTRiYmItOGNjYy0wMDAwMDAwMDAwMDEiLCJyZXNvdXJjZVZlcnNpb24iOiI0MSJ9fQ==",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B40",
+   "intent": "a top-level array is no object (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "W3siYXBpVmVyc2lvbiI6InYxIiwia2luZCI6IlBvZCIsIm1ldGFkYXRhIjp7Im5hbWVzcGFjZSI6InBsYW5lb24tcXVhbCIsIm5hbWUiOiJwcm9iZS1wb2QiLCJ1aWQiOiIxMTExMTExMS1hYWFhLTRiYmItOGNjYy0wMDAwMDAwMDAwMDEiLCJyZXNvdXJjZVZlcnNpb24iOiI0MSJ9fV0=",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B41",
+   "intent": "an integer of 4301 digits is refused (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sIm4iOjc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3fQ==",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B42",
+   "intent": "a lone-surrogate escape is accepted in agreement mode (there is no encode step)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn0sIm5vdGUiOiJcdWQ4MDAifQ==",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  },
+  {
+   "id": "R10-B43",
+   "intent": "objectBase64 with a non-ASCII character is no object (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn19\u00e9",
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B44",
+   "intent": "objectBase64 that is not a string is no object (M05)",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": 1,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": 7,
+    "outcome": "CREATED"
+   },
+   "expect": "M05 reported object missing or not strictly decodable"
+  },
+  {
+   "id": "R10-B45",
+   "intent": "Python equality: httpStatus 201.0 selects the 201 row and actionId true equals 1",
+   "verb": "CREATE",
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "name": "probe-pod",
+    "namespace": "planeon-qual"
+   },
+   "outcome": {
+    "actionId": true,
+    "admittedBeforeInvalidation": false,
+    "classification": "DELIVERED_RESULT",
+    "httpStatus": 201.0,
+    "observedResourceVersion": "41",
+    "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+    "result": "OK",
+    "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+   },
+   "resourceResult": {
+    "actionId": 1,
+    "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJraW5kIjoiUG9kIiwibWV0YWRhdGEiOnsibmFtZXNwYWNlIjoicGxhbmVvbi1xdWFsIiwibmFtZSI6InByb2JlLXBvZCIsInVpZCI6IjExMTExMTExLWFhYWEtNGJiYi04Y2NjLTAwMDAwMDAwMDAwMSIsInJlc291cmNlVmVyc2lvbiI6IjQxIn19",
+    "outcome": "CREATED"
+   },
+   "expect": null
+  }
+ ]
+}

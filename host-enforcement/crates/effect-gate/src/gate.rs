@@ -1411,3 +1411,160 @@ impl Gate {
         reply(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use i05_protocol::json::{self, JStr, Object};
+
+    const VECTORS: &str = include_str!("../../../contracts/i05-v3/vectors.json");
+
+    fn active_gate() -> Gate {
+        let vectors = json::parse(VECTORS).unwrap_or(Value::Null);
+        let config = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null);
+        match Config::from_value(&config).map(Gate::new) {
+            Ok(Ok(gate)) => gate,
+            _ => panic!("the ACTIVE configuration builds a gate"),
+        }
+    }
+
+    fn broker_frame(gate: &Gate, sequence: i64, operation: &str, payload: Value) -> Value {
+        let mut frame = Object::new();
+        for (key, value) in [
+            ("schemaVersion", Value::str(FRAME_VERSION)),
+            ("generation", Value::str(&"a".repeat(64))),
+            ("challenge", Value::str(&"c".repeat(64))),
+            ("sequence", Value::int(sequence)),
+            ("previousDigest", Value::str(gate.last_digest())),
+            ("direction", Value::str("BROKER_TO_GATE")),
+            ("operation", Value::str(operation)),
+            ("payload", payload),
+        ] {
+            frame.insert(JStr::new(key), value);
+        }
+        Value::Object(frame)
+    }
+
+    fn status(gate: &mut Gate) -> Output {
+        let frame = broker_frame(gate, gate.next_sequence(), "GENERATION_STATUS", Value::Object(Object::new()));
+        gate.handle(Event::Frame(FrameInput::Value(frame))).unwrap_or_else(|error| panic!("{error:?}"))
+    }
+
+    fn last_record(gate: &Gate) -> Option<&Record> {
+        match gate.journal().last() {
+            Some(Entry::Record(record)) => Some(record),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn a_response_past_the_sequence_bound_closes_fatally() {
+        let mut gate = active_gate();
+        assert!(matches!(status(&mut gate).kind, OutputKind::Response(_)));
+        // The broker's frame may carry 2147483647, the schema maximum; the response would carry 2147483648.
+        gate.next_sequence = 2147483647;
+        let output = status(&mut gate);
+        assert_eq!(output.kind, OutputKind::Fatal(FatalReason::ResponseOutOfBounds));
+        assert_eq!(output.to_doc().canonical(), b"{\"fatal\":\"RESPONSE_OUT_OF_BOUNDS\"}");
+        assert_eq!(gate.state(), State::Held);
+        assert_eq!(last_record(&gate), Some(&Record::Invalidated {
+            reason: Invalidation::Fatal(FatalReason::ResponseOutOfBounds),
+            state: State::Held,
+        }));
+        assert!(matches!(status(&mut gate).kind, OutputKind::RefusedChannel(ChannelRefusal::GenerationChannelUsed)));
+    }
+
+    #[test]
+    fn a_counter_past_its_bound_closes_fatally() {
+        let mut gate = active_gate();
+        assert!(matches!(status(&mut gate).kind, OutputKind::Response(_)));
+        gate.counters.stamps_issued = 2147483648;
+        assert_eq!(status(&mut gate).kind, OutputKind::Fatal(FatalReason::ResponseOutOfBounds));
+        assert_eq!(gate.state(), State::Held);
+    }
+
+    #[test]
+    fn counters_saturate_instead_of_overflowing() {
+        let mut gate = active_gate();
+        gate.counters.flush_closures = u64::MAX;
+        gate.backlog.push("c1".to_string());
+        assert!(gate.handle(Event::Accept { conn: "c1".into() }).is_ok());
+        gate.close_connections(|_| true);
+        assert_eq!(gate.counters.flush_closures, u64::MAX);
+        assert_eq!(count_doc(u64::MAX), Doc::Int(i64::MAX));
+    }
+
+    #[test]
+    fn events_outside_the_preconditions_change_nothing() {
+        let mut gate = active_gate();
+        let before = gate.snapshot();
+        let refused = [
+            Event::Accept { conn: "c9".into() },
+            Event::Request { conn: "c9".into(), certificate_digest: String::new(), head: String::new(), body_digest: None },
+            Event::UpstreamResponse {
+                conn: "c9".into(),
+                response: UpstreamResponse { http_status: 200, body_digest: String::new(), uid: None, resource_version: None },
+            },
+            Event::UpstreamLost { conn: "c9".into() },
+            Event::UpstreamTimeout { conn: "c9".into() },
+            Event::SecondChannel,
+        ];
+        for event in refused {
+            assert!(gate.handle(event).is_err());
+            assert_eq!(gate.snapshot(), before);
+        }
+    }
+
+    #[test]
+    fn the_bytes_entry_refuses_with_the_decoder_codes() {
+        let mut gate = active_gate();
+        assert_eq!(gate.handle(Event::Frame(FrameInput::NotBytes)).map(|output| output.kind),
+                   Ok(OutputKind::Fatal(FatalReason::InvalidFrame(FrameError::F07))));
+        let mut gate = active_gate();
+        let frame = broker_frame(&gate, 1, "GENERATION_STATUS", Value::Object(Object::new()));
+        let mut raw = json::canonical(&frame).unwrap_or_default();
+        raw.push(b'\n');
+        assert_eq!(gate.handle(Event::Frame(FrameInput::Bytes(raw))).map(|output| output.kind),
+                   Ok(OutputKind::Fatal(FatalReason::InvalidFrame(FrameError::F06))));
+        assert_eq!(last_record(&gate), Some(&Record::Invalidated {
+            reason: Invalidation::Fatal(FatalReason::InvalidFrame(FrameError::F06)),
+            state: State::Held,
+        }));
+    }
+
+    #[test]
+    fn the_response_frame_is_canonical_and_chains() {
+        let mut gate = active_gate();
+        let frame = broker_frame(&gate, 1, "GENERATION_STATUS", Value::Object(Object::new()));
+        let raw = json::canonical(&frame).unwrap_or_default();
+        let output = gate.handle(Event::Frame(FrameInput::Bytes(raw.clone()))).unwrap_or_else(|error| panic!("{error:?}"));
+        let response = output.response_frame.unwrap_or_default();
+        let decoded = decode_frame(Datagram::Bytes(&response), &gate.schema);
+        assert!(decoded.is_ok(), "the gate's response is a valid v3 frame");
+        let decoded = decoded.unwrap_or(Value::Null);
+        assert_eq!(decoded.get("previousDigest").and_then(Value::as_str), Some(sha256::prefixed(&raw).as_str()));
+        assert_eq!(decoded.get("sequence").and_then(Value::as_int).and_then(|int| int.to_i64()), Some(2));
+        assert_eq!(gate.last_digest(), sha256::prefixed(&response));
+        assert_eq!(gate.next_sequence(), 3);
+    }
+
+    #[test]
+    fn a_rebuild_that_meets_an_unknown_action_restarts_held() {
+        let mut gate = active_gate();
+        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.rebuild(), State::Closed);
+        assert!(gate.journal.attempt(Record::Consumed { action_id: 9 }));
+        assert_eq!(gate.rebuild(), State::Held);
+    }
+
+    #[test]
+    fn the_drain_answer_rides_on_the_settling_event() {
+        let mut gate = active_gate();
+        assert!(matches!(status(&mut gate).kind, OutputKind::Response(_)));
+        let drain = gate.handle(Event::DrainRequest).unwrap_or_else(|error| panic!("{error:?}"));
+        // From ACTIVE with nothing in flight the drain closes the generation and settles at once.
+        assert_eq!(drain.to_doc().canonical(), b"{\"denied\":[],\"drain\":\"OPEN\"}");
+        assert_eq!(gate.state(), State::Closed);
+        assert_eq!(gate.fence(), DrainAnswer::Open);
+    }
+}
