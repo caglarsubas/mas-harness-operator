@@ -6,7 +6,7 @@
   "hostNote": "Darwin-only: the owner-operated verifier runs on macOS; this pin changes with Linux qualification.",
   "sysroot": "/opt/planeon/toolchains/rust-1.99.0",
   "linkerWrapper": "host-enforcement/tools/rust-lld",
-  "linkerWrapperReason": "rust-lld finds libLLVM.dylib through DYLD_FALLBACK_LIBRARY_PATH, which cargo's [env] cannot pass; the wrapper sets it to <sysroot>/lib and execs <sysroot>/lib/rustlib/aarch64-apple-darwin/bin/rust-lld.",
+  "linkerWrapperReason": "rust-lld finds libLLVM.dylib through DYLD_FALLBACK_LIBRARY_PATH, which did not reach the linker when set through cargo's [env] in the local simulation; the wrapper sets it to <sysroot>/lib and execs <sysroot>/lib/rustlib/aarch64-apple-darwin/bin/rust-lld.",
   "targets": {
     "x86_64-unknown-linux-musl": {
       "shape": "static-pie",
@@ -14,7 +14,7 @@
     },
     "aarch64-unknown-linux-musl": {
       "shape": "static",
-      "reason": "The target spec at 1.99.0 has no static-pie default, so +crt-static links a static ET_EXEC without PT_DYNAMIC (confirmed by the local link). Owner decision D3 (a), 2026-10-11: accept and record this shape, checked per target by the gate; forcing static-pie is left to a later packet."
+      "reason": "The target spec at 1.99.0 has no static-pie default, so +crt-static links a static ET_EXEC without PT_DYNAMIC (confirmed by the local link). The executable image is therefore not randomised. Owner decision D3 (a) on design-review finding D3, relayed by the lane monitor on 2026-10-11: accept and record this shape, checked per target by the gate; forcing static-pie is left to a later packet."
     }
   },
   "commandLineTools": {

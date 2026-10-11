@@ -12,13 +12,20 @@ import os
 import struct
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
 import gate
 
 X86, ARM = "x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"
-COMMENT = b"Linker: LLD 23.1.1\0rustc version 1.99.0 (b940084d7 2026-09-28)\0"
+COMMENT = b"Linker: LLD 23.1.1 (https://example.invalid/llvm 0)\0rustc version 1.99.0 (b940084d7 2026-09-28)\0"
+PIN = {"rustc": {"release": "1.99.0", "commit": "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4", "llvm": "23.1.1"},
+       "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)", "host": "aarch64-apple-darwin", "sysroot": "/sys-root",
+       "linkerWrapper": "host-enforcement/tools/rust-lld",
+       "targets": {X86: {"shape": "static-pie"}, ARM: {"shape": "static"}},
+       "commandLineTools": {"clang": "Apple clang version 14.0.3 (clang-1403.0.22.14.1)", "sdk": "13.3"}}
+MARKERS = gate.comment_markers(PIN)
 
 
 def build_elf(*, e_type=gate.ET_DYN, machine=62, loads=(5, 6), stack=6, interp=False, relro=True,
@@ -89,13 +96,13 @@ def static_elf(**changes):
 class BinaryShapeTests(unittest.TestCase):
     def assertRefused(self, raw, message, target=X86, shape="static-pie"):
         with self.assertRaisesRegex(gate.GateError, message):
-            gate.check_binary(raw, target, shape)
+            gate.check_binary(raw, target, shape, MARKERS)
 
     def test_good_shapes_pass(self):
-        gate.check_binary(build_elf(), X86, "static-pie")
-        gate.check_binary(build_elf(machine=183, rela=(1027,)), ARM, "static-pie")
-        gate.check_binary(build_elf(rela=()), X86, "static-pie")
-        gate.check_binary(static_elf(), ARM, "static")
+        gate.check_binary(build_elf(), X86, "static-pie", MARKERS)
+        gate.check_binary(build_elf(machine=183, rela=(1027,)), ARM, "static-pie", MARKERS)
+        gate.check_binary(build_elf(rela=()), X86, "static-pie", MARKERS)
+        gate.check_binary(static_elf(), ARM, "static", MARKERS)
 
     def test_not_elf64(self):
         self.assertRefused(b"\x7fELF" + b"\1" * 60, "ELF64")
@@ -139,20 +146,26 @@ class BinaryShapeTests(unittest.TestCase):
 
     def test_comment(self):
         self.assertRefused(build_elf(comment=None), ".comment missing")
-        self.assertRefused(build_elf(comment=b"Linker: LLD 23.1.1\0"), "rustc version 1.99.0")
-        self.assertRefused(build_elf(comment=b"rustc version 1.98.0 (aaaaaaaaa 2026-08-01)\0Linker: LLD 23\0"), "rustc")
-        self.assertRefused(build_elf(comment=b"rustc version 1.99.0 (b940084d7 2026-09-28)\0GCC: (GNU) 13\0"), "LLD")
+        rustc = b"rustc version 1.99.0 (b940084d7 2026-09-28)\0"
+        self.assertRefused(build_elf(comment=b"Linker: LLD 23.1.1 (x)\0"), "rustc version 1.99.0")
+        self.assertRefused(build_elf(comment=b"rustc version 1.98.0 (aaaaaaaaa 2026-08-01)\0Linker: LLD 23.1.1 (x)\0"),
+                           "rustc")
+        self.assertRefused(build_elf(comment=b"rustc version 1.99.0 (b940084d8 2026-09-28)\0Linker: LLD 23.1.1 (x)\0"),
+                           "rustc")
+        self.assertRefused(build_elf(comment=rustc + b"GCC: (GNU) 13\0"), "LLD")
+        for linker in (b"Linker: LLD 22.1.8 (x)", b"Linker: LLD 23.1.10 (x)", b"Linker: LLD 23.1.1"):
+            self.assertRefused(build_elf(comment=rustc + linker + b"\0"), "LLD 23.1.1")
 
     def test_host_paths(self):
         for needle in (b"/Users/someone/src", b"/opt/planeon/toolchains", b"/private/tmp/x", b"/private/var/folders"):
             self.assertRefused(build_elf(payload=needle), "build-host path")
         with self.assertRaisesRegex(gate.GateError, "build-host path"):
-            gate.check_binary(build_elf(payload=b"/srv/checkout/x"), X86, "static-pie", (b"/srv/checkout",))
+            gate.check_binary(build_elf(payload=b"/srv/checkout/x"), X86, "static-pie", MARKERS, (b"/srv/checkout",))
 
     def test_truncated_file_fails(self):
         raw = build_elf()
         with self.assertRaises(Exception):
-            gate.check_binary(raw[:200], X86, "static-pie")
+            gate.check_binary(raw[:200], X86, "static-pie", MARKERS)
 
 
 class CrtObjectTests(unittest.TestCase):
@@ -253,6 +266,8 @@ class TableTests(unittest.TestCase):
         names = sorted(component["name"] for component in document["components"])
         self.assertEqual(names, ["c-lib/liba.rlib", "c-lib/self-contained/libc.a", "host-common", "planeon-gate"])
         self.assertNotEqual(first, gate.sbom("planeon-gate", X86, "cd" * 32, rows, {"host-common", "planeon-gate"}))
+        serial = uuid.UUID(document["serialNumber"])
+        self.assertEqual((document["serialNumber"][:9], serial.version, serial.variant), ("urn:uuid:", 5, uuid.RFC_4122))
 
 
 class WorkspaceAndSourceTests(unittest.TestCase):
@@ -283,9 +298,10 @@ class WorkspaceAndSourceTests(unittest.TestCase):
         (self.base / "crates/b/Cargo.toml").write_text('[package]\nname = "b"\nbuild = "gen.rs"\n')
         with self.assertRaisesRegex(gate.GateError, "build script"):
             gate.check_workspace(self.base)
-        (self.base / "crates/b/Cargo.toml").write_text('[package]\nname = "b"\n\n[lib]\nproc-macro = true\n')
-        with self.assertRaisesRegex(gate.GateError, "proc-macro"):
-            gate.check_workspace(self.base)
+        for spelling in ("proc-macro", "proc_macro"):
+            (self.base / "crates/b/Cargo.toml").write_text('[package]\nname = "b"\n\n[lib]\n%s = true\n' % spelling)
+            with self.assertRaisesRegex(gate.GateError, "proc-macro"):
+                gate.check_workspace(self.base)
 
     def test_lock(self):
         self.lock('[[package]]\nname = "a"\nversion = "0.1.0"\n')
@@ -305,17 +321,17 @@ class WorkspaceAndSourceTests(unittest.TestCase):
         (self.base / "target/debug").mkdir(parents=True)
         (self.base / "target/debug/generated.rs").write_text("std::thread::available_parallelism()\n")
         self.assertEqual(gate.check_sources(self.base), 2)
+        nested = self.base / "crates/a/src/target/mod.rs"   # a module named target is still workspace source
+        nested.parent.mkdir()
+        nested.write_text("pub fn f() -> usize { std::thread::available_parallelism().map_or(1, |n| n.get()) }\n")
+        with self.assertRaisesRegex(gate.GateError, "crates/a/src/target/mod.rs uses available_parallelism"):
+            gate.check_sources(self.base)
+        nested.unlink()
         main = self.base / "crates/a/src/main.rs"
         for token in gate.FORBIDDEN_SOURCE:
             main.write_text("fn main() { let _ = %s; }\n" % token)
             with self.assertRaisesRegex(gate.GateError, "start-up lint"):
                 gate.check_sources(self.base)
-
-
-PIN = {"rustc": {"release": "1.99.0", "commit": "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"},
-       "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)", "host": "aarch64-apple-darwin", "sysroot": "/sys-root",
-       "targets": {X86: {"shape": "static-pie"}, ARM: {"shape": "static"}},
-       "commandLineTools": {"clang": "Apple clang version 14.0.3 (clang-1403.0.22.14.1)", "sdk": "13.3"}}
 
 
 class ToolchainTests(unittest.TestCase):
@@ -330,7 +346,8 @@ class ToolchainTests(unittest.TestCase):
         self.pin["commandLineTools"]["path"] = str(tools)
         self.answers = {
             "rustc -vV": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: "
-                         "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\nhost: aarch64-apple-darwin\nrelease: 1.99.0\n",
+                         "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\nhost: aarch64-apple-darwin\nrelease: 1.99.0\n"
+                         "LLVM version: 23.1.1\n",
             "cargo -V": "cargo 1.99.0 (5f94df478 2026-08-27)\n", "rustc --print sysroot": "/sys-root\n",
             "rustc --print target-libdir --target " + X86: "/sys-root/lib/rustlib/%s/lib\n" % X86,
             "rustc --print target-libdir --target " + ARM: "/sys-root/lib/rustlib/%s/lib\n" % ARM,
@@ -350,6 +367,7 @@ class ToolchainTests(unittest.TestCase):
 
     def test_rustc_cargo_and_sysroot_mismatch_fail(self):
         for key, value in (("rustc -vV", self.answers["rustc -vV"].replace("b940084d7eb6", "0000084d7eb6")),
+                           ("rustc -vV", self.answers["rustc -vV"].replace("LLVM version: 23.1.1", "LLVM version: 23.1.2")),
                            ("cargo -V", "cargo 1.99.1 (aaaaaaaaa 2026-09-01)\n"),
                            ("rustc --print sysroot", "/elsewhere\n"),
                            ("rustc --print target-libdir --target " + ARM, "/elsewhere/lib\n")):
@@ -364,6 +382,54 @@ class ToolchainTests(unittest.TestCase):
         os.unlink(Path(self.pin["commandLineTools"]["path"]) / "usr/bin/clang")
         with self.assertRaisesRegex(gate.GateError, "Command Line Tools are missing"):
             self.check()
+
+
+WRAPPER = ("#!/bin/sh\n# comment\nDYLD_FALLBACK_LIBRARY_PATH=/sys-root/lib\nexport DYLD_FALLBACK_LIBRARY_PATH\n"
+           'exec /sys-root/lib/rustlib/aarch64-apple-darwin/bin/rust-lld "$@"\n')
+CONFIG = ('[net]\noffline = true\n\n' + "".join(
+    '[target.%s]\nlinker = "host-enforcement/tools/rust-lld"\n'
+    'rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]\n\n' % target for target in (X86, ARM)))
+
+
+class LinkerTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        (self.root / ".cargo").mkdir()
+        (self.root / "host-enforcement/tools").mkdir(parents=True)
+        self.write(CONFIG, WRAPPER)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def write(self, config, wrapper):
+        (self.root / ".cargo/config.toml").write_text(config)
+        (self.root / "host-enforcement/tools/rust-lld").write_text(wrapper)
+
+    def test_pinned_linker_passes(self):
+        gate.check_linker(PIN, self.root)
+
+    def test_cargo_config_mutations_fail(self):
+        for config in (CONFIG.replace("offline = true", "offline = false"),
+                       CONFIG.replace('linker = "host-enforcement/tools/rust-lld"', 'linker = "rust-lld"', 1),
+                       CONFIG.replace(', "-C", "target-feature=+crt-static"', "", 1),
+                       CONFIG.replace("link-self-contained=yes", "link-self-contained=no", 1),
+                       CONFIG + '[target.x86_64-unknown-linux-gnu]\nlinker = "cc"\n',
+                       CONFIG.replace("[net]\noffline = true\n", "")):
+            self.write(config, WRAPPER)
+            with self.assertRaisesRegex(gate.GateError, "cargo config"):
+                gate.check_linker(PIN, self.root)
+
+    def test_wrapper_mutations_fail(self):
+        for wrapper in (WRAPPER.replace("exec /sys-root/", "exec /old-root/"),
+                        WRAPPER.replace("rustlib/aarch64-apple-darwin/bin", "rustlib/x86_64-apple-darwin/bin"),
+                        WRAPPER.replace("PATH=/sys-root/lib", "PATH=/old-root/lib"),
+                        WRAPPER.replace("export DYLD_FALLBACK_LIBRARY_PATH\n", ""),
+                        WRAPPER + "touch /tmp/x\n",
+                        WRAPPER.replace('"$@"', '"$@" --extra')):
+            self.write(CONFIG, wrapper)
+            with self.assertRaisesRegex(gate.GateError, "linker wrapper"):
+                gate.check_linker(PIN, self.root)
 
 
 class OutputPrefixTests(unittest.TestCase):

@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tomllib
 import unittest
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,7 +24,7 @@ PREFIX = "he-gate: "
 VERSION = "0.1.0"
 BINARIES = ("planeon-containment", "planeon-broker", "planeon-observer", "planeon-gate", "planeon-writer")
 TABLE = HE / "licenses/closure-1.99.0.json"
-TABLE_SHA256 = "18d966989598cf23902d90f833dffbce732ad1822254983ef74eab3233a86300"
+TABLE_SHA256 = "e085f1b784c1635b609734575d23d858beaffdd5b8b63a7fce585a38984e54a1"
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
 RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
@@ -32,7 +33,6 @@ HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 CRT_OBJECTS = ("crtbegin.o", "crtbeginS.o", "crtend.o", "crtendS.o")
 CRT_MARKERS = {"crtbegin": ({"__do_init", "__do_fini"}, {"frame_dummy", "__do_global_dtors_aux"}),
                "crtend": ({"__EH_FRAME_LIST_END__"}, {"__FRAME_END__", "__TMC_END__"})}
-COMMENT_MARKERS = (b"rustc version 1.99.0 (b940084d7", b"Linker: LLD ")
 ET_EXEC, ET_DYN = 2, 3
 PT_LOAD, PT_DYNAMIC, PT_INTERP, PT_GNU_STACK, PT_GNU_RELRO = 1, 2, 3, 0x6474E551, 0x6474E552
 PF_X, PF_W = 1, 2
@@ -122,7 +122,14 @@ def vaddr_offset(phdrs: list[tuple], vaddr: int) -> int:
     raise GateError("address outside every PT_LOAD")
 
 
-def check_binary(raw: bytes, target: str, shape: str, host_paths: tuple[bytes, ...] = HOST_PATHS) -> None:
+def comment_markers(pin: dict) -> tuple[bytes, bytes]:
+    """The .comment lines every binary must carry: rustc's release and commit, and LLD of rustc's LLVM version."""
+    return (("rustc version %s (%s " % (pin["rustc"]["release"], pin["rustc"]["commit"][:9])).encode(),
+            ("Linker: LLD %s " % pin["rustc"]["llvm"]).encode())
+
+
+def check_binary(raw: bytes, target: str, shape: str, markers: tuple[bytes, bytes],
+                 host_paths: tuple[bytes, ...] = HOST_PATHS) -> None:
     header = elf_header(raw)
     require(header["machine"] == MACHINE[target], "wrong e_machine")
     phdrs = program_headers(raw, header)
@@ -158,8 +165,8 @@ def check_binary(raw: bytes, target: str, shape: str, host_paths: tuple[bytes, .
     comments = [entry for name, entry in sections(raw, header) if name == ".comment"]
     require(len(comments) == 1, ".comment missing")
     lines = section_bytes(raw, comments[0]).split(b"\0")
-    for marker in COMMENT_MARKERS:
-        require(any(line.startswith(marker) for line in lines), ".comment does not name %s" % marker.decode())
+    for marker in markers:
+        require(any(line.startswith(marker) for line in lines), ".comment does not name %s" % marker.decode().strip())
     for needle in host_paths:
         require(needle not in raw, "a build-host path is in the binary")
 
@@ -174,7 +181,8 @@ def check_crt_symbols(name: str, names: set[str]) -> None:
 def check_toolchain(pin: dict) -> str:
     fields = dict(line.split(": ", 1) for line in run(["rustc", "-vV"]).splitlines()[1:] if ": " in line)
     require(fields.get("release") == pin["rustc"]["release"] and fields.get("commit-hash") == pin["rustc"]["commit"]
-            and fields.get("host") == pin["host"], "rustc is not the pinned toolchain")
+            and fields.get("host") == pin["host"] and fields.get("LLVM version") == pin["rustc"]["llvm"],
+            "rustc is not the pinned toolchain")
     require(run(["cargo", "-V"]).strip() == pin["cargo"], "cargo is not the pinned toolchain")
     sysroot = run(["rustc", "--print", "sysroot"]).strip()
     require(sysroot == pin["sysroot"], "rustc's sysroot is not the pinned tree")
@@ -194,6 +202,23 @@ def check_toolchain(pin: dict) -> str:
     return sysroot
 
 
+def check_linker(pin: dict, root: Path) -> None:
+    """The repository-root cargo config links both musl targets through the wrapper, and the wrapper execs the pinned
+    rust-lld with the pinned sysroot's lib/ on the dylib search path (so a pin change cannot miss the wrapper)."""
+    config = tomllib.loads((root / ".cargo/config.toml").read_text(encoding="utf-8"))
+    require(config.get("net") == {"offline": True}, "the cargo config must set [net] offline = true and nothing else")
+    flags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
+    require(set(config.get("target", {})) == set(pin["targets"]), "the cargo config must name exactly the pinned targets")
+    for target in pin["targets"]:
+        require(config["target"][target] == {"linker": pin["linkerWrapper"], "rustflags": flags},
+                "the cargo config for %s is not the wrapper with the static flags" % target)
+    commands = [line for line in (root / pin["linkerWrapper"]).read_text(encoding="utf-8").splitlines()
+                if line and not line.startswith("#")]
+    require(commands == ["DYLD_FALLBACK_LIBRARY_PATH=%s/lib" % pin["sysroot"], "export DYLD_FALLBACK_LIBRARY_PATH",
+                         'exec %s/lib/rustlib/%s/bin/rust-lld "$@"' % (pin["sysroot"], pin["host"])],
+            "the linker wrapper does not exec the pinned rust-lld")
+
+
 def check_workspace(base: Path) -> set[str]:
     workspace = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
     names = set()
@@ -201,7 +226,8 @@ def check_workspace(base: Path) -> set[str]:
         manifest = tomllib.loads((base / member / "Cargo.toml").read_text(encoding="utf-8"))
         package = manifest["package"]
         require("build" not in package and not (base / member / "build.rs").exists(), "a build script in " + member)
-        require(not manifest.get("lib", {}).get("proc-macro"), "a proc-macro crate in " + member)
+        library = manifest.get("lib", {})
+        require(not library.get("proc-macro") and not library.get("proc_macro"), "a proc-macro crate in " + member)
         names.add(package["name"])
     packages = tomllib.loads((base / "Cargo.lock").read_text(encoding="utf-8"))["package"]
     require(sorted(package["name"] for package in packages) == sorted(names),
@@ -237,7 +263,7 @@ def check_tree(rows: list[dict], sysroot: Path, targets: list[str]) -> None:
 def check_sources(base: Path) -> int:
     count = 0
     for path in sorted(base.rglob("*.rs")):
-        if "target" in path.relative_to(base).parts:
+        if path.relative_to(base).parts[0] == "target":   # the build directory only
             continue
         text = path.read_text(encoding="utf-8")
         for token in FORBIDDEN_SOURCE:
@@ -260,9 +286,8 @@ def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set
                 "metadata": {"component": {"type": "application", "name": binary, "version": VERSION,
                                            "hashes": [{"alg": "SHA-256", "content": digest}],
                                            "properties": [{"name": "planeon:target", "value": target}]}}}
-    serial = sha256(canonical(document))
-    document["serialNumber"] = "urn:uuid:%s-%s-%s-%s-%s" % (serial[:8], serial[8:12], serial[12:16], serial[16:20],
-                                                            serial[20:32])
+    # RFC 4122 name-based (version 5) UUID of the document's content: deterministic, with version and variant bits.
+    document["serialNumber"] = uuid.uuid5(uuid.NAMESPACE_URL, "urn:planeon:sbom:sha256:" + sha256(canonical(document))).urn
     return canonical(document)
 
 
@@ -284,6 +309,9 @@ def main() -> int:
         sysroot = Path(check_toolchain(pin))
         targets = list(pin["targets"])
         require(sorted(targets) == sorted(MACHINE), "toolchain.json must name both musl targets")
+        require(TABLE.name == "closure-%s.json" % pin["rustc"]["release"], "the closure table is not the pinned release's")
+        check_linker(pin, ROOT)
+        say("linker: the cargo config links both targets through %s, which execs the pinned rust-lld" % pin["linkerWrapper"])
         workspace = check_workspace(HE)
         say("workspace: %d crates, a lock without registry or git packages, no build script or proc-macro" % len(workspace))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
@@ -295,12 +323,13 @@ def main() -> int:
                                                      .read_bytes()))
         say("crt objects: compiler-rt's crtbegin and crtend on both targets")
         say("start-up lint: %d workspace sources without a forbidden API" % check_sources(HE))
+        markers = comment_markers(pin)
         host_paths = HOST_PATHS + tuple(path.encode() for path in (str(ROOT), str(Path.home())) if len(path) > 1)
         for target in targets:
             shape = pin["targets"][target]["shape"]
             for binary in BINARIES:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
-                check_binary(raw, target, shape, host_paths)
+                check_binary(raw, target, shape, markers, host_paths)
                 digest = sha256(raw)
                 document = sbom(binary, target, digest, rows, workspace)
                 out = HE / "target/sbom" / target / (binary + ".cdx.json")
