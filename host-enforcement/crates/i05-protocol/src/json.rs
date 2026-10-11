@@ -804,8 +804,8 @@ fn scientific_digits(text: &str) -> Option<(String, i64)> {
 /// even last digit, where Rust's shortest formatting rounds the tie up. Returns the even candidate when `digits` is the
 /// odd one of such a tie (for example 111659285584252.125: Python prints `…252.12`).
 fn tie_to_even(x: f64, digits: &str, exponent: i64) -> Option<String> {
-    let last = digits.bytes().last()?;
-    if (last - b'0') % 2 == 0 {
+    // ASCII '0' is even, so a digit's parity is its byte's parity.
+    if digits.bytes().last()? % 2 == 0 {
         return None;
     }
     // A double's exact decimal expansion has at most 767 significant digits, so this is exact.
@@ -858,7 +858,7 @@ pub fn py_float_repr(x: f64) -> Option<String> {
         out.push('-');
     }
     if (-4..=15).contains(&exponent) {
-        let point = exponent + 1;
+        let point = exponent.checked_add(1)?;
         if point <= 0 {
             out.push_str("0.");
             out.extend(std::iter::repeat_n('0', usize::try_from(-point).ok()?));

@@ -2,7 +2,8 @@
 
 The Rust workspace for the Planeon host-enforcement modules (W03). HE-001 adds only the scaffold: a closed configuration
 library, five binaries that parse their argv and exit, the toolchain pin, a reviewed closure table and an in-repo gate.
-Module logic arrives in HE-002 to HE-007.
+Module logic arrives in HE-002 to HE-007. HE-002 adds the effect gate's I05 v3 logic as two libraries, tested against
+the published contract vectors; no binary links them yet.
 
 ## Layout
 
@@ -11,6 +12,9 @@ Module logic arrives in HE-002 to HE-007.
 | `Cargo.toml`, `Cargo.lock` | Workspace (edition 2024, Apache-2.0); the lock lists only workspace crates |
 | `crates/host-common/` | Closed configuration parser; thread counts come from configuration, never from the host |
 | `crates/{containment,broker,observer,gate,writer}/` | Binaries `planeon-*`; argv only, no file access |
+| `crates/i05-protocol/` | Library (HE-002): the I05 v3 wire codec, canonical encoder, SHA-256 (NIST CAVP tested), schema subset, outcome mapping and request rendering |
+| `crates/effect-gate/` | Library (HE-002): the I05 v3 gate state machine with an in-memory journal and failure marker; `MODEL_DEFINED.md` lists what the pinned model, not the READMEs, defines |
+| `contracts/` | The I05 and I07 contract data and READMEs copied byte for byte from harness-onion `a2eab93`; `PROVENANCE.md` |
 | `toolchain.json` | The pinned toolchain, each target's ELF shape and the Command Line Tools dependency |
 | `licenses/closure-1.99.0.json` | The reviewed classification of every shipped file under `lib/rustlib/<target>/` |
 | `tools/gate.py`, `tools/test_gate.py` | The gate and its self-test (stdlib only) |

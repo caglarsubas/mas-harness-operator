@@ -96,6 +96,14 @@ impl Loader {
         value.as_int().and_then(json::Int::to_u64).map_or_else(|| refuse(format!("{keyword} is not a count")), Ok)
     }
 
+    /// A `const` or `enum` value, bounded in depth so that holding and comparing it stays shallow.
+    fn literal(value: &Value) -> Result<Value, SchemaError> {
+        if json::depth(value) > MAX_SCHEMA_DEPTH {
+            return refuse("a const or enum value is nested too deep");
+        }
+        Ok(value.clone())
+    }
+
     fn number(value: &Value, keyword: &str) -> Result<Value, SchemaError> {
         match value {
             Value::Int(_) | Value::Float(_) => Ok(value.clone()),
@@ -184,10 +192,10 @@ impl Loader {
                         other => Additional::Schema(self.node(other, false, depth)?),
                     });
                 }
-                "const" => k.constant = Some(member.clone()),
+                "const" => k.constant = Some(Loader::literal(member)?),
                 "enum" => {
                     let Some(items) = member.as_array() else { return refuse("enum is not an array") };
-                    k.enumeration = Some(items.to_vec());
+                    k.enumeration = Some(items.iter().map(Loader::literal).collect::<Result<Vec<_>, _>>()?);
                 }
                 "minimum" => k.minimum = Some(Loader::number(member, name)?),
                 "maximum" => k.maximum = Some(Loader::number(member, name)?),
@@ -566,6 +574,10 @@ mod tests {
                      r#"{"properties":{"a":{"$schema":"https://json-schema.org/draft/2020-12/schema"}}}"#,
                      r#"{"properties":{"a":{"$id":"urn:y"}}}"#, r#"{"pattern":"\\d"}"#, r#"{"type":"float"}"#,
                      r#"{"minLength":-1}"#, r#"{"oneOf":[]}"#, "1", r#"{"uniqueItems":1}"#] {
+            assert!(Schema::from_json(text.as_bytes()).is_err(), "{text}");
+        }
+        for text in [format!("{{\"const\":{}{}}}", "[".repeat(200), "]".repeat(200)),
+                     format!("{{\"enum\":[{}{}]}}", "[".repeat(200), "]".repeat(200))] {
             assert!(Schema::from_json(text.as_bytes()).is_err(), "{text}");
         }
     }
