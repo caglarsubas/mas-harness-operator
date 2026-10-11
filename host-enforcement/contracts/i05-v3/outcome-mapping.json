@@ -1,0 +1,185 @@
+{
+ "schemaVersion": "planeon.internal.effect-gate-outcome-mapping/v2",
+ "rows": [
+  {
+   "verb": "CREATE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 201,
+   "excludeStatus": [],
+   "resourceResults": [
+    "CREATED"
+   ],
+   "object": "IDENTITY_MATCH"
+  },
+  {
+   "verb": "CREATE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": "4xx",
+   "excludeStatus": [
+    408
+   ],
+   "resourceResults": [
+    "DENIED"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "GET",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 200,
+   "excludeStatus": [],
+   "resourceResults": [
+    "PRESENT"
+   ],
+   "object": "IDENTITY_MATCH"
+  },
+  {
+   "verb": "GET",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 404,
+   "excludeStatus": [],
+   "resourceResults": [
+    "ABSENT"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "GET",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": "4xx",
+   "excludeStatus": [],
+   "resourceResults": [
+    "DENIED"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "GET",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": "5xx",
+   "excludeStatus": [],
+   "resourceResults": [
+    "AMBIGUOUS"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "DELETE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 200,
+   "excludeStatus": [],
+   "resourceResults": [
+    "DELETED"
+   ],
+   "object": "DELETE_BODY_IF_PRESENT"
+  },
+  {
+   "verb": "DELETE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 202,
+   "excludeStatus": [],
+   "resourceResults": [
+    "DELETED"
+   ],
+   "object": "DELETE_BODY_IF_PRESENT"
+  },
+  {
+   "verb": "DELETE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": 404,
+   "excludeStatus": [],
+   "resourceResults": [
+    "ABSENT"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "DELETE",
+   "classification": "DELIVERED_RESULT",
+   "httpStatus": "4xx",
+   "excludeStatus": [
+    408
+   ],
+   "resourceResults": [
+    "DENIED"
+   ],
+   "object": "ANY"
+  },
+  {
+   "verb": "*",
+   "classification": "NOT_FORWARDED",
+   "httpStatus": null,
+   "excludeStatus": [],
+   "resourceResults": [
+    "DENIED",
+    "AMBIGUOUS"
+   ],
+   "object": "NULL"
+  },
+  {
+   "verb": "*",
+   "classification": "IO_AMBIGUOUS",
+   "httpStatus": null,
+   "excludeStatus": [],
+   "resourceResults": [
+    "AMBIGUOUS"
+   ],
+   "object": "NULL"
+  }
+ ],
+ "objectRules": {
+  "IDENTITY_MATCH": "objectBase64 required; strictly decoded (duplicate-free, no NaN, depth <= 16), its apiVersion, kind, metadata.namespace and metadata.name equal the armed template and its metadata.uid and metadata.resourceVersion equal the gate's observation",
+  "DELETE_BODY_IF_PRESENT": "objectBase64 optional; when present it is the kind's DELETE body (deleteResponseBody): an OBJECT under the IDENTITY_MATCH rule, or a v1 Status with status Success whose details.name, details.kind (the resource) and details.uid match, with no resourceVersion observed",
+  "ANY": "objectBase64 optional and not compared",
+  "NULL": "objectBase64 must be null"
+ },
+ "deleteResponseBody": {
+  "Pod": "OBJECT",
+  "Service": "OBJECT",
+  "ConfigMap": "STATUS"
+ },
+ "upstreamSource": {
+  "repository": "https://github.com/kubernetes/kubernetes",
+  "tag": "v1.37.1",
+  "commit": "f78e722310e50bcaca9276be22276d9e91d91308",
+  "files": [
+   {
+    "path": "pkg/registry/core/configmap/storage/storage.go",
+    "sha256": "f2cb2988fcde7e8869ff92aa4235f4a8899acd7ecb4f7944fedc2e8ff45170ae"
+   },
+   {
+    "path": "pkg/registry/core/pod/storage/storage.go",
+    "sha256": "a781286c7977e0f94ffe5fea9853f79732308548e0cc6d61224d5cd1f460626e"
+   },
+   {
+    "path": "pkg/registry/core/service/storage/storage.go",
+    "sha256": "7ba0fe206016002e65080f694cea238f56972ffdd7a91cb62b78ee8878aa59df"
+   },
+   {
+    "path": "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/delete.go",
+    "sha256": "e147c00d1c47ef33bf3f9029c5c1ce84ff282ebc021952bf8cae78976456a468"
+   },
+   {
+    "path": "staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go",
+    "sha256": "b0e1b669df3de70beb228b2be79ce6544439bb36edcf9464633cf40588176ab3"
+   }
+  ],
+  "distributionCheck": "The Kubernetes distribution is not selected yet (W02). Before the gate is built (W03), these rows and deleteResponseBody are re-checked against the selected distribution's source at its pinned commit."
+ },
+ "deleteResponseBodySources": {
+  "Pod": "pkg/registry/core/pod/storage/storage.go:89 ReturnDeletedObject true",
+  "Service": "pkg/registry/core/service/storage/storage.go:89 ReturnDeletedObject true",
+  "ConfigMap": "pkg/registry/core/configmap/storage/storage.go:38-50 leaves ReturnDeletedObject unset; staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go:1458-1483 finalizeDelete then returns a Status whose details carry name, group, kind (the resource) and uid"
+ },
+ "deleteNotImmediate": "staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go:1233-1261: when the deletion is not immediate (graceful deletion or pending finalizers) Store.Delete returns the updated object, not a Status, and the handler answers 200 with it. For Pod and Service the body is the object in both cases. For a ConfigMap with finalizers the STATUS rule refuses the object body (M05), so the broker holds the generation: a known HELD cause that affects liveness only.",
+ "deleteStatus202": "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/delete.go:188: the handler answers 202 only when the deletion is not immediate and DeleteOptions set orphanDependents false. The gate's DeleteOptions carry only the UID precondition, so the DELETE 202 row is unreachable; it is kept so that such a response is never a disagreement by itself.",
+ "rules": [
+  "A CREATE or DELETE whose response does not settle the outcome (5xx, 408, 1xx, 3xx or another 2xx) is classified IO_AMBIGUOUS by the gate, never DELIVERED_RESULT; only GET maps 5xx to AMBIGUOUS.",
+  "The CREATE and DELETE status-class 4xx rows exclude 408 (excludeStatus): an outcome claiming DELIVERED_RESULT for a CREATE or DELETE 408 matches no row (M02).",
+  "An exact httpStatus row takes precedence over a status-class row; any status without a row has no agreement.",
+  "Only an OK ACTION_OUTCOME is usable; a refused or missing one is a missing outcome.",
+  "Any disagreement, a missing ACTION_OUTCOME or a missing RESOURCE_RESULT is sticky failure: the broker holds the generation HELD and never advances the I02 transcript past the action.",
+  "admittedBeforeInvalidation does not change the mapped outcome; an execution with such an action never ends COMPLETED, and its resources stay owned for exact-UID cleanup.",
+  "Object content beyond identity, UID and resourceVersion is not verified. resultDigest is the gate's digest of the exact relayed response body, kept for reconciliation; RESOURCE_RESULT carries bounded observed-object data (I02 unchanged)."
+ ]
+}

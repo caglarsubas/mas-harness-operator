@@ -1,0 +1,1170 @@
+{
+ "$defs": {
+  "jsonObject": {
+   "additionalProperties": {
+    "$ref": "#/$defs/jsonValue"
+   },
+   "maxProperties": 256,
+   "propertyNames": {
+    "maxLength": 317,
+    "minLength": 1,
+    "pattern": "^[ -~]+$"
+   },
+   "type": "object"
+  },
+  "jsonValue": {
+   "oneOf": [
+    {
+     "maxLength": 16384,
+     "pattern": "^[ -~]*$",
+     "type": "string"
+    },
+    {
+     "maximum": 9007199254740991,
+     "minimum": -9007199254740991,
+     "type": "integer"
+    },
+    {
+     "type": "boolean"
+    },
+    {
+     "type": "null"
+    },
+    {
+     "items": {
+      "$ref": "#/$defs/jsonValue"
+     },
+     "maxItems": 1024,
+     "type": "array"
+    },
+    {
+     "$ref": "#/$defs/jsonObject"
+    }
+   ]
+  }
+ },
+ "$id": "urn:planeon:internal:policy-write-frame:v3",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "oneOf": [
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "WRITER_TO_GATE"
+    },
+    "operation": {
+     "const": "MAINTENANCE_STATUS"
+    },
+    "payload": {
+     "additionalProperties": false,
+     "maxProperties": 0,
+     "properties": {},
+     "type": "object"
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "GATE_TO_WRITER"
+    },
+    "operation": {
+     "const": "MAINTENANCE_STATUS"
+    },
+    "payload": {
+     "additionalProperties": false,
+     "allOf": [
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "OPEN"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "CLOSED",
+           "INVALIDATED"
+          ]
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "HELD"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "HELD"
+          ]
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "PENDING"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "DRAINING",
+           "INVALIDATED"
+          ]
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "OPEN"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "ambiguousWriteIds": {
+          "maxItems": 0
+         },
+         "inFlightActionId": {
+          "type": "null"
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "ambiguousWriteIds": {
+          "minItems": 1
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "HELD"
+          ]
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "ENDED"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "DRAINING",
+           "CLOSED",
+           "INVALIDATED",
+           "HELD"
+          ]
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "maintenance": {
+          "enum": [
+           "PENDING"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "inFlightActionId": {
+          "maximum": 256,
+          "minimum": 1,
+          "type": "integer"
+         }
+        }
+       }
+      },
+      {
+       "if": {
+        "properties": {
+         "gateState": {
+          "enum": [
+           "CLOSED"
+          ]
+         }
+        }
+       },
+       "then": {
+        "properties": {
+         "inFlightActionId": {
+          "type": "null"
+         }
+        }
+       }
+      }
+     ],
+     "properties": {
+      "ambiguousWriteIds": {
+       "items": {
+        "maximum": 256,
+        "minimum": 1,
+        "type": "integer"
+       },
+       "maxItems": 256,
+       "type": "array",
+       "uniqueItems": true
+      },
+      "gateState": {
+       "enum": [
+        "INSPECTING",
+        "ACTIVE",
+        "DRAINING",
+        "CLOSED",
+        "INVALIDATED",
+        "HELD"
+       ]
+      },
+      "generation": {
+       "maxLength": 64,
+       "minLength": 64,
+       "pattern": "^[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "inFlightActionId": {
+       "oneOf": [
+        {
+         "type": "null"
+        },
+        {
+         "maximum": 256,
+         "minimum": 1,
+         "type": "integer"
+        }
+       ]
+      },
+      "journalDigest": {
+       "maxLength": 71,
+       "minLength": 71,
+       "pattern": "^sha256:[0-9a-f]{64}$",
+       "type": "string"
+      },
+      "maintenance": {
+       "enum": [
+        "NONE",
+        "PENDING",
+        "OPEN",
+        "HELD",
+        "ENDED"
+       ]
+      },
+      "result": {
+       "const": "OK"
+      },
+      "writes": {
+       "maximum": 256,
+       "minimum": 0,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "ambiguousWriteIds",
+      "gateState",
+      "generation",
+      "inFlightActionId",
+      "journalDigest",
+      "maintenance",
+      "result",
+      "writes"
+     ],
+     "type": "object"
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "WRITER_TO_GATE"
+    },
+    "operation": {
+     "const": "WRITE_BEGIN"
+    },
+    "payload": {
+     "additionalProperties": false,
+     "properties": {
+      "expectedGeneration": {
+       "maxLength": 64,
+       "minLength": 64,
+       "pattern": "^[0-9a-f]{64}$",
+       "type": "string"
+      }
+     },
+     "required": [
+      "expectedGeneration"
+     ],
+     "type": "object"
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "GATE_TO_WRITER"
+    },
+    "operation": {
+     "const": "WRITE_BEGIN"
+    },
+    "payload": {
+     "oneOf": [
+      {
+       "additionalProperties": false,
+       "allOf": [
+        {
+         "if": {
+          "properties": {
+           "maintenance": {
+            "enum": [
+             "OPEN"
+            ]
+           }
+          }
+         },
+         "then": {
+          "properties": {
+           "gateState": {
+            "enum": [
+             "CLOSED",
+             "INVALIDATED"
+            ]
+           }
+          }
+         }
+        },
+        {
+         "if": {
+          "properties": {
+           "maintenance": {
+            "enum": [
+             "HELD"
+            ]
+           }
+          }
+         },
+         "then": {
+          "properties": {
+           "gateState": {
+            "enum": [
+             "HELD"
+            ]
+           }
+          }
+         }
+        },
+        {
+         "if": {
+          "properties": {
+           "maintenance": {
+            "enum": [
+             "PENDING"
+            ]
+           }
+          }
+         },
+         "then": {
+          "properties": {
+           "gateState": {
+            "enum": [
+             "DRAINING",
+             "INVALIDATED"
+            ]
+           }
+          }
+         }
+        }
+       ],
+       "properties": {
+        "deniedActionIds": {
+         "items": {
+          "maximum": 256,
+          "minimum": 1,
+          "type": "integer"
+         },
+         "maxItems": 1,
+         "type": "array",
+         "uniqueItems": true
+        },
+        "gateState": {
+         "enum": [
+          "INSPECTING",
+          "ACTIVE",
+          "DRAINING",
+          "CLOSED",
+          "INVALIDATED",
+          "HELD"
+         ]
+        },
+        "maintenance": {
+         "enum": [
+          "PENDING",
+          "OPEN",
+          "HELD"
+         ]
+        },
+        "result": {
+         "const": "OK"
+        }
+       },
+       "required": [
+        "deniedActionIds",
+        "gateState",
+        "maintenance",
+        "result"
+       ],
+       "type": "object"
+      },
+      {
+       "additionalProperties": false,
+       "properties": {
+        "reason": {
+         "enum": [
+          "GENERATION_MISMATCH",
+          "MAINTENANCE_ENDED",
+          "STORAGE_FAILURE"
+         ]
+        },
+        "result": {
+         "const": "REFUSED"
+        }
+       },
+       "required": [
+        "reason",
+        "result"
+       ],
+       "type": "object"
+      }
+     ]
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "WRITER_TO_GATE"
+    },
+    "operation": {
+     "const": "WRITE_OBJECT"
+    },
+    "payload": {
+     "additionalProperties": false,
+     "properties": {
+      "name": {
+       "maxLength": 253,
+       "minLength": 1,
+       "pattern": "^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$",
+       "type": "string"
+      },
+      "namespace": {
+       "oneOf": [
+        {
+         "type": "null"
+        },
+        {
+         "maxLength": 63,
+         "minLength": 1,
+         "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
+         "type": "string"
+        }
+       ]
+      },
+      "object": {
+       "oneOf": [
+        {
+         "type": "null"
+        },
+        {
+         "$ref": "#/$defs/jsonObject"
+        }
+       ]
+      },
+      "operation": {
+       "enum": [
+        "CREATE",
+        "UPDATE",
+        "DELETE"
+       ]
+      },
+      "prior": {
+       "oneOf": [
+        {
+         "type": "null"
+        },
+        {
+         "additionalProperties": false,
+         "properties": {
+          "projectionDigest": {
+           "maxLength": 71,
+           "minLength": 71,
+           "pattern": "^sha256:[0-9a-f]{64}$",
+           "type": "string"
+          },
+          "resourceVersion": {
+           "maxLength": 64,
+           "minLength": 1,
+           "pattern": "^[A-Za-z0-9]{1,64}$",
+           "type": "string"
+          },
+          "uid": {
+           "maxLength": 128,
+           "minLength": 1,
+           "pattern": "^[A-Za-z0-9-]{1,128}$",
+           "type": "string"
+          }
+         },
+         "required": [
+          "projectionDigest",
+          "resourceVersion",
+          "uid"
+         ],
+         "type": "object"
+        }
+       ]
+      },
+      "resource": {
+       "additionalProperties": false,
+       "properties": {
+        "group": {
+         "maxLength": 253,
+         "pattern": "^([a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?)?$",
+         "type": "string"
+        },
+        "resource": {
+         "maxLength": 63,
+         "minLength": 1,
+         "pattern": "^[a-z][a-z0-9]{0,62}$",
+         "type": "string"
+        },
+        "version": {
+         "maxLength": 20,
+         "minLength": 2,
+         "pattern": "^v[1-9][0-9]*((alpha|beta)[1-9][0-9]*)?$",
+         "type": "string"
+        }
+       },
+       "required": [
+        "group",
+        "resource",
+        "version"
+       ],
+       "type": "object"
+      },
+      "writeId": {
+       "maximum": 256,
+       "minimum": 1,
+       "type": "integer"
+      }
+     },
+     "required": [
+      "name",
+      "namespace",
+      "object",
+      "operation",
+      "prior",
+      "resource",
+      "writeId"
+     ],
+     "type": "object"
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "GATE_TO_WRITER"
+    },
+    "operation": {
+     "const": "WRITE_OBJECT"
+    },
+    "payload": {
+     "oneOf": [
+      {
+       "oneOf": [
+        {
+         "additionalProperties": false,
+         "allOf": [
+          {
+           "if": {
+            "properties": {
+             "httpStatus": {
+              "minimum": 400
+             }
+            }
+           },
+           "then": {
+            "properties": {
+             "observedResourceVersion": {
+              "type": "null"
+             },
+             "observedUid": {
+              "type": "null"
+             }
+            }
+           }
+          }
+         ],
+         "properties": {
+          "classification": {
+           "const": "DELIVERED_RESULT"
+          },
+          "httpStatus": {
+           "anyOf": [
+            {
+             "enum": [
+              200,
+              201,
+              202
+             ]
+            },
+            {
+             "maximum": 499,
+             "minimum": 400,
+             "not": {
+              "const": 408
+             },
+             "type": "integer"
+            }
+           ]
+          },
+          "observedResourceVersion": {
+           "oneOf": [
+            {
+             "type": "null"
+            },
+            {
+             "maxLength": 64,
+             "minLength": 1,
+             "pattern": "^[A-Za-z0-9]{1,64}$",
+             "type": "string"
+            }
+           ]
+          },
+          "observedUid": {
+           "oneOf": [
+            {
+             "type": "null"
+            },
+            {
+             "maxLength": 128,
+             "minLength": 1,
+             "pattern": "^[A-Za-z0-9-]{1,128}$",
+             "type": "string"
+            }
+           ]
+          },
+          "requestDigest": {
+           "maxLength": 71,
+           "minLength": 71,
+           "pattern": "^sha256:[0-9a-f]{64}$",
+           "type": "string"
+          },
+          "result": {
+           "const": "OK"
+          },
+          "resultDigest": {
+           "maxLength": 71,
+           "minLength": 71,
+           "pattern": "^sha256:[0-9a-f]{64}$",
+           "type": "string"
+          },
+          "writeId": {
+           "maximum": 256,
+           "minimum": 1,
+           "type": "integer"
+          }
+         },
+         "required": [
+          "classification",
+          "httpStatus",
+          "observedResourceVersion",
+          "observedUid",
+          "requestDigest",
+          "result",
+          "resultDigest",
+          "writeId"
+         ],
+         "type": "object"
+        },
+        {
+         "additionalProperties": false,
+         "properties": {
+          "classification": {
+           "const": "IO_AMBIGUOUS"
+          },
+          "httpStatus": {
+           "type": "null"
+          },
+          "observedResourceVersion": {
+           "type": "null"
+          },
+          "observedUid": {
+           "type": "null"
+          },
+          "requestDigest": {
+           "maxLength": 71,
+           "minLength": 71,
+           "pattern": "^sha256:[0-9a-f]{64}$",
+           "type": "string"
+          },
+          "result": {
+           "const": "OK"
+          },
+          "resultDigest": {
+           "type": "null"
+          },
+          "writeId": {
+           "maximum": 256,
+           "minimum": 1,
+           "type": "integer"
+          }
+         },
+         "required": [
+          "classification",
+          "httpStatus",
+          "observedResourceVersion",
+          "observedUid",
+          "requestDigest",
+          "result",
+          "resultDigest",
+          "writeId"
+         ],
+         "type": "object"
+        }
+       ]
+      },
+      {
+       "additionalProperties": false,
+       "properties": {
+        "reason": {
+         "enum": [
+          "MAINTENANCE_NOT_OPEN",
+          "MAINTENANCE_HELD",
+          "WRITE_ID_OUT_OF_ORDER",
+          "EFFECT_KIND",
+          "POLICY_KIND_NOT_WRITABLE",
+          "ADMISSION_OBJECT_SEALED",
+          "KIND_OUTSIDE_TABLE",
+          "VERB_NOT_ALLOWED",
+          "SCOPE_MISMATCH",
+          "PRIOR_RULE",
+          "OBJECT_RULE",
+          "STORAGE_FAILURE"
+         ]
+        },
+        "result": {
+         "const": "REFUSED"
+        }
+       },
+       "required": [
+        "reason",
+        "result"
+       ],
+       "type": "object"
+      }
+     ]
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "WRITER_TO_GATE"
+    },
+    "operation": {
+     "const": "WRITE_END"
+    },
+    "payload": {
+     "additionalProperties": false,
+     "maxProperties": 0,
+     "properties": {},
+     "type": "object"
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  },
+  {
+   "additionalProperties": false,
+   "properties": {
+    "challenge": {
+     "maxLength": 64,
+     "minLength": 64,
+     "pattern": "^[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "direction": {
+     "const": "GATE_TO_WRITER"
+    },
+    "operation": {
+     "const": "WRITE_END"
+    },
+    "payload": {
+     "oneOf": [
+      {
+       "additionalProperties": false,
+       "allOf": [
+        {
+         "if": {
+          "properties": {
+           "ambiguousWriteIds": {
+            "minItems": 1
+           }
+          }
+         },
+         "then": {
+          "properties": {
+           "gateState": {
+            "enum": [
+             "HELD"
+            ]
+           }
+          }
+         }
+        }
+       ],
+       "properties": {
+        "ambiguousWriteIds": {
+         "items": {
+          "maximum": 256,
+          "minimum": 1,
+          "type": "integer"
+         },
+         "maxItems": 256,
+         "type": "array",
+         "uniqueItems": true
+        },
+        "gateState": {
+         "enum": [
+          "DRAINING",
+          "CLOSED",
+          "INVALIDATED",
+          "HELD"
+         ]
+        },
+        "maintenance": {
+         "const": "ENDED"
+        },
+        "result": {
+         "const": "OK"
+        },
+        "writes": {
+         "maximum": 256,
+         "minimum": 0,
+         "type": "integer"
+        }
+       },
+       "required": [
+        "ambiguousWriteIds",
+        "gateState",
+        "maintenance",
+        "result",
+        "writes"
+       ],
+       "type": "object"
+      },
+      {
+       "additionalProperties": false,
+       "properties": {
+        "reason": {
+         "enum": [
+          "MAINTENANCE_NOT_BEGUN",
+          "MAINTENANCE_ENDED",
+          "STORAGE_FAILURE"
+         ]
+        },
+        "result": {
+         "const": "REFUSED"
+        }
+       },
+       "required": [
+        "reason",
+        "result"
+       ],
+       "type": "object"
+      }
+     ]
+    },
+    "previousDigest": {
+     "maxLength": 71,
+     "minLength": 71,
+     "pattern": "^sha256:[0-9a-f]{64}$",
+     "type": "string"
+    },
+    "schemaVersion": {
+     "const": "planeon.internal.policy-write-frame/v3"
+    },
+    "sequence": {
+     "maximum": 2147483647,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "required": [
+    "challenge",
+    "direction",
+    "operation",
+    "payload",
+    "previousDigest",
+    "schemaVersion",
+    "sequence"
+   ],
+   "type": "object"
+  }
+ ],
+ "title": "I07 policy writer to effect gate frame"
+}
