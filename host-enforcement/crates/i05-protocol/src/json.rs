@@ -789,23 +789,68 @@ fn escape_into(out: &mut Vec<u8>, text: &[u8]) {
     out.push(b'"');
 }
 
-/// Python `float.__repr__`: the shortest digits that round-trip, fixed notation for decimal exponents -4 to 15 (with at
-/// least one fractional digit), otherwise `d[.ddd]e±XX`. `None` for NaN and the infinities.
-pub fn py_float_repr(x: f64) -> Option<String> {
-    if !x.is_finite() {
-        return None;
-    }
-    // Rust's `{:e}` prints the same shortest round-trip digits in scientific form, e.g. `-1.5e-7`, `0e0`.
-    let scientific = format!("{x:e}");
-    let (negative, unsigned) = match scientific.strip_prefix('-') {
-        Some(rest) => (true, rest),
-        None => (false, scientific.as_str()),
-    };
-    let (mantissa, exponent) = unsigned.split_once('e')?;
+/// The significant digits and decimal exponent of `{x:e}` for a finite, non-negative `x` (`x = d.ddd × 10^e`).
+fn scientific_digits(text: &str) -> Option<(String, i64)> {
+    let (mantissa, exponent) = text.split_once('e')?;
     let exponent: i64 = exponent.parse().ok()?;
     let mut digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
     while digits.len() > 1 && digits.ends_with('0') {
         digits.pop();
+    }
+    Some((digits, exponent))
+}
+
+/// CPython's shortest repr (David Gay's `dtoa` mode 0) breaks an exact tie between two shortest candidates toward the
+/// even last digit, where Rust's shortest formatting rounds the tie up. Returns the even candidate when `digits` is the
+/// odd one of such a tie (for example 111659285584252.125: Python prints `…252.12`).
+fn tie_to_even(x: f64, digits: &str, exponent: i64) -> Option<String> {
+    let last = digits.bytes().last()?;
+    if (last - b'0') % 2 == 0 {
+        return None;
+    }
+    // A double's exact decimal expansion has at most 767 significant digits, so this is exact.
+    let (exact, exact_exponent) = {
+        let text = format!("{x:.1100e}");
+        let (mantissa, exponent) = text.split_once('e')?;
+        (mantissa.chars().filter(char::is_ascii_digit).collect::<String>(), exponent.parse::<i64>().ok()?)
+    };
+    if exact_exponent != exponent {
+        return None;
+    }
+    let truncated = exact.get(..digits.len())?;
+    let rest = exact.get(digits.len()..)?;
+    if !(rest.starts_with('5') && rest.bytes().skip(1).all(|byte| byte == b'0')) {
+        return None;
+    }
+    let alternative = if digits == truncated {
+        // The candidate above: add one in the last place (no carry past an odd digit).
+        let mut bytes = truncated.as_bytes().to_vec();
+        let last = bytes.last_mut()?;
+        *last = last.checked_add(1)?;
+        String::from_utf8(bytes).ok()?
+    } else {
+        truncated.to_string()
+    };
+    if alternative.len() != digits.len() || alternative.ends_with('0') {
+        return None;
+    }
+    let reparsed: f64 = format!("{}.{}e{}", alternative.get(..1)?, alternative.get(1..)?, exponent).parse().ok()?;
+    (reparsed == x).then_some(alternative)
+}
+
+/// Python `float.__repr__`: the shortest digits that round-trip (an exact tie between two shortest candidates goes to
+/// the even digit), fixed notation for decimal exponents -4 to 15 (with at least one fractional digit), otherwise
+/// `d[.ddd]e±XX`. `None` for NaN and the infinities.
+pub fn py_float_repr(x: f64) -> Option<String> {
+    if !x.is_finite() {
+        return None;
+    }
+    let negative = x.is_sign_negative();
+    let magnitude = x.abs();
+    // Rust's `{:e}` prints the shortest round-trip digits in scientific form, e.g. `1.5e-7`, `0e0`.
+    let (mut digits, exponent) = scientific_digits(&format!("{magnitude:e}"))?;
+    if let Some(even) = tie_to_even(magnitude, &digits, exponent) {
+        digits = even;
     }
     let count = i64::try_from(digits.len()).ok()?;
     let mut out = String::new();
@@ -1141,7 +1186,9 @@ mod tests {
                           (1e-5, "1e-05"), (1e-4, "0.0001"), (5e-324, "5e-324"), (-0.0, "-0.0"), (0.0, "0.0"),
                           (0.1, "0.1"), (123456789012345680.0, "1.2345678901234568e+17"),
                           (1.7976931348623157e308, "1.7976931348623157e+308"), (2.5, "2.5"), (100.0, "100.0"),
-                          (1e22, "1e+22"), (0.00012345, "0.00012345"), (123.456, "123.456"), (-1.5e-7, "-1.5e-07")] {
+                          (1e22, "1e+22"), (0.00012345, "0.00012345"), (123.456, "123.456"), (-1.5e-7, "-1.5e-07"),
+                          (-1113178120592002.25, "-1113178120592002.2"), (-233891771783429.625, "-233891771783429.62"),
+                          (111659285584252.125, "111659285584252.12")] {
             assert_eq!(py_float_repr(x).as_deref(), Some(text), "{x:e}");
         }
         assert_eq!(py_float_repr(f64::INFINITY), None);
