@@ -91,14 +91,14 @@ pub fn identity_of(kind: Kind, namespace: &str, name: &str) -> String {
     format!("{}/{}/{}", kind.as_str(), namespace, name)
 }
 
-/// The exact request one armed action permits: the request-head bytes and the body digest.
+/// What A1 compares for an armed action (M15): the rendered request head and the digest of the body.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RenderedRequest {
     pub head: String,
     pub body_digest: Option<String>,
 }
 
-/// The only DeleteOptions body a DELETE may carry: the recorded-UID precondition (a missing UID encodes as null).
+/// Canonical DeleteOptions for DELETE (M15): a UID precondition holding the recorded UID, or null when none is recorded.
 pub fn delete_options(uid: Option<&str>) -> Vec<u8> {
     Doc::object(vec![
         ("apiVersion", Doc::str("v1")),
@@ -142,8 +142,8 @@ pub fn template_digest(verb: Verb, api_version: &str, kind: Kind, namespace: &st
     sha256::prefixed(&template.canonical())
 }
 
-/// Whether a delivered response settles the action (Decision 0): every GET status; a CREATE with 201 or a rejection
-/// (4xx other than 408); a DELETE with 200, 202, 404 or a rejection. Anything else leaves a mutation's outcome unknown.
+/// Decision 0: true when the response decides the outcome. GET: any status. CREATE: 201 or a 4xx except 408.
+/// DELETE: 200, 202, 404 or a 4xx except 408. Every other mutation response leaves the outcome unknown.
 pub fn outcome_is_final(verb: Verb, status: i64) -> bool {
     let rejected = (400..=499).contains(&status) && status != 408;
     match verb {

@@ -503,7 +503,8 @@ impl Gate {
         sha256::prefixed(&self.journal.to_doc().canonical())
     }
 
-    /// One event. A pending I07 drain is settled after every event; the event that settles it carries the answer.
+    /// Applies one event, then settles any I07 drain still waiting for its fence (M28); the output of the event that
+    /// decides the fence carries the drain answer.
     pub fn handle(&mut self, event: Event) -> Result<Output, EventError> {
         let mut output = self.dispatch(event)?;
         if let Some(answer) = self.settle_drain() {
@@ -512,7 +513,7 @@ impl Gate {
         Ok(output)
     }
 
-    /// The A3 fence for an I07 write, from gate state only.
+    /// Answers the A3 fence question for a pending I07 write, using nothing but the gate's own state.
     pub fn fence(&self) -> DrainAnswer {
         if self.state == State::Held {
             return DrainAnswer::Held;
@@ -562,8 +563,8 @@ impl Gate {
 
     // ------------------------------------------------------------------------------------------ journal and marker
 
-    /// One journal record. A failed write is an urgent STORAGE_FAILURE (the marker first, A1 closed, HELD, an armed
-    /// action denied, an in-flight one marked admitted before invalidation); the caller then refuses or reports.
+    /// Appends one journal record and reports whether it is durable. When the write fails, the storage-failure path
+    /// of M20 has already run by the time this returns, so callers only decide how to refuse or report it.
     fn record(&mut self, record: Record) -> bool {
         if self.journal.attempt(record) {
             return true;
@@ -587,8 +588,8 @@ impl Gate {
         self.failing = false;
     }
 
-    /// Replay restart: the actions and the state come from the failure marker and the journal alone; execution data
-    /// kept in memory (bound execution, counters, bound identifiers, created UIDs, mutation keys, expiry) stays.
+    /// GATE_RESTART (M30): action statuses and the generation state are recomputed only from what the journal and
+    /// the failure marker hold; the in-memory execution data that M30 lists is left as it is.
     fn rebuild(&mut self) -> State {
         let mut actions: BTreeMap<u16, Action> = BTreeMap::new();
         let mut state = State::Held;
@@ -650,7 +651,8 @@ impl Gate {
             .all(|action| action.settled() && action.classification != Some(Classification::IoAmbiguous));
         for action in actions.values_mut() {
             match action.status {
-                // Admitted without a terminal record: ambiguous, and admitted before the restart (C6, base §5).
+                // Consumed but never given a TERMINAL record, so its outcome is unknown: IO_AMBIGUOUS, treated as
+                // admitted ahead of the restart (C6, base §5).
                 Status::Consumed => {
                     action.status = Status::Terminal;
                     action.classification = Some(Classification::IoAmbiguous);
@@ -690,7 +692,7 @@ impl Gate {
         self.actions.values().filter(|action| action.status == Status::Armed).map(|action| action.id).collect()
     }
 
-    /// The actions armed when an operation began that it denied, by whichever path.
+    /// Of the action ids that were ARMED when the current operation started, those that are now TERMINAL (M21).
     fn denied_since(&self, armed: &[u16]) -> Vec<u16> {
         armed
             .iter()
@@ -722,8 +724,8 @@ impl Gate {
         }
     }
 
-    /// Denies every armed, unconsumed action: its stamped connections close, then NOT_FORWARDED is recorded; the deny
-    /// holds in memory even if the record fails.
+    /// The deny step of M21 for each action still ARMED: close its stamped connections first, then mark it
+    /// NOT_FORWARDED and try to journal DENIED. A failed DENIED write does not undo the in-memory denial.
     fn deny_armed(&mut self) {
         for id in self.armed_ids() {
             if !self.actions.get(&id).is_some_and(|action| action.status == Status::Armed) {
@@ -765,8 +767,8 @@ impl Gate {
         self.actions.values().any(|action| action.classification == Some(Classification::IoAmbiguous))
     }
 
-    /// A pending drain settles once its fence is decided: a DRAINING generation with nothing in flight first becomes
-    /// CLOSED (HELD if an action is ambiguous); the DRAINED record is written and the answer goes to I07.
+    /// Resolves a waiting I07 drain (M28). With nothing in flight, DRAINING turns into CLOSED, or HELD when some
+    /// action is IO_AMBIGUOUS; once the fence is decided, DRAINED is journaled and its answer returned.
     fn settle_drain(&mut self) -> Option<DrainAnswer> {
         if !self.drain_pending {
             return None;
@@ -848,7 +850,7 @@ impl Gate {
                 self.backlog.clear();
                 self.channel = Channel::Closed;
                 self.drain_pending = false;
-                // The restart's own record: a store that still fails makes the restart HELD.
+                // Journal RESTARTED; if the store is still failing, the storage-failure path leaves the generation HELD.
                 self.record(Record::Restarted { state: self.state });
                 Output::of(OutputKind::RestartState(self.state))
             }
@@ -914,9 +916,10 @@ impl Gate {
             return Err(ConnectionRefusal::ConnectionClosed);
         }
         if requests > 1 {
-            return Err(ConnectionRefusal::ProtocolViolation); // C1: one request per connection
+            return Err(ConnectionRefusal::ProtocolViolation); // C1 allows a single request per connection
         }
-        // The observed policy generation is current exactly while ACTIVE with no pending drain.
+        // NOT_ACTIVE unless an execution is bound, the generation is ACTIVE, no drain waits and the channel is
+        // open (M26).
         let Some(bound) = self.bound.as_ref() else { return Err(ConnectionRefusal::NotActive) };
         if self.state != State::Active || self.drain_pending || self.channel != Channel::Open {
             return Err(ConnectionRefusal::NotActive);
@@ -984,7 +987,7 @@ impl Gate {
             None => return Err(EventError("upstream event without a forwarded action")),
         };
         if status == Status::Terminal {
-            // The seal (or the bound) aborted this exchange: a late response is never relayed.
+            // Already sealed, or cut off by the 900 s bound: journal LATE_UPSTREAM and relay nothing (M27).
             self.record(Record::LateUpstream { action_id: id });
             return Ok(Output::of(OutputKind::LateUpstream));
         }
@@ -993,7 +996,8 @@ impl Gate {
         let (classification, details, delivered) = match response {
             None => (Classification::IoAmbiguous, TerminalDetails::None, None),
             Some(response) if !verb.is_some_and(|verb| i05_protocol::outcome_is_final(verb, response.http_status)) => {
-                // Unknown mutation outcome: ambiguous; status and digest are kept for reconciliation only.
+                // This response does not settle the mutation, so it is IO_AMBIGUOUS; its HTTP status and body digest
+                // are recorded only to support reconciliation.
                 let details =
                     TerminalDetails::Reconciliation { http_status: response.http_status, result_digest: response.body_digest };
                 (Classification::IoAmbiguous, details, None)
@@ -1014,7 +1018,8 @@ impl Gate {
                 (Classification::DeliveredResult, details, Some(delivered))
             }
         };
-        // The terminal record, qualifier included, is durable before any response byte is relayed.
+        // Journal TERMINAL, with the admitted-before-invalidation flag, first; nothing is relayed unless that write
+        // succeeded.
         let recorded = self.record(Record::Terminal { action_id: id, classification, after_invalidation: after, details });
         let (classification, delivered) = if recorded { (classification, delivered) } else { (Classification::IoAmbiguous, None) };
         let created = match (&armed, &delivered) {
@@ -1033,7 +1038,7 @@ impl Gate {
         if classification == Classification::IoAmbiguous {
             self.state = State::Held;
         } else if let Some((manifest_digest, uid)) = created {
-            // Only this execution's own created objects may be deleted (I02: server-recorded created UIDs).
+            // Remember the server-assigned UID of an object this execution created; DELETE accepts only such UIDs (I02).
             self.created_uids.entry(manifest_digest).or_default().insert(uid);
         }
         if let Some(connection) = self.connections.get_mut(conn) {
@@ -1065,8 +1070,8 @@ impl Gate {
         Ok(Output::of(OutputKind::Upstream { classification: Classification::IoAmbiguous, relayed: false, aborted: true }))
     }
 
-    /// I07 WRITE_BEGIN, in any state: from ACTIVE or INSPECTING the gate's own normal drain; in every state it denies
-    /// an armed action and waits for the A3 fence.
+    /// Handles I07 WRITE_BEGIN whatever the state (M28): ACTIVE and INSPECTING start the gate's normal drain, any
+    /// ARMED action is denied, and the answer waits on the A3 fence.
     fn drain(&mut self) -> Output {
         let armed = self.armed_ids();
         if matches!(self.state, State::Active | State::Inspecting) {
@@ -1211,7 +1216,7 @@ impl Gate {
         if digests.iter().any(|digest| prior.manifest_digests.contains(digest))
             || identities.iter().any(|identity| prior.manifest_identities.contains(identity))
         {
-            return refused("MANIFEST_REUSED"); // a run never re-uses an earlier generation's manifest
+            return refused("MANIFEST_REUSED"); // manifests bound by an earlier generation cannot be bound again
         }
         if !self.config.observed_workers.contains(&(p.worker_pid, p.worker_start_ticks)) {
             return refused("WORKER_NOT_OBSERVED");
@@ -1261,12 +1266,12 @@ impl Gate {
             return refused("MANIFEST_OUTSIDE_CASE");
         };
         if (p.verb == Verb::Delete) != p.recorded_uid.is_some() {
-            return refused("UID_RULE"); // only DELETE carries the recorded-UID precondition
+            return refused("UID_RULE"); // a recorded UID is required for DELETE and forbidden otherwise
         }
         if p.verb == Verb::Delete {
             let created = self.created_uids.get(&p.manifest_digest);
             if !p.recorded_uid.as_ref().is_some_and(|uid| created.is_some_and(|uids| uids.contains(uid))) {
-                return refused("UID_NOT_CREATED"); // the UID must come from this execution's own CREATE 201
+                return refused("UID_NOT_CREATED"); // the UID has to be one this execution itself created (201)
             }
         }
         let expected = template_digest(p.verb, &manifest.api_version, manifest.kind, &manifest.namespace, &manifest.name,
@@ -1282,7 +1287,7 @@ impl Gate {
         if key.as_ref().is_some_and(|key| self.mutation_keys.contains(key)) {
             return refused("MUTATION_KEY_REUSED"); // C7
         }
-        // C2: close every unconsumed connection and drain the listen backlog before recording ARM.
+        // C2 flush (M25) before ARM is journaled: unconsumed connections and queued backlog entries are all closed.
         let mut flushed = self.close_connections(|connection| !connection.consumed);
         for conn in std::mem::take(&mut self.backlog) {
             self.connections.insert(conn, Connection { stamp: None, open: false, requests: 0, consumed: false });
@@ -1328,7 +1333,7 @@ impl Gate {
             return refused("UNKNOWN_ACTION");
         };
         if !sealed {
-            // Sealing: from here on the action can never be consumed, and its classification never changes.
+            // Seal the action: it can no longer be consumed and its classification is frozen.
             match status {
                 Status::Armed => {
                     self.close_unconsumed_stamped(self.stamp_of(action_id));
@@ -1338,7 +1343,7 @@ impl Gate {
                     }
                 }
                 Status::Consumed => {
-                    // Still in flight: the gate aborts the upstream exchange and closes the server connection.
+                    // Consumed with no TERMINAL yet: cut the upstream exchange off and close the server-side connection.
                     if let Some(connection) = conn.and_then(|conn| self.connections.get_mut(&conn)) {
                         connection.open = false;
                     }
@@ -1405,7 +1410,8 @@ impl Gate {
             self.deny_armed();
             return reply(self);
         }
-        // The broker's own disagreement or missing outcome ends the gate's generation HELD as well.
+        // RECONCILIATION_REQUIRED (the broker disagrees or lacks an outcome) leaves the generation HELD; the other
+        // urgent reasons invalidate it.
         let target = if reason == CloseReason::ReconciliationRequired { State::Held } else { State::Invalidated };
         self.urgent(target, Invalidation::Close(reason));
         reply(self)

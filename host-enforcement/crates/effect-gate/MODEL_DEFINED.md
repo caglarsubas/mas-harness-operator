@@ -4,9 +4,18 @@ HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `ho
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
 `scripts/i05_gate_channel_v3.py` (sha256 `2c7985b539c0ce8eb79eaabfa1f1ab7d43bdca7515defc590a76ecb1697ca959`) and the
 validator `scripts/validate_admission_channel_v3.py` (sha256
-`7bd762d3069ad6add891063c5b5cd16c75534adb88b1afa245f050b5856dc247`) were read as specification, never translated line by
-line and never copied. Each such point is listed below with its file and lines at `a2eab93` ("model" and "validator"
-below), followed by the behaviour R10 defines itself. The vectors decide every disagreement; all I05 v3 vectors pass.
+`7bd762d3069ad6add891063c5b5cd16c75534adb88b1afa245f050b5856dc247`) were read as specification and never copied: no
+code or comment text is shared with them (checked with an 8-word span search, HE-002 PR review round 1, R1-1). Each such
+point is listed below with its file and lines at `a2eab93` ("model" and "validator" below), followed by the behaviour R10
+defines itself. The vectors decide every disagreement; all I05 v3 vectors pass.
+
+Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
+`json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
+decomposition into operations (BIND, ARM, ACTION_OUTCOME, CLOSE, GENERATION_STATUS, A1, the upstream, expiry, drain and
+restart handlers, and the helpers for recording, denying and urgent closes) and in the order of the checks inside each
+operation, because M17-M31 make refusal order, journal tuples and the restart rebuild normative and the vectors pin
+them. The Rust types and data structures (typed events, requests, outcomes and journal records, the split of A1 into
+admission and consumption) and the R10-defined paths (R1-R12) are R10's own.
 
 ## Wire codec and canonical form (`i05-protocol`: `json`, `frame`, `base64`)
 

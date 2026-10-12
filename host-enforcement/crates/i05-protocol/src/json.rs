@@ -974,7 +974,7 @@ impl Doc {
 
 // ------------------------------------------------------------------------------------------------ walks
 
-/// Nesting depth without recursion: a scalar is 0, an empty array or object 1.
+/// Iterative nesting depth (M5): scalars count 0 and an empty array or object counts 1.
 pub fn depth(value: &Value) -> usize {
     let mut deepest = 0usize;
     let mut stack = vec![(value, 0usize)];

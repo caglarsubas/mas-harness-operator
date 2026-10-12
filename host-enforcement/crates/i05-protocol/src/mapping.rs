@@ -224,8 +224,8 @@ impl OutcomeMapping {
         }
         let present = !data.is_null();
         if row.object == ObjectRule::DeleteBodyIfPresent && present && self.body_kind(identity.kind) == BodyKind::Status {
-            // A registry that does not return the deleted object answers with a v1 Status (details.kind is the
-            // resource); a deletion that is not immediate returns the object instead, which is refused here.
+            // A completed deletion is answered with a v1 Status whose details.kind names the resource (M12); a server
+            // that returns the object itself has not finished deleting it, and that body is refused here.
             let decoded = decode_object(data);
             let details = decoded.as_ref().and_then(|value| value.get("details")).and_then(Value::as_object);
             let (Some(value), Some(details)) = (decoded.as_ref(), details) else { return Some(Mismatch::M05) };

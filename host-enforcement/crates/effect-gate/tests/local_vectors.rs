@@ -28,15 +28,22 @@ fn local_transcripts() {
     let transcripts = rows(&local, "transcripts");
     let ids: Vec<&str> = transcripts.iter().map(|row| text(row, "id")).collect();
     assert_eq!(ids, ["R10-L01a", "R10-L01b", "R10-L01c", "R10-L01d", "R10-L02", "R10-L02b", "R10-L03", "R10-L03b"]);
+    let (mut frames, mut fallbacks) = ([0usize; 2], 0usize);
     for row in transcripts {
         let id = text(row, "id");
-        for mode in [Mode::Value, Mode::Bytes] {
+        for (slot, mode) in [Mode::Value, Mode::Bytes].into_iter().enumerate() {
             let replay = replay(field(configs, text(row, "config")), rows(row, "events"), mode, id);
             if let Err(difference) = compare(&replay, row) {
                 panic!("{id} ({mode:?}): {difference}");
             }
+            frames[slot] += replay.frames;
+            if mode == Mode::Bytes {
+                fallbacks += replay.value_fallbacks;
+            }
         }
     }
+    assert_eq!(frames, [37, 37], "every FRAME event replayed on both paths");
+    assert_eq!(fallbacks, 0, "every built frame has a canonical encoding");
 }
 
 /// A second STORAGE_FAIL_AFTER replaces the first: each pair has the same outputs (the injection events aside) and the

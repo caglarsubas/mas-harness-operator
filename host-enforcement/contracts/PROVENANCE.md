@@ -1,7 +1,9 @@
 # Contract data provenance (HE-002)
 
 Contract data and contract text copied byte for byte (owner decision A on HE-002 DESIGN revision 3, Q-HE2-A (a)). No
-model, validator or other implementation byte is copied. Source repository `caglarsubas/harness-onion`, commit
+model, validator or other implementation code or comment text is copied (HE-002 PR review round 1, finding R1-1: an
+8-word span search of the files HE-002 adds or changes against the I05 and I07 models and validators at `a2eab93`,
+contract text excluded, finds no shared span apart from a two-line hashing helper in `tools/gate.py` that HE-001 merged). Source repository `caglarsubas/harness-onion`, commit
 `a2eab9365c8663cc1ae23a666e864b821f600fa6`, read with `git show a2eab93:<path>`. One line per file: R10 path, source
 path, sha256, bytes.
 
@@ -30,7 +32,7 @@ ACTIVE configuration of `contracts/i05-v3/vectors.json`; S01-S04 close AF2-I05-1
 
 ## NIST CAVP SHA-256 test vectors
 
-Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov, CAVS 11.1), archive sha256
+Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256
 `929ef80b7b3418aca026643f6f248815913b60e01741a44bba9e118067f4c9b8`, copied unchanged (CRLF line ends kept):
 
 - `crates/i05-protocol/tests/cavp/SHA256ShortMsg.rsp`, sha256 `75e1cb83994638481808e225b9eb0c1ebd0c232d952ac42b61abce6363be283c`, 10299 bytes
