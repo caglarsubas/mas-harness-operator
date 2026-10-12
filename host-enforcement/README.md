@@ -14,7 +14,7 @@ the published contract vectors; no binary links them yet.
 | `crates/{containment,broker,observer,gate,writer}/` | Binaries `planeon-*`; argv only, no file access |
 | `crates/i05-protocol/` | Library (HE-002): the I05 v3 wire codec, canonical encoder, SHA-256 (NIST CAVP tested), schema subset, outcome mapping and request rendering |
 | `crates/effect-gate/` | Library (HE-002): the I05 v3 gate state machine with an in-memory journal and failure marker; `MODEL_DEFINED.md` lists what the pinned model, not the READMEs, defines |
-| `contracts/` | The I05 and I07 contract data and READMEs copied byte for byte from harness-onion `a2eab93`; `PROVENANCE.md` |
+| `contracts/` | The I05 and I07 contract data and READMEs copied byte for byte from harness-onion `a2eab93`, and the I05 v3 supplementary vectors (S01-S06) from `93d32e1`; `PROVENANCE.md` |
 | `toolchain.json` | The pinned toolchain, each target's ELF shape and the Command Line Tools dependency |
 | `licenses/closure-1.99.0.json` | The reviewed classification of every shipped file under `lib/rustlib/<target>/` |
 | `tools/gate.py`, `tools/test_gate.py` | The gate and its self-test (stdlib only) |

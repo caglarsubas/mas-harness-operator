@@ -18,6 +18,16 @@ path, sha256, bytes.
 - `contracts/i07-v1/README.md` from `architecture/i07-policy-write/README.md`, sha256 `9e5cb3d1023bc12b9e2643ae42dde5a87640cf04fc8ac1aa88350c65b12ba2dc`, 18817 bytes
 - `contracts/i07-v2/README.md` from `architecture/i07-policy-write-v2/README.md`, sha256 `cde20d7fee8661cd9314350849870fe5b0838b7914a60237d0eeb1f5dca39d39`, 12929 bytes
 
+## I05 v3 supplementary vectors (W03-AMEND)
+
+Copied byte for byte from `caglarsubas/harness-onion` commit `93d32e1cc5125b5878f51de31c61ada29e1fa6da` (MET-ENFORCE-024,
+W03-AMEND; owner decision Q-HE2-E (b)), read with `git show 93d32e1:<path>`. The file is registered before use in that
+commit's edge record `architecture/artifact-edges/operator-harness-engineering.json` (status REGISTERED_BEFORE_USE,
+relation BYTE_IDENTICAL, consumer packet HE-002). Its six transcripts (S01-S06) use the v3 transcript format and the v3
+ACTIVE configuration of `contracts/i05-v3/vectors.json`; S01-S04 close AF2-I05-1 (plan obligation I05-4).
+
+- `contracts/i05-v3-supplement/vectors.json` from `architecture/i05-gate-channel-v3-supplement/vectors.json`, sha256 `1c00bdb3ea112af6098a09158cce3e4a7a6098c9670f490ead4ca65d8bdbb5ac`, 29077 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov, CAVS 11.1), archive sha256
