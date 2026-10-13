@@ -1,4 +1,5 @@
-//! The closed vocabularies of the I05 gate: states, classifications, close and fatal reasons, drain answers.
+//! The closed vocabularies of the I05 gate (states, classifications, close and fatal reasons, drain answers) and of
+//! its I07 channel (maintenance states and reasons, session ends, abort reasons).
 
 use i05_protocol::FrameError;
 
@@ -136,11 +137,14 @@ impl FatalReason {
     }
 }
 
-/// The reason an INVALIDATED record carries: an urgent close, the storage-failure path, or a fatal channel failure.
+/// The reason an INVALIDATED record carries: an urgent close, the storage-failure path, a fatal channel failure, or
+/// (HE-002B) a deviation of the I07 writer peer. The last one is neither a `CloseReason` (a broker CLOSE can never name
+/// it) nor a `FatalReason` (no I05 channel failure produces it); only PolicyGate records it.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Invalidation {
     Close(CloseReason),
     Fatal(FatalReason),
+    WriterPeerDeviation,
 }
 
 impl Invalidation {
@@ -148,6 +152,102 @@ impl Invalidation {
         match self {
             Invalidation::Close(reason) => reason.as_str(),
             Invalidation::Fatal(reason) => reason.as_str(),
+            Invalidation::WriterPeerDeviation => "WRITER_PEER_DEVIATION",
+        }
+    }
+}
+
+/// The I07 maintenance of a generation (Decisions 0 and 1): not begun, waiting for the A3 fence, open for writes,
+/// held, or ended for good.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Maintenance {
+    NotBegun,
+    Pending,
+    Open,
+    Held,
+    Ended,
+}
+
+impl Maintenance {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Maintenance::NotBegun => "NONE",
+            Maintenance::Pending => "PENDING",
+            Maintenance::Open => "OPEN",
+            Maintenance::Held => "HELD",
+            Maintenance::Ended => "ENDED",
+        }
+    }
+}
+
+/// How a writer session ended: end of file or loss, or a fatal frame or peer deviation.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SessionEnd {
+    Ended,
+    Fatal,
+}
+
+impl SessionEnd {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionEnd::Ended => "ENDED",
+            SessionEnd::Fatal => "FATAL",
+        }
+    }
+}
+
+/// The reason a MAINT_ENDED record carries: the writer's WRITE_END, or the end of the owning session.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum MaintenanceEnd {
+    WriteEnd,
+    Session(SessionEnd),
+}
+
+impl MaintenanceEnd {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MaintenanceEnd::WriteEnd => "WRITE_END",
+            MaintenanceEnd::Session(SessionEnd::Ended) => "SESSION_ENDED",
+            MaintenanceEnd::Session(SessionEnd::Fatal) => "SESSION_FATAL",
+        }
+    }
+}
+
+/// Why the maintenance is ENDED (the snapshot's `maintenanceReason`): a recorded end, or a restart that met a begun
+/// maintenance without an end record, or none at all (I07 v3 W2).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum MaintenanceReason {
+    Ended(MaintenanceEnd),
+    GateRestart,
+    GenerationRebuilt,
+}
+
+impl MaintenanceReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MaintenanceReason::Ended(end) => end.as_str(),
+            MaintenanceReason::GateRestart => "GATE_RESTART",
+            MaintenanceReason::GenerationRebuilt => "GENERATION_REBUILT",
+        }
+    }
+}
+
+/// Why the gate gave up on an outstanding write before its upstream outcome (I07 v2 R4, v3 W2).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AbortReason {
+    WriterChannelLost,
+    WriterPeerDeviation,
+    WriterProtocolFailure,
+    UpstreamTimeout,
+}
+
+impl AbortReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AbortReason::WriterChannelLost => "WRITER_CHANNEL_LOST",
+            AbortReason::WriterPeerDeviation => "WRITER_PEER_DEVIATION",
+            AbortReason::WriterProtocolFailure => "WRITER_PROTOCOL_FAILURE",
+            AbortReason::UpstreamTimeout => "UPSTREAM_TIMEOUT",
         }
     }
 }

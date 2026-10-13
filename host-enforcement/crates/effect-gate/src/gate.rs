@@ -4,6 +4,9 @@
 //! marker); where they are silent the pinned model is the specification (MODEL_DEFINED.md lists each point). The gate
 //! never panics: arithmetic saturates or is checked, lookups are fallible, and an event outside the model's
 //! preconditions is refused with [`EventError`] without any state change.
+//!
+//! The I07 PolicyGate (`policy_gate`) owns a `Gate` and reaches its journal, fence, drain, deny and urgent-close steps
+//! through the `pub(crate)` methods below; the public I05 API is unchanged by it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -565,7 +568,7 @@ impl Gate {
 
     /// Appends one journal record and reports whether it is durable. When the write fails, the storage-failure path
     /// of M20 has already run by the time this returns, so callers only decide how to refuse or report it.
-    fn record(&mut self, record: Record) -> bool {
+    pub(crate) fn record(&mut self, record: Record) -> bool {
         if self.journal.attempt(record) {
             return true;
         }
@@ -688,12 +691,27 @@ impl Gate {
         }
     }
 
-    fn armed_ids(&self) -> Vec<u16> {
+    pub(crate) fn armed_ids(&self) -> Vec<u16> {
         self.actions.values().filter(|action| action.status == Status::Armed).map(|action| action.id).collect()
     }
 
+    /// The consumed action that has no TERMINAL record yet, if any (the status answers' `inFlightActionId`).
+    pub(crate) fn in_flight_id(&self) -> Option<u16> {
+        self.in_flight().map(|action| action.id)
+    }
+
+    /// The generation this gate serves.
+    pub(crate) fn generation(&self) -> &str {
+        &self.config.generation
+    }
+
+    /// A direct state change, without a record of its own (PolicyGate holds the generation this way: N11, N12, N15).
+    pub(crate) fn set_state(&mut self, state: State) {
+        self.state = state;
+    }
+
     /// Of the action ids that were ARMED when the current operation started, those that are now TERMINAL (M21).
-    fn denied_since(&self, armed: &[u16]) -> Vec<u16> {
+    pub(crate) fn denied_since(&self, armed: &[u16]) -> Vec<u16> {
         armed
             .iter()
             .copied()
@@ -741,7 +759,7 @@ impl Gate {
     }
 
     /// A4: close A1 first (in memory), record the invalidation, deny unconsumed actions.
-    fn urgent(&mut self, state: State, reason: Invalidation) {
+    pub(crate) fn urgent(&mut self, state: State, reason: Invalidation) {
         if self.state != State::Held {
             self.state = state;
         }
@@ -769,7 +787,7 @@ impl Gate {
 
     /// Resolves a waiting I07 drain (M28). With nothing in flight, DRAINING turns into CLOSED, or HELD when some
     /// action is IO_AMBIGUOUS; once the fence is decided, DRAINED is journaled and its answer returned.
-    fn settle_drain(&mut self) -> Option<DrainAnswer> {
+    pub(crate) fn settle_drain(&mut self) -> Option<DrainAnswer> {
         if !self.drain_pending {
             return None;
         }
@@ -841,20 +859,27 @@ impl Gate {
                     Output::of(OutputKind::Nothing)
                 }
             }
-            Event::GateRestart => {
-                // Deny-first restart: no channel, stamps, connections or pending drain.
-                self.state = self.rebuild();
-                for connection in self.connections.values_mut() {
-                    connection.open = false;
-                }
-                self.backlog.clear();
-                self.channel = Channel::Closed;
-                self.drain_pending = false;
-                // Journal RESTARTED; if the store is still failing, the storage-failure path leaves the generation HELD.
-                self.record(Record::Restarted { state: self.state });
-                Output::of(OutputKind::RestartState(self.state))
-            }
+            Event::GateRestart => self.restart_with(None),
         })
+    }
+
+    /// GATE_RESTART (M30) with an optional state floor. The public I05 event passes `None`, so without PolicyGate the
+    /// floor never applies. PolicyGate passes `Some(State::Held)` when its own journal-only rebuild finds an ambiguous
+    /// write (HE-002B DESIGN §3, §6): the restart is then HELD whatever the I05 rebuild found, before RESTARTED records the
+    /// state. HELD is the strictest state, so no other floor value changes anything.
+    pub(crate) fn restart_with(&mut self, floor: Option<State>) -> Output {
+        let rebuilt = self.rebuild();
+        self.state = if floor == Some(State::Held) { State::Held } else { rebuilt };
+        // Deny-first restart: no channel, stamps, connections or pending drain.
+        for connection in self.connections.values_mut() {
+            connection.open = false;
+        }
+        self.backlog.clear();
+        self.channel = Channel::Closed;
+        self.drain_pending = false;
+        // Journal RESTARTED; if the store is still failing, the storage-failure path leaves the generation HELD.
+        self.record(Record::Restarted { state: self.state });
+        Output::of(OutputKind::RestartState(self.state))
     }
 
     fn expire(&mut self) -> Output {
@@ -987,7 +1012,8 @@ impl Gate {
             None => return Err(EventError("upstream event without a forwarded action")),
         };
         if status == Status::Terminal {
-            // Already sealed, or cut off by the 900 s bound: journal LATE_UPSTREAM and relay nothing (M27).
+            // The action already has its TERMINAL classification (it was sealed, cut off by the 900 s bound, or
+            // settled by an earlier upstream response or loss): journal LATE_UPSTREAM and relay nothing (M27).
             self.record(Record::LateUpstream { action_id: id });
             return Ok(Output::of(OutputKind::LateUpstream));
         }
@@ -1072,7 +1098,7 @@ impl Gate {
 
     /// Handles I07 WRITE_BEGIN whatever the state (M28): ACTIVE and INSPECTING start the gate's normal drain, any
     /// ARMED action is denied, and the answer waits on the A3 fence.
-    fn drain(&mut self) -> Output {
+    pub(crate) fn drain(&mut self) -> Output {
         let armed = self.armed_ids();
         if matches!(self.state, State::Active | State::Inspecting) {
             self.state = State::Draining;
@@ -1216,7 +1242,9 @@ impl Gate {
         if digests.iter().any(|digest| prior.manifest_digests.contains(digest))
             || identities.iter().any(|identity| prior.manifest_identities.contains(identity))
         {
-            return refused("MANIFEST_REUSED"); // manifests bound by an earlier generation cannot be bound again
+            // A manifest digest, or a kind/namespace/name identity, that an earlier generation bound cannot be bound
+            // again (even under a different digest).
+            return refused("MANIFEST_REUSED");
         }
         if !self.config.observed_workers.contains(&(p.worker_pid, p.worker_start_ticks)) {
             return refused("WORKER_NOT_OBSERVED");
@@ -1561,6 +1589,22 @@ mod tests {
         assert_eq!(gate.rebuild(), State::Closed);
         assert!(gate.journal.attempt(Record::Consumed { action_id: 9 }));
         assert_eq!(gate.rebuild(), State::Held);
+    }
+
+    #[test]
+    fn the_restart_floor_only_ever_holds() {
+        // Without a floor the restart is exactly GATE_RESTART's: a clean CLOSED journal restarts CLOSED.
+        let mut gate = active_gate();
+        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.restart_with(None).kind, OutputKind::RestartState(State::Closed));
+        // A HELD floor makes the same journal restart HELD, and RESTARTED records the floored state.
+        assert_eq!(gate.restart_with(Some(State::Held)).kind, OutputKind::RestartState(State::Held));
+        assert_eq!(last_record(&gate), Some(&Record::Restarted { state: State::Held }));
+        // No other floor lifts a HELD rebuild (the journal's last state record is now RESTARTED HELD).
+        assert_eq!(gate.restart_with(Some(State::Closed)).kind, OutputKind::RestartState(State::Held));
+        let mut gate = active_gate();
+        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.restart_with(Some(State::Invalidated)).kind, OutputKind::RestartState(State::Closed));
     }
 
     #[test]
