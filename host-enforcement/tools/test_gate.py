@@ -349,6 +349,218 @@ class WorkspaceAndSourceTests(unittest.TestCase):
                 gate.check_sources(self.base)
 
 
+LINKED_TREE = {
+    "crates/i05-protocol/src/lib.rs": "//! Protocol.\n#![forbid(unsafe_code)]\npub mod json;\n",
+    "crates/i05-protocol/src/json.rs": "use std::collections::BTreeMap;\npub fn parse() {}\n",
+    "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]\npub mod file_store;\n",
+    "crates/effect-gate/src/file_store.rs": "use std::fs::File;\nuse std::io;\nuse std::os::unix::fs::FileExt;\n"
+                                           "pub fn open() {} // FileStores::open, Gate::open, Gate::create\n",
+    "crates/effect-gate/tests/files.rs": "use std::process::Command;\nuse std::os::fd::AsRawFd;\n",
+    "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]\npub mod openat;\n",
+    "crates/gate-sys/src/openat.rs": "#![allow(unsafe_code)]\nuse std::fs::File;\nuse std::os::fd::FromRawFd;\n"
+                                     "use std::os::unix::fs::MetadataExt;\nunsafe extern \"C\" {}\n"
+                                     "fn f(fd: i32) -> File { unsafe { std::fs::File::from_raw_fd(fd) } }\n",
+    "crates/gate/src/main.rs": "fn main() {}\n",
+    "target/debug/build/out.rs": "unsafe fn generated() {}\n",
+}
+
+
+class LinkedSourceTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.base = Path(self.directory.name)
+        for rel, text in LINKED_TREE.items():
+            self.write(rel, text)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def write(self, rel, text):
+        path = self.base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def refused(self, rel, text, message, check=gate.check_linked_sources):
+        self.write(rel, text)
+        with self.assertRaisesRegex(gate.GateError, message):
+            check(self.base)
+        if rel in LINKED_TREE:
+            self.write(rel, LINKED_TREE[rel])
+        else:
+            (self.base / rel).unlink()
+
+    def test_the_tree_passes(self):
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+        self.assertEqual(gate.check_unsafe(self.base), 8)
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    def test_forbidden_names_in_linked_sources(self):
+        for text in ("use std::process::Command;", "let _ = std::env::args_os();", "use std::net::TcpStream;",
+                     "use std::path::Path;", "fn f(_: &Path) {}", "fn f(_: PathBuf) {}", "let _ = DirBuilder::new();",
+                     "let _ = OpenOptions::new();", "let _ = File::open(x);", "let _ = File::create(x);",
+                     "let _ = File::options();", "Err(TryLockError::WouldBlock) => {}", "fn f(_: Metadata) {}"):
+            self.refused("crates/i05-protocol/src/json.rs", text + "\n", "linked-source tripwire")
+            self.refused("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"] + text + "\n",
+                         "linked-source tripwire")
+        # Tests and other crates are outside the allowlist (the start-up lint and the unsafe rule still apply).
+        self.write("crates/gate/src/main.rs", "use std::path::Path;\nfn main() {}\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_std_fs_items(self):
+        source = "crates/effect-gate/src/file_store.rs"
+        for text in ("use std::fs::{File};", "use std::fs;", "let _ = std::fs::read(x);", "use std::fs::FileType;",
+                     "use std::os::unix::fs::MetadataExt;", "use std::os::unix::fs;", "use std::{fs, io};", "let _ = fs::File::from_raw_fd;"):
+            self.refused(source, LINKED_TREE[source] + text + "\n", "std fs item")
+        self.refused("crates/effect-gate/src/gate.rs", "use std::os::unix::fs::FileExt;\n", "std fs item")
+        self.refused("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"]
+                     + "use std::os::unix::fs::{FileExt, MetadataExt};\n", "std fs item")
+        self.write("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"]
+                   + "use std::os::unix::fs::FileExt;\nuse std::os::unix::fs::MetadataExt;\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_fd_items_only_in_openat(self):
+        for text in ("use std::os::fd::AsRawFd;", "fn f(_: RawFd) {}", "use std::os::unix::io::FromRawFd;",
+                     "fn f(_: OwnedFd) {}"):
+            self.refused("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"] + text + "\n",
+                         "std::os::fd item outside")
+            self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                         + text + "\n", "std::os::fd item outside")
+
+    def test_std_uses_are_not_renamed(self):
+        for text in ("use std::fs::File as Handle;", "use std::io::{self as stdio};", "use std::collections::{\n  BTreeMap as Map,\n};"):
+            self.refused("crates/i05-protocol/src/json.rs", text + "\n", "renames a std item")
+        self.write("crates/i05-protocol/src/json.rs", "use crate::json as j;\nlet x = y as u64;\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_crate_root_attributes(self):
+        for rel in gate.CRATE_ROOTS:
+            self.refused(rel, "pub mod x;\n", "lacks")
+        self.refused("crates/gate-sys/src/lib.rs", "#![forbid(unsafe_code)]\npub mod openat;\n", "lacks")
+        self.refused("crates/effect-gate/src/lib.rs", "#![deny(unsafe_code)]\npub mod file_store;\n", "lacks")
+
+    def test_unsafe_is_confined_to_openat(self):
+        for rel in ("crates/effect-gate/tests/files.rs", "crates/gate/src/main.rs", "crates/i05-protocol/src/json.rs",
+                    "crates/gate-sys/src/lib.rs"):
+            self.refused(rel, LINKED_TREE.get(rel, "") + "// no unsafe here\n", "contains unsafe outside",
+                         check=gate.check_unsafe)
+        self.write("crates/effect-gate/src/lib.rs", "#![forbid(unsafe_code)]\n// unsafe_code is a lint name\n")
+        self.assertEqual(gate.check_unsafe(self.base), 8)
+
+    # HE-002C PR review round 2, R2-1 and R2-2: std::os paths, nested globs, std aliases, raw identifiers, inline
+    # assembly, symlinks and manifest paths.
+
+    def test_std_os_paths(self):
+        for text in ("use std::os::unix::net::UnixStream;", "let _ = std::os::unix::net::UnixListener::bind(p);",
+                     "use std::os;", "let _ = std :: os :: unix :: process::CommandExt;"):
+            self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                         + text + "\n", "std::os item other than")
+            self.refused("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"] + text + "\n",
+                         "std::os item other than")
+        self.write("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"]
+                   + "use std::os::fd::AsRawFd;\nuse std::os::fd::OwnedFd;\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_nested_globs_and_std_aliases(self):
+        for text, message in (("use std::collections::*;", "nested glob of std"),
+                              ("use std :: io :: prelude :: * ;", "nested glob of std"),
+                              ("use std::os::unix::prelude::*;", "std::os item other than"),
+                              ("use {std as s};", "renames std"), ("pub use { std  as  s };", "renames std")):
+            self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
+        self.write("crates/i05-protocol/src/json.rs", "mod tests { use super::*; }\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_raw_identifiers_and_inline_assembly(self):
+        for rel in ("crates/i05-protocol/src/json.rs", "crates/gate/src/main.rs", "crates/effect-gate/tests/files.rs"):
+            for text, message in (("let _ = std::r#process::Command::new(x);", "uses a raw identifier"),
+                                  ("use r#std as s;", "uses a raw identifier"),
+                                  ('#[r#path = "x.inc"] mod m;', "uses a raw identifier"),
+                                  ('core::arch::global_asm!("");', "uses inline assembly"),
+                                  ('fn f() { asm ! ("nop") }', "uses inline assembly")):
+                self.refused(rel, LINKED_TREE[rel] + text + "\n", message, check=gate.check_included_code)
+        self.write("crates/gate/src/main.rs", 'fn main() { let _ = r#"raw string"#; let asm = 1; }\n')
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    def test_symlinks_and_manifest_paths(self):
+        (self.base / "crates/elsewhere").mkdir()
+        (self.base / "crates/linked").symlink_to(self.base / "crates/elsewhere")
+        with self.assertRaisesRegex(gate.GateError, "is a symlink under crates/"):
+            gate.check_included_code(self.base)
+        (self.base / "crates/linked").unlink()
+        (self.base / "crates/elsewhere").rmdir()
+        for text, message in (('[package]\nname = "gate"\nbuild = "b.rs"\n', "names a build script"),
+                              ('[package]\nname = "gate"\n[lib]\npath = "../other/lib.rs"\n', "gives a lib target a path"),
+                              ('[package]\nname = "gate"\n[[bin]]\nname = "g"\npath = "x.rs"\n',
+                               "gives a bin target a path")):
+            self.refused("crates/gate/Cargo.toml", text, message, check=gate.check_included_code)
+        self.write("crates/gate/Cargo.toml", '[package]\nname = "gate"\n[dependencies]\nhost-common = { path = "../host-common" }\n')
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    # HE-002C PR review round 1, R1-1: the forms that passed the first tripwire.
+
+    def test_grouped_std_imports(self):
+        for text in ("use std::{process::Command};", "use std :: {net::TcpStream};", "pub use ::std::{env};",
+                     "use std::*;", "pub use std :: * ;"):
+            self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                         + text + "\n", "top-level group or glob of std")
+        self.write("crates/i05-protocol/src/json.rs", "use std::collections::{BTreeMap, BTreeSet};\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_spaced_paths(self):
+        for text, message in (("let _ = std :: process :: Command::new(x);", "std::process"),
+                              ("let _ = std\n    ::env::args_os();", "std::env"),
+                              ("let _ = ::std:: net ::TcpStream::connect(x);", "std::net"),
+                              ("let _ = std::fs::File :: open(x);", "File::open"),
+                              ("let _ = File ::create(x);", "File::create"),
+                              ("use std :: os :: fd;", "std::os::fd item outside"),
+                              ("use std :: fs;", "std fs item"),
+                              ("use std::fs :: File as Handle;", "renames a std item")):
+            self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
+        self.write("crates/effect-gate/src/file_store.rs", "use std :: fs :: File;\nuse std::os::unix::fs ::FileExt;\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    def test_extern_crate(self):
+        for text in ("extern crate std as s;\nfn f() { let _ = s::net::TcpStream::connect(x); }", "extern  crate alloc;"):
+            self.refused("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"] + text + "\n",
+                         "declares an extern crate")
+
+    def test_macro_built_std_paths(self):
+        for text in ("macro_rules! m { ($k:ident) => { std::$k::Command::new(x) } }",
+                     "macro_rules! m { ($k:ident) => { std :: $k :: TcpStream::connect(x) } }"):
+            self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                         + text + "\n", "completes a std path in a macro")
+
+    def test_path_attributes(self):
+        for rel in ("crates/gate-sys/src/lib.rs", "crates/gate/src/main.rs", "crates/effect-gate/tests/files.rs"):
+            for text in ('#[path = "extra.inc"]\nmod extra;', '# [ path="extra.rs"] mod extra;', '#![path = "x"]',
+                         '#[cfg_attr(all(), path = "extra.inc")]\nmod extra;'):
+                self.refused(rel, LINKED_TREE[rel] + text + "\n", "has a path attribute", check=gate.check_included_code)
+        self.write("crates/gate/src/main.rs", '#[cfg_attr(test, derive(Debug))]\nstruct S;\nfn main() { let path = "p"; }\n')
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    def test_include_in_a_linked_crate(self):
+        for text in ('include!("extra.txt");', 'std::include !("extra.txt");', "use core::include as inc;",
+                     "use core::{include as inc};"):
+            self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                         + text + "\n", "names include", check=gate.check_included_code)
+
+    def test_include_in_a_binary_crate(self):
+        self.refused("crates/gate/src/main.rs", 'include!("extra.txt");\nfn main() {}\n', "names include",
+                     check=gate.check_included_code)
+        self.write("crates/gate/src/main.rs", 'const A: &str = include_str!("a.txt");\n'
+                                              'const B: &[u8] = include_bytes!("b.bin");\nfn main() {}\n')
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    def test_non_rs_files_under_src(self):
+        for rel in ("crates/gate-sys/src/extra.inc", "crates/gate/src/extra.txt", "crates/effect-gate/src/sub/x.rs.txt"):
+            self.refused(rel, "#![allow(unsafe_code)]\nunsafe fn f() {}\n", "not a .rs file", check=gate.check_included_code)
+        os.symlink("../tests", self.base / "crates/effect-gate/src/linked")
+        with self.assertRaisesRegex(gate.GateError, "symlink under crates/"):
+            gate.check_included_code(self.base)
+        (self.base / "crates/effect-gate/src/linked").unlink()
+        self.write("crates/effect-gate/tests/data.json", "{}\n")
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+
 class ToolchainTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

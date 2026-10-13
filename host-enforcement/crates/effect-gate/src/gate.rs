@@ -7,6 +7,9 @@
 //!
 //! The I07 PolicyGate (`policy_gate`) owns a `Gate` and reaches its journal, fence, drain, deny and urgent-close steps
 //! through the `pub(crate)` methods below; the public I05 API is unchanged by it.
+//!
+//! HE-002C puts the journal and the failure marker behind `store::Stores`: `Gate::new` keeps HE-002's in-memory pair,
+//! `Gate::create` starts a new generation on file stores and `Gate::open` is the process restart (DESIGN §8).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,8 +19,10 @@ use i05_protocol::{
     ZERO_DIGEST,
 };
 
-use crate::config::Config;
-use crate::journal::{ChannelEnd, Entry, Journal, Marker, Record, TerminalDetails};
+use crate::config::{Config, PriorBindings};
+use crate::file_store::FileStores;
+use crate::journal::{journal_doc, ChannelEnd, Entry, Record, TerminalDetails};
+use crate::store::{Appended, MemoryStores, Stores};
 use crate::types::{Classification, CloseReason, DrainAnswer, FatalReason, Invalidation, State};
 
 /// A connection stamp: the action a server connection was accepted for (C3).
@@ -427,6 +432,51 @@ fn update(actions: &mut BTreeMap<u16, Action>, inconsistent: &mut bool, id: u16,
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GateError {
     Schema(String),
+    /// `create` on stores that do not hold a new generation: this opening did not create the journal file or append
+    /// the index entry, the journal is not empty, or a marker file exists (HE-002C DESIGN §8). Use `open`.
+    NotFresh,
+    /// The stores belong to another generation than the configuration.
+    GenerationMismatch,
+}
+
+/// Adds every binding of `from` to `into` (owner decision Q-HE2C-2 (a): the union, so it refuses more, never less).
+fn unite(into: &mut PriorBindings, from: &PriorBindings) {
+    into.execution_ids.extend(from.execution_ids.iter().cloned());
+    into.run_nonces.extend(from.run_nonces.iter().cloned());
+    into.manifest_digests.extend(from.manifest_digests.iter().cloned());
+    into.manifest_identities.extend(from.manifest_identities.iter().cloned());
+}
+
+/// What a process restart derives from the journal alone (HE-002C DESIGN §8): the execution of the last BIND, whether
+/// an EXPIRED record for it follows that BIND, and every execution ID and run nonce this generation bound.
+struct Derived {
+    bound: Option<Bound>,
+    expired: bool,
+    bound_ids: Vec<String>,
+    bound_nonces: Vec<String>,
+}
+
+impl Derived {
+    fn from_journal(entries: &[Entry]) -> Derived {
+        let mut derived = Derived { bound: None, expired: false, bound_ids: Vec::new(), bound_nonces: Vec::new() };
+        for entry in entries {
+            match entry {
+                Entry::Record(Record::Bind { execution_id, run_nonce, .. }) => {
+                    derived.bound = Some(Bound { execution_id: execution_id.clone(), run_nonce: run_nonce.clone() });
+                    derived.expired = false;
+                    derived.bound_ids.push(execution_id.clone());
+                    derived.bound_nonces.push(run_nonce.clone());
+                }
+                Entry::Record(Record::Expired { execution_id }) => {
+                    if derived.bound.as_ref().is_some_and(|bound| bound.execution_id == *execution_id) {
+                        derived.expired = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        derived
+    }
 }
 
 /// The I05 gate for one generation.
@@ -449,15 +499,53 @@ pub struct Gate {
     backlog: Vec<String>,
     connections: BTreeMap<String, Connection>,
     counters: Counters,
-    journal: Journal,
-    marker: Marker,
+    stores: Box<dyn Stores>,
     failing: bool,
 }
 
 impl Gate {
-    /// A gate for a validated configuration, checking frames against the embedded I05 v3 schema.
+    /// A gate for a validated configuration, checking frames against the embedded I05 v3 schema, on in-memory stores.
     pub fn new(config: Config) -> Result<Gate, GateError> {
+        Gate::with_stores(config, Box::new(MemoryStores::default()))
+    }
+
+    /// A new generation on file stores: allowed only when this opening created the journal file and appended the
+    /// generation's index entry, the journal is empty and no marker file exists; the gate then starts as `new` does,
+    /// with the earlier generations' bindings united into the configuration's.
+    pub fn create(config: Config, stores: FileStores) -> Result<Gate, GateError> {
+        if config.generation != stores.generation() {
+            return Err(GateError::GenerationMismatch);
+        }
+        if !(stores.journal_created() && stores.indexed_now() && stores.entries().is_empty() && !stores.marker_file_exists()) {
+            return Err(GateError::NotFresh);
+        }
+        Gate::with_stores(config, Box::new(stores))
+    }
+
+    /// The I05 process restart: the gate as the stores' files leave it, restarted once (RESTARTED appended), with a
+    /// HELD floor when the journal holds an ambiguous I07 write; returns the restart's `RestartState` output.
+    pub fn open(config: Config, stores: FileStores) -> Result<(Gate, Output), GateError> {
+        let floor = crate::policy_gate::write_floor(stores.entries());
+        let mut gate = Gate::reopened(config, stores)?;
+        let output = gate.restart_with(floor);
+        Ok((gate, output))
+    }
+
+    /// The gate on reopened file stores, not yet restarted (PolicyGate's process restart restarts it itself).
+    pub(crate) fn reopened(config: Config, stores: FileStores) -> Result<Gate, GateError> {
+        if config.generation != stores.generation() {
+            return Err(GateError::GenerationMismatch);
+        }
+        Gate::with_stores(config, Box::new(stores))
+    }
+
+    /// A gate on `stores` without a restart: the bound execution, its expiry and this generation's bound IDs and
+    /// nonces are derived from the mirror (nothing for an empty one), the stores' earlier bindings are united into
+    /// the configuration's, and everything else starts as for a new generation.
+    pub(crate) fn with_stores(mut config: Config, stores: Box<dyn Stores>) -> Result<Gate, GateError> {
         let schema = i05_protocol::i05_v3_schema().map_err(|error| GateError::Schema(error.0))?;
+        unite(&mut config.prior, stores.prior_bindings());
+        let derived = Derived::from_journal(stores.entries());
         Ok(Gate {
             state: config.state,
             config,
@@ -467,18 +555,17 @@ impl Gate {
             challenge: None,
             next_sequence: 1,
             last_digest: ZERO_DIGEST.to_string(),
-            bound: None,
-            bound_ids: Vec::new(),
-            bound_nonces: Vec::new(),
-            expired: false,
+            bound: derived.bound,
+            bound_ids: derived.bound_ids,
+            bound_nonces: derived.bound_nonces,
+            expired: derived.expired,
             actions: BTreeMap::new(),
             mutation_keys: BTreeSet::new(),
             created_uids: BTreeMap::new(),
             backlog: Vec::new(),
             connections: BTreeMap::new(),
             counters: Counters::default(),
-            journal: Journal::default(),
-            marker: Marker::default(),
+            stores,
             failing: false,
         })
     }
@@ -498,12 +585,12 @@ impl Gate {
     }
 
     pub fn journal(&self) -> &[Entry] {
-        self.journal.entries()
+        self.stores.entries()
     }
 
     /// `journalDigest`: the SHA-256 of the canonical journal.
     pub fn journal_digest(&self) -> String {
-        sha256::prefixed(&self.journal.to_doc().canonical())
+        sha256::prefixed(&journal_doc(self.stores.entries()).canonical())
     }
 
     /// Applies one event, then settles any I07 drain still waiting for its fence (M28); the output of the event that
@@ -559,8 +646,8 @@ impl Gate {
             ("actions", Doc::Object(actions)),
             ("connections", Doc::Object(connections)),
             ("counters", self.counters.to_doc()),
-            ("journal", self.journal.to_doc()),
-            ("failureMarker", self.marker.to_doc()),
+            ("journal", journal_doc(self.stores.entries())),
+            ("failureMarker", self.stores.marker_doc()),
         ])
     }
 
@@ -569,7 +656,7 @@ impl Gate {
     /// Appends one journal record and reports whether it is durable. When the write fails, the storage-failure path
     /// of M20 has already run by the time this returns, so callers only decide how to refuse or report it.
     pub(crate) fn record(&mut self, record: Record) -> bool {
-        if self.journal.attempt(record) {
+        if self.stores.append(record) == Appended::Durable {
             return true;
         }
         self.storage_failure();
@@ -585,7 +672,7 @@ impl Gate {
         self.mark_in_flight_after_invalidation();
         let generation = self.config.generation.clone();
         // The marker's own result changes nothing here: a failed marker write is what the disclosed residual covers.
-        let _marker_written = self.marker.write(&generation, CloseReason::StorageFailure.as_str());
+        let _marker_written = self.stores.write_marker(&generation, CloseReason::StorageFailure.as_str());
         self.record(Record::Invalidated { reason: Invalidation::Close(CloseReason::StorageFailure), state: State::Held });
         self.deny_armed();
         self.failing = false;
@@ -598,7 +685,7 @@ impl Gate {
         let mut state = State::Held;
         let mut torn = false;
         let mut inconsistent = false;
-        for entry in self.journal.entries() {
+        for entry in self.stores.entries() {
             let record = match entry {
                 Entry::Torn => {
                     torn = true;
@@ -669,7 +756,7 @@ impl Gate {
             }
         }
         self.actions = actions;
-        if self.marker.is_present() || torn || inconsistent {
+        if self.stores.marker_present() || torn || inconsistent {
             return State::Held;
         }
         if clean && matches!(state, State::Closed | State::Invalidated) { state } else { State::Held }
@@ -819,15 +906,15 @@ impl Gate {
             Event::UpstreamLost { conn } => self.upstream(&conn, None)?,
             Event::UpstreamTimeout { conn } => self.timeout(&conn)?,
             Event::StorageFailNext { torn } => {
-                self.journal.fail_next(torn);
+                self.stores.fail_next(torn);
                 Output::of(OutputKind::Nothing)
             }
             Event::MarkerFailNext => {
-                self.marker.fail_next();
+                self.stores.marker_fail_next();
                 Output::of(OutputKind::Nothing)
             }
             Event::StorageFailAfter { after } => {
-                self.journal.fail_after(after);
+                self.stores.fail_after(after);
                 Output::of(OutputKind::Nothing)
             }
             Event::DrainRequest => self.drain(),
@@ -1585,9 +1672,9 @@ mod tests {
     #[test]
     fn a_rebuild_that_meets_an_unknown_action_restarts_held() {
         let mut gate = active_gate();
-        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.stores.append(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }), Appended::Durable);
         assert_eq!(gate.rebuild(), State::Closed);
-        assert!(gate.journal.attempt(Record::Consumed { action_id: 9 }));
+        assert_eq!(gate.stores.append(Record::Consumed { action_id: 9 }), Appended::Durable);
         assert_eq!(gate.rebuild(), State::Held);
     }
 
@@ -1595,7 +1682,7 @@ mod tests {
     fn the_restart_floor_only_ever_holds() {
         // Without a floor the restart is exactly GATE_RESTART's: a clean CLOSED journal restarts CLOSED.
         let mut gate = active_gate();
-        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.stores.append(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }), Appended::Durable);
         assert_eq!(gate.restart_with(None).kind, OutputKind::RestartState(State::Closed));
         // A HELD floor makes the same journal restart HELD, and RESTARTED records the floored state.
         assert_eq!(gate.restart_with(Some(State::Held)).kind, OutputKind::RestartState(State::Held));
@@ -1603,7 +1690,7 @@ mod tests {
         // No other floor lifts a HELD rebuild (the journal's last state record is now RESTARTED HELD).
         assert_eq!(gate.restart_with(Some(State::Closed)).kind, OutputKind::RestartState(State::Held));
         let mut gate = active_gate();
-        assert!(gate.journal.attempt(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }));
+        assert_eq!(gate.stores.append(Record::Closed { reason: CloseReason::NormalDrain, state: State::Closed }), Appended::Durable);
         assert_eq!(gate.restart_with(Some(State::Invalidated)).kind, OutputKind::RestartState(State::Closed));
     }
 

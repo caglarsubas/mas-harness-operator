@@ -6,8 +6,13 @@ version = 4
 name = "effect-gate"
 version = "0.1.0"
 dependencies = [
+ "gate-sys",
  "i05-protocol",
 ]
+
+[[package]]
+name = "gate-sys"
+version = "0.1.0"
 
 [[package]]
 name = "host-common"

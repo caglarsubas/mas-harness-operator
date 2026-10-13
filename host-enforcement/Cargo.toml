@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/host-common", "crates/containment", "crates/broker", "crates/observer", "crates/gate", "crates/writer",
-           "crates/i05-protocol", "crates/effect-gate"]
+           "crates/i05-protocol", "crates/effect-gate", "crates/gate-sys"]
 
 [workspace.package]
 version = "0.1.0"

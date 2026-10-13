@@ -1,13 +1,13 @@
 //! The durable journal as typed records (I05 v1 and v2 "Durable journal", and the I07 records of I07 v1-v3), their
 //! exact canonical tuple form (which the journal digest covers), the in-memory store with the contract's three test
-//! injections, and the failure marker. The durable file formats are HE-002C's.
-
-use std::collections::VecDeque;
+//! injections, and the failure marker. The injection queue lives in `store::FaultPlan` (HE-002C, moved unchanged);
+//! the byte format and the file-backed stores are `frame` and `file_store`.
 
 use i05_protocol::json::Doc;
 use i05_protocol::Verb;
 
 use crate::policy::{Prior, WriteOperation};
+use crate::store::FaultPlan;
 use crate::types::{AbortReason, Classification, CloseReason, Invalidation, MaintenanceEnd, SessionEnd, State};
 
 /// A TERMINAL record's details.
@@ -238,6 +238,11 @@ impl Entry {
     }
 }
 
+/// The canonical form of a whole journal, `[[…], …]`, which `journalDigest` covers.
+pub fn journal_doc(entries: &[Entry]) -> Doc {
+    Doc::Array(entries.iter().map(Entry::to_doc).collect())
+}
+
 /// The in-memory journal store with the contract's test injections (model events, never channel frames):
 /// `STORAGE_FAIL_NEXT` (optionally torn) queues one failure; `STORAGE_FAIL_AFTER {after: k}` makes the (k+1)-th record
 /// attempted from then on fail, counting every attempt (failed ones and those inside the storage-failure path
@@ -246,8 +251,7 @@ impl Entry {
 #[derive(Clone, Debug, Default)]
 pub struct Journal {
     entries: Vec<Entry>,
-    pending_failures: VecDeque<bool>,
-    fail_after: Option<u64>,
+    plan: FaultPlan,
 }
 
 impl Journal {
@@ -256,24 +260,16 @@ impl Journal {
     }
 
     pub fn fail_next(&mut self, torn: bool) {
-        self.pending_failures.push_back(torn);
+        self.plan.fail_next(torn);
     }
 
     pub fn fail_after(&mut self, after: u64) {
-        self.fail_after = Some(after);
+        self.plan.fail_after(after);
     }
 
     /// One record attempt (fsync and read back in a durable store); `false` when the write failed.
     pub fn attempt(&mut self, record: Record) -> bool {
-        match self.fail_after {
-            Some(0) => {
-                self.fail_after = None;
-                self.pending_failures.push_back(false);
-            }
-            Some(remaining) => self.fail_after = Some(remaining - 1),
-            None => {}
-        }
-        match self.pending_failures.pop_front() {
+        match self.plan.record_failure() {
             Some(torn) => {
                 if torn {
                     self.entries.push(Entry::Torn);
@@ -289,7 +285,7 @@ impl Journal {
 
     /// The canonical form of the whole journal, `[[…], …]`, which `journalDigest` covers.
     pub fn to_doc(&self) -> Doc {
-        Doc::Array(self.entries.iter().map(Entry::to_doc).collect())
+        journal_doc(&self.entries)
     }
 }
 
@@ -297,12 +293,12 @@ impl Journal {
 #[derive(Clone, Debug, Default)]
 pub struct Marker {
     record: Option<(String, &'static str)>,
-    pending_failures: u64,
+    plan: FaultPlan,
 }
 
 impl Marker {
     pub fn fail_next(&mut self) {
-        self.pending_failures = self.pending_failures.saturating_add(1);
+        self.plan.marker_fail_next();
     }
 
     pub fn is_present(&self) -> bool {
@@ -314,8 +310,7 @@ impl Marker {
         if self.record.is_some() {
             return true;
         }
-        if self.pending_failures > 0 {
-            self.pending_failures -= 1;
+        if self.plan.marker_failure() {
             return false;
         }
         self.record = Some((generation.to_string(), reason));

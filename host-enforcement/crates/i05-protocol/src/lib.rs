@@ -1,6 +1,7 @@
 //! I05 v3 effect-gate protocol logic (HE-002): the strict wire codec, the canonical encoder, SHA-256, strict base64, the
 //! schema-subset interpreter and its pattern matcher, the outcome mapping with `check_agreement`, and the request
-//! rendering (`render_request`, `template_digest`, `identity_of`). Std only, no unsafe code, no panics on any input.
+//! rendering (`render_request`, `template_digest`, `identity_of`). Std only, safe Rust (`unsafe_code` is forbidden
+//! below), no panics on any input.
 //!
 //! The contract is harness-onion `a2eab93` (`host-enforcement/contracts/`); where its READMEs are silent the pinned
 //! reference model is the specification, and every such point is listed in `crates/effect-gate/MODEL_DEFINED.md`.

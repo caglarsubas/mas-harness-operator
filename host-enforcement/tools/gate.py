@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """HE-001 gate: toolchain pin, workspace and lock, closure table, crt objects, binaries, start-up lint and SBOM.
 
+HE-002C adds three lexical tripwires over the workspace's Rust sources: no refused std path in the sources linked into
+EFFECT_GATE (a list of refused modules and items, not an allowlist of std modules), the word `unsafe` only in gate-sys's
+openat module, and no code included from a file the scans do not read. They match text, not Rust: the compiler's `#![forbid(unsafe_code)]` on the effect-gate and
+i05-protocol roots enforces those crates' unsafe rule, and any form the tripwires do not refuse is code review's.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -10,9 +15,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import struct
 import subprocess
 import sys
+import tomllib
 import tomllib
 import unittest
 import uuid
@@ -47,6 +54,47 @@ MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
 RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
 FORBIDDEN_SOURCE = ("available_parallelism", "current_exe", "current_dir", "env::var", "var_os", "vars", "/proc", "/sys")
 HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
+# HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/).
+LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
+OPENAT = "crates/gate-sys/src/openat.rs"
+CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
+               "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
+               "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]"}
+# The linked-source patterns below are matched against the source with the whitespace around every `::` removed
+# (PATH_SPACE), so `std :: process` is `std::process` to them.
+PATH_SPACE = re.compile(r"\s*::\s*")
+# std's own openers and the modules no linked crate names; the workspace's Gate::create, Gate::open,
+# PolicyGate::create, PolicyGate::open and FileStores::open do not match. TryLockError and Metadata are never named.
+LINKED_FORBIDDEN = (r"std::process", r"std::env", r"std::net", r"std::path", r"\bPath\b", r"\bPathBuf\b", r"DirBuilder",
+                    r"OpenOptions", r"File::open", r"File::create", r"File::options", r"\bTryLockError\b", r"\bMetadata\b")
+# Forms that would name std's modules without spelling their paths: a top-level grouped or glob std import (a nested
+# group such as std::collections::{..} is still read), a std path a macro completes, and an extern crate (an alias).
+LINKED_FORMS = ((re.compile(r"\bextern\s+crate\b"), "declares an extern crate"),
+                (re.compile(r"std::[{*]"), "imports a top-level group or glob of std"),
+                (re.compile(r"std(?:::\w+)+::\*"), "imports a nested glob of std"),
+                (re.compile(r"\bstd\s+as\b"), "renames std"),
+                (re.compile(r"std::\$"), "completes a std path in a macro"))
+# The std::os paths a linked source may name besides the fs items: the fd items, in the openat module only.
+OPENAT_FD_PATH = re.compile(r"std::os::fd::\w+")
+FD_ITEMS = re.compile(r"std::os::fd|\b(?:FromRawFd|AsRawFd|IntoRawFd|RawFd|OwnedFd|BorrowedFd|AsFd)\b")
+# The only std fs items a linked source may name, each where it may (longest first): any other occurrence of the word
+# fs (another item, a module import, a grouped import of these) refuses.
+FS_ITEMS = (("std::os::unix::fs::MetadataExt", lambda rel: rel.startswith("crates/gate-sys/")),
+            ("std::os::unix::fs::FileExt",
+             lambda rel: rel.startswith("crates/gate-sys/") or rel == "crates/effect-gate/src/file_store.rs"),
+            ("std::fs::File", lambda rel: True))
+STD_USE = re.compile(r"\buse\b\s*(?:::)?std\b[^;]*;", re.S)
+UNSAFE = re.compile(r"\bunsafe\b")
+# Code from a file the scans do not read: a path attribute on a module (also under cfg_attr), and the macro include!
+# under any spelling (the word include: include!, a path to it, an import renaming it; include_str! and include_bytes!
+# are other words).
+INCLUDED_CODE = ((re.compile(r"#\s*!?\s*\[\s*(?:path\b|cfg_attr\s*\([^\]]*\bpath\s*=)"), "has a path attribute"),
+                 (re.compile(r"\binclude\b"), "names include"),
+                 # Forms the other patterns cannot read: a raw identifier (r#process, r#path) and inline assembly.
+                 (re.compile(r"\br#[A-Za-z_]"), "uses a raw identifier"),
+                 (re.compile(r"\b(?:global_asm|naked_asm|asm)\s*!"), "uses inline assembly"))
+# Cargo target tables whose path key would compile a file the scans do not read, and the package's build-script key.
+MANIFEST_TARGETS = ("lib", "bin", "test", "bench", "example")
 CRT_OBJECTS = ("crtbegin.o", "crtbeginS.o", "crtend.o", "crtendS.o")
 CRT_MARKERS = {"crtbegin": ({"__do_init", "__do_fini"}, {"frame_dummy", "__do_global_dtors_aux"}),
                "crtend": ({"__EH_FRAME_LIST_END__"}, {"__FRAME_END__", "__TMC_END__"})}
@@ -72,8 +120,8 @@ def require(condition: object, message: str) -> None:
         raise GateError(message)
 
 
-def sha256(raw: bytes) -> str:
-    return hashlib.sha256(raw).hexdigest()
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def canonical(value: object) -> bytes:
@@ -326,6 +374,86 @@ def check_sources(base: Path) -> int:
     return count
 
 
+def workspace_sources(base: Path) -> list[Path]:
+    """Every .rs file of the workspace outside the build directory (tests and binaries included)."""
+    return [path for path in sorted(base.rglob("*.rs")) if path.relative_to(base).parts[0] != "target"]
+
+
+def check_included_code(base: Path) -> int:
+    """A lexical tripwire: no workspace source takes code from a file the other scans do not read (a path attribute,
+    include!, a crate manifest's target path or build key, a symlink under crates/) or uses a form the other patterns
+    cannot read (a raw identifier, inline assembly), and a crate's src/ holds only .rs files."""
+    for path in sorted((base / "crates").rglob("*")):
+        require(not path.is_symlink(), "%s is a symlink under crates/" % path.relative_to(base).as_posix())
+    for manifest in sorted(base.glob("crates/*/Cargo.toml")):
+        table = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        rel = manifest.relative_to(base).as_posix()
+        require("build" not in table.get("package", {}), "%s names a build script" % rel)
+        for kind in MANIFEST_TARGETS:
+            targets = table.get(kind, [])
+            for target in targets if isinstance(targets, list) else [targets]:
+                require(not isinstance(target, dict) or "path" not in target, "%s gives a %s target a path" % (rel, kind))
+    for directory in sorted(base.glob("crates/*/src")):
+        for path in sorted(directory.rglob("*")):
+            require(path.is_dir() and not path.is_symlink() or path.suffix == ".rs",
+                    "%s is not a .rs file but lies under a crate's src/" % path.relative_to(base).as_posix())
+    count = 0
+    for path in workspace_sources(base):
+        text = path.read_text(encoding="utf-8")
+        for pattern, form in INCLUDED_CODE:
+            require(not pattern.search(text), "%s %s (code from a file the scans do not read)"
+                    % (path.relative_to(base).as_posix(), form))
+        count += 1
+    return count
+
+
+def check_linked_sources(base: Path) -> int:
+    """A lexical tripwire over the non-test sources of the crates EFFECT_GATE will link, with the whitespace around `::`
+    removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside the openat module; std fs items
+    other than the allowed ones; std::os paths other than those), renames a std item, or uses a form that names std's
+    modules without spelling their paths (LINKED_FORMS); and their crate-root attributes. Other std paths pass: it
+    refuses a list, it is not an allowlist of std modules. It matches text, not Rust: the compiler's
+    `#![forbid(unsafe_code)]` enforces the roots' rule, and any other form is code review's."""
+    for root, attribute in CRATE_ROOTS.items():
+        require(attribute in (base / root).read_text(encoding="utf-8").splitlines(), "%s lacks %s" % (root, attribute))
+    count = 0
+    for crate in LINKED_CRATES:
+        for path in sorted((base / crate / "src").rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
+            text = PATH_SPACE.sub("::", path.read_text(encoding="utf-8"))
+            for pattern in LINKED_FORBIDDEN:
+                require(not re.search(pattern, text), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
+            require(rel == OPENAT or not FD_ITEMS.search(text), "%s names a std::os::fd item outside %s" % (rel, OPENAT))
+            rest = text
+            for item, allowed in FS_ITEMS:
+                if allowed(rel):
+                    rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
+            require(not re.search(r"\bfs\b", rest),
+                    "%s names a std fs item other than its allowed ones, one item per use line (linked-source tripwire)" % rel)
+            if rel == OPENAT:
+                rest = OPENAT_FD_PATH.sub("", rest)
+            require(not re.search(r"std::os\b", rest),
+                    "%s names a std::os item other than its allowed ones (linked-source tripwire)" % rel)
+            for use in STD_USE.finditer(text):
+                require(not re.search(r"\sas\s", use.group(0)), "%s renames a std item in a use statement" % rel)
+            for pattern, form in LINKED_FORMS:
+                require(not pattern.search(text), "%s %s (linked-source tripwire)" % (rel, form))
+            count += 1
+    return count
+
+
+def check_unsafe(base: Path) -> int:
+    """A lexical tripwire: the word unsafe appears in no workspace source but gate-sys's openat module (tests and
+    binaries included)."""
+    count = 0
+    for path in workspace_sources(base):
+        rel = path.relative_to(base).as_posix()
+        if rel != OPENAT:
+            require(not UNSAFE.search(path.read_text(encoding="utf-8")), "%s contains unsafe outside %s" % (rel, OPENAT))
+        count += 1
+    return count
+
+
 def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set) -> bytes:
     """workspace: the workspace crates in the binary's dependency closure."""
     components = [{"type": "library", "name": row["component"], "version": row["version"],
@@ -379,6 +507,13 @@ def main() -> int:
                                                      .read_bytes()))
         say("crt objects: compiler-rt's crtbegin and crtend on both targets")
         say("start-up lint: %d workspace sources without a forbidden API" % check_sources(HE))
+        say("included code: %d workspace sources pass the lexical tripwire (no path attribute, include!, raw "
+            "identifier or inline assembly; no manifest target path, build key or symlink), crates' src/ hold only .rs "
+            "files" % check_included_code(HE))
+        say("linked sources: %d sources of effect-gate, gate-sys and i05-protocol name no refused std path (lexical "
+            "tripwire), crate roots forbid or deny unsafe_code" % check_linked_sources(HE))
+        say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
+            % (OPENAT, check_unsafe(HE)))
         markers = comment_markers(pin)
         host_paths = HOST_PATHS + tuple(path.encode() for path in (str(ROOT), str(Path.home())) if len(path) > 1)
         for target in targets:
