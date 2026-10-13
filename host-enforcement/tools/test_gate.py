@@ -288,7 +288,22 @@ class WorkspaceAndSourceTests(unittest.TestCase):
         (self.base / "Cargo.lock").write_text("version = 4\n\n" + text)
 
     def test_workspace_passes(self):
-        self.assertEqual(gate.check_workspace(self.base), {"a", "b"})
+        self.assertEqual(gate.check_workspace(self.base), {"a": set(), "b": set()})
+
+    def test_dependency_closure_and_workspace_only_dependencies(self):
+        (self.base / "crates/a/Cargo.toml").write_text('[package]\nname = "a"\n\n[dependencies]\nb = { path = "../b" }\n')
+        dependencies = gate.check_workspace(self.base)
+        self.assertEqual(dependencies, {"a": {"b"}, "b": set()})
+        self.assertEqual(gate.linked(dependencies, "a"), {"a", "b"})
+        self.assertEqual(gate.linked(dependencies, "b"), {"b"})
+        for spec in ('b = "1.0"', 'b = { path = "../b", version = "1" }', 'c = { path = "../b" }',
+                     'b = { git = "https://example.invalid/b" }'):
+            (self.base / "crates/a/Cargo.toml").write_text('[package]\nname = "a"\n\n[dependencies]\n%s\n' % spec)
+            with self.assertRaisesRegex(gate.GateError, "dependency outside the workspace"):
+                gate.check_workspace(self.base)
+        (self.base / "crates/a/Cargo.toml").write_text('[package]\nname = "a"\n\n[build-dependencies]\nb = { path = "../b" }\n')
+        with self.assertRaisesRegex(gate.GateError, "build or target dependencies"):
+            gate.check_workspace(self.base)
 
     def test_build_scripts_and_proc_macros(self):
         (self.base / "crates/a/build.rs").write_text("fn main() {}\n")
@@ -420,6 +435,18 @@ class LinkerTests(unittest.TestCase):
             with self.assertRaisesRegex(gate.GateError, "cargo config"):
                 gate.check_linker(PIN, self.root)
 
+    def test_extra_cargo_config_tables_fail(self):
+        for extra in ('[build]\nrustc-wrapper = "/tmp/x"\n', '[env]\nRUSTFLAGS = "-C x"\n', '[source.crates-io]\nreplace-with = "x"\n'):
+            self.write(CONFIG + extra, WRAPPER)
+            with self.assertRaisesRegex(gate.GateError, "only \\[net\\] and \\[target\\]"):
+                gate.check_linker(PIN, self.root)
+
+    def test_wrapper_interpreter_is_pinned(self):
+        for first in ("#!/bin/bash", "#!/usr/bin/env sh", "# no shebang"):
+            self.write(CONFIG, WRAPPER.replace("#!/bin/sh", first, 1))
+            with self.assertRaisesRegex(gate.GateError, "must start with #!/bin/sh"):
+                gate.check_linker(PIN, self.root)
+
     def test_wrapper_mutations_fail(self):
         for wrapper in (WRAPPER.replace("exec /sys-root/", "exec /old-root/"),
                         WRAPPER.replace("rustlib/aarch64-apple-darwin/bin", "rustlib/x86_64-apple-darwin/bin"),
@@ -430,6 +457,41 @@ class LinkerTests(unittest.TestCase):
             self.write(CONFIG, wrapper)
             with self.assertRaisesRegex(gate.GateError, "linker wrapper"):
                 gate.check_linker(PIN, self.root)
+
+
+class ContractTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.base = Path(self.directory.name)
+        (self.base / "contracts/i05-v3").mkdir(parents=True)
+        (self.base / "contracts/i05-v3/vectors.json").write_bytes(b"{}")
+        (self.base / "contracts/PROVENANCE.md").write_text("provenance\n")
+        self.patch = mock.patch.object(gate, "CONTRACTS", {"contracts/i05-v3/vectors.json": hashlib.sha256(b"{}").hexdigest()})
+        self.patch.start()
+
+    def tearDown(self):
+        self.patch.stop()
+        self.directory.cleanup()
+
+    def test_registered_contracts_pass(self):
+        self.assertEqual(gate.check_contracts(self.base), 1)
+
+    def test_changed_extra_missing_and_linked_contracts_fail(self):
+        (self.base / "contracts/i05-v3/vectors.json").write_bytes(b"{ }")
+        with self.assertRaisesRegex(gate.GateError, "differs from its registered bytes"):
+            gate.check_contracts(self.base)
+        (self.base / "contracts/i05-v3/vectors.json").write_bytes(b"{}")
+        (self.base / "contracts/i05-v3/extra.json").write_bytes(b"{}")
+        with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
+            gate.check_contracts(self.base)
+        (self.base / "contracts/i05-v3/extra.json").unlink()
+        (self.base / "contracts/i05-v3/vectors.json").unlink()
+        with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
+            gate.check_contracts(self.base)
+        (self.base / "contracts/real.json").write_bytes(b"{}")
+        os.symlink("../real.json", self.base / "contracts/i05-v3/vectors.json")
+        with self.assertRaisesRegex(gate.GateError, "exactly the registered files|differs from its registered bytes"):
+            gate.check_contracts(self.base)
 
 
 class OutputPrefixTests(unittest.TestCase):

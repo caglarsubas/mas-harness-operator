@@ -1,0 +1,1047 @@
+{
+ "schemaVersion": "planeon.internal.effect-gate-supplement/v1",
+ "evidenceClass": "DATA_CHECK_ONLY",
+ "contract": {
+  "path": "architecture/i05-gate-channel-v3/vectors.json",
+  "sha256": "ab75d86fe54ade7ee2695ef84b200d0473e14e4112e64e7702032593658763ed",
+  "model": {
+   "path": "scripts/i05_gate_channel_v3.py",
+   "sha256": "2c7985b539c0ce8eb79eaabfa1f1ab7d43bdca7515defc590a76ecb1697ca959"
+  }
+ },
+ "closes": "AF2-I05-1 (architecture/i05-gate-channel-v3/status.json:58)",
+ "configs": {
+  "ACTIVE": {
+   "vectorsPath": "architecture/i05-gate-channel-v3/vectors.json",
+   "key": [
+    "configs",
+    "ACTIVE"
+   ]
+  }
+ },
+ "transcripts": [
+  {
+   "id": "S01",
+   "intent": "I05-4: a second STORAGE_FAIL_AFTER replaces a pending first one (AFTER 0, then AFTER 1): every non-injection output and the final snapshot equal S02's",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 0
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 1
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "actionId": 1,
+      "flushedConnections": 0
+     }
+    },
+    {},
+    {},
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": [
+       1
+      ]
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {
+     "1": {
+      "status": "TERMINAL",
+      "classification": "NOT_FORWARDED",
+      "admittedBeforeInvalidation": false,
+      "sealed": false
+     }
+    },
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "GET",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0"
+     ],
+     [
+      "CLOSED",
+      "NORMAL_DRAIN",
+      "CLOSED"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   },
+   "equals": "S02"
+  },
+  {
+   "id": "S02",
+   "intent": "I05-4 reference: AFTER 1 alone (the CLOSED record succeeds; the INVALIDATED storage-failure path follows the failed DENIED record)",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 1
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "actionId": 1,
+      "flushedConnections": 0
+     }
+    },
+    {},
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": [
+       1
+      ]
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {
+     "1": {
+      "status": "TERMINAL",
+      "classification": "NOT_FORWARDED",
+      "admittedBeforeInvalidation": false,
+      "sealed": false
+     }
+    },
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "GET",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0"
+     ],
+     [
+      "CLOSED",
+      "NORMAL_DRAIN",
+      "CLOSED"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "S03",
+   "intent": "I05-4: the replacement also holds the other way (AFTER 1, then AFTER 0): every non-injection output and the final snapshot equal S04's",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 1
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 0
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "actionId": 1,
+      "flushedConnections": 0
+     }
+    },
+    {},
+    {},
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": [
+       1
+      ]
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {
+     "1": {
+      "status": "TERMINAL",
+      "classification": "NOT_FORWARDED",
+      "admittedBeforeInvalidation": false,
+      "sealed": false
+     }
+    },
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "GET",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "DENIED",
+      1
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   },
+   "equals": "S04"
+  },
+  {
+   "id": "S04",
+   "intent": "I05-4 reference: AFTER 0 alone (the CLOSED record fails)",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 0
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "actionId": 1,
+      "flushedConnections": 0
+     }
+    },
+    {},
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": [
+       1
+      ]
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {
+     "1": {
+      "status": "TERMINAL",
+      "classification": "NOT_FORWARDED",
+      "admittedBeforeInvalidation": false,
+      "sealed": false
+     }
+    },
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "GET",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "DENIED",
+      1
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "S05",
+   "intent": "Injection accumulation (model-defined): after NEXT, NEXT, an AFTER 0 failure is added to the two pending NEXT failures rather than replacing either, so three consecutive record attempts fail",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 0
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "actionId": 1,
+      "flushedConnections": 0
+     }
+    },
+    {},
+    {},
+    {},
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": [
+       1
+      ]
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {
+     "1": {
+      "status": "TERMINAL",
+      "classification": "NOT_FORWARDED",
+      "admittedBeforeInvalidation": false,
+      "sealed": false
+     }
+    },
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "GET",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "S06",
+   "intent": "Injection queue order (model-defined): the AFTER failure queues behind the pending NEXT failures. The BIND succeeds; NEXT, NEXT torn and AFTER 0 are then pending; the ARM run fails the first record attempts, and the GENERATION_STATUS after it reads a journalDigest that differs if the AFTER failure were put in front of the queue. The CLOSE on the HELD generation writes no record, so the queued remainder stays pending and fails the RESTARTED record after GATE_RESTART (a pending failure crosses the restart, as in T104)",
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "caseId": "KUBERNETES_SMOKE",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001,
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+     }
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT",
+     "torn": true
+    },
+    {
+     "type": "STORAGE_FAIL_AFTER",
+     "after": 0
+    },
+    {
+     "type": "FRAME",
+     "operation": "ARM_ACTION",
+     "payload": {
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "actionId": 1,
+      "verb": "GET",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "requestTemplateDigest": "sha256:815309fdb6f3da836521fc354b0fa853941e82501260e1e58117896a962780e0",
+      "recordedUid": null
+     }
+    },
+    {
+     "type": "FRAME",
+     "operation": "GENERATION_STATUS",
+     "payload": {}
+    },
+    {
+     "type": "FRAME",
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     }
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "outputs": [
+    {
+     "response": {
+      "result": "OK",
+      "state": "ACTIVE",
+      "drainPending": false,
+      "boundExecutionId": null,
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19"
+     }
+    },
+    {},
+    {},
+    {},
+    {
+     "response": {
+      "result": "REFUSED",
+      "reason": "STORAGE_FAILURE"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "drainPending": false,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "armedActionId": null,
+      "inFlightActionId": null,
+      "counters": {
+       "stampsIssued": 0,
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0
+      },
+      "journalDigest": "sha256:ec2b97d3c0093194c570e146a24e70a680e8f16ff2091c16e463f5784ac2ab77"
+     }
+    },
+    {
+     "response": {
+      "result": "OK",
+      "state": "HELD",
+      "deniedActionIds": []
+     }
+    },
+    {
+     "restartState": "HELD"
+    }
+   ],
+   "final": {
+    "state": "HELD",
+    "drainPending": false,
+    "channel": "CLOSED",
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "actions": {},
+    "connections": {},
+    "counters": {
+     "stampsIssued": 0,
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0
+    },
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "TORN"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ]
+   }
+  }
+ ]
+}

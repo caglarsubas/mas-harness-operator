@@ -25,6 +25,23 @@ VERSION = "0.1.0"
 BINARIES = ("planeon-containment", "planeon-broker", "planeon-observer", "planeon-gate", "planeon-writer")
 TABLE = HE / "licenses/closure-1.99.0.json"
 TABLE_SHA256 = "e085f1b784c1635b609734575d23d858beaffdd5b8b63a7fce585a38984e54a1"
+# harness-onion contract files R10 holds, byte-exact, registered in harness-onion's operator -> harness-engineering
+# buildArtifact edge record (owner decision Q-HE2-A); provenance in contracts/PROVENANCE.md.
+CONTRACTS = {
+    "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
+    "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
+    "contracts/i05-v3/README.md": "f82f43330125640d3ac946d2afc9a1804a21e5e60a7ac4b94e5d6cb6ed2ea3aa",
+    "contracts/i05-v3/channel.schema.json": "3bfee13c9d32e82fe5ab908eb6f716bc11881f9d57b324f8ea4a21a3ad35356f",
+    "contracts/i05-v3/outcome-mapping.json": "4466f379f1cc669e047cffd8afa5fa88b2cc7648a51e2d38b17f0bd5e2252a3a",
+    "contracts/i05-v3/vectors.json": "ab75d86fe54ade7ee2695ef84b200d0473e14e4112e64e7702032593658763ed",
+    "contracts/i05-v3-supplement/vectors.json": "1c00bdb3ea112af6098a09158cce3e4a7a6098c9670f490ead4ca65d8bdbb5ac",
+    "contracts/i07-v1/README.md": "9e5cb3d1023bc12b9e2643ae42dde5a87640cf04fc8ac1aa88350c65b12ba2dc",
+    "contracts/i07-v2/README.md": "cde20d7fee8661cd9314350849870fe5b0838b7914a60237d0eeb1f5dca39d39",
+    "contracts/i07-v3/README.md": "a8c51a725b99d84351aba7a326196e7078c239ba4e28d3eaec1cf09fb3dca43d",
+    "contracts/i07-v3/channel.schema.json": "c68721a1002fccc7d6e59eeee9016a0a0f4a7428fad714e5a3d90a362d30ce09",
+    "contracts/i07-v3/policy-kinds.json": "4e427204b89959cb855d8641c3fa6f95d358b0b6a6a7730bfc7776adc4a173c0",
+    "contracts/i07-v3/vectors.json": "c4c24c5ff15618aa2f0fe0f016011359bc4316220c6e40d5168f9ee24b6f736d",
+}
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
 RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
@@ -206,29 +223,66 @@ def check_linker(pin: dict, root: Path) -> None:
     """The repository-root cargo config links both musl targets through the wrapper, and the wrapper execs the pinned
     rust-lld with the pinned sysroot's lib/ on the dylib search path (so a pin change cannot miss the wrapper)."""
     config = tomllib.loads((root / ".cargo/config.toml").read_text(encoding="utf-8"))
+    require(set(config) == {"net", "target"}, "the cargo config must hold only [net] and [target]")
     require(config.get("net") == {"offline": True}, "the cargo config must set [net] offline = true and nothing else")
     flags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
     require(set(config.get("target", {})) == set(pin["targets"]), "the cargo config must name exactly the pinned targets")
     for target in pin["targets"]:
         require(config["target"][target] == {"linker": pin["linkerWrapper"], "rustflags": flags},
                 "the cargo config for %s is not the wrapper with the static flags" % target)
-    commands = [line for line in (root / pin["linkerWrapper"]).read_text(encoding="utf-8").splitlines()
-                if line and not line.startswith("#")]
+    lines = (root / pin["linkerWrapper"]).read_text(encoding="utf-8").splitlines()
+    require(lines[:1] == ["#!/bin/sh"], "the linker wrapper must start with #!/bin/sh")
+    commands = [line for line in lines if line and not line.startswith("#")]
     require(commands == ["DYLD_FALLBACK_LIBRARY_PATH=%s/lib" % pin["sysroot"], "export DYLD_FALLBACK_LIBRARY_PATH",
                          'exec %s/lib/rustlib/%s/bin/rust-lld "$@"' % (pin["sysroot"], pin["host"])],
             "the linker wrapper does not exec the pinned rust-lld")
 
 
-def check_workspace(base: Path) -> set[str]:
+def check_contracts(base: Path) -> int:
+    """Every registered harness-onion contract file is present byte-exact, and contracts/ holds nothing else."""
+    root = base / "contracts"
+    found = {path.relative_to(base).as_posix() for path in root.rglob("*") if path.is_file() or path.is_symlink()}
+    require(found == set(CONTRACTS) | {"contracts/PROVENANCE.md"}, "contracts/ holds exactly the registered files")
+    for path, expected in CONTRACTS.items():
+        require(not (base / path).is_symlink() and sha256((base / path).read_bytes()) == expected,
+                "a contract file differs from its registered bytes: " + path)
+    return len(CONTRACTS)
+
+
+def linked(dependencies: dict, name: str) -> set:
+    """The workspace crates in a crate's dependency closure, the crate included."""
+    seen, todo = set(), [name]
+    while todo:
+        crate = todo.pop()
+        if crate not in seen:
+            seen.add(crate)
+            todo.extend(dependencies[crate])
+    return seen
+
+
+def check_workspace(base: Path) -> dict:
+    """The workspace members, each with its direct workspace (path) dependencies."""
     workspace = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
-    names = set()
+    names, paths = {}, {}
+    manifests = []
     for member in workspace["workspace"]["members"]:
         manifest = tomllib.loads((base / member / "Cargo.toml").read_text(encoding="utf-8"))
         package = manifest["package"]
         require("build" not in package and not (base / member / "build.rs").exists(), "a build script in " + member)
         library = manifest.get("lib", {})
         require(not library.get("proc-macro") and not library.get("proc_macro"), "a proc-macro crate in " + member)
-        names.add(package["name"])
+        require("build-dependencies" not in manifest and "target" not in manifest, "build or target dependencies in " + member)
+        names[package["name"]] = set()
+        paths[(base / member).resolve()] = package["name"]
+        manifests.append((member, package["name"], manifest))
+    for member, name, manifest in manifests:
+        for table in ("dependencies", "dev-dependencies"):
+            for dependency, spec in manifest.get(table, {}).items():
+                require(type(spec) is dict and set(spec) == {"path"} and (base / member / spec["path"]).resolve() in paths
+                        and paths[(base / member / spec["path"]).resolve()] == dependency,
+                        "a dependency outside the workspace in " + member)
+                if table == "dependencies":
+                    names[name].add(dependency)
     packages = tomllib.loads((base / "Cargo.lock").read_text(encoding="utf-8"))["package"]
     require(sorted(package["name"] for package in packages) == sorted(names),
             "Cargo.lock does not list exactly the workspace crates")
@@ -272,7 +326,8 @@ def check_sources(base: Path) -> int:
     return count
 
 
-def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set[str]) -> bytes:
+def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set) -> bytes:
+    """workspace: the workspace crates in the binary's dependency closure."""
     components = [{"type": "library", "name": row["component"], "version": row["version"],
                    "licenses": [{"expression": row["canonical"]}], "hashes": [{"alg": "SHA-256", "content": row["sha256"]}],
                    "properties": [{"name": "planeon:path", "value": row["path"]},
@@ -314,6 +369,7 @@ def main() -> int:
         say("linker: the cargo config links both targets through %s, which execs the pinned rust-lld" % pin["linkerWrapper"])
         workspace = check_workspace(HE)
         say("workspace: %d crates, a lock without registry or git packages, no build script or proc-macro" % len(workspace))
+        say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
         check_tree(rows, sysroot, targets)
         say("closure: %d shipped files match the reviewed table %s" % (len(rows), TABLE_SHA256))
@@ -331,7 +387,7 @@ def main() -> int:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
                 check_binary(raw, target, shape, markers, host_paths)
                 digest = sha256(raw)
-                document = sbom(binary, target, digest, rows, workspace)
+                document = sbom(binary, target, digest, rows, linked(workspace, binary))
                 out = HE / "target/sbom" / target / (binary + ".cdx.json")
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(document)

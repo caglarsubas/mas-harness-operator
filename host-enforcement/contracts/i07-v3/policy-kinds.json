@@ -1,0 +1,264 @@
+{
+ "effectKinds": [
+  {
+   "group": "",
+   "kind": "ConfigMap",
+   "resource": "configmaps"
+  },
+  {
+   "group": "",
+   "kind": "Pod",
+   "resource": "pods"
+  },
+  {
+   "group": "",
+   "kind": "Service",
+   "resource": "services"
+  }
+ ],
+ "kubernetesVersion": "v1.37.1",
+ "notWritable": [
+  {
+   "disposition": "REBOOT_MAINTENANCE_ONLY",
+   "group": "rbac.authorization.k8s.io",
+   "kind": "ClusterRole",
+   "resource": "clusterroles"
+  },
+  {
+   "disposition": "REBOOT_MAINTENANCE_ONLY",
+   "group": "rbac.authorization.k8s.io",
+   "kind": "ClusterRoleBinding",
+   "resource": "clusterrolebindings"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "admissionregistration.k8s.io",
+   "kind": "ValidatingWebhookConfiguration",
+   "resource": "validatingwebhookconfigurations"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "admissionregistration.k8s.io",
+   "kind": "MutatingWebhookConfiguration",
+   "resource": "mutatingwebhookconfigurations"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "admissionregistration.k8s.io",
+   "kind": "MutatingAdmissionPolicy",
+   "resource": "mutatingadmissionpolicies"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "admissionregistration.k8s.io",
+   "kind": "MutatingAdmissionPolicyBinding",
+   "resource": "mutatingadmissionpolicybindings"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "apiregistration.k8s.io",
+   "kind": "APIService",
+   "resource": "apiservices"
+  },
+  {
+   "disposition": "MUST_STAY_ABSENT",
+   "group": "apiextensions.k8s.io",
+   "kind": "CustomResourceDefinition",
+   "resource": "customresourcedefinitions"
+  },
+  {
+   "disposition": "REBOOT_MAINTENANCE_ONLY",
+   "group": "certificates.k8s.io",
+   "kind": "CertificateSigningRequest",
+   "resource": "certificatesigningrequests"
+  },
+  {
+   "closureResource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+   "closureScope": "CLUSTER",
+   "disposition": "SEALED_STATIC_MANIFEST",
+   "group": "admissionregistration.k8s.io",
+   "kind": "ValidatingAdmissionPolicy",
+   "resource": "validatingadmissionpolicies"
+  },
+  {
+   "closureResource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+   "closureScope": "CLUSTER",
+   "disposition": "SEALED_STATIC_MANIFEST",
+   "group": "admissionregistration.k8s.io",
+   "kind": "ValidatingAdmissionPolicyBinding",
+   "resource": "validatingadmissionpolicybindings"
+  }
+ ],
+ "operationVerbs": {
+  "CREATE": "create",
+  "DELETE": "delete",
+  "UPDATE": "update"
+ },
+ "rbacSideGrants": {
+  "grants": [
+   {
+    "resource": "rbac.authorization.k8s.io/roles",
+    "verb": "bind"
+   },
+   {
+    "resource": "rbac.authorization.k8s.io/roles",
+    "verb": "escalate"
+   }
+  ],
+  "meaning": "bind and escalate on the two named planeon Roles only. They are not I07 operations: the apiserver's own RBAC escalation check lets a Role or RoleBinding write reference those two Roles. The gate adds no name rule of its own.",
+  "resourceNames": [
+   "planeon-gate-effect",
+   "planeon-policy-observer"
+  ]
+ },
+ "schemaVersion": "planeon.internal.i07-policy-kinds/v2",
+ "sealedBy": "architecture/admission-semantics-v2/README.md (W02f, owner decision 2026-10-08): A2 policies live in a sealed static admission manifest directory, and its guard planeon-a2-admission-objects.static.k8s.io denies every API write of admission policies, bindings and webhook configurations; the W02g closure's policy-writer grants for ValidatingAdmissionPolicy and its binding are inert, and no name is writable (W02c R2).",
+ "source": {
+  "identity": "planeon:policy-writer",
+  "identityClosure": "architecture/i06-backend-profile/identity-closure.json",
+  "identityClosureSha256": "sha256:0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb"
+ },
+ "writable": [
+  {
+   "closureResource": "/limitranges",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "",
+   "kind": "LimitRange",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "limitranges",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "spec"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "/namespaces",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "",
+   "kind": "Namespace",
+   "operations": [
+    "UPDATE"
+   ],
+   "resource": "namespaces",
+   "scope": "QUALIFICATION_NAMESPACE_OBJECT",
+   "topLevelKeys": [
+    "spec"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "/resourcequotas",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "",
+   "kind": "ResourceQuota",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "resourcequotas",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "spec"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "/serviceaccounts",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "",
+   "kind": "ServiceAccount",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "serviceaccounts",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "automountServiceAccountToken",
+    "imagePullSecrets",
+    "secrets"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "networking.k8s.io/networkpolicies",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "networking.k8s.io",
+   "kind": "NetworkPolicy",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "networkpolicies",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "spec"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "rbac.authorization.k8s.io/rolebindings",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "rbac.authorization.k8s.io",
+   "kind": "RoleBinding",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "rolebindings",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "roleRef",
+    "subjects"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  },
+  {
+   "closureResource": "rbac.authorization.k8s.io/roles",
+   "closureScope": "QUALIFICATION_NAMESPACE",
+   "group": "rbac.authorization.k8s.io",
+   "kind": "Role",
+   "operations": [
+    "CREATE",
+    "UPDATE",
+    "DELETE"
+   ],
+   "resource": "roles",
+   "scope": "QUALIFICATION_NAMESPACE",
+   "topLevelKeys": [
+    "rules"
+   ],
+   "unusedVerbs": [
+    "patch"
+   ],
+   "version": "v1"
+  }
+ ]
+}
