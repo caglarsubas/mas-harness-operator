@@ -15,7 +15,10 @@ decomposition into operations (BIND, ARM, ACTION_OUTCOME, CLOSE, GENERATION_STAT
 restart handlers, and the helpers for recording, denying and urgent closes) and in the order of the checks inside each
 operation, because M17-M31 make refusal order, journal tuples and the restart rebuild normative and the vectors pin
 them. The Rust types and data structures (typed events, requests, outcomes and journal records, the split of A1 into
-admission and consumption) and the R10-defined paths (R1-R12) are R10's own.
+admission and consumption) and the R10-defined paths (R1-R12) are R10's own. Owner decision Q-HE2-R1 (a), 2026-10-13
+(via the lane monitor), verbatim: "Disclose and accept": MODEL_DEFINED.md and the packet text state that
+effect-gate's Gate follows the pinned model's operation decomposition and per-operation order (normative under
+M17-M31); the Rust stays independently written with no shared comment or code text once R1-1 is fixed.
 
 ## Wire codec and canonical form (`i05-protocol`: `json`, `frame`, `base64`)
 
