@@ -11,6 +11,10 @@
 //! The READMEs (I07 v1-v3) decide; where they are silent the pinned I07 v3 model is the specification and each such
 //! point is an N-item in MODEL_DEFINED.md, the R10-defined behaviour R13-R18. Like the base gate it never panics: an
 //! event outside the preconditions is an [`EventError`] with no state change.
+//!
+//! HE-002C adds the durable constructors: `create` starts a new generation on file stores, and `open` is the process
+//! restart, which rebuilds the writes and the maintenance from the journal file exactly as GATE_RESTART does from the
+//! in-process journal (HE-002C DESIGN §8).
 
 use std::collections::BTreeMap;
 
@@ -18,6 +22,7 @@ use i05_protocol::json::{Doc, JStr, Value};
 use i05_protocol::{decode_frame, frame, sha256, Datagram, FrameError, Schema, ZERO_DIGEST};
 
 use crate::config::{Config, ConfigError};
+use crate::file_store::FileStores;
 use crate::gate::{Event, EventError, FrameInput, Gate, GateError, Output, UpstreamResponse};
 use crate::journal::{Entry, Record, WriteDetails};
 use crate::policy::{check_write, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
@@ -348,10 +353,17 @@ pub struct PolicyGate {
     counters: WriteCounters,
 }
 
-impl PolicyGate {
-    /// A PolicyGate for a configuration with its `policyWriter` member (R16) and the closed policy-kind table. The
-    /// rest of the configuration goes to the unchanged I05 `Config`.
-    pub fn new(config_value: &Value, kinds_value: &Value) -> Result<PolicyGate, PolicyGateError> {
+/// What a PolicyGate holds besides its base gate: the writer member, the kinds table and the I07 schema.
+struct Parts {
+    writer: PolicyWriter,
+    kinds: PolicyKinds,
+    schema: Schema,
+}
+
+impl Parts {
+    /// The configuration with its `policyWriter` member (R16) and the closed policy-kind table. The rest of the
+    /// configuration goes to the unchanged I05 `Config`, returned for the base gate.
+    fn read(config_value: &Value, kinds_value: &Value) -> Result<(Config, Parts), PolicyGateError> {
         let Some(root) = config_value.as_object() else {
             return Err(PolicyGateError::PolicyWriter("the configuration is not an object".to_string()));
         };
@@ -361,19 +373,52 @@ impl PolicyGate {
         let config = Config::from_value(&Value::Object(rest)).map_err(PolicyGateError::Config)?;
         let kinds = PolicyKinds::from_value(kinds_value).map_err(PolicyGateError::Kinds)?;
         let schema = i05_protocol::i07_v3_schema().map_err(|error| PolicyGateError::Schema(error.0))?;
-        let gate = Gate::new(config).map_err(PolicyGateError::Gate)?;
-        Ok(PolicyGate {
+        Ok((config, Parts { writer, kinds, schema }))
+    }
+
+    fn around(self, gate: Gate) -> PolicyGate {
+        PolicyGate {
             gate,
-            kinds,
-            schema,
-            writer,
+            kinds: self.kinds,
+            schema: self.schema,
+            writer: self.writer,
             maintenance: Maintenance::NotBegun,
             maintenance_reason: None,
             session: None,
             writes: BTreeMap::new(),
             pending: None,
             counters: WriteCounters::default(),
-        })
+        }
+    }
+}
+
+impl PolicyGate {
+    /// A PolicyGate for a configuration with its `policyWriter` member (R16) and the closed policy-kind table, on
+    /// in-memory stores. The rest of the configuration goes to the unchanged I05 `Config`.
+    pub fn new(config_value: &Value, kinds_value: &Value) -> Result<PolicyGate, PolicyGateError> {
+        let (config, parts) = Parts::read(config_value, kinds_value)?;
+        let gate = Gate::new(config).map_err(PolicyGateError::Gate)?;
+        Ok(parts.around(gate))
+    }
+
+    /// A new generation on file stores (`Gate::create`'s conditions).
+    pub fn create(config_value: &Value, kinds_value: &Value, stores: FileStores) -> Result<PolicyGate, PolicyGateError> {
+        let (config, parts) = Parts::read(config_value, kinds_value)?;
+        let gate = Gate::create(config, stores).map_err(PolicyGateError::Gate)?;
+        Ok(parts.around(gate))
+    }
+
+    /// The process restart (HE-002C DESIGN §8): the gate as the files leave it, then GATE_RESTART's I07 path (no
+    /// outstanding write, the writes and the maintenance rebuilt from the journal, the base restart with a HELD floor
+    /// when a write is ambiguous, RESTARTED appended once, no session). The write counters start at zero.
+    pub fn open(config_value: &Value, kinds_value: &Value, stores: FileStores)
+                -> Result<(PolicyGate, PolicyOutput), PolicyGateError> {
+        let (config, parts) = Parts::read(config_value, kinds_value)?;
+        let gate = Gate::reopened(config, stores).map_err(PolicyGateError::Gate)?;
+        let mut policy = parts.around(gate);
+        let output = policy.restart();
+        policy.settle_maintenance();
+        Ok((policy, output))
     }
 
     /// The base gate (read only).
@@ -898,6 +943,13 @@ impl PolicyGate {
             ("ambiguousWriteIds", ids_doc(&self.ambiguous_writes())),
         ])
     }
+}
+
+/// The floor a process restart of the I05 gate takes (HE-002C DESIGN §8): HELD when the journal's I07 rebuild finds an
+/// ambiguous write, none otherwise (so none for a journal without I07 records).
+pub(crate) fn write_floor(journal: &[Entry]) -> Option<State> {
+    let (writes, _) = rebuild_writes(journal);
+    writes.values().any(|entry| entry.classification == Some(Classification::IoAmbiguous)).then_some(State::Held)
 }
 
 /// The I07 part of a restart, from the journal alone (HE-002B DESIGN §6, N10): a WRITE_FORWARDED makes its write FORWARDED,

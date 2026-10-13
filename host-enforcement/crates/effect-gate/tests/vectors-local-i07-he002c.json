@@ -1,0 +1,421 @@
+{
+ "configs": {
+  "ACTIVE": {
+   "key": [
+    "configs",
+    "ACTIVE"
+   ],
+   "vectorsPath": "contracts/i07-v3/vectors.json"
+  }
+ },
+ "evidenceClass": "R10_LOCAL",
+ "model": {
+  "commit": "a2eab9365c8663cc1ae23a666e864b821f600fa6",
+  "path": "scripts/i07_policy_write_v3.py",
+  "sha256": "6cc7ea0d3df0c7f2966184bb6d322189de3b49b5b02dfe2429911121973afe08"
+ },
+ "note": "R10-local I07 vectors of HE-002C (DESIGN section 11, HE-002B review R1-5), not contract data: a peer change whose WRITER_SESSION_ENDED record fails and a delivered rejection whose WRITE_TERMINAL record fails. Configurations are the I07 v3 contract's, named through configs. Expected outputs and final snapshots were computed by running the pinned harness-onion model scripts/i07_policy_write_v3.py at a2eab93 (sha256 6cc7ea0d3df0c7f2966184bb6d322189de3b49b5b02dfe2429911121973afe08) on these events; R10 replays each in memory and through file stores and must reproduce them.",
+ "transcripts": [
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "after": 1,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "type": "W_PEER_CHANGED"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "INVALIDATED",
+      "WRITER_PEER_DEVIATION",
+      "HELD"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_ENDED",
+      "SESSION_FATAL",
+      0,
+      []
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "SESSION_FATAL",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 2,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-C01",
+   "intent": "A writer peer change while the owning session's maintenance is open, whose WRITER_SESSION_ENDED record fails (STORAGE_FAIL_AFTER 1: the urgent close's INVALIDATED is written first): the storage-failure path runs inside the peer-change path, the maintenance still ends SESSION_FATAL, and a restart is HELD (HE-002B review R1-5)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "fatal": "PEER_CHANGED",
+     "maintenance": "ENDED",
+     "sessionEnd": "FATAL"
+    },
+    {
+     "maintenance": "ENDED",
+     "restartState": "HELD"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:649370c7d837a5eaf30706e801475f783938d342d43dd1041c79abc2dd81f951",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": {
+      "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "httpStatus": 409,
+      "resourceVersion": "42",
+      "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+     },
+     "writeId": 1
+    },
+    {
+     "operation": "WRITE_END",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "type": "GATE_RESTART"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ],
+     [
+      "MAINT_ENDED",
+      "WRITE_END",
+      1,
+      [
+       1
+      ]
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "WRITE_END",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-C02",
+   "intent": "A delivered rejection (409) whose WRITE_TERMINAL record fails: the write is IO_AMBIGUOUS with no details, the answer is still relayed, the generation HELD; WRITE_END then ends the maintenance and a restart finds the write ambiguous (HE-002B review R1-5)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "classification": "IO_AMBIGUOUS",
+     "relayed": true,
+     "response": {
+      "classification": "IO_AMBIGUOUS",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "requestDigest": "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      "result": "OK",
+      "resultDigest": null,
+      "writeId": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:df5702fb474adfc16c1feae36dd53bcb3ae28f58fe6141caf7c6043f12484f38",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 1
+     }
+    },
+    {
+     "maintenance": "ENDED",
+     "restartState": "HELD"
+    }
+   ]
+  }
+ ]
+}

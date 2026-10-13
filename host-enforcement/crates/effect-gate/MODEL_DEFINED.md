@@ -1,4 +1,4 @@
-# HE-002 and HE-002B: model-defined and R10-defined behaviour
+# HE-002, HE-002B and HE-002C: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -6,16 +6,21 @@ READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs a
 validator `scripts/validate_admission_channel_v3.py` (sha256
 `7bd762d3069ad6add891063c5b5cd16c75534adb88b1afa245f050b5856dc247`) were read as specification and never copied: the
 two crates `i05-protocol` and `effect-gate` share no code or comment text with them (checked with an 8-word span search,
-HE-002 PR review round 1, R1-1; the one shared span in R10, a two-line hashing helper in `tools/gate.py` that HE-001
-merged, is outside these crates, as `contracts/PROVENANCE.md` states). Each such point is listed below with its file and
-lines at `a2eab93` ("model" and "validator" below), followed by the behaviour R10 defines itself. The vectors decide
-every disagreement; all I05 v3 vectors pass.
+HE-002 PR review round 1, R1-1; the one shared span R10 had, a two-line hashing helper in `tools/gate.py` that HE-001
+merged, was outside these crates, as `contracts/PROVENANCE.md` states, and HE-002C's rename of its parameter removed
+it). Each such point is listed below with its file and lines at `a2eab93` ("model" and "validator" below), followed by
+the behaviour R10 defines itself. The vectors decide every disagreement; all I05 v3 vectors pass.
 
 HE-002B adds the I07 v3 PolicyGate (`effect-gate`: `policy`, `policy_gate`) the same way, from the I07 v1-v3 READMEs,
 the I07 v3 schema, `policy-kinds.json` and vectors, with the pinned I07 v3 model `scripts/i07_policy_write_v3.py` (sha256
 `6cc7ea0d3df0c7f2966184bb6d322189de3b49b5b02dfe2429911121973afe08`, "I07 model" below) read as specification where the
 READMEs are silent and never copied; its points are N1-N19 and its R10-defined behaviour R13-R18 below. All I07 v3
 vectors pass (79 kind, 7 render, 22 outcome checks and 62 transcripts on both frame paths).
+
+HE-002C adds the durable stores (`effect-gate`: `frame`, `store`, `file_store`; the new crate `gate-sys`). The pinned
+models keep their journal and marker in memory and define no byte format, so nothing in HE-002C is model-defined: its
+rules are the R10-defined R19-R30 and the disclosures in the HE-002C section at the end, each with the owner decision
+that settled it (HE-002C design revision 4, §18).
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -148,3 +153,108 @@ Lines are the I07 model's (`scripts/i07_policy_write_v3.py` at `a2eab93`) unless
 | R16 | Configuration (PolicyGate): `policyWriter` is required and parsed by PolicyGate itself: exactly `qualificationNamespace` (a DNS-1123 label of at most 63 characters) and `apiserverAuthority` (printable ASCII without space, CR or LF, 1 to 255 characters); a missing, unknown, mistyped or out-of-rule member refuses the configuration, and the rest goes to the unchanged I05 `Config`, which still refuses `policyWriter` itself. The policy-kind table is read into closed types: version `planeon.internal.i07-policy-kinds/v2`, writable rows with scope QUALIFICATION_NAMESPACE or QUALIFICATION_NAMESPACE_OBJECT (the retired CLUSTER scope is refused), operations among CREATE, UPDATE, DELETE, the three known dispositions; members the gate does not use are ignored | HE-002B DESIGN §13, B4; the I07 model reads both with dictionary lookups |
 | R17 | Counters (PolicyGate) saturate at `u64::MAX` instead of overflowing; the writes map is bounded by the schema's write ID (1-256), so it never holds more than 256 writes | no panics |
 | R18 | The upstream answer with no session (I07 model :370-371) is unreachable, because every session end aborts the outstanding write first (N9, N11) and GATE_RESTART drops it; it is kept as no-panic code (`{classification, relayed: false}`) and unit-tested on a constructed state. The other unreachable fallbacks fail closed the same way: a WRITE_OBJECT payload the schema passed but the gate cannot type is a fatal F00 frame, and a checked write that does not render is refused OBJECT_RULE | no panics (as R4, R5) |
+
+## HE-002C: durable stores (`frame`, `store`, `file_store`, crate `gate-sys`)
+
+The gate's one journal (I05 and I07 records) and its failure marker are files: `<generation>.journal` in the journal
+directory, `<generation>.marker` in a marker directory on another device, and the generation index `generations` beside
+the journals. Each record, marker and index entry is one frame, `FF 00 "HEJ1"`, the payload length in 8 lowercase hex
+digits, the payload's SHA-256, the SHA-256 of the 80 header bytes before it, LF, the canonical tuple (the bytes
+`journalDigest` covers), a status byte (`P`, `C` or `R`) and LF. Files are opened only by `openat` in
+`gate-sys/src/openat.rs`, the one module of the workspace that holds `unsafe` code (the gate's lexical tripwire below);
+the other system calls are std on the returned `File` (`pwrite64`, `pread64`, `fstat`, `fsync`, `flock`, `close`).
+`Gate::new` and `PolicyGate::new` keep HE-002's in-memory stores and their behaviour; the injection queue moved
+unchanged into `store::FaultPlan`. The in-process view of a file journal is its mirror, which every append changes
+exactly as the in-memory journal does (a durable record added, a torn failure one TORN, a clean failure nothing), so
+`journalDigest`, the snapshot and every replay restart are the in-memory gate's; the file is scanned only when the
+stores open. The test suites run every I05 and I07 transcript through files with a fresh scan compared after every
+event, and every transcript with a GATE_RESTART, as it is and extended by EXPIRE and by DRAIN_REQUEST, as a process
+restart.
+
+The source check in `tools/gate.py` is a lexical tripwire over the workspace's `.rs` files (`target/` excluded): it
+matches text and does not parse Rust (HE-002C PR review rounds 1 and 2, R1-1 and R2-1). It refuses a list of std
+modules and items; it is not an allowlist of std modules, so other std paths (`std::thread`, `std::sync`, `std::time`,
+and so on) pass and are code review's. In the non-test sources of the crates
+EFFECT_GATE will link (`effect-gate`, `gate-sys`, `i05-protocol`), read with the whitespace around every `::` removed,
+it refuses `std::process`, `std::env`, `std::net` and `std::path`; the names `Path`, `PathBuf`, `DirBuilder`,
+`OpenOptions`, `File::open`, `File::create`, `File::options`, `TryLockError` and `Metadata`; a `std::os::fd` item outside
+`openat.rs`; any std `fs` item but `std::fs::File` and, where allowed, `std::os::unix::fs::FileExt` and `MetadataExt`;
+any other `std::os` path (for example `std::os::unix::net`); a `use` of std that renames, and `std as` anywhere; a
+top-level grouped or glob std import (`std::{`, `std::*`) and a nested std glob (`std::io::prelude::*`); a std path a
+macro completes (`std::$`); and `extern crate`. In every workspace source, tests and binaries included, it refuses the
+word `unsafe` outside `gate-sys/src/openat.rs`, a `path` attribute (also under `cfg_attr`), the word `include` (the
+macro `include!` under any spelling; `include_str!` and `include_bytes!` are other words), a raw identifier (`r#process`)
+and inline assembly (`asm!`, `global_asm!`, `naked_asm!`). It refuses any file under a crate's `src/` that is not a `.rs`
+file, any symlink under `crates/`, and a crate manifest whose `[package]` names a `build` script or whose `lib`, `bin`,
+`test`, `bench` or `example` target names a `path`. It also requires `#![forbid(unsafe_code)]` on the `effect-gate` and `i05-protocol` roots and
+`#![deny(unsafe_code)]` on `gate-sys`'s (whose `openat` module allows it); for the first two crates the compiler, through
+that attribute, enforces the rule against unsafe code, and the tripwire only checks the attribute is there. Anything
+beyond the tripwire's forms, for example a comment between a path's tokens or inside an attribute, a `]` inside a
+string in `cfg_attr`, or a macro that assembles a std path or an attribute from its arguments, is code review's.
+
+| # | Behaviour | Why |
+|---|---|---|
+| R19 | A generation on file stores matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$` and is not `generations`; any other name refuses `FileStores::open` before anything is created | store file names derive from it |
+| R20 | A payload holds at most 1 MiB and a store file at most 64 MiB: a larger payload, or an append that would pass 64 MiB, fails clean (no bytes); a scan reads in 64 KiB chunks, holds at most one frame, and stops at 64 MiB with one TORN for the rest | bounded memory and work on any file |
+| R21 | A committed frame whose digests match but whose payload is not UTF-8 JSON in canonical form, or not exactly one of the record tuples (checked by re-encoding the decoded record), is TORN; an index or marker frame is held to its own tuple the same way | only the gate's own bytes are records |
+| R22 | Marker bytes other than one committed `["MARKER", generation, "STORAGE_FAILURE"]` of this generation count as a present marker, shown as `[[generation, "UNREADABLE"]]`; a failed marker write that left bytes is such a marker (stricter than the model, whose failed write leaves none; `MARKER_FAIL_NEXT` is clean, so no vector reaches it) | fail closed; owner decision Q-HE2C-4 (a), below |
+| R23 | Every TORN or undecodable index entry is ignored; a committed earlier generation whose journal is missing refuses the open. An index or earlier journal that cannot be read whole (a read error, or past R20's bound) refuses the open too | an entry is appended only after its journal exists (R26); owner decision Q-HE2C-4 (a), below |
+| R24 | The open refuses when the journal and marker directories report the same device (`fstat`'s `st_dev`; tests pass their own probe, E15). Necessary, not sufficient: the failure-domain proof is HE-008's and T04's | the marker's separate failure domain (I05 v2 P4) |
+| R25 | The journal is `flock`ed (non-blocking) for the stores' life; a journal another holder has locked refuses the open | one writer per generation |
+| R26 | Durability order: the index is created if new and the journal directory synced before the index's first append; a new journal is created and the journal directory synced before the generation's index entry, which comes before the first record; the marker file is created at the first marker write, then the marker directory is synced, then the frame is written. The syncs do not depend on which opening created a file (HE-002C PR review round 1, R1-3): every opening syncs the journal directory once the index is open, and once more when it created the journal or will append the generation's index entry (so a journal an earlier, failed opening created is synced before its entry), and the first marker write syncs the marker directory also when the marker file was already there. Per opening: one journal-directory sync for an indexed generation; two, plus the index append's two file syncs, for a new or unindexed one, and two for a committed generation whose own journal is missing and is recreated empty (design §7; unlike R23's missing earlier journal, which refuses); the first marker write adds one marker-directory sync and its frame's two. `FileStores::directory_syncs()` is a read-only count of these syncs, public for the tests that assert them | a crash never leaves an index entry without its journal, or a marker frame in an unsynced entry |
+| R27 | Every I/O error and scan outcome is a value: a failed append is `Appended::Failed { torn }`, an unreadable rest of a journal is one TORN (the restart is then HELD), and no store code unwraps, indexes or does unchecked arithmetic on file-derived data | no panics (`panic = "abort"`) |
+| R28 | A generation that is a committed index entry but not the last committed one cannot be opened | an older generation never runs beside a newer one |
+| R29 | Two phases per append: the frame with status `P`, synced and read back; then the status byte `C`, synced and read back. A failure that left the file's length unchanged is clean; any other failure (or an unreadable length) is torn, and a frame whose `C` byte was written is rewritten to `R`, synced and read back. The mirror holds TORN either way | owner decision Q-HE2C-1 (a), below |
+| R30 | The open refuses while an earlier generation's journal is locked by a live holder, so generations never overlap, also within one process (HE-003 drops a generation's stores before it opens the next) | that generation could still write BINDs this open cannot see |
+
+Opening (`FileStores::open`) runs every check before anything is appended and appends the generation's index entry
+last, all under a blocking `flock` on the index: R19 and R24, the index (R23), R28, every earlier generation's journal
+(R23, R30, its committed BIND records), the marker, the journal (created if new, R25, scanned into the mirror), then the
+index entry; a failed index append fails the open. `Gate::create` and `PolicyGate::create` accept only stores whose
+opening created the journal file and appended the index entry, with an empty journal and no marker file, and stores of
+the configured generation (`GateError::NotFresh`, `GateError::GenerationMismatch`); everything else is reopened with
+`open`, the process restart. A generation whose open failed after its journal was created is therefore restart-only
+(HELD); the broker uses a new generation.
+
+The process restart (`Gate::open`, `PolicyGate::open`) builds the gate from the files without a restart, then restarts
+once: the bound execution is this journal's last BIND, its expiry an EXPIRED record for it after that BIND, the bound
+execution IDs and run nonces this journal's BIND records, and the prior bindings the configuration's united with the
+earlier generations' (Q-HE2C-2 (a)); PolicyGate then takes GATE_RESTART's I07 path (writes and maintenance rebuilt from
+the journal, a HELD floor for an ambiguous write, RESTARTED appended once, no session), and the I05 gate alone takes the
+same floor. Not kept, and unobservable after a restart because the generation's one channel never reopens and the
+data-plane connections die with the process: the I05 counters, the connection table, the challenge and chain position,
+the mutation keys and created UIDs, and the I07 write counters (zero after a process restart).
+
+Notes from HE-002C PR review round 1. R1-5, carried to HE-008/T04 (which own the store directory and the failure-domain
+proof): `Dir::file` opens without `O_NOCTTY` and checks for a regular file only after the open succeeds, so a device
+node or FIFO planted at a store name (which needs write access to the store directory, and `mknod` for a device) is
+opened before it is refused. R1-7 (1): `GateError` is not `#[non_exhaustive]`; its new variants `NotFresh` and
+`GenerationMismatch` are additive (`Gate::new` never returns them) and no match in the workspace is exhaustive over it,
+but an exhaustive match outside the workspace would need the two arms.
+
+Owner decisions (2026-10-13, relayed by the lane monitor; quoted from HE-002C design revision 4, §18):
+
+- **Q-HE2C-1 (a), the append protocol and its disclosed residual.** "two-phase append plus revocation (frame pending,
+  sync and read-back; commit status byte, sync and read-back; revoke on failure). The residual window extends the
+  disclosed I05 v2 P4 / v3 V3 residual by one case." The case: a record whose `C` byte was written but whose commit
+  sync or read-back failed, after the frame's own sync and read-back had succeeded, is answered as a storage failure
+  (HELD), and its revocation fails too. Without a reboot the scan then reads the page cache's `C`; after a reboot the
+  medium may hold `C` without the `R`. Either way a process restart can read as durable a record the gate reported as
+  failed, so a CLOSED record answered HELD can come back CLOSED. The read-back checks the kernel's view, not the medium.
+  A torn status rewrite can also corrupt earlier short frames sharing its sector; they read as TORN (fail closed). The
+  append-point tests assert this window as such (mirror TORN, scan a record).
+- **Q-HE2C-2 (a), earlier bindings.** "the union of the configuration's priorBindings and the journal-derived earlier
+  bindings." A BIND torn at write time was never granted and contributes nothing; a granted BIND corrupted later loses
+  its derived bindings, which the configured priorBindings still cover.
+- **Q-HE2C-3 (a), the E14 divergence.** "accept and disclose. Keep the model's order (expired set before the EXPIRED
+  write) and amend HE-002 design §7's identical-journal claim for this case." `Gate::expire` sets `expired` before it
+  attempts the EXPIRED record and keeps it when the write fails (R10-L02, R10-L02b); the process restart sees only
+  durable records, so after such a failure a later EXPIRE journals `["EXPIRED", id]` again where the replay restart
+  answers without a record. Outputs (`{"denied": []}`) and the generation's state are equal; the journal and its digest
+  differ by that one record. The process-restart tests assert exactly this for R10-L02 and R10-L02b extended by EXPIRE,
+  and journal equality for every other case.
+- **Q-HE2C-4 (a), two points stricter than the design** (2026-10-13, relayed by the lane monitor). "Accept both, fail
+  closed": R22 (a committed marker counts only with reason STORAGE_FAILURE, otherwise UNREADABLE) and R23 (an index or
+  earlier-generation journal that can't be read whole refuses FileStores::open) stand as built and disclosed. Design
+  revision 4 asked only for one committed marker of this generation (R22), and its R27 would have read the unread rest of
+  an index or earlier journal as one ignored TORN entry (R23), which could hide a committed earlier BIND.
