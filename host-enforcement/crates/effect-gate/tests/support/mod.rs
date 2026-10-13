@@ -108,6 +108,75 @@ fn opt_text(event: &Value, key: &str) -> Option<String> {
     }
 }
 
+/// The broker frame a FRAME event stands for: the envelope a correct broker sends next (the config's generation and
+/// broker challenge, the gate's next sequence and last digest), then the event's `mutate` operations.
+pub fn broker_frame(config_value: &Value, next_sequence: i64, last_digest: &str, event: &Value) -> Value {
+    let mut envelope = Object::new();
+    envelope.insert(JStr::new("schemaVersion"), Value::str(FRAME_VERSION));
+    envelope.insert(JStr::new("generation"), field(config_value, "generation").clone());
+    envelope.insert(JStr::new("challenge"), field(config_value, "brokerChallenge").clone());
+    envelope.insert(JStr::new("sequence"), Value::int(next_sequence));
+    envelope.insert(JStr::new("previousDigest"), Value::str(last_digest));
+    envelope.insert(JStr::new("direction"), Value::str("BROKER_TO_GATE"));
+    envelope.insert(JStr::new("operation"), field(event, "operation").clone());
+    envelope.insert(JStr::new("payload"), field(event, "payload").clone());
+    apply_mutations(Value::Object(envelope), event.get("mutate"))
+}
+
+/// How a built frame enters the gate in `mode`; on the bytes path a frame without a canonical encoding falls back to
+/// the value path and is counted.
+pub fn frame_input(built: Value, mode: Mode, value_fallbacks: &mut usize) -> FrameInput {
+    match mode {
+        Mode::Value => FrameInput::Value(built),
+        Mode::Bytes => match json::canonical(&built) {
+            Ok(raw) => FrameInput::Bytes(raw),
+            Err(_) => {
+                *value_fallbacks += 1;
+                FrameInput::Value(built)
+            }
+        },
+    }
+}
+
+/// A vector event other than FRAME as a typed I05 gate event.
+pub fn base_event(event: &Value, context: &str) -> Event {
+    let conn = || text(event, "conn").to_string();
+    match text(event, "type") {
+        "BACKLOG" => Event::Backlog { conn: conn() },
+        "ACCEPT" => Event::Accept { conn: conn() },
+        "REQUEST" => Event::Request {
+            conn: conn(),
+            certificate_digest: text(event, "certificateDigest").to_string(),
+            head: text(event, "head").to_string(),
+            body_digest: opt_text(event, "bodyDigest"),
+        },
+        "UPSTREAM_RESPONSE" => Event::UpstreamResponse {
+            conn: conn(),
+            response: UpstreamResponse {
+                http_status: field(event, "httpStatus").as_int().and_then(|status| status.to_i64()).expect("status"),
+                body_digest: text(event, "bodyDigest").to_string(),
+                uid: opt_text(event, "uid"),
+                resource_version: opt_text(event, "resourceVersion"),
+            },
+        },
+        "UPSTREAM_LOST" => Event::UpstreamLost { conn: conn() },
+        "UPSTREAM_TIMEOUT" => Event::UpstreamTimeout { conn: conn() },
+        // `torn` counts only when it is exactly true (the model's `event.get("torn", False) is True`).
+        "STORAGE_FAIL_NEXT" => Event::StorageFailNext { torn: matches!(event.get("torn"), Some(Value::Bool(true))) },
+        "MARKER_FAIL_NEXT" => Event::MarkerFailNext,
+        "STORAGE_FAIL_AFTER" => Event::StorageFailAfter {
+            after: field(event, "after").as_int().and_then(|after| after.to_u64()).expect("after"),
+        },
+        "DRAIN_REQUEST" => Event::DrainRequest,
+        "EXPIRE" => Event::Expire,
+        "CHANNEL_LOST" => Event::ChannelLost,
+        "SECOND_CHANNEL" => Event::SecondChannel,
+        "PEER_CHANGED" => Event::PeerChanged,
+        "GATE_RESTART" => Event::GateRestart,
+        other => panic!("{context}: unknown event type {other}"),
+    }
+}
+
 /// Replays one event list on a fresh gate.
 pub fn replay(config_value: &Value, events: &[Value], mode: Mode, context: &str) -> Replay {
     let config = Config::from_value(config_value).unwrap_or_else(|error| panic!("{context}: config refused: {error:?}"));
@@ -116,64 +185,14 @@ pub fn replay(config_value: &Value, events: &[Value], mode: Mode, context: &str)
     let mut replay = Replay { outputs: Vec::new(), snapshot: Value::Null, frames: 0, value_fallbacks: 0 };
     for (index, event) in events.iter().enumerate() {
         let context = format!("{context} event {index}");
-        let conn = || text(event, "conn").to_string();
         let typed = match text(event, "type") {
             "FRAME" => {
-                let mut envelope = Object::new();
-                envelope.insert(JStr::new("schemaVersion"), Value::str(FRAME_VERSION));
-                envelope.insert(JStr::new("generation"), field(config_value, "generation").clone());
-                envelope.insert(JStr::new("challenge"), field(config_value, "brokerChallenge").clone());
-                envelope.insert(JStr::new("sequence"), Value::int(gate.next_sequence()));
-                envelope.insert(JStr::new("previousDigest"), Value::str(gate.last_digest()));
-                envelope.insert(JStr::new("direction"), Value::str("BROKER_TO_GATE"));
-                envelope.insert(JStr::new("operation"), field(event, "operation").clone());
-                envelope.insert(JStr::new("payload"), field(event, "payload").clone());
-                let built = apply_mutations(Value::Object(envelope), event.get("mutate"));
+                let built = broker_frame(config_value, gate.next_sequence(), gate.last_digest(), event);
                 assert_bytes_path_agrees(&built, &schema, &context);
                 replay.frames += 1;
-                Event::Frame(match mode {
-                    Mode::Value => FrameInput::Value(built),
-                    Mode::Bytes => match json::canonical(&built) {
-                        Ok(raw) => FrameInput::Bytes(raw),
-                        Err(_) => {
-                            replay.value_fallbacks += 1;
-                            FrameInput::Value(built)
-                        }
-                    },
-                })
+                Event::Frame(frame_input(built, mode, &mut replay.value_fallbacks))
             }
-            "BACKLOG" => Event::Backlog { conn: conn() },
-            "ACCEPT" => Event::Accept { conn: conn() },
-            "REQUEST" => Event::Request {
-                conn: conn(),
-                certificate_digest: text(event, "certificateDigest").to_string(),
-                head: text(event, "head").to_string(),
-                body_digest: opt_text(event, "bodyDigest"),
-            },
-            "UPSTREAM_RESPONSE" => Event::UpstreamResponse {
-                conn: conn(),
-                response: UpstreamResponse {
-                    http_status: field(event, "httpStatus").as_int().and_then(|status| status.to_i64()).expect("status"),
-                    body_digest: text(event, "bodyDigest").to_string(),
-                    uid: opt_text(event, "uid"),
-                    resource_version: opt_text(event, "resourceVersion"),
-                },
-            },
-            "UPSTREAM_LOST" => Event::UpstreamLost { conn: conn() },
-            "UPSTREAM_TIMEOUT" => Event::UpstreamTimeout { conn: conn() },
-            // `torn` counts only when it is exactly true (the model's `event.get("torn", False) is True`).
-            "STORAGE_FAIL_NEXT" => Event::StorageFailNext { torn: matches!(event.get("torn"), Some(Value::Bool(true))) },
-            "MARKER_FAIL_NEXT" => Event::MarkerFailNext,
-            "STORAGE_FAIL_AFTER" => Event::StorageFailAfter {
-                after: field(event, "after").as_int().and_then(|after| after.to_u64()).expect("after"),
-            },
-            "DRAIN_REQUEST" => Event::DrainRequest,
-            "EXPIRE" => Event::Expire,
-            "CHANNEL_LOST" => Event::ChannelLost,
-            "SECOND_CHANNEL" => Event::SecondChannel,
-            "PEER_CHANGED" => Event::PeerChanged,
-            "GATE_RESTART" => Event::GateRestart,
-            other => panic!("{context}: unknown event type {other}"),
+            _ => base_event(event, &context),
         };
         let output = gate.handle(typed).unwrap_or_else(|error| panic!("{context}: {error:?}"));
         replay.outputs.push(output.to_doc().to_value());

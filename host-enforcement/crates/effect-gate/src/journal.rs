@@ -1,13 +1,14 @@
-//! The durable journal as typed records (I05 v1 and v2 "Durable journal"), their exact canonical tuple form (which the
-//! journal digest covers), the in-memory store with the contract's three test injections, and the failure marker.
-//! The durable file formats are HE-002C's.
+//! The durable journal as typed records (I05 v1 and v2 "Durable journal", and the I07 records of I07 v1-v3), their
+//! exact canonical tuple form (which the journal digest covers), the in-memory store with the contract's three test
+//! injections, and the failure marker. The durable file formats are HE-002C's.
 
 use std::collections::VecDeque;
 
 use i05_protocol::json::Doc;
 use i05_protocol::Verb;
 
-use crate::types::{Classification, CloseReason, Invalidation, State};
+use crate::policy::{Prior, WriteOperation};
+use crate::types::{AbortReason, Classification, CloseReason, Invalidation, MaintenanceEnd, SessionEnd, State};
 
 /// A TERMINAL record's details.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,6 +21,41 @@ pub enum TerminalDetails {
     None,
     /// The 900-second upstream bound expired: `{aborted: UPSTREAM_TIMEOUT}` (Decision 12).
     Aborted,
+}
+
+/// A WRITE_TERMINAL record's details (HE-002B DESIGN §5, N19).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WriteDetails {
+    /// A settling response: `{httpStatus, resultDigest, observedUid, observedResourceVersion}`, the observed members
+    /// null unless the status is the operation's success.
+    Delivered { http_status: i64, result_digest: String, observed_uid: Option<String>, observed_resource_version: Option<String> },
+    /// A response that leaves the outcome unknown, kept for reconciliation: `{httpStatus, resultDigest}`.
+    Reconciliation { http_status: i64, result_digest: String },
+    /// A LOST upstream outcome: `{}`.
+    Lost,
+    /// The gate gave the exchange up: `{aborted: reason}`.
+    Aborted(AbortReason),
+}
+
+impl WriteDetails {
+    pub fn to_doc(&self) -> Doc {
+        match self {
+            WriteDetails::Delivered { http_status, result_digest, observed_uid, observed_resource_version } => {
+                Doc::object(vec![
+                    ("httpStatus", Doc::Int(*http_status)),
+                    ("resultDigest", Doc::str(result_digest)),
+                    ("observedUid", Doc::opt_str(observed_uid.as_deref())),
+                    ("observedResourceVersion", Doc::opt_str(observed_resource_version.as_deref())),
+                ])
+            }
+            WriteDetails::Reconciliation { http_status, result_digest } => Doc::object(vec![
+                ("httpStatus", Doc::Int(*http_status)),
+                ("resultDigest", Doc::str(result_digest)),
+            ]),
+            WriteDetails::Lost => Doc::Object(Vec::new()),
+            WriteDetails::Aborted(reason) => Doc::object(vec![("aborted", Doc::str(reason.as_str()))]),
+        }
+    }
 }
 
 /// How the channel ended without a fatal failure.
@@ -52,6 +88,31 @@ pub enum Record {
     Expired { execution_id: String },
     LateUpstream { action_id: u16 },
     Restarted { state: State },
+    /// I07: WRITE_BEGIN starts the generation's maintenance (before its drain).
+    MaintRequested { generation: String },
+    /// I07: the fence is OPEN while the maintenance waits.
+    MaintOpen { state: State },
+    /// I07: the fence is HELD while the maintenance waits or is open.
+    MaintHeld { state: State },
+    /// I07: a write's durable intent, before its first upstream byte.
+    WriteForwarded {
+        write_id: u16,
+        operation: WriteOperation,
+        api_version: String,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        request_digest: String,
+        prior: Option<Prior>,
+    },
+    /// I07: a write's terminal classification, before the writer hears of it.
+    WriteTerminal { write_id: u16, classification: Classification, details: WriteDetails },
+    /// I07: the maintenance ended, with its write count and ambiguous writes.
+    MaintEnded { reason: MaintenanceEnd, writes: u16, ambiguous_write_ids: Vec<u16> },
+    /// I07: a writer session ended.
+    WriterSessionEnded { how: SessionEnd },
+    /// I07: an upstream outcome for a write that is no longer outstanding.
+    WriteLateUpstream { write_id: u16 },
 }
 
 /// A journal position: a record, or the placeholder a torn write leaves.
@@ -118,6 +179,31 @@ impl Record {
             Record::Expired { execution_id } => vec![tag("EXPIRED"), Doc::str(execution_id)],
             Record::LateUpstream { action_id } => vec![tag("LATE_UPSTREAM"), id(*action_id)],
             Record::Restarted { state } => vec![tag("RESTARTED"), Doc::str(state.as_str())],
+            Record::MaintRequested { generation } => vec![tag("MAINT_REQUESTED"), Doc::str(generation)],
+            Record::MaintOpen { state } => vec![tag("MAINT_OPEN"), Doc::str(state.as_str())],
+            Record::MaintHeld { state } => vec![tag("MAINT_HELD"), Doc::str(state.as_str())],
+            Record::WriteForwarded { write_id, operation, api_version, kind, namespace, name, request_digest, prior } => vec![
+                tag("WRITE_FORWARDED"),
+                id(*write_id),
+                Doc::str(operation.as_str()),
+                Doc::str(api_version),
+                Doc::str(kind),
+                Doc::opt_str(namespace.as_deref()),
+                Doc::str(name),
+                Doc::str(request_digest),
+                prior.as_ref().map_or(Doc::Null, Prior::to_doc),
+            ],
+            Record::WriteTerminal { write_id, classification, details } => {
+                vec![tag("WRITE_TERMINAL"), id(*write_id), Doc::str(classification.as_str()), details.to_doc()]
+            }
+            Record::MaintEnded { reason, writes, ambiguous_write_ids } => vec![
+                tag("MAINT_ENDED"),
+                Doc::str(reason.as_str()),
+                id(*writes),
+                Doc::Array(ambiguous_write_ids.iter().map(|write_id| id(*write_id)).collect()),
+            ],
+            Record::WriterSessionEnded { how } => vec![tag("WRITER_SESSION_ENDED"), Doc::str(how.as_str())],
+            Record::WriteLateUpstream { write_id } => vec![tag("WRITE_LATE_UPSTREAM"), id(*write_id)],
         })
     }
 }

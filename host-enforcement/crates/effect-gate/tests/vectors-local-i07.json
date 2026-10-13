@@ -1,0 +1,2906 @@
+{
+ "configs": {
+  "ACTIVE": {
+   "key": [
+    "configs",
+    "ACTIVE"
+   ],
+   "vectorsPath": "contracts/i07-v3/vectors.json"
+  }
+ },
+ "evidenceClass": "R10_LOCAL",
+ "kindChecks": [
+  {
+   "expect": "OBJECT_RULE",
+   "id": "R10-I07-K01",
+   "intent": "An UPDATE of the qualification Namespace whose metadata names a namespace is refused OBJECT_RULE (model :108-109)",
+   "payload": {
+    "name": "planeon-qual",
+    "namespace": null,
+    "object": {
+     "apiVersion": "v1",
+     "kind": "Namespace",
+     "metadata": {
+      "name": "planeon-qual",
+      "namespace": "planeon-qual",
+      "resourceVersion": "41",
+      "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+     },
+     "spec": {
+      "finalizers": [
+       "kubernetes"
+      ]
+     }
+    },
+    "operation": "UPDATE",
+    "prior": {
+     "projectionDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+     "resourceVersion": "41",
+     "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+    },
+    "resource": {
+     "group": "",
+     "resource": "namespaces",
+     "version": "v1"
+    },
+    "writeId": 1
+   }
+  }
+ ],
+ "model": {
+  "commit": "a2eab9365c8663cc1ae23a666e864b821f600fa6",
+  "path": "scripts/i07_policy_write_v3.py",
+  "sha256": "6cc7ea0d3df0c7f2966184bb6d322189de3b49b5b02dfe2429911121973afe08"
+ },
+ "note": "R10-local I07 vectors (HE-002B DESIGN sections 8 and 9), not contract data. They close the gaps of the coverage measure on the pinned model and add the I07 form of R10-L03. Configurations are the I07 v3 contract's, named through configs. Expected values were computed by running the pinned harness-onion model scripts/i07_policy_write_v3.py at a2eab93 (sha256 6cc7ea0d3df0c7f2966184bb6d322189de3b49b5b02dfe2429911121973afe08) on these inputs; R10's own replay of every transcript reproduces them.",
+ "transcripts": [
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "type": "W_PEER_CHANGED"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": true,
+      "classification": null,
+      "sealed": false,
+      "status": "CONSUMED"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "OPEN",
+    "connections": {
+     "c1": "OPEN"
+    },
+    "counters": {
+     "consumptions": 1,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "CONSUMED",
+      1
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "INVALIDATED",
+      "WRITER_PEER_DEVIATION",
+      "HELD"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "FATAL"
+     ],
+     [
+      "DRAINED",
+      "HELD"
+     ]
+    ],
+    "maintenance": "NONE",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 2,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-L01",
+   "intent": "A writer peer deviation while an I05 drain waits on an in-flight action holds the generation, and the drain settles HELD on the writer event's own output (model :245-247)",
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {
+     "actionId": 1,
+     "decision": "FORWARD"
+    },
+    {
+     "denied": [],
+     "drain": "PENDING"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "drain": "HELD",
+     "fatal": "PEER_CHANGED",
+     "maintenance": "NONE",
+     "sessionEnd": "FATAL"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": 1,
+      "journalDigest": "sha256:034cf6aba67d884e85b0fcc2dba56ef7a6402c3779cbeb61061c259dc69f3068",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "type": "W_PEER_CHANGED"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "type": "W_PEER_CHANGED"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "WRITER_SESSION_ENDED",
+      "ENDED"
+     ]
+    ],
+    "maintenance": "NONE",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "ACTIVE",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {}
+   },
+   "id": "R10-I07-L02",
+   "intent": "Without a session, a writer loss and a peer change output {} and change nothing (model :268-270)",
+   "outputs": [
+    {},
+    {},
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "maintenance": "NONE",
+     "sessionEnd": "ENDED"
+    },
+    {},
+    {}
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "operation": "WRITE_END",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_END",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ],
+     [
+      "MAINT_ENDED",
+      "WRITE_END",
+      0,
+      []
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "WRITE_END",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-L03",
+   "intent": "A WRITE_END whose MAINT_ENDED record fails is refused STORAGE_FAILURE and keeps the maintenance, which the storage failure then holds; a second WRITE_END ends it (model :428-429)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "response": {
+      "reason": "STORAGE_FAILURE",
+      "result": "REFUSED"
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:0e04e11ac7f680ba7645dee60582c6dde131533c25ae9a9b5bc7a10274744f76",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "after": 3,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ]
+    ],
+    "maintenance": "HELD",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-L04",
+   "intent": "A failed MAINT_OPEN record leaves the maintenance PENDING with the generation HELD, so the same settle holds it and records MAINT_HELD (model :178-185)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {},
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "HELD",
+      "maintenance": "HELD",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:ccfb5651b197fb61b81802587ae5234c68bd9e400e3a44acaa0c26ee015c3fd8",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "after": 1,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": "LOST",
+     "writeId": 1
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "WRITE_TERMINAL",
+      1,
+      "IO_AMBIGUOUS",
+      {}
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "maintenance": "HELD",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L05",
+   "intent": "A failed MAINT_HELD record still holds the maintenance (model :181-185)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "classification": "IO_AMBIGUOUS",
+     "relayed": true,
+     "response": {
+      "classification": "IO_AMBIGUOUS",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "requestDigest": "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      "result": "OK",
+      "resultDigest": null,
+      "writeId": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:e10c302537c837fc6b749f9c9b88da49ef0ce3dd433f810b1886f83ea3ffc014",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 1
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "after": 1,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "CLOSED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "ENDED"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "RESTARTED",
+      "HELD"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "GATE_RESTART",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 2,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-L06",
+   "intent": "The owning session is lost while its maintenance is open and MAINT_ENDED fails: the maintenance is ENDED anyway, and a restart reports GATE_RESTART (model :190-192, :228)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "maintenance": "ENDED",
+     "sessionEnd": "ENDED"
+    },
+    {
+     "maintenance": "ENDED",
+     "restartState": "HELD"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:261d7e0b5275bda9885ab8fc4a48b745a8c5adbc5bb832a06adcc9980f08a6fa",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "after": 1,
+     "type": "STORAGE_FAIL_AFTER"
+    },
+    {
+     "mutate": [
+      {
+       "op": "set",
+       "path": [
+        "sequence"
+       ],
+       "value": 9
+      }
+     ],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "FATAL"
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "SESSION_FATAL",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {}
+   },
+   "id": "R10-I07-L07",
+   "intent": "A fatal frame ends the owning session and its MAINT_ENDED record fails (SESSION_FATAL, model :190-192, :293-297)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "fatal": "CHAIN_BROKEN",
+     "maintenance": "ENDED",
+     "sessionEnd": "FATAL"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "maintenance": "NONE",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 2,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-I07-L08",
+   "intent": "A failed WRITER_SESSION_ENDED record on a writer loss holds the generation through the storage-failure path (model :285-291)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {},
+    {
+     "maintenance": "NONE",
+     "sessionEnd": "ENDED"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:7d6ee64cc13c854ff72193141829b32bd9fcfa0a3a86f9d788dd06cc43eafd52",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "maintenance": "NONE",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {}
+   },
+   "id": "R10-I07-L09",
+   "intent": "A failed WRITER_SESSION_ENDED record on a fatal opening frame (model :285-291, FATAL)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {},
+    {
+     "fatal": "OPENING_FRAME_REQUIRED",
+     "maintenance": "NONE",
+     "sessionEnd": "FATAL"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_CHANNEL_LOST"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": {
+      "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "httpStatus": 201,
+      "resourceVersion": "42",
+      "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+     },
+     "writeId": 1
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "ENDED"
+     ],
+     [
+      "MAINT_ENDED",
+      "SESSION_ENDED",
+      1,
+      [
+       1
+      ]
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "SESSION_ENDED",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L10",
+   "intent": "A writer loss with a write outstanding whose abort record fails, then a late outcome whose WRITE_LATE_UPSTREAM record fails (model :194-204, :337-340)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "maintenance": "ENDED",
+     "sessionEnd": "ENDED"
+    },
+    {},
+    {
+     "lateUpstream": "NOT_RELAYED"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_PEER_CHANGED"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "INVALIDATED",
+      "WRITER_PEER_DEVIATION",
+      "HELD"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "FATAL"
+     ],
+     [
+      "MAINT_ENDED",
+      "SESSION_FATAL",
+      1,
+      [
+       1
+      ]
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "SESSION_FATAL",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L11",
+   "intent": "A writer peer deviation with a write outstanding whose abort record fails (model :194-204, :278)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "fatal": "PEER_CHANGED",
+     "maintenance": "ENDED",
+     "sessionEnd": "FATAL"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "WRITER_SESSION_ENDED",
+      "FATAL"
+     ],
+     [
+      "MAINT_ENDED",
+      "SESSION_FATAL",
+      1,
+      [
+       1
+      ]
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "SESSION_FATAL",
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L12",
+   "intent": "A lockstep breach whose abort record fails (model :194-204, :293-297, :310-311)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "fatal": "LOCKSTEP",
+     "maintenance": "ENDED",
+     "sessionEnd": "FATAL"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": "LOST",
+     "writeId": 1
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ]
+    ],
+    "maintenance": "HELD",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L13",
+   "intent": "A LOST outcome whose WRITE_TERMINAL record fails: IO_AMBIGUOUS with no details, still relayed (model :344-359)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "classification": "IO_AMBIGUOUS",
+     "relayed": true,
+     "response": {
+      "classification": "IO_AMBIGUOUS",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "requestDigest": "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      "result": "OK",
+      "resultDigest": null,
+      "writeId": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:09f6aafcab6131e296e5159adc212800bc00e3c4db05ff8be40b98dbc8f0a8c4",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 1
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": "TIMEOUT",
+     "writeId": 1
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ]
+    ],
+    "maintenance": "HELD",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L14",
+   "intent": "A TIMEOUT outcome whose WRITE_TERMINAL record fails (model :346-359)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "classification": "IO_AMBIGUOUS",
+     "relayed": true,
+     "response": {
+      "classification": "IO_AMBIGUOUS",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "requestDigest": "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      "result": "OK",
+      "resultDigest": null,
+      "writeId": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:09f6aafcab6131e296e5159adc212800bc00e3c4db05ff8be40b98dbc8f0a8c4",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 1
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_BEGIN",
+     "payload": {
+      "expectedGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "operation": "WRITE_OBJECT",
+     "payload": {
+      "name": "planeon-role",
+      "namespace": "planeon-qual",
+      "object": {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "Role",
+       "metadata": {
+        "name": "planeon-role",
+        "namespace": "planeon-qual"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "configmaps"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      },
+      "operation": "CREATE",
+      "prior": null,
+      "resource": {
+       "group": "rbac.authorization.k8s.io",
+       "resource": "roles",
+       "version": "v1"
+      },
+      "writeId": 1
+     },
+     "type": "W_FRAME"
+    },
+    {
+     "type": "STORAGE_FAIL_NEXT"
+    },
+    {
+     "type": "W_UPSTREAM",
+     "upstream": {
+      "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "httpStatus": 503,
+      "resourceVersion": "42",
+      "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+     },
+     "writeId": 1
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [
+     [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "STORAGE_FAILURE"
+     ]
+    ],
+    "journal": [
+     [
+      "MAINT_REQUESTED",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ],
+     [
+      "MAINT_OPEN",
+      "CLOSED"
+     ],
+     [
+      "WRITE_FORWARDED",
+      1,
+      "CREATE",
+      "rbac.authorization.k8s.io/v1",
+      "Role",
+      "planeon-qual",
+      "planeon-role",
+      "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      null
+     ],
+     [
+      "INVALIDATED",
+      "STORAGE_FAILURE",
+      "HELD"
+     ],
+     [
+      "MAINT_HELD",
+      "HELD"
+     ]
+    ],
+    "maintenance": "HELD",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "HELD",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 1,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {
+     "1": {
+      "classification": "IO_AMBIGUOUS",
+      "status": "TERMINAL"
+     }
+    }
+   },
+   "id": "R10-I07-L15",
+   "intent": "A non-final response (503) whose WRITE_TERMINAL record fails (model :348-359)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "gateState": "CLOSED",
+      "maintenance": "OPEN",
+      "result": "OK"
+     }
+    },
+    {
+     "forwarded": 1
+    },
+    {},
+    {
+     "classification": "IO_AMBIGUOUS",
+     "relayed": true,
+     "response": {
+      "classification": "IO_AMBIGUOUS",
+      "httpStatus": null,
+      "observedResourceVersion": null,
+      "observedUid": null,
+      "requestDigest": "sha256:888f56284a54ff26a361b63cde4cecc2ca3425610cd7600e69ea1d6f9980f7bd",
+      "result": "OK",
+      "resultDigest": null,
+      "writeId": 1
+     }
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [
+       1
+      ],
+      "gateState": "HELD",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:09f6aafcab6131e296e5159adc212800bc00e3c4db05ff8be40b98dbc8f0a8c4",
+      "maintenance": "HELD",
+      "result": "OK",
+      "writes": 1
+     }
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    },
+    {
+     "challenge": "8888888888888888888888888888888888888888888888888888888888888888",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {},
+    "boundExecutionId": null,
+    "channel": "UNOPENED",
+    "connections": {},
+    "counters": {
+     "consumptions": 0,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 0
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "WRITER_SESSION_ENDED",
+      "FATAL"
+     ]
+    ],
+    "maintenance": "NONE",
+    "maintenanceReason": null,
+    "pendingWriteId": null,
+    "state": "ACTIVE",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": null,
+    "writes": {}
+   },
+   "id": "R10-I07-L16",
+   "intent": "The W_FRAME replay rule takes the challenge of the latest W_CONNECT even when that connection was refused, so the open session's next frame carries another challenge: CHALLENGE_MISMATCH (design B10)",
+   "outputs": [
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "ACTIVE",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "maintenance": "NONE",
+      "result": "OK",
+      "writes": 0
+     }
+    },
+    {
+     "refusedSession": "SESSION_EXISTS"
+    },
+    {
+     "fatal": "CHALLENGE_MISMATCH",
+     "maintenance": "NONE",
+     "sessionEnd": "FATAL"
+    }
+   ]
+  },
+  {
+   "config": "ACTIVE",
+   "events": [
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "operation": "BIND_EXECUTION",
+     "payload": {
+      "bindingDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "caseId": "KUBERNETES_SMOKE",
+      "dispatchGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "peerQualificationDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "requestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "reservationDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "runNonce": "run-one",
+      "serverCertificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "workerPid": 4100,
+      "workerStartTicks": 900001
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "ARM_ACTION",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "recordedUid": null,
+      "requestTemplateDigest": "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c",
+      "verb": "CREATE"
+     },
+     "type": "FRAME"
+    },
+    {
+     "conn": "c1",
+     "type": "BACKLOG"
+    },
+    {
+     "conn": "c1",
+     "type": "ACCEPT"
+    },
+    {
+     "bodyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "certificateDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+     "conn": "c1",
+     "head": "POST /api/v1/namespaces/planeon-qual/pods HTTP/1.1\r\nHost: 198.51.100.7:6443\r\nAccept: application/json\r\nContent-Type: application/json\r\nContent-Length: 1234\r\n\r\n",
+     "type": "REQUEST"
+    },
+    {
+     "bodyDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+     "conn": "c1",
+     "httpStatus": 201,
+     "resourceVersion": "41",
+     "type": "UPSTREAM_RESPONSE",
+     "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "operation": "ACTION_OUTCOME",
+     "payload": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "CLOSE_GENERATION",
+     "payload": {
+      "reason": "NORMAL_DRAIN"
+     },
+     "type": "FRAME"
+    },
+    {
+     "operation": "GENERATION_STATUS",
+     "payload": {},
+     "type": "FRAME"
+    },
+    {
+     "type": "CHANNEL_LOST"
+    },
+    {
+     "type": "GATE_RESTART"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "EXPIRE"
+    },
+    {
+     "type": "DRAIN_REQUEST"
+    },
+    {
+     "challenge": "9999999999999999999999999999999999999999999999999999999999999999",
+     "type": "W_CONNECT"
+    },
+    {
+     "mutate": [],
+     "operation": "MAINTENANCE_STATUS",
+     "payload": {},
+     "type": "W_FRAME"
+    }
+   ],
+   "final": {
+    "actions": {
+     "1": {
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "sealed": true,
+      "status": "TERMINAL"
+     }
+    },
+    "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+    "channel": "CLOSED",
+    "connections": {
+     "c1": "CLOSED"
+    },
+    "counters": {
+     "consumptions": 1,
+     "correlationRefusals": 0,
+     "flushClosures": 0,
+     "stampsIssued": 1
+    },
+    "drainPending": false,
+    "failureMarker": [],
+    "journal": [
+     [
+      "BIND",
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "run-one",
+      "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      [
+       "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+       "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+       "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      ],
+      [
+       "ConfigMap/planeon-qual/probe-config",
+       "Pod/planeon-qual/probe-pod",
+       "Service/planeon-qual/probe-service"
+      ]
+     ],
+     [
+      "ARM",
+      1,
+      "CREATE",
+      "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      null,
+      "sha256:3a27a2635d71e1c068c2be15e3f027bec15470b7ec035fd421bb51179337f57c"
+     ],
+     [
+      "CONSUMED",
+      1
+     ],
+     [
+      "TERMINAL",
+      1,
+      "DELIVERED_RESULT",
+      false,
+      {
+       "httpStatus": 201,
+       "observedResourceVersion": "41",
+       "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+       "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      }
+     ],
+     [
+      "SEALED",
+      1,
+      "DELIVERED_RESULT",
+      false
+     ],
+     [
+      "CLOSED",
+      "NORMAL_DRAIN",
+      "CLOSED"
+     ],
+     [
+      "CHANNEL_ENDED",
+      "ORDERLY"
+     ],
+     [
+      "RESTARTED",
+      "CLOSED"
+     ],
+     [
+      "EXPIRED",
+      "1111111111111111111111111111111111111111111111111111111111111111"
+     ],
+     [
+      "DRAIN_STARTED"
+     ],
+     [
+      "DRAINED",
+      "CLOSED"
+     ]
+    ],
+    "maintenance": "ENDED",
+    "maintenanceReason": "GENERATION_REBUILT",
+    "pendingWriteId": null,
+    "state": "CLOSED",
+    "writeCounters": {
+     "sessions": 1,
+     "writesForwarded": 0,
+     "writesRefused": 0
+    },
+    "writerSession": "OPEN",
+    "writes": {}
+   },
+   "id": "R10-L03-I07",
+   "intent": "R10-L03 with the I07 ACTIVE configuration, then a writer session: the restart is CLOSED, the maintenance ENDED (GENERATION_REBUILT), and MAINTENANCE_STATUS reports the journal digest on the channel",
+   "outputs": [
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": null,
+      "counters": {
+       "consumptions": 0,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 0
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "result": "OK",
+      "state": "ACTIVE"
+     }
+    },
+    {
+     "response": {
+      "caseManifestSetDigest": "sha256:51435c24c91efce536c060353b403798a5eaadea60fa7d88ee9a829b15ba9e19",
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "OK"
+     }
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "flushedConnections": 0,
+      "result": "OK"
+     }
+    },
+    {},
+    {
+     "stamp": {
+      "actionId": 1,
+      "executionId": "1111111111111111111111111111111111111111111111111111111111111111"
+     }
+    },
+    {
+     "actionId": 1,
+     "decision": "FORWARD"
+    },
+    {
+     "classification": "DELIVERED_RESULT",
+     "relayed": true
+    },
+    {
+     "response": {
+      "actionId": 1,
+      "admittedBeforeInvalidation": false,
+      "classification": "DELIVERED_RESULT",
+      "httpStatus": 201,
+      "observedResourceVersion": "41",
+      "observedUid": "11111111-aaaa-4bbb-8ccc-000000000001",
+      "result": "OK",
+      "resultDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+     }
+    },
+    {
+     "response": {
+      "deniedActionIds": [],
+      "result": "OK",
+      "state": "CLOSED"
+     }
+    },
+    {
+     "response": {
+      "armedActionId": null,
+      "boundExecutionId": "1111111111111111111111111111111111111111111111111111111111111111",
+      "counters": {
+       "consumptions": 1,
+       "correlationRefusals": 0,
+       "flushClosures": 0,
+       "stampsIssued": 1
+      },
+      "drainPending": false,
+      "inFlightActionId": null,
+      "journalDigest": "sha256:b6a230a082c102ce0c31c2d32b3f45a82568bd095b1a571898518da6c518fce9",
+      "result": "OK",
+      "state": "CLOSED"
+     }
+    },
+    {
+     "channelEnd": "ORDERLY"
+    },
+    {
+     "maintenance": "ENDED",
+     "restartState": "CLOSED"
+    },
+    {
+     "denied": []
+    },
+    {
+     "denied": []
+    },
+    {
+     "denied": [],
+     "drain": "OPEN"
+    },
+    {
+     "session": "CONNECTED"
+    },
+    {
+     "response": {
+      "ambiguousWriteIds": [],
+      "gateState": "CLOSED",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inFlightActionId": null,
+      "journalDigest": "sha256:d406a10ae219760668b3685e632fb8a20dac473d66179cd502705dc3ae3c0e1d",
+      "maintenance": "ENDED",
+      "result": "OK",
+      "writes": 0
+     }
+    }
+   ]
+  }
+ ]
+}
