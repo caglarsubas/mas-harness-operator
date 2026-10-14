@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import struct
 import tempfile
 import unittest
@@ -348,6 +349,36 @@ class WorkspaceAndSourceTests(unittest.TestCase):
             with self.assertRaisesRegex(gate.GateError, "start-up lint"):
                 gate.check_sources(self.base)
 
+    # HE-002S DESIGN section 6 (D3): one occurrence of the status read's expression is excepted in gate-sys's seal.rs
+    # only (PR review round 1, R1-5: not the bare literal, and not twice).
+    def test_start_up_lint_exception_is_one_expression_in_one_file(self):
+        seal = self.base / "crates/gate-sys/src/seal.rs"
+        seal.parent.mkdir(parents=True)
+        status = 'pub fn own_status() { let _ = Dir::at("/proc/self")?.file_ro("status")?; }\n'
+        for text in (status, 'fn f() { let _ = Dir :: at( "/proc/self" )\n    ? . file_ro ("status")?; }\n'):
+            seal.write_text(text)
+            self.assertEqual(gate.check_sources(self.base), 3)
+        for text in ('let _ = Dir::at("/proc/self/status");', "// reads /proc/self", 'let _ = "/proc/self/exe";',
+                     'let _ = ("/proc/self", "/sys");', 'let _ = Dir::at("/proc/self");',
+                     'let _ = Dir::at(r"/proc/self")?.file_ro("status");',
+                     'let _ = Dir::at(r#"/proc/self"#)?.file_ro("status");',
+                     'let _ = Dir::at(concat!("/proc", "/self"))?.file_ro("status");',
+                     '// Dir::at("/proc/self")?.file_ro("status")\nlet _ = Dir::at(r"/proc/self")?.file_ro("status");',
+                     status + 'let _ = Dir::at("/proc/self")?.file_ro("status");',
+                     'let _ = Dir::at("/proc/self")?.file_ro("environ");',
+                     'let _ = Dir::at("/proc/self")?.file_ro("status")?;\nlet _ = Dir::at("/proc/1")?.file_ro("status");'):
+            seal.write_text(text + "\n")
+            with self.assertRaisesRegex(gate.GateError, "crates/gate-sys/src/seal.rs uses /(proc|sys) .start-up lint"):
+                gate.check_sources(self.base)
+        seal.unlink()
+        for rel in ("crates/a/src/main.rs", "crates/gate-sys/src/openat.rs", "crates/effect-gate/src/seal.rs"):
+            path = self.base / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('fn f() { let _ = Dir::at("/proc/self"); }\n')
+            with self.assertRaisesRegex(gate.GateError, "uses /proc .start-up lint"):
+                gate.check_sources(self.base)
+            path.unlink()
+
 
 LINKED_TREE = {
     "crates/i05-protocol/src/lib.rs": "//! Protocol.\n#![forbid(unsafe_code)]\npub mod json;\n",
@@ -402,7 +433,7 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", "linked-source tripwire")
             self.refused("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"] + text + "\n",
                          "linked-source tripwire")
-        # Tests and other crates are outside the allowlist (the start-up lint and the unsafe rule still apply).
+        # Tests and other crates are outside the linked-source tripwire (the start-up lint and the unsafe rule still apply).
         self.write("crates/gate/src/main.rs", "use std::path::Path;\nfn main() {}\n")
         self.assertEqual(gate.check_linked_sources(self.base), 6)
 
@@ -427,9 +458,45 @@ class LinkedSourceTests(unittest.TestCase):
                          + text + "\n", "std::os::fd item outside")
 
     def test_std_uses_are_not_renamed(self):
-        for text in ("use std::fs::File as Handle;", "use std::io::{self as stdio};", "use std::collections::{\n  BTreeMap as Map,\n};"):
+        for text in ("use std::fs::File as Handle;", "use std::io::{self as stdio};", "use std::collections::{\n  BTreeMap as Map,\n};",
+                     "use std::io as z;"):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", "renames a std item")
         self.write("crates/i05-protocol/src/json.rs", "use crate::json as j;\nlet x = y as u64;\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    # HE-002S PR review round 1, R1-2 (d): a rename through a use of a name imported from std (in any linked source,
+    # whatever the order), and a top-level group that renames std.
+    def test_std_renames_through_other_uses(self):
+        json, store = "crates/i05-protocol/src/json.rs", "crates/effect-gate/src/file_store.rs"
+        message = "renames a std module or item through a use of a name imported from std"
+        for rel, text in ((json, "use std::io;\nuse io as z;\nfn f() { z::copy(&mut a, &mut b); }"),
+                          (json, "use io as z;\nuse std::io;"),
+                          (json, "use std::io;\nuse self::io as z;"),
+                          (json, "use std::io::{self, Read};\nuse io::{copy as c};"),
+                          (json, "use std::io::Read;\npub use Read as R;"),
+                          (json, "use {std::io as z};"),
+                          (json, "use ::std::io;\nuse {io as z};"),
+                          (json, "use crate::io as z;"),            # io is imported from std by file_store.rs
+                          (json, "use super::m::File as F;"),
+                          (store, LINKED_TREE[store] + "mod m { pub use super::io; }\nuse m::io as z;")):
+            self.refused(rel, text + "\n", message)
+        # A use the reader cannot follow refuses; renames of other names and the precise-capturing `use<..>` pass.
+        self.refused(json, "macro_rules! m { () => { use $crate::json; } }\n", "use declaration .* cannot read")
+        self.write(json, "use crate::json as j;\nuse crate::frame::{Frame as F, self as fr};\n"
+                         "fn f<'a>(x: &'a u8) -> impl Sized + use<'a> { x }\n// use std::io; use io as z;\n"
+                         "const S: &str = \"use io as z;\";\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    # HE-002S PR review round 2, R2-1: a glob through std or a name imported from std.
+    def test_std_globs_through_other_uses(self):
+        json, store = "crates/i05-protocol/src/json.rs", "crates/effect-gate/src/file_store.rs"
+        message = "imports a glob through std or a name imported from std"
+        for rel, text in ((json, "use std::io::{*};\nfn f() { copy(&mut a, &mut b); }"),
+                          (json, "use std::io;\nuse io::*;"),
+                          (json, "use std::io::{self, *};"),
+                          (store, LINKED_TREE[store] + "mod m { pub use super::io::*; }")):
+            self.refused(rel, text + "\n", message)
+        self.write(json, "use crate::json::*;\n#[cfg(test)]\nmod tests { use super::*; }\n")
         self.assertEqual(gate.check_linked_sources(self.base), 6)
 
     def test_crate_root_attributes(self):
@@ -445,6 +512,66 @@ class LinkedSourceTests(unittest.TestCase):
                          check=gate.check_unsafe)
         self.write("crates/effect-gate/src/lib.rs", "#![forbid(unsafe_code)]\n// unsafe_code is a lint name\n")
         self.assertEqual(gate.check_unsafe(self.base), 8)
+
+    # HE-002S DESIGN section 6: gate-sys's seal.rs is the second file that may contain the word unsafe.
+    def test_unsafe_is_also_allowed_in_gate_sys_seal(self):
+        self.write("crates/gate-sys/src/seal.rs", "#![allow(unsafe_code)]\nfn f() -> i32 { unsafe { prctl(38, 1) } }\n")
+        self.assertEqual(gate.check_unsafe(self.base), 9)
+        for rel in ("crates/effect-gate/src/seal.rs", "crates/gate-sys/src/seal/raw.rs", "crates/gate-sys/tests/seal.rs"):
+            self.refused(rel, "fn f() { unsafe { g() } }\n", "contains unsafe outside crates/gate-sys/src/openat.rs and "
+                         "crates/gate-sys/src/seal.rs", check=gate.check_unsafe)
+
+    # HE-002C PR review round 3, R3-1: a renaming import of global_asm or naked_asm.
+    def test_renamed_assembly_macros(self):
+        for rel in ("crates/gate/src/main.rs", "crates/effect-gate/src/file_store.rs"):
+            for text in ("use core::arch::global_asm as ga;\nga!(\".globl x\");", "use core::arch::{naked_asm as na};",
+                         "use std::arch::global_asm as ga;",
+                         "macro_rules! call { ($m:ident) => { core::arch::$m!(\"\"); } }\ncall!(global_asm);"):
+                self.refused(rel, LINKED_TREE[rel] + text + "\n", "uses inline assembly", check=gate.check_included_code)
+        self.write("crates/gate/src/main.rs", "fn main() { let global_asmx = 1; let _ = global_asmx; }\n")
+        self.assertEqual(gate.check_included_code(self.base), 8)
+
+    # HE-002S PR review round 1, R1-4: a renaming import of asm (now possible in seal.rs too), and the word asm in a
+    # linked source, where a macro could otherwise assemble the call from its arguments.
+    def test_renamed_asm(self):
+        for rel in ("crates/gate-sys/src/seal.rs", "crates/gate/src/main.rs", "crates/effect-gate/src/file_store.rs"):
+            for text in ("use core::arch::asm as a;\nfn f() { unsafe { a!(\"nop\") } }", "use core::arch::{asm as a};",
+                         "use std :: arch :: asm;", "use core::arch::{global_asm, asm};", "use core::arch::{\n    asm,\n};"):
+                self.refused(rel, LINKED_TREE.get(rel, "") + text + "\n", "uses inline assembly",
+                             check=gate.check_included_code)
+        for rel, text in (("crates/gate-sys/src/seal.rs", "use core::arch as ar;\nfn f() { call!(unsafe ar::asm) }"),
+                          ("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"]
+                           + "macro_rules! call { ($u:tt $a:ident $b:tt) => { $u { $a::asm $b (\"nop\") } } }"),
+                          ("crates/i05-protocol/src/json.rs", "fn f() { let asm = 1; }")):
+            self.refused(rel, text + "\n", "names asm .inline assembly. .linked-source tripwire")
+        # Outside the linked crates the word alone passes; the forms above do not.
+        self.write("crates/gate/src/main.rs", "fn main() { let asm = 1; let _ = asm; }\n")
+        self.assertEqual(gate.check_included_code(self.base), 8)
+        self.assertEqual(gate.check_linked_sources(self.base), 6)
+
+    # HE-002S DESIGN section 5 (D7): std APIs that reach a call the EFFECT_GATE filter kills, in effect-gate, gate-sys
+    # and (PR review round 1, R1-2) i05-protocol, whose code runs after the seal too; is_terminal joins the list.
+    def test_post_seal_std_apis(self):
+        self.assertEqual(gate.check_post_seal_sources(self.base), 6)
+        for text, name in (("let _ = stream.set_nonblocking(true);", "set_nonblocking"),
+                           ("for entry in std::fs::read_dir(x) {}", "read_dir"), ("let _ = current_exe();", "current_exe"),
+                           ("let _ = uname(x);", "uname"), ("membarrier(0, 0);", "membarrier"),
+                           ("file.set_len(0)?;", "set_len"), ("file.set_permissions(p)?;", "set_permissions"),
+                           ("file.set_times(t)?;", "set_times"), ("file.set_modified(t)?;", "set_modified"),
+                           ("std::io::copy(&mut a, &mut b)?;", "io::copy"), ("let _ = io :: copy(&mut a, &mut b);", "io::copy"),
+                           ("use std::io::{self, copy};", "io::copy in a grouped import"),
+                           ("if file.is_terminal() { return; }", "is_terminal"),
+                           ("use std::io::IsTerminal;", "IsTerminal"), ("fn f(_: &dyn IsTerminal) {}", "IsTerminal")):
+            for rel in ("crates/effect-gate/src/file_store.rs", "crates/gate-sys/src/openat.rs",
+                        "crates/i05-protocol/src/json.rs"):
+                self.refused(rel, LINKED_TREE[rel] + text + "\n", re.escape(name) + r" .*\(post-seal check\)",
+                             check=gate.check_post_seal_sources)
+        # The tests and the binary crates run no post-seal code of the gate; try_clone (fcntl) is allowed.
+        self.write("crates/effect-gate/tests/files.rs", "fn f(f: &File) { let _ = f.set_len(0); }\n")
+        self.write("crates/gate/src/main.rs", "fn main() { let _ = std::io::stdin().is_terminal(); }\n")
+        self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
+                   + "fn g(f: &File) { let _ = f.try_clone(); let _ = copy_from_slice; let _ = terminal; }\n")
+        self.assertEqual(gate.check_post_seal_sources(self.base), 6)
 
     # HE-002C PR review round 2, R2-1 and R2-2: std::os paths, nested globs, std aliases, raw identifiers, inline
     # assembly, symlinks and manifest paths.
@@ -559,6 +686,160 @@ class LinkedSourceTests(unittest.TestCase):
         (self.base / "crates/effect-gate/src/linked").unlink()
         self.write("crates/effect-gate/tests/data.json", "{}\n")
         self.assertEqual(gate.check_included_code(self.base), 8)
+
+
+SEAL_DECLARATIONS = ("unsafe extern \"C\" {\n    fn prlimit(pid: c_int, resource: c_int, new: *const R, old: *mut R) -> c_int;\n"
+                     "    fn prctl(option: c_int, ...) -> c_int;\n    fn capget(h: *mut H, d: *mut D) -> c_int;\n"
+                     "    fn capset(h: *mut H, d: *const D) -> c_int;\n"
+                     "    fn getresuid(r: *mut c_uint, e: *mut c_uint, s: *mut c_uint) -> c_int;\n"
+                     "    fn getresgid(r: *mut c_uint, e: *mut c_uint, s: *mut c_uint) -> c_int;\n"
+                     "    fn syscall(number: c_long, ...) -> c_long;\n}\n")
+FOREIGN_TREE = {
+    **LINKED_TREE,
+    "crates/gate-sys/src/openat.rs": "#![allow(unsafe_code)]\nunsafe extern \"C\" {\n    // the one call\n"
+                                     "    fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;\n}\n",
+    "crates/gate-sys/src/seal.rs": "#![allow(unsafe_code)]\n" + SEAL_DECLARATIONS
+                                   + "pub fn user_ids() -> [u32; 3] { [0; 3] }\n",
+}
+
+
+class ForeignItemTests(unittest.TestCase):
+    """HE-002S DESIGN section 6 (D8): the per-file allowlist of declared foreign symbols."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.base = Path(self.directory.name)
+        for rel, text in FOREIGN_TREE.items():
+            self.write(rel, text)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def write(self, rel, text):
+        path = self.base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def refused(self, rel, text, message):
+        self.write(rel, text)
+        with self.assertRaisesRegex(gate.GateError, message):
+            gate.check_foreign_items(self.base)
+        if rel in FOREIGN_TREE:
+            self.write(rel, FOREIGN_TREE[rel])
+        else:
+            (self.base / rel).unlink()
+
+    def test_the_allowlisted_declarations_pass(self):
+        self.assertEqual(gate.check_foreign_items(self.base), 7)
+        self.assertEqual(gate.extern_blocks("unsafe extern \"C\" { fn a(); }\nextern {\n fn b(); }"),
+                         [" fn a(); ", "\n fn b(); "])
+
+    def test_exactly_the_allowed_symbols(self):
+        seal = "crates/gate-sys/src/seal.rs"
+        for text in (FOREIGN_TREE[seal] + "unsafe extern \"C\" { fn setrlimit(r: c_int, l: *const R) -> c_int; }\n",
+                     FOREIGN_TREE[seal].replace("    fn syscall(number: c_long, ...) -> c_long;\n", ""),
+                     FOREIGN_TREE[seal].replace("fn prctl(", "fn prctl2("),
+                     FOREIGN_TREE[seal].replace("fn capget(", "static mut environ: *const u8;\n    fn capgot(")):
+            self.refused(seal, text, "seal.rs declares the foreign items .* not exactly")
+        self.refused("crates/gate-sys/src/openat.rs", FOREIGN_TREE["crates/gate-sys/src/openat.rs"]
+                     + "unsafe extern \"C\" { fn open(path: *const c_char, flags: c_int, ...) -> c_int; }\n",
+                     "openat.rs declares the foreign items")
+        self.refused("crates/gate-sys/src/openat.rs", "#![allow(unsafe_code)]\n", "openat.rs declares the foreign items")
+        (self.base / seal).unlink()
+        with self.assertRaisesRegex(gate.GateError, "seal.rs is missing"):
+            gate.check_foreign_items(self.base)
+
+    def test_no_other_linked_source_declares_a_foreign_item(self):
+        for rel, text in (("crates/effect-gate/src/seal.rs", "unsafe extern \"C\" { fn prctl(o: c_int, ...) -> c_int; }"),
+                          ("crates/gate-sys/src/lib.rs", "unsafe extern { static environ: *const *const u8; }"),
+                          ("crates/i05-protocol/src/json.rs", "extern \"C\"\n{\n    type Opaque;\n}"),
+                          ("crates/gate-sys/src/raw.rs", SEAL_DECLARATIONS)):
+            self.refused(rel, FOREIGN_TREE.get(rel, "") + text + "\n", "declares the foreign items .* not exactly \\[\\]")
+        # Function pointer types and Rust-ABI definitions are not foreign items; the binary crates are not linked here.
+        self.write("crates/effect-gate/src/file_store.rs", "type Callback = unsafe extern \"C\" fn(i32) -> i32;\n"
+                                                           "pub extern \"C\" fn exported() {}\n")
+        self.write("crates/gate/src/main.rs", "unsafe extern \"C\" { fn system(c: *const u8) -> i32; }\nfn main() {}\n")
+        self.assertEqual(gate.check_foreign_items(self.base), 7)
+
+    def test_extern_items_are_private_and_not_safe(self):
+        seal = "crates/gate-sys/src/seal.rs"
+        for old, new, message in (("    fn prctl(", "    pub fn prctl(", "public foreign item"),
+                                  ("    fn prctl(", "    pub(crate) fn prctl(", "public foreign item"),
+                                  ("    fn getresuid(", "    safe fn getresuid(", "safe foreign item"),
+                                  ("    fn capget(", "    pub safe fn capget(", "public foreign item")):
+            self.refused(seal, FOREIGN_TREE[seal].replace(old, new), message)
+        # A comment inside the block is not read; the word unsafe before extern is not the word safe.
+        self.write(seal, FOREIGN_TREE[seal].replace("    fn prctl(", "    // not pub, not safe\n    fn prctl("))
+        self.assertEqual(gate.check_foreign_items(self.base), 7)
+
+    def test_no_link_name(self):
+        for rel in ("crates/gate-sys/src/seal.rs", "crates/effect-gate/src/file_store.rs"):
+            self.refused(rel, FOREIGN_TREE[rel].replace("fn syscall(", "#[link_name = \"syscall\"]\n    fn syscall(")
+                         if rel.endswith("seal.rs") else FOREIGN_TREE[rel] + "#[link_name = \"x\"] fn y() {}\n",
+                         "names link_name")
+
+    def test_an_unterminated_extern_block_fails(self):
+        self.refused("crates/gate-sys/src/seal.rs", "unsafe extern \"C\" {\n    fn prctl(o: c_int, ...) -> c_int;\n",
+                     "without its closing brace")
+
+    # HE-002S PR review round 1, R1-1: the reviewer's three forms, each refused.
+    def test_a_comment_between_the_abi_and_the_brace(self):
+        seal = "crates/gate-sys/src/seal.rs"
+        kill = "fn kill(pid: c_int, signal: c_int) -> c_int;"
+        for extra in ("unsafe extern \"C\" /* raw */ { %s }" % kill, "unsafe extern \"C\" // raw\n{ %s }" % kill,
+                      "unsafe extern /* \"C\" */ { %s }" % kill, "unsafe extern r#\"C\"# { %s }" % kill):
+            self.refused(seal, FOREIGN_TREE[seal] + extra + "\n", "seal.rs declares the foreign items .*kill.* not exactly")
+
+    def test_a_brace_inside_a_comment_or_literal_does_not_end_the_block(self):
+        seal = "crates/gate-sys/src/seal.rs"
+        last = "    fn syscall(number: c_long, ...) -> c_long;\n"
+        kill = "    fn kill(pid: c_int, signal: c_int) -> c_int;\n"
+        for inserted in ("    // end of the seven }\n", "    /* } */\n", "    /* /* } */ } */\n"):
+            self.refused(seal, FOREIGN_TREE[seal].replace(last, last + inserted + kill),
+                         "seal.rs declares the foreign items .*kill.* not exactly")
+        # A brace or an extern block inside a literal is not code.
+        self.write(seal, FOREIGN_TREE[seal] + "const A: &str = \"}\"; const B: char = '}';\n"
+                   "const C: &str = r#\"unsafe extern \"C\" { fn kill(); }\"#;\nfn f<'a>(x: &'a str) -> &'a str { x }\n")
+        self.assertEqual(gate.check_foreign_items(self.base), 7)
+
+    def test_a_macro_generated_block(self):
+        seal, lib = "crates/gate-sys/src/seal.rs", "crates/gate-sys/src/lib.rs"
+        for extra in ("macro_rules! ext { ($n:ident) => { unsafe extern \"C\" { fn $n(pid: c_int) -> c_int; } } }\n"
+                      "ext!(kill);",
+                      "macro_rules! ext { ($v:vis $n:ident) => { unsafe extern \"C\" { $v fn $n(); } } }\next!(pub kill);",
+                      "// $n\n", "const D: char = '$'; fn f() { macro_rules! m { () => {} } }"):
+            self.refused(seal, FOREIGN_TREE[seal] + extra + "\n", "seal.rs: defines a macro")
+        # In another linked source the reader refuses what it cannot read: a metavariable, a macro call or an attribute
+        # in a block, or an extern it cannot place.
+        for rel, text in ((lib, "macro_rules! ext { ($u:tt $n:ident) => { $u extern \"C\" { fn $n(); } } }"),
+                          (lib, "macro_rules! ext { ($u:tt $v:vis) => { $u extern \"C\" { $v fn kill(); } } }"),
+                          (lib, "macro_rules! ext { ($u:tt $a:tt $b:tt) => { $u extern $a $b } }"),
+                          (lib, "macro_rules! ext { ($u:tt $b:tt) => { $u extern \"C\" $b } }"),
+                          (seal, FOREIGN_TREE[seal].replace("    fn syscall(", "    ext!(kill);\n    fn syscall(")),
+                          (seal, FOREIGN_TREE[seal].replace("    fn syscall(", "    #[cfg(all())]\n    fn syscall(")),
+                          (seal, FOREIGN_TREE[seal].replace("    fn syscall(", "    static X: [u8; 2] = 0;\n    fn syscall(")),
+                          (seal, FOREIGN_TREE[seal].replace("    fn syscall(", "    const X: u8;\n    fn syscall("))):
+            self.refused(rel, FOREIGN_TREE.get(rel, "") + text + "\n", "cannot read")
+        # A string literal may hold a $ in seal.rs; a fixed-size array parameter is read.
+        self.write(seal, FOREIGN_TREE[seal].replace("fn capget(h: *mut H, d: *mut D)", "fn capget(h: *mut H, d: *mut [D; 2])")
+                   + "const D: &str = \"$n macro_rules\";\n")
+        self.assertEqual(gate.check_foreign_items(self.base), 7)
+
+    def test_the_reader(self):
+        self.assertEqual(gate.rust_code("a /* x /* y */ z */ b // c\nd"), "a   b  \nd")
+        self.assertEqual(gate.rust_code("a /* x */ b // c\nd", comments=True), "a /* x */ b // c\nd")
+        self.assertEqual(gate.rust_code(r"""f("}", r#"a"b"#, br"\", b'\'', '"', '\u{7d}', 'a', &'a T, 'l: loop, '_)"""),
+                         r"""f("", "", "", b'', '', '', '', &'a T, 'l: loop, '_)""")
+        self.assertEqual(gate.rust_code('"a\\"b // c" /* d */'), '""  ')
+        for text, message in (('"abc', "unterminated string"), ("/* a /* b */", "unterminated block comment"),
+                              ('r#"a"', "unterminated raw string"), ("let c = ' ;", "neither a character literal"),
+                              ("'\\q'", "neither a character literal")):
+            with self.assertRaisesRegex(gate.GateError, message):
+                gate.rust_code(text)
+        self.assertEqual(gate.foreign_items(" fn a(x: [u8; 4]) -> c_int; static mut b: u8;\n unsafe fn c(); type d; "),
+                         {"a", "b", "c", "d"})
+        self.assertEqual(gate.use_paths(" ::std::io::{self, Read as R, prelude::*}"),
+                         [(("std", "io", "self"), None), (("std", "io", "Read"), "R"), (("std", "io", "prelude", "*"), None)])
 
 
 class ToolchainTests(unittest.TestCase):
@@ -687,6 +968,18 @@ class ContractTests(unittest.TestCase):
 
     def test_registered_contracts_pass(self):
         self.assertEqual(gate.check_contracts(self.base), 1)
+
+    # HE-002S DESIGN section 3: the two published EFFECT_GATE programs join the 13 contract files at their digests.
+    def test_the_table_pins_the_effect_gate_programs(self):
+        self.patch.stop()
+        try:
+            self.assertEqual(len(gate.CONTRACTS), 15)
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf"],
+                             "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf"],
+                             "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115")
+        finally:
+            self.patch.start()
 
     def test_changed_extra_missing_and_linked_contracts_fail(self):
         (self.base / "contracts/i05-v3/vectors.json").write_bytes(b"{ }")

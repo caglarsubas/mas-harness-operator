@@ -2,8 +2,9 @@
 //! the in-memory journal and failure marker, the replay restart, the drain fence and the contract's test injections.
 //! HE-002B adds the I07 v3 PolicyGate (`policy`, `policy_gate`): the policy-writer channel on top of that gate.
 //! HE-002C adds the durable stores (`frame`, `store`, `file_store`): the one journal and the failure marker as files,
-//! opened through `gate-sys`, and the process restart. Std only and safe Rust (the root forbids `unsafe_code`), no
-//! panics on any input. The channel substrate (HE-003) is not here.
+//! opened through `gate-sys`, and the process restart. HE-002S adds the EFFECT_GATE process seal (`seal`): two
+//! stages, then the published seccomp program, over gate-sys's raw calls. Std only and safe Rust (the root forbids
+//! `unsafe_code`), no panics on any input. The channel substrate and the call site of the seal (HE-003) are not here.
 //!
 //! Behaviour taken from the pinned models or validator rather than the READMEs, and the R10-defined behaviour, is
 //! listed in `MODEL_DEFINED.md`.
@@ -16,6 +17,7 @@ pub mod gate;
 pub mod journal;
 pub mod policy;
 pub mod policy_gate;
+pub mod seal;
 pub mod store;
 pub mod types;
 
@@ -28,6 +30,9 @@ pub use policy::{check_write, classify, render_write, request_digest, write_outc
                  Prior, RenderedWrite, ResourceRef, WritableKind, WriteOperation, WriteRefusal, WriteRequest};
 pub use policy_gate::{PolicyEvent, PolicyGate, PolicyGateError, PolicyOutput, PolicyOutputKind, PolicyWriter,
                       UpstreamOutcome, WriteCounters, WriterFatal, WRITER_FRAME_VERSION};
+#[cfg(target_os = "linux")]
+pub use seal::{seal_stage1, seal_stage2};
+pub use seal::{SealError, SealFailure, SealStep, Sealed, Stage, Stage1};
 pub use store::{Appended, FaultHandle, FaultPlan, FilePoint, MemoryStores, StoreFile, Stores};
 pub use types::{AbortReason, Classification, CloseReason, DrainAnswer, FatalReason, Invalidation, Maintenance,
                 MaintenanceEnd, MaintenanceReason, SessionEnd, State};

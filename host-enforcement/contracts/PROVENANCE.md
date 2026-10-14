@@ -30,6 +30,21 @@ ACTIVE configuration of `contracts/i05-v3/vectors.json`; S01-S04 close AF2-I05-1
 
 - `contracts/i05-v3-supplement/vectors.json` from `architecture/i05-gate-channel-v3-supplement/vectors.json`, sha256 `1c00bdb3ea112af6098a09158cce3e4a7a6098c9670f490ead4ca65d8bdbb5ac`, 29077 bytes
 
+## Compiled seccomp programs (HE-002S)
+
+Copied byte for byte from `caglarsubas/harness-onion` `architecture/compiled-filter-programs/programs/`, packet
+MET-ENFORCE-025 (slot 232; owner decisions Q-HE2S-1 (a) and Q-HE2S-2 (a)), which publishes all 14 programs recompiled
+by its layer with the pinned v3 compiler (`scripts/seccomp_allowlists_v3.py`, MET-ENFORCE-020, `5fab673e`) and checked
+against v3's `filterDigests` and `programLengths`. Read at that packet's merge commit
+`5da126570973293e1075459efe7cf99038f378c9` (harness-onion PR #186); the two files are unchanged since its first review
+round. Both are registered before use in that packet's edge registry record v2,
+`architecture/artifact-edges/operator-harness-engineering-v2.json` (status REGISTERED_BEFORE_USE, relation
+BYTE_IDENTICAL, consumer packet HE-002S). Each file is the kernel's `struct sock_filter` array, 8 bytes per instruction;
+`crates/effect-gate/src/seal.rs` embeds both and installs the running architecture's.
+
+- `contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf` from `architecture/compiled-filter-programs/programs/EFFECT_GATE.aarch64.bpf`, sha256 `0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a`, 1464 bytes (183 instructions)
+- `contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf` from `architecture/compiled-filter-programs/programs/EFFECT_GATE.x86_64.bpf`, sha256 `ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115`, 1552 bytes (194 instructions)
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

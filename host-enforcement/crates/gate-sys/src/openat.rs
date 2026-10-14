@@ -1,16 +1,21 @@
-//! `openat(2)` behind a safe API (HE-002C DESIGN §3): the only module of the workspace where `unsafe` code may
-//! appear, and only in two places, the call itself and the conversion of the descriptor it returns into a `File`.
+//! `openat(2)` behind a safe API (HE-002C DESIGN §3): one of the two modules of the workspace where `unsafe` code may
+//! appear (the other is the process seal's `seal.rs`, HE-002S), and here only in two places, the call itself and the
+//! conversion of the descriptor it returns into a `File`.
 //!
 //! - [`Dir::at`] opens a store directory by absolute path (`openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC)`).
 //! - [`Dir::file`] opens one store file inside it by name, read and write, never following a final symbolic link
 //!   (`O_RDWR|O_CLOEXEC|O_NOFOLLOW`); [`FileMode::CreateOrExisting`] first tries an exclusive create with mode `0o600`
 //!   and falls back to a plain open when the name exists. Whatever it opens must be a regular file (`fstat`): a FIFO,
 //!   a device or a directory planted at a store name is refused.
+//! - [`Dir::file_ro`] (HE-002S DESIGN §6) opens one existing file inside it by name, read-only and without waiting
+//!   (`O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK`), with the same name and regular-file checks: the seal's own status file
+//!   and the signed configuration.
 //! - [`Dir::sync`] and [`Dir::device`] are `fsync` and `fstat`'s `st_dev` on the directory.
 //!
 //! The flag values are pinned per target. The two Linux columns were checked against the pinned musl `libc.a` and
-//! the macOS column (host tests only) against the 13.3 SDK's `fcntl.h` (design review round 1); any other target
-//! does not compile. Errors are the OS's (`io::Error::last_os_error()`), except the name and type checks of this
+//! the macOS column (host tests only) against the 13.3 SDK's `fcntl.h` (design review round 1; `O_NONBLOCK`, HE-002S:
+//! musl's `pipe2` sets 0o4000 with `F_SETFL` on both Linux targets, and the SDK's `sys/fcntl.h` defines 0x4); any other
+//! target does not compile. Errors are the OS's (`io::Error::last_os_error()`), except the name and type checks of this
 //! module, which are `InvalidInput`.
 #![allow(unsafe_code)]
 
@@ -36,6 +41,7 @@ mod flags {
     pub const O_DIRECTORY: c_int = 0o200000;
     pub const O_NOFOLLOW: c_int = 0o400000;
     pub const O_CLOEXEC: c_int = 0o2000000;
+    pub const O_NONBLOCK: c_int = 0o4000;
 }
 
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
@@ -50,6 +56,7 @@ mod flags {
     pub const O_DIRECTORY: c_int = 0o40000;
     pub const O_NOFOLLOW: c_int = 0o100000;
     pub const O_CLOEXEC: c_int = 0o2000000;
+    pub const O_NONBLOCK: c_int = 0o4000;
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -64,6 +71,7 @@ mod flags {
     pub const O_DIRECTORY: c_int = 0x100000;
     pub const O_NOFOLLOW: c_int = 0x100;
     pub const O_CLOEXEC: c_int = 0x1000000;
+    pub const O_NONBLOCK: c_int = 0x4;
 }
 
 #[cfg(not(any(
@@ -163,6 +171,21 @@ impl Dir {
             return Err(refusal("a store file name names something other than a regular file"));
         }
         Ok(Some((file, created)))
+    }
+
+    /// Opens the existing file `name` in this directory read-only, never following a final symbolic link and never
+    /// waiting (`O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK`), with [`Dir::file`]'s name check (before any call) and
+    /// regular-file check (`fstat`, after the open). `O_NONBLOCK` has no effect on a regular file; a FIFO planted at the
+    /// name opens at once instead of waiting for a writer, and the regular-file check refuses it (owner decision
+    /// Q-HE2S-11 (a)). A missing name is the OS's `NotFound`.
+    pub fn file_ro(&self, name: &str) -> io::Result<File> {
+        let name = store_name(name)?;
+        let read_only = flags::O_RDONLY | flags::O_CLOEXEC | flags::O_NOFOLLOW | flags::O_NONBLOCK;
+        let file = call(self.handle.as_raw_fd(), &name, read_only, false)?;
+        if !file.metadata()?.file_type().is_file() {
+            return Err(refusal("a file name names something other than a regular file"));
+        }
+        Ok(file)
     }
 
     /// Makes the directory's entries durable (`fsync` on the directory; `F_FULLFSYNC` on Darwin).

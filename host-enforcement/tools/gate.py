@@ -6,6 +6,13 @@ EFFECT_GATE (a list of refused modules and items, not an allowlist of std module
 openat module, and no code included from a file the scans do not read. They match text, not Rust: the compiler's `#![forbid(unsafe_code)]` on the effect-gate and
 i05-protocol roots enforces those crates' unsafe rule, and any form the tripwires do not refuse is code review's.
 
+HE-002S (the EFFECT_GATE process seal) pins the two published EFFECT_GATE seccomp programs among the contract files,
+allows the word `unsafe` in gate-sys's seal module too, excepts one occurrence of the one expression that opens the
+process's own status file in that module from the start-up lint, and adds two lexical tripwires over the linked
+sources: a per-file allowlist of the foreign symbols each may declare (read with comments and literal contents removed,
+every `extern` read or refused), and none of a list of std APIs that reach a system call the EFFECT_GATE filter kills
+after the seal (HE-002S DESIGN section 5's list plus set_modified and is_terminal).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -20,7 +27,6 @@ import struct
 import subprocess
 import sys
 import tomllib
-import tomllib
 import unittest
 import uuid
 from pathlib import Path
@@ -33,7 +39,8 @@ BINARIES = ("planeon-containment", "planeon-broker", "planeon-observer", "planeo
 TABLE = HE / "licenses/closure-1.99.0.json"
 TABLE_SHA256 = "e085f1b784c1635b609734575d23d858beaffdd5b8b63a7fce585a38984e54a1"
 # harness-onion contract files R10 holds, byte-exact, registered in harness-onion's operator -> harness-engineering
-# buildArtifact edge record (owner decision Q-HE2-A); provenance in contracts/PROVENANCE.md.
+# buildArtifact edge record (owner decision Q-HE2-A; the two EFFECT_GATE programs in its record v2, MET-ENFORCE-025,
+# pinned at the published digests); provenance in contracts/PROVENANCE.md.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -48,6 +55,8 @@ CONTRACTS = {
     "contracts/i07-v3/channel.schema.json": "c68721a1002fccc7d6e59eeee9016a0a0f4a7428fad714e5a3d90a362d30ce09",
     "contracts/i07-v3/policy-kinds.json": "4e427204b89959cb855d8641c3fa6f95d358b0b6a6a7730bfc7776adc4a173c0",
     "contracts/i07-v3/vectors.json": "c4c24c5ff15618aa2f0fe0f016011359bc4316220c6e40d5168f9ee24b6f736d",
+    "contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf": "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a",
+    "contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf": "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115",
 }
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
@@ -57,6 +66,51 @@ HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 # HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/).
 LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
 OPENAT = "crates/gate-sys/src/openat.rs"
+SEAL = "crates/gate-sys/src/seal.rs"
+# The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6).
+UNSAFE_FILES = (OPENAT, SEAL)
+# HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5): the start-up lint's one
+# exception, one occurrence of the expression that opens the process's own status file in gate-sys's seal module
+# (whitespace between its tokens ignored). Any other /proc (a second occurrence, a raw string, concat!, another file
+# name) still refuses.
+STATUS_READ = 'Dir::at("/proc/self")?.file_ro("status")'
+STARTUP_EXCEPTIONS = {SEAL: re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')}
+# HE-002S DESIGN section 6 (D8): the foreign symbols each linked source declares, exactly; no other linked source
+# declares a foreign item. Extern items are private, none is declared `safe`, and no linked source names link_name.
+# PR review round 1, R1-1: the sources are read with comments removed and literal contents emptied (rust_code), every
+# `extern` must be a block, `extern crate` or a function's ABI, a block's body must hold only items the reader follows,
+# and the files allowed `unsafe` define no macro; anything else refuses.
+FOREIGN_ITEMS = {OPENAT: {"openat"},
+                 SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"}}
+EXTERN_WORD = re.compile(r"\bextern\b")
+EXTERN_BLOCK = re.compile(r'\bextern\s*(?:""\s*)?\{')
+EXTERN_OTHER = re.compile(r'\bextern\s*(?:crate\b|(?:""\s*)?fn\b)')
+FOREIGN_ITEM = re.compile(r"\s*(?:unsafe\s+)?(?:fn\s+([A-Za-z_]\w*)\s*\(|static\s+(?:mut\s+)?([A-Za-z_]\w*)\s*:"
+                          r"|type\s+([A-Za-z_]\w*)\s*$)")
+# The lexer's literals: a character or byte literal (one character or one escape), a raw string's opening, a lifetime
+# or label (any other quote is not Rust).
+CHAR_LITERAL = re.compile(r"""'(?:\\(?:x[0-9A-Fa-f]{2}|u\{[0-9A-Fa-f_]{1,8}\}|[nrt\\0'"])|[^\\'\n\r\t])'""")
+RAW_STRING = re.compile(r'(?<![\w])(?:br|cr|r)(#*)"')
+LIFETIME = re.compile(r"'(?:r#)?[^\W\d]\w*")
+# HE-002S DESIGN section 5 (D7): std APIs that reach a system call the EFFECT_GATE filter kills, so the code that runs
+# after the seal must not name them; matched with the whitespace around `::` removed. The std path openers are
+# LINKED_FORBIDDEN's. try_clone (fcntl F_DUPFD_CLOEXEC) is allowed. PR review round 1, R1-2: i05-protocol's code runs
+# after the seal too, and is_terminal (musl's isatty: ioctl TIOCGWINSZ) joins the list. It is a list, not a proof:
+# anything it does not name is code review's and T04's (the steady-state trace).
+POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
+POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)"),
+                       (r"\bread_dir\b", "read_dir (getdents64)"),
+                       (r"\bcurrent_exe\b", "current_exe (readlink, readlinkat)"),
+                       (r"\buname\b", "uname"),
+                       (r"\bmembarrier\b", "membarrier"),
+                       (r"\bset_len\b", "set_len (ftruncate)"),
+                       (r"\bset_permissions\b", "set_permissions (fchmod)"),
+                       (r"\bset_times\b", "set_times (utimensat)"),
+                       (r"\bset_modified\b", "set_modified (utimensat)"),
+                       (r"\bio::copy\b", "io::copy (copy_file_range, sendfile, splice)"),
+                       (r"\bio::\{[^}]*\bcopy\b", "io::copy in a grouped import"),
+                       (r"\bis_terminal\b", "is_terminal (isatty: ioctl TIOCGWINSZ)"),
+                       (r"\bIsTerminal\b", "IsTerminal (isatty: ioctl TIOCGWINSZ)"))
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]"}
@@ -73,7 +127,14 @@ LINKED_FORMS = ((re.compile(r"\bextern\s+crate\b"), "declares an extern crate"),
                 (re.compile(r"std::[{*]"), "imports a top-level group or glob of std"),
                 (re.compile(r"std(?:::\w+)+::\*"), "imports a nested glob of std"),
                 (re.compile(r"\bstd\s+as\b"), "renames std"),
-                (re.compile(r"std::\$"), "completes a std path in a macro"))
+                (re.compile(r"std::\$"), "completes a std path in a macro"),
+                # PR review round 1, R1-4: the word asm at all (inline assembly needs the asm macro named somewhere in
+                # the crate, so no macro or renaming import can call it from a linked source).
+                (re.compile(r"\basm\b"), "names asm (inline assembly)"))
+# PR review round 1, R1-2: a use declaration (not `use<..>`, precise capturing), read with comments removed and literal
+# contents emptied, and its tree's tokens; a tree holding anything else refuses.
+USE_DECLARATION = re.compile(r"\buse\b(?!\s*<)([^;]*);")
+USE_TOKEN = re.compile(r"\s*(::|[A-Za-z_]\w*|[{},*])")
 # The std::os paths a linked source may name besides the fs items: the fd items, in the openat module only.
 OPENAT_FD_PATH = re.compile(r"std::os::fd::\w+")
 FD_ITEMS = re.compile(r"std::os::fd|\b(?:FromRawFd|AsRawFd|IntoRawFd|RawFd|OwnedFd|BorrowedFd|AsFd)\b")
@@ -90,9 +151,13 @@ UNSAFE = re.compile(r"\bunsafe\b")
 # are other words).
 INCLUDED_CODE = ((re.compile(r"#\s*!?\s*\[\s*(?:path\b|cfg_attr\s*\([^\]]*\bpath\s*=)"), "has a path attribute"),
                  (re.compile(r"\binclude\b"), "names include"),
-                 # Forms the other patterns cannot read: a raw identifier (r#process, r#path) and inline assembly.
+                 # Forms the other patterns cannot read: a raw identifier (r#process, r#path) and inline assembly
+                 # (asm!, and the words global_asm and naked_asm, so a renaming import is refused too: HE-002C PR
+                 # review round 3, R3-1; the word asm after arch:: (also in a group) and before `as`: HE-002S PR
+                 # review round 1, R1-4).
                  (re.compile(r"\br#[A-Za-z_]"), "uses a raw identifier"),
-                 (re.compile(r"\b(?:global_asm|naked_asm|asm)\s*!"), "uses inline assembly"))
+                 (re.compile(r"\b(?:global_asm|naked_asm)\b|\basm\s*!|\barch\s*::\s*(?:\{[^}]*)?\basm\b|\basm\s+as\b"),
+                  "uses inline assembly"))
 # Cargo target tables whose path key would compile a file the scans do not read, and the package's build-script key.
 MANIFEST_TARGETS = ("lib", "bin", "test", "bench", "example")
 CRT_OBJECTS = ("crtbegin.o", "crtbeginS.o", "crtend.o", "crtendS.o")
@@ -363,13 +428,19 @@ def check_tree(rows: list[dict], sysroot: Path, targets: list[str]) -> None:
 
 
 def check_sources(base: Path) -> int:
+    """The start-up lint: no workspace source contains a forbidden token, except one occurrence of the expression
+    STARTUP_EXCEPTIONS allows in its one file (removed before the scan, so a second occurrence or any other form still
+    refuses)."""
     count = 0
     for path in sorted(base.rglob("*.rs")):
         if path.relative_to(base).parts[0] == "target":   # the build directory only
             continue
+        rel = path.relative_to(base).as_posix()
         text = path.read_text(encoding="utf-8")
+        if rel in STARTUP_EXCEPTIONS:
+            text = STARTUP_EXCEPTIONS[rel].sub("", text, count=1)
         for token in FORBIDDEN_SOURCE:
-            require(token not in text, "%s uses %s (start-up lint)" % (path.relative_to(base).as_posix(), token))
+            require(token not in text, "%s uses %s (start-up lint)" % (rel, token))
         count += 1
     return count
 
@@ -407,49 +478,296 @@ def check_included_code(base: Path) -> int:
     return count
 
 
+def rust_code(text: str, comments: bool = False) -> str:
+    """A source as the lexical checks read it (HE-002S PR review round 1, R1-1): line and nested block comments become
+    one space (kept as they are with `comments`), string, byte-string and C-string literals keep only their quotes and
+    prefix (`""`, `b""`), raw-string literals become `""`, and character and byte literals become `''` (`b''`);
+    lifetimes and labels stay. Anything it cannot lex
+    refuses: an unterminated block comment or literal, or a quote that starts neither a character literal nor a
+    lifetime."""
+    out, index, length = [], 0, len(text)
+    while index < length:
+        char = text[index]
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            end = length if end < 0 else end
+            out.append(text[index:end] if comments else " ")
+            index = end
+        elif text.startswith("/*", index):
+            depth, cursor = 1, index + 2
+            while depth:
+                require(cursor < length, "an unterminated block comment")
+                if text.startswith("/*", cursor):
+                    depth, cursor = depth + 1, cursor + 2
+                elif text.startswith("*/", cursor):
+                    depth, cursor = depth - 1, cursor + 2
+                else:
+                    cursor += 1
+            out.append(text[index:cursor] if comments else " ")
+            index = cursor
+        elif char in "bcr" and (raw := RAW_STRING.match(text, index)):
+            end = text.find('"' + raw.group(1), raw.end())
+            require(end >= 0, "an unterminated raw string literal")
+            out.append('""')
+            index = end + 1 + len(raw.group(1))
+        elif char == '"':
+            cursor = index + 1
+            while True:
+                require(cursor < length, "an unterminated string literal")
+                if text[cursor] == "\\":
+                    cursor += 2
+                elif text[cursor] == '"':
+                    break
+                else:
+                    cursor += 1
+            out.append('""')
+            index = cursor + 1
+        elif char == "'":
+            literal = CHAR_LITERAL.match(text, index)
+            if literal:
+                out.append("''")
+                index = literal.end()
+            else:
+                lifetime = LIFETIME.match(text, index)
+                require(lifetime, "a quote that starts neither a character literal nor a lifetime")
+                out.append(lifetime.group(0))
+                index = lifetime.end()
+        else:
+            out.append(char)
+            index += 1
+    return "".join(out)
+
+
+def use_paths(tree: str) -> list[tuple[tuple[str, ...], str | None]]:
+    """The paths of a use declaration's tree (the text between `use` and `;`), each with its rename or None; a leading
+    `::` is dropped, and `self` stays a segment. A tree holding anything but identifiers, `::`, braces, commas and `*`,
+    or not in use-tree form, refuses."""
+    tokens, index = [], 0
+    while tree[index:].strip():
+        token = USE_TOKEN.match(tree, index)
+        require(token, "a use declaration the linked-source check cannot read")
+        tokens.append(token.group(1))
+        index = token.end()
+    paths: list[tuple[tuple[str, ...], str | None]] = []
+
+    def at(position: int) -> str:
+        require(position < len(tokens), "a use declaration the linked-source check cannot read")
+        return tokens[position]
+
+    def identifier(token: str) -> bool:
+        return token not in ("::", "{", "}", ",", "*", "as")
+
+    def read(position: int, prefix: tuple[str, ...]) -> int:
+        if not prefix and at(position) == "::":
+            position += 1
+        path = prefix
+        while True:
+            token = at(position)
+            if token == "*":
+                paths.append((path + ("*",), None))
+                return position + 1
+            if token == "{":
+                position += 1
+                while at(position) != "}":
+                    position = read(position, path)
+                    if at(position) == ",":
+                        position += 1
+                    else:
+                        require(at(position) == "}", "a use declaration the linked-source check cannot read")
+                return position + 1
+            require(identifier(token), "a use declaration the linked-source check cannot read")
+            path, position = path + (token,), position + 1
+            if position < len(tokens) and tokens[position] == "::":
+                position += 1
+                continue
+            rename = None
+            if position < len(tokens) and tokens[position] == "as":
+                rename = at(position + 1)
+                require(identifier(rename), "a use declaration the linked-source check cannot read")
+                position += 2
+            paths.append((path, rename))
+            return position
+
+    require(read(0, ()) == len(tokens), "a use declaration the linked-source check cannot read")
+    return paths
+
+
+def source_uses(rel: str, raw: str) -> list[tuple[tuple[str, ...], str | None]]:
+    """Every path (with its rename) of a source's use declarations, read with comments and literal contents removed;
+    a source or declaration the reader cannot follow refuses, naming the file."""
+    try:
+        return [path for declaration in USE_DECLARATION.finditer(rust_code(raw))
+                for path in use_paths(declaration.group(1))]
+    except GateError as error:
+        raise GateError("%s: %s (linked-source tripwire)" % (rel, error)) from None
+
+
+def std_names(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
+    """`std` and every name the given use paths bind from a std path: the rename, the last segment, or the module
+    before a `self` (renames and globs of std are refused by the linked-source checks themselves)."""
+    names = {"std"}
+    for path, rename in uses:
+        if path[0] == "std" and path[-1] != "*":
+            names.add(rename or (path[-2] if path[-1] == "self" and len(path) > 1 else path[-1]))
+    return names
+
+
 def check_linked_sources(base: Path) -> int:
     """A lexical tripwire over the non-test sources of the crates EFFECT_GATE will link, with the whitespace around `::`
     removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside the openat module; std fs items
-    other than the allowed ones; std::os paths other than those), renames a std item, or uses a form that names std's
-    modules without spelling their paths (LINKED_FORMS); and their crate-root attributes. Other std paths pass: it
-    refuses a list, it is not an allowlist of std modules. It matches text, not Rust: the compiler's
-    `#![forbid(unsafe_code)]` enforces the roots' rule, and any other form is code review's."""
+    other than the allowed ones; std::os paths other than those), renames a std module or item, or uses a form that
+    names std's modules without spelling their paths or the word asm (LINKED_FORMS); and their crate-root attributes.
+    A rename is refused in a use of std and, read from the source with comments and literal contents removed, in any
+    use whose renamed path has a segment that is `std` or a name some linked source imports from std (the union over
+    the three crates, whatever the order, so a `crate::`, `self::` or `super::` path through such a name refuses too;
+    HE-002S PR review round 1, R1-2); a glob is refused through the same names (round 2, R2-1). Other std paths pass: it refuses a list, it is not an allowlist of std modules. It
+    matches text, not Rust: the compiler's `#![forbid(unsafe_code)]` enforces the roots' rule, and any other form is
+    code review's."""
     for root, attribute in CRATE_ROOTS.items():
         require(attribute in (base / root).read_text(encoding="utf-8").splitlines(), "%s lacks %s" % (root, attribute))
+    sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
+               for crate in LINKED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
+    uses = {rel: source_uses(rel, raw) for rel, raw in sources}
+    from_std = std_names([path for paths in uses.values() for path in paths])
+    count = 0
+    for rel, raw in sources:
+        text = PATH_SPACE.sub("::", raw)
+        for pattern in LINKED_FORBIDDEN:
+            require(not re.search(pattern, text), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
+        require(rel == OPENAT or not FD_ITEMS.search(text), "%s names a std::os::fd item outside %s" % (rel, OPENAT))
+        rest = text
+        for item, allowed in FS_ITEMS:
+            if allowed(rel):
+                rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
+        require(not re.search(r"\bfs\b", rest),
+                "%s names a std fs item other than its allowed ones, one item per use line (linked-source tripwire)" % rel)
+        if rel == OPENAT:
+            rest = OPENAT_FD_PATH.sub("", rest)
+        require(not re.search(r"std::os\b", rest),
+                "%s names a std::os item other than its allowed ones (linked-source tripwire)" % rel)
+        for use in STD_USE.finditer(text):
+            require(not re.search(r"\sas\s", use.group(0)), "%s renames a std item in a use statement" % rel)
+        for pattern, form in LINKED_FORMS:
+            require(not pattern.search(text), "%s %s (linked-source tripwire)" % (rel, form))
+        for path, rename in uses[rel]:
+            require(rename is None or not from_std & set(path),
+                    "%s renames a std module or item through a use of a name imported from std (linked-source "
+                    "tripwire)" % rel)
+            # HE-002S PR review round 2, R2-1: a glob through std or a name imported from std would name std's items
+            # without spelling them.
+            require(path[-1] != "*" or not from_std & set(path[:-1]),
+                    "%s imports a glob through std or a name imported from std (linked-source tripwire)" % rel)
+        count += 1
+    return count
+
+
+def extern_blocks(text: str) -> list[str]:
+    """The bodies of a source's extern blocks, read from the source with comments removed and literal contents emptied
+    (rust_code), so neither can hide a block or end one early: from each block's opening brace to its matching one.
+    Every other `extern` must be `extern crate` or a function's ABI (`extern "C" fn`); any other form refuses, since
+    the check could not read it (HE-002S PR review round 1, R1-1)."""
+    code = rust_code(text)
+    blocks = []
+    for word in EXTERN_WORD.finditer(code):
+        block = EXTERN_BLOCK.match(code, word.start())
+        if block is None:
+            require(EXTERN_OTHER.match(code, word.start()), "an extern the foreign-item check cannot read")
+            continue
+        depth, index = 1, block.end()
+        while depth and index < len(code):
+            depth += {"{": 1, "}": -1}.get(code[index], 0)
+            index += 1
+        require(depth == 0, "an extern block without its closing brace")
+        blocks.append(code[block.end():index - 1])
+    return blocks
+
+
+def foreign_items(body: str) -> set[str]:
+    """The symbols an extern block's body (from extern_blocks) declares, read strictly: items ending in `;` outside
+    parentheses and brackets, each a `fn` (also `unsafe fn`), `static` (also `mut`) or `type` with its name. A body
+    holding anything the reader does not follow (a macro call or metavariable, `!` or `$`; an attribute, `#`; a brace;
+    an initialiser, `=`) or an item of another form refuses."""
+    require(not any(char in body for char in "$!#{}="), "an extern block the foreign-item check cannot read")
+    names, depth, start = set(), 0, 0
+    for index, char in enumerate(body):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+            require(depth >= 0, "an extern block the foreign-item check cannot read")
+        elif char == ";" and depth == 0:
+            item = FOREIGN_ITEM.match(body[start:index])
+            require(item, "an extern block the foreign-item check cannot read")
+            names.add(next(name for name in item.groups() if name))
+            start = index + 1
+    require(depth == 0 and not body[start:].strip(), "an extern block the foreign-item check cannot read")
+    return names
+
+
+def check_foreign_items(base: Path) -> int:
+    """A lexical tripwire over the non-test sources of the linked crates (HE-002S DESIGN section 6, D8): each file of
+    FOREIGN_ITEMS declares exactly its foreign symbols, no other linked source declares one, no extern item is public or
+    declared `safe`, and no linked source names link_name. The sources are read with comments removed and literal
+    contents emptied; every `extern` is an extern block, read strictly (foreign_items), `extern crate` or a function's
+    ABI; and the files allowed `unsafe` define no macro (`macro_rules`, or any `$` outside string and character
+    literals). Anything the check cannot read refuses, so it reads every extern block of these sources (HE-002S PR
+    review round 1, R1-1)."""
     count = 0
     for crate in LINKED_CRATES:
         for path in sorted((base / crate / "src").rglob("*.rs")):
             rel = path.relative_to(base).as_posix()
+            text = path.read_text(encoding="utf-8")
+            require(not re.search(r"\blink_name\b", text), "%s names link_name (foreign-item check)" % rel)
+            try:
+                if rel in UNSAFE_FILES:
+                    kept = rust_code(text, comments=True)
+                    require(not re.search(r"\bmacro_rules\b", kept) and "$" not in kept,
+                            "defines a macro (macro_rules or $), which the check cannot read")
+                blocks = extern_blocks(text)
+            except GateError as error:
+                raise GateError("%s: %s (foreign-item check)" % (rel, error)) from None
+            declared = set()
+            for body in blocks:
+                require(not re.search(r"\bpub\b", body), "%s declares a public foreign item (foreign-item check)" % rel)
+                require(not re.search(r"\bsafe\b", body), "%s declares a safe foreign item (foreign-item check)" % rel)
+                try:
+                    declared |= foreign_items(body)
+                except GateError as error:
+                    raise GateError("%s: %s (foreign-item check)" % (rel, error)) from None
+            allowed = FOREIGN_ITEMS.get(rel, set())
+            require(declared == allowed, "%s declares the foreign items %s, not exactly %s (foreign-item check)"
+                    % (rel, sorted(declared), sorted(allowed)))
+            count += 1
+    for rel in FOREIGN_ITEMS:
+        require((base / rel).is_file(), "%s is missing (foreign-item check)" % rel)
+    return count
+
+
+def check_post_seal_sources(base: Path) -> int:
+    """A lexical tripwire over the non-test sources of effect-gate, gate-sys and i05-protocol, whose code runs after the
+    seal, with the whitespace around `::` removed: none of the std APIs of POST_SEAL_FORBIDDEN (HE-002S DESIGN section
+    5's list plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter kills. A
+    std API the list does not name is code review's and T04's (HE-002S PR review round 1, R1-2)."""
+    count = 0
+    for crate in POST_SEAL_CRATES:
+        for path in sorted((base / crate / "src").rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
             text = PATH_SPACE.sub("::", path.read_text(encoding="utf-8"))
-            for pattern in LINKED_FORBIDDEN:
-                require(not re.search(pattern, text), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
-            require(rel == OPENAT or not FD_ITEMS.search(text), "%s names a std::os::fd item outside %s" % (rel, OPENAT))
-            rest = text
-            for item, allowed in FS_ITEMS:
-                if allowed(rel):
-                    rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
-            require(not re.search(r"\bfs\b", rest),
-                    "%s names a std fs item other than its allowed ones, one item per use line (linked-source tripwire)" % rel)
-            if rel == OPENAT:
-                rest = OPENAT_FD_PATH.sub("", rest)
-            require(not re.search(r"std::os\b", rest),
-                    "%s names a std::os item other than its allowed ones (linked-source tripwire)" % rel)
-            for use in STD_USE.finditer(text):
-                require(not re.search(r"\sas\s", use.group(0)), "%s renames a std item in a use statement" % rel)
-            for pattern, form in LINKED_FORMS:
-                require(not pattern.search(text), "%s %s (linked-source tripwire)" % (rel, form))
+            for pattern, name in POST_SEAL_FORBIDDEN:
+                require(not re.search(pattern, text), "%s names %s (post-seal check)" % (rel, name))
             count += 1
     return count
 
 
 def check_unsafe(base: Path) -> int:
-    """A lexical tripwire: the word unsafe appears in no workspace source but gate-sys's openat module (tests and
-    binaries included)."""
+    """A lexical tripwire: the word unsafe appears in no workspace source but gate-sys's openat and seal modules
+    (tests and binaries included)."""
     count = 0
     for path in workspace_sources(base):
         rel = path.relative_to(base).as_posix()
-        if rel != OPENAT:
-            require(not UNSAFE.search(path.read_text(encoding="utf-8")), "%s contains unsafe outside %s" % (rel, OPENAT))
+        if rel not in UNSAFE_FILES:
+            require(not UNSAFE.search(path.read_text(encoding="utf-8")),
+                    "%s contains unsafe outside %s" % (rel, " and ".join(UNSAFE_FILES)))
         count += 1
     return count
 
@@ -506,14 +824,24 @@ def main() -> int:
                 check_crt_symbols(name, symbol_names((sysroot / "lib/rustlib" / target / "lib/self-contained" / name)
                                                      .read_bytes()))
         say("crt objects: compiler-rt's crtbegin and crtend on both targets")
-        say("start-up lint: %d workspace sources without a forbidden API" % check_sources(HE))
+        say("start-up lint: %d workspace sources without a forbidden API (one excepted expression, %s once in %s)"
+            % (check_sources(HE), STATUS_READ, SEAL))
         say("included code: %d workspace sources pass the lexical tripwire (no path attribute, include!, raw "
             "identifier or inline assembly; no manifest target path, build key or symlink), crates' src/ hold only .rs "
             "files" % check_included_code(HE))
-        say("linked sources: %d sources of effect-gate, gate-sys and i05-protocol name no refused std path (lexical "
-            "tripwire), crate roots forbid or deny unsafe_code" % check_linked_sources(HE))
+        say("linked sources: %d sources of effect-gate, gate-sys and i05-protocol name no refused std path, rename or "
+            "glob no std module or item and do not name asm (lexical tripwire), crate roots forbid or deny unsafe_code"
+            % check_linked_sources(HE))
+        say("foreign items: %d sources of effect-gate, gate-sys and i05-protocol, every extern read with comments and "
+            "literal contents removed; %s declares exactly %s and %s exactly %s, no other declares a foreign item, none "
+            "is public or safe, no link_name, no macro in either (lexical tripwire)"
+            % (check_foreign_items(HE), OPENAT, ", ".join(sorted(FOREIGN_ITEMS[OPENAT])), SEAL,
+               ", ".join(sorted(FOREIGN_ITEMS[SEAL]))))
+        say("post-seal: %d sources of effect-gate, gate-sys and i05-protocol name none of HE-002S DESIGN section 5's "
+            "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
+            "kills (lexical tripwire)" % check_post_seal_sources(HE))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
-            % (OPENAT, check_unsafe(HE)))
+            % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         markers = comment_markers(pin)
         host_paths = HOST_PATHS + tuple(path.encode() for path in (str(ROOT), str(Path.home())) if len(path) > 1)
         for target in targets:
