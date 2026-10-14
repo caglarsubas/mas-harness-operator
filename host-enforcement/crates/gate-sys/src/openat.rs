@@ -1,28 +1,39 @@
-//! `openat(2)` behind a safe API (HE-002C DESIGN §3): one of the two modules of the workspace where `unsafe` code may
-//! appear (the other is the process seal's `seal.rs`, HE-002S), and here only in two places, the call itself and the
-//! conversion of the descriptor it returns into a `File`.
+//! `openat(2)` behind a safe API (HE-002C DESIGN §3): one of the three modules of the workspace where `unsafe` code may
+//! appear (the others are the process seal's `seal.rs`, HE-002S, and the channel substrate's `channel.rs`, HE-003A),
+//! and here only in two places, the call itself and the conversion of the descriptor it returns into a `File`.
 //!
 //! - [`Dir::at`] opens a store directory by absolute path (`openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC)`).
-//! - [`Dir::file`] opens one store file inside it by name, read and write, never following a final symbolic link
-//!   (`O_RDWR|O_CLOEXEC|O_NOFOLLOW`); [`FileMode::CreateOrExisting`] first tries an exclusive create with mode `0o600`
-//!   and falls back to a plain open when the name exists. Whatever it opens must be a regular file (`fstat`): a FIFO,
-//!   a device or a directory planted at a store name is refused.
+//! - [`Dir::file`] opens one store file inside it by name, read and write, never following a final symbolic link,
+//!   never waiting and never taking a controlling terminal (`O_RDWR|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK|O_NOCTTY`, HE-003A
+//!   DESIGN §7, owner decision Q-HE3-4 (a)); [`FileMode::CreateOrExisting`] first tries an exclusive create with mode
+//!   `0o600` and falls back to a plain open when the name exists. Whatever it opens must be a regular file (`fstat`): a
+//!   FIFO, a device or a directory planted at a store name is refused. `O_NOCTTY` keeps the gate, a session leader
+//!   under systemd, from acquiring a controlling terminal if a terminal node is planted at a store name; `O_NONBLOCK`
+//!   keeps an open of a device node from waiting (a terminal waiting for carrier). Neither changes `pread`, `pwrite`,
+//!   `fsync` or `flock` on a regular file.
 //! - [`Dir::file_ro`] (HE-002S DESIGN §6) opens one existing file inside it by name, read-only and without waiting
 //!   (`O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK`), with the same name and regular-file checks: the seal's own status file
 //!   and the signed configuration.
+//! - [`Dir::sub`] (HE-003A DESIGN §7) opens one directory inside it by name, never following a symbolic link
+//!   (`O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW`), with the same name check: `attr` under a peer's process directory.
 //! - [`Dir::sync`] and [`Dir::device`] are `fsync` and `fstat`'s `st_dev` on the directory.
+//!
+//! `Dir`'s `Debug` prints `Dir` and no descriptor: std's `Debug` of a `File` reads the descriptor's link in the proc
+//! filesystem, a call the EFFECT_GATE program kills (HE-003A DESIGN §8).
 //!
 //! The flag values are pinned per target. The two Linux columns were checked against the pinned musl `libc.a` and
 //! the macOS column (host tests only) against the 13.3 SDK's `fcntl.h` (design review round 1; `O_NONBLOCK`, HE-002S:
-//! musl's `pipe2` sets 0o4000 with `F_SETFL` on both Linux targets, and the SDK's `sys/fcntl.h` defines 0x4); any other
-//! target does not compile. Errors are the OS's (`io::Error::last_os_error()`), except the name and type checks of this
-//! module, which are `InvalidInput`.
+//! musl's `pipe2` sets 0o4000 with `F_SETFL` on both Linux targets, and the SDK's `sys/fcntl.h` defines 0x4;
+//! `O_NOCTTY`, HE-003A: musl's `openpty.lo` opens the multiplexer with `O_RDWR|O_NOCTTY` = 0x102 on both Linux
+//! targets, so 0o400, and the SDK's `sys/fcntl.h` defines 0x20000); any other target does not compile. Errors are the
+//! OS's (`io::Error::last_os_error()`), except the name and type checks of this module, which are `InvalidInput`.
 #![allow(unsafe_code)]
 
 use std::ffi::CString;
 use std::ffi::c_char;
 use std::ffi::c_int;
 use std::ffi::c_uint;
+use std::fmt;
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
@@ -42,6 +53,7 @@ mod flags {
     pub const O_NOFOLLOW: c_int = 0o400000;
     pub const O_CLOEXEC: c_int = 0o2000000;
     pub const O_NONBLOCK: c_int = 0o4000;
+    pub const O_NOCTTY: c_int = 0o400;
 }
 
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
@@ -57,6 +69,7 @@ mod flags {
     pub const O_NOFOLLOW: c_int = 0o100000;
     pub const O_CLOEXEC: c_int = 0o2000000;
     pub const O_NONBLOCK: c_int = 0o4000;
+    pub const O_NOCTTY: c_int = 0o400;
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -72,7 +85,13 @@ mod flags {
     pub const O_NOFOLLOW: c_int = 0x100;
     pub const O_CLOEXEC: c_int = 0x1000000;
     pub const O_NONBLOCK: c_int = 0x4;
+    pub const O_NOCTTY: c_int = 0x20000;
 }
+
+// HE-003A: the pinned musl `openpty.lo` opens the terminal multiplexer with `O_RDWR|O_NOCTTY`, the immediate 0x102 on
+// both Linux targets.
+#[cfg(target_os = "linux")]
+const _: () = assert!(flags::O_RDWR | flags::O_NOCTTY == 0x102);
 
 #[cfg(not(any(
     all(target_os = "linux", target_arch = "x86_64"),
@@ -102,9 +121,15 @@ pub enum FileMode {
 }
 
 /// An open store directory.
-#[derive(Debug)]
 pub struct Dir {
     handle: File,
+}
+
+/// The type name only: no descriptor, and never std's `Debug` of the `File` (HE-003A DESIGN §7, §8).
+impl fmt::Debug for Dir {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Dir")
+    }
 }
 
 fn refusal(message: &'static str) -> io::Error {
@@ -139,6 +164,17 @@ fn store_name(name: &str) -> io::Result<CString> {
 }
 
 impl Dir {
+    /// [`Dir::file`]'s flags: `O_RDWR|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK|O_NOCTTY` (HE-003A DESIGN §7).
+    pub const FILE_FLAGS: c_int =
+        flags::O_RDWR | flags::O_CLOEXEC | flags::O_NOFOLLOW | flags::O_NONBLOCK | flags::O_NOCTTY;
+
+    /// [`Dir::sub`]'s flags: `O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW`.
+    pub const SUB_FLAGS: c_int = flags::O_RDONLY | flags::O_DIRECTORY | flags::O_CLOEXEC | flags::O_NOFOLLOW;
+
+    /// This target's `O_NOCTTY` and `O_NONBLOCK` (pinned by the host tests).
+    pub const NOCTTY: c_int = flags::O_NOCTTY;
+    pub const NONBLOCK: c_int = flags::O_NONBLOCK;
+
     /// Opens a directory by absolute path.
     pub fn at(absolute: &str) -> io::Result<Dir> {
         if !absolute.starts_with('/') {
@@ -154,7 +190,7 @@ impl Dir {
     pub fn file(&self, name: &str, mode: FileMode) -> io::Result<Option<(File, bool)>> {
         let name = store_name(name)?;
         let dirfd = self.handle.as_raw_fd();
-        let plain = flags::O_RDWR | flags::O_CLOEXEC | flags::O_NOFOLLOW;
+        let plain = Dir::FILE_FLAGS;
         let (file, created) = match mode {
             FileMode::Existing => match call(dirfd, &name, plain, false) {
                 Ok(file) => (file, false),
@@ -186,6 +222,14 @@ impl Dir {
             return Err(refusal("a file name names something other than a regular file"));
         }
         Ok(file)
+    }
+
+    /// Opens the directory `name` in this directory (`O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW`), with
+    /// [`Dir::file`]'s name check before any call: one component, never `.` or `..`, never a symbolic link.
+    pub fn sub(&self, name: &str) -> io::Result<Dir> {
+        let name = store_name(name)?;
+        let handle = call(self.handle.as_raw_fd(), &name, Dir::SUB_FLAGS, false)?;
+        Ok(Dir { handle })
     }
 
     /// Makes the directory's entries durable (`fsync` on the directory; `F_FULLFSYNC` on Darwin).

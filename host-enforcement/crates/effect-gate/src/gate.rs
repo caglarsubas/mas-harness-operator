@@ -10,6 +10,10 @@
 //!
 //! HE-002C puts the journal and the failure marker behind `store::Stores`: `Gate::new` keeps HE-002's in-memory pair,
 //! `Gate::create` starts a new generation on file stores and `Gate::open` is the process restart (DESIGN §8).
+//!
+//! HE-003A adds what the channel substrate reads (`channel_state`, `bound_run`, `connection_open`, none of which
+//! changes any state) and the R10-defined `Event::AnswerLate` (HE-003A DESIGN §5.1, §5.7); no existing event's answer
+//! changes.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -73,6 +77,26 @@ pub enum Event {
     SecondChannel,
     PeerChanged,
     GateRestart,
+    /// R10-defined (HE-003A DESIGN §5.7, owner decision Q-HE3A-2 (b)): the substrate did not send an answer because
+    /// the 2-second bound had passed. Fatal `ANSWER_LATE` (HELD) on an OPEN channel; an `EventError` otherwise.
+    AnswerLate,
+}
+
+/// The model's channel, as the substrate reads it (HE-003A DESIGN §5.1).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ChannelState {
+    Unopened,
+    Open,
+    Closed,
+}
+
+/// The execution the last BIND bound, as the substrate reads it (HE-003A DESIGN §5.1, §5.6): its run nonce keys the
+/// signed lifetime, and `expired` is set once EXPIRE was handled for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundRun {
+    pub execution_id: String,
+    pub run_nonce: String,
+    pub expired: bool,
 }
 
 /// An event outside the model's preconditions (the pinned model raises there); the gate state is unchanged.
@@ -588,6 +612,30 @@ impl Gate {
         self.stores.entries()
     }
 
+    /// The channel's state (read only; HE-003A DESIGN §5.1). After [`Gate::open`] it is CLOSED.
+    pub fn channel_state(&self) -> ChannelState {
+        match self.channel {
+            Channel::Unopened => ChannelState::Unopened,
+            Channel::Open => ChannelState::Open,
+            Channel::Closed => ChannelState::Closed,
+        }
+    }
+
+    /// The bound execution and whether it has expired (read only; HE-003A DESIGN §5.1). After [`Gate::open`] both
+    /// come from the journal's rebuild.
+    pub fn bound_run(&self) -> Option<BoundRun> {
+        self.bound.as_ref().map(|bound| BoundRun {
+            execution_id: bound.execution_id.clone(),
+            run_nonce: bound.run_nonce.clone(),
+            expired: self.expired,
+        })
+    }
+
+    /// Whether the I04 connection `conn` is one the gate holds open (read only; HE-003A DESIGN §6).
+    pub fn connection_open(&self, conn: &str) -> bool {
+        self.connections.get(conn).is_some_and(|connection| connection.open)
+    }
+
     /// `journalDigest`: the SHA-256 of the canonical journal.
     pub fn journal_digest(&self) -> String {
         sha256::prefixed(&journal_doc(self.stores.entries()).canonical())
@@ -947,6 +995,11 @@ impl Gate {
                 }
             }
             Event::GateRestart => self.restart_with(None),
+            Event::AnswerLate => match self.channel {
+                // As R1's RESPONSE_OUT_OF_BOUNDS: HELD in every state, INVALIDATED journalled, armed actions denied.
+                Channel::Open => self.fatal(FatalReason::AnswerLate),
+                Channel::Unopened | Channel::Closed => return Err(EventError("answer late without an open channel")),
+            },
         })
     }
 

@@ -13,6 +13,14 @@ sources: a per-file allowlist of the foreign symbols each may declare (read with
 every `extern` read or refused), and none of a list of std APIs that reach a system call the EFFECT_GATE filter kills
 after the seal (HE-002S DESIGN section 5's list plus set_modified and is_terminal).
 
+HE-003A (the effect gate's channel substrate) allows the word `unsafe` in gate-sys's channel module too, with its own
+foreign-symbol allowlist, and the std::os::fd items there as in the openat module; turns the start-up lint's exception
+into a per-file list of exact expressions, each excepted once (the channel module's two openings in the proc
+filesystem); refuses `derive(Debug)`, also under `cfg_attr`, on a struct or enum of the linked crates whose field types
+mention a type whose `Debug` would format a `File` or a descriptor; and checks the workspace's shape (HE-002C PR review
+round 3, R3-2: members under crates/, crates not a symlink, the crates effect-gate links, edition 2024 inherited and
+not overridden by a target table).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -67,21 +75,50 @@ HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
 OPENAT = "crates/gate-sys/src/openat.rs"
 SEAL = "crates/gate-sys/src/seal.rs"
-# The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6).
-UNSAFE_FILES = (OPENAT, SEAL)
-# HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5): the start-up lint's one
-# exception, one occurrence of the expression that opens the process's own status file in gate-sys's seal module
-# (whitespace between its tokens ignored). Any other /proc (a second occurrence, a raw string, concat!, another file
-# name) still refuses.
+CHANNEL = "crates/gate-sys/src/channel.rs"
+# The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6, HE-003A
+# DESIGN section 8).
+UNSAFE_FILES = (OPENAT, SEAL, CHANNEL)
+# The linked sources that may name std::os::fd items (HE-003A DESIGN section 8): effect-gate holds gate-sys's opaque
+# types and names no descriptor.
+FD_FILES = (OPENAT, CHANNEL)
+# HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5) and HE-003A DESIGN section 8:
+# the start-up lint's exceptions, a per-file list of exact expressions (whitespace between their tokens ignored), each
+# removed once before the scan: in gate-sys's seal module the expression that opens the process's own status file, in
+# its channel module the two that open the thread's own attribute directory and a peer's process directory. Any other
+# /proc (a second occurrence, a raw string, concat!, another file name, another file) still refuses.
 STATUS_READ = 'Dir::at("/proc/self")?.file_ro("status")'
-STARTUP_EXCEPTIONS = {SEAL: re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')}
+SOCKCREATE_DIR = 'Dir::at("/proc/thread-self/attr")'
+PEER_DIR = 'Dir::at(&format!("/proc/{}", pid))'
+STARTUP_EXCEPTIONS = {
+    SEAL: ((STATUS_READ,
+            re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')),),
+    CHANNEL: ((SOCKCREATE_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/thread-self/attr"\s*\)')),
+              (PEER_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*&\s*format\s*!\s*\(\s*"/proc/\{\}"\s*,\s*pid\s*\)\s*\)'))),
+}
 # HE-002S DESIGN section 6 (D8): the foreign symbols each linked source declares, exactly; no other linked source
 # declares a foreign item. Extern items are private, none is declared `safe`, and no linked source names link_name.
 # PR review round 1, R1-1: the sources are read with comments removed and literal contents emptied (rust_code), every
 # `extern` must be a block, `extern crate` or a function's ABI, a block's body must hold only items the reader follows,
-# and the files allowed `unsafe` define no macro; anything else refuses.
+# and the files allowed `unsafe` define no macro; anything else refuses. HE-003A DESIGN section 3: the channel module's
+# twelve symbols (accept4 only through syscall).
 FOREIGN_ITEMS = {OPENAT: {"openat"},
-                 SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"}}
+                 SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"},
+                 CHANNEL: {"socket", "bind", "listen", "setsockopt", "getsockopt", "recvmsg", "sendmsg", "epoll_create1",
+                           "epoll_ctl", "epoll_pwait", "ppoll", "syscall"}}
+# HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
+# with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
+# struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
+# impls and direct formatting are code review's.
+DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir")
+DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS))
+OUTER_ATTRIBUTE = re.compile(r"#\s*\[")
+ITEM_AFTER_ATTRIBUTES = re.compile(r"\s*(?:#\s*\[|(?:pub\s*(?:\([^)]*\)\s*)?)?(struct|enum|union)\s+([A-Za-z_]\w*))")
+FIELD_NAME = re.compile(r"\b[A-Za-z_]\w*\s*:(?!:)")
+TYPE_TOKEN = re.compile(r"#\s*\[[^\]]*\]|[A-Za-z_]\w*|\S")
+# HE-002C PR review round 3, R3-2 (1)-(4): the workspace's shape.
+WORKSPACE_MEMBER = re.compile(r"crates/[A-Za-z0-9_-]+")
+WORKSPACE_EDITION = "2024"
 EXTERN_WORD = re.compile(r"\bextern\b")
 EXTERN_BLOCK = re.compile(r'\bextern\s*(?:""\s*)?\{')
 EXTERN_OTHER = re.compile(r'\bextern\s*(?:crate\b|(?:""\s*)?fn\b)')
@@ -135,7 +172,8 @@ LINKED_FORMS = ((re.compile(r"\bextern\s+crate\b"), "declares an extern crate"),
 # contents emptied, and its tree's tokens; a tree holding anything else refuses.
 USE_DECLARATION = re.compile(r"\buse\b(?!\s*<)([^;]*);")
 USE_TOKEN = re.compile(r"\s*(::|[A-Za-z_]\w*|[{},*])")
-# The std::os paths a linked source may name besides the fs items: the fd items, in the openat module only.
+# The std::os paths a linked source may name besides the fs items: the fd items, in FD_FILES only (HE-003A adds the
+# channel module).
 OPENAT_FD_PATH = re.compile(r"std::os::fd::\w+")
 FD_ITEMS = re.compile(r"std::os::fd|\b(?:FromRawFd|AsRawFd|IntoRawFd|RawFd|OwnedFd|BorrowedFd|AsFd)\b")
 # The only std fs items a linked source may name, each where it may (longest first): any other occurrence of the word
@@ -428,8 +466,8 @@ def check_tree(rows: list[dict], sysroot: Path, targets: list[str]) -> None:
 
 
 def check_sources(base: Path) -> int:
-    """The start-up lint: no workspace source contains a forbidden token, except one occurrence of the expression
-    STARTUP_EXCEPTIONS allows in its one file (removed before the scan, so a second occurrence or any other form still
+    """The start-up lint: no workspace source contains a forbidden token, except one occurrence of each expression
+    STARTUP_EXCEPTIONS allows in its file (removed before the scan, so a second occurrence or any other form still
     refuses)."""
     count = 0
     for path in sorted(base.rglob("*.rs")):
@@ -437,8 +475,8 @@ def check_sources(base: Path) -> int:
             continue
         rel = path.relative_to(base).as_posix()
         text = path.read_text(encoding="utf-8")
-        if rel in STARTUP_EXCEPTIONS:
-            text = STARTUP_EXCEPTIONS[rel].sub("", text, count=1)
+        for _, expression in STARTUP_EXCEPTIONS.get(rel, ()):
+            text = expression.sub("", text, count=1)
         for token in FORBIDDEN_SOURCE:
             require(token not in text, "%s uses %s (start-up lint)" % (rel, token))
         count += 1
@@ -614,7 +652,7 @@ def std_names(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
 
 def check_linked_sources(base: Path) -> int:
     """A lexical tripwire over the non-test sources of the crates EFFECT_GATE will link, with the whitespace around `::`
-    removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside the openat module; std fs items
+    removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside FD_FILES; std fs items
     other than the allowed ones; std::os paths other than those), renames a std module or item, or uses a form that
     names std's modules without spelling their paths or the word asm (LINKED_FORMS); and their crate-root attributes.
     A rename is refused in a use of std and, read from the source with comments and literal contents removed, in any
@@ -634,14 +672,15 @@ def check_linked_sources(base: Path) -> int:
         text = PATH_SPACE.sub("::", raw)
         for pattern in LINKED_FORBIDDEN:
             require(not re.search(pattern, text), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
-        require(rel == OPENAT or not FD_ITEMS.search(text), "%s names a std::os::fd item outside %s" % (rel, OPENAT))
+        require(rel in FD_FILES or not FD_ITEMS.search(text),
+                "%s names a std::os::fd item outside %s" % (rel, " and ".join(FD_FILES)))
         rest = text
         for item, allowed in FS_ITEMS:
             if allowed(rel):
                 rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
         require(not re.search(r"\bfs\b", rest),
                 "%s names a std fs item other than its allowed ones, one item per use line (linked-source tripwire)" % rel)
-        if rel == OPENAT:
+        if rel in FD_FILES:
             rest = OPENAT_FD_PATH.sub("", rest)
         require(not re.search(r"std::os\b", rest),
                 "%s names a std::os item other than its allowed ones (linked-source tripwire)" % rel)
@@ -760,7 +799,7 @@ def check_post_seal_sources(base: Path) -> int:
 
 
 def check_unsafe(base: Path) -> int:
-    """A lexical tripwire: the word unsafe appears in no workspace source but gate-sys's openat and seal modules
+    """A lexical tripwire: the word unsafe appears in no workspace source but gate-sys's openat, seal and channel modules
     (tests and binaries included)."""
     count = 0
     for path in workspace_sources(base):
@@ -770,6 +809,133 @@ def check_unsafe(base: Path) -> int:
                     "%s contains unsafe outside %s" % (rel, " and ".join(UNSAFE_FILES)))
         count += 1
     return count
+
+
+def bracket_end(code: str, start: int) -> int:
+    """The index after the `]` that closes the `[` at or after `start` (literal contents are already emptied)."""
+    depth = 0
+    for index in range(code.index("[", start), len(code)):
+        if code[index] == "[":
+            depth += 1
+        elif code[index] == "]":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    raise GateError("an attribute without its closing bracket")
+
+
+def item_rest(code: str, start: int) -> str:
+    """An item's text from `start` (after its name) to its end: the `}` that closes its body, or the `;` at depth 0
+    (a tuple or unit struct). Anything else refuses."""
+    depth = 0
+    for index in range(start, len(code)):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            require(depth >= 0, "an item the Debug check cannot read")
+            if depth == 0 and char == "}":
+                return code[start:index + 1]
+        elif char == ";" and depth == 0:
+            return code[start:index]
+    raise GateError("an item the Debug check cannot read")
+
+
+def field_types(kind: str, rest: str) -> str:
+    """The text of an item's field types: its generics, body and payloads with the field names removed and, for an
+    enum, the variant names (the first identifier after the body's `{` or a `,` at the body's depth) removed too."""
+    text = FIELD_NAME.sub(" ", rest)
+    if kind != "enum":
+        return text
+    kept, depth, at_variant = [], 0, False
+    for match in TYPE_TOKEN.finditer(text):
+        token = match.group(0)
+        if token.startswith("#"):
+            continue
+        if token in ("(", "[", "{"):
+            depth += 1
+            at_variant = depth == 1 and token == "{"
+        elif token in (")", "]", "}"):
+            depth -= 1
+            at_variant = False
+        elif token == ",":
+            at_variant = depth == 1
+        elif at_variant and re.match(r"[A-Za-z_]", token):
+            at_variant = False
+            continue
+        kept.append(token)
+    return " ".join(kept)
+
+
+def check_debug_derives(base: Path) -> int:
+    """A lexical tripwire over the sources of the crates EFFECT_GATE will link (HE-003A DESIGN section 8), read with
+    comments removed and literal contents emptied: an outer attribute that derives Debug (`derive(.. Debug ..)`, also
+    inside `cfg_attr`) must be followed, after other attributes and a visibility, by a struct, enum or union whose field
+    types mention none of DEBUG_HAZARDS (field and variant names are not types). An attribute or item the check cannot
+    read refuses. Manual impls and direct formatting are code review's."""
+    count = 0
+    for crate in LINKED_CRATES:
+        for path in sorted((base / crate / "src").rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
+            try:
+                code = rust_code(path.read_text(encoding="utf-8"))
+                for attribute in OUTER_ATTRIBUTE.finditer(code):
+                    end = bracket_end(code, attribute.start())
+                    body = code[attribute.start():end]
+                    if not (re.search(r"\bderive\s*\(", body) and re.search(r"\bDebug\b", body)):
+                        continue
+                    cursor = end
+                    while True:
+                        item = ITEM_AFTER_ATTRIBUTES.match(code, cursor)
+                        require(item, "a derive(Debug) on something the Debug check cannot read")
+                        if item.group(1) is None:   # another attribute first
+                            cursor = bracket_end(code, item.end() - 1)
+                            continue
+                        break
+                    types = field_types(item.group(1), item_rest(code, item.end()))
+                    hazard = DEBUG_HAZARD.search(types)
+                    require(not hazard, "%s derives Debug on %s %s, whose field types mention %s (Debug check)"
+                            % (rel, item.group(1), item.group(2), hazard.group(0) if hazard else ""))
+            except GateError as error:
+                if "(Debug check)" in str(error):
+                    raise
+                raise GateError("%s: %s (Debug check)" % (rel, error)) from None
+            count += 1
+    return count
+
+
+def check_workspace_shape(base: Path, workspace: dict) -> int:
+    """HE-002C PR review round 3, R3-2 (1)-(4): every workspace member is `crates/<name>`; `crates` itself is not a
+    symlink; the crates effect-gate links (its path dependencies, transitively, with itself) are exactly LINKED_CRATES;
+    the workspace edition is 2024 and every member inherits it (the unsafe tripwire relies on edition 2024's `unsafe
+    extern` and `#[unsafe(no_mangle)]`), and no target table of a member manifest ([lib], [[bin]], [[test]], [[bench]],
+    [[example]]) overrides the edition (HE-003A PR review round 1, R1-1). `workspace` is check_workspace's result."""
+    require(not (base / "crates").is_symlink(), "crates is a symlink (workspace shape)")
+    manifest = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
+    members = manifest.get("workspace", {}).get("members", [])
+    for member in members:
+        require(type(member) is str and WORKSPACE_MEMBER.fullmatch(member),
+                "the workspace member %r is not crates/<name> (workspace shape)" % (member,))
+    require(manifest.get("workspace", {}).get("package", {}).get("edition") == WORKSPACE_EDITION,
+            "the workspace edition is not %s (workspace shape)" % WORKSPACE_EDITION)
+    names = {}
+    for member in members:
+        table = tomllib.loads((base / member / "Cargo.toml").read_text(encoding="utf-8"))
+        package = table.get("package", {})
+        require(package.get("edition") == {"workspace": True},
+                "%s does not inherit the workspace edition (workspace shape)" % member)
+        for kind in MANIFEST_TARGETS:
+            targets = table.get(kind, [])
+            for target in targets if isinstance(targets, list) else [targets]:
+                require(not isinstance(target, dict) or "edition" not in target,
+                        "%s gives a %s target its own edition (workspace shape)" % (member, kind))
+        names[package.get("name")] = member
+    require("effect-gate" in names and "effect-gate" in workspace, "no effect-gate member (workspace shape)")
+    closure = {names.get(name) for name in linked(workspace, "effect-gate")}
+    require(closure == set(LINKED_CRATES), "the crates effect-gate links are %s, not %s (workspace shape)"
+            % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
+    return len(members)
 
 
 def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set) -> bytes:
@@ -815,6 +981,9 @@ def main() -> int:
         say("linker: the cargo config links both targets through %s, which execs the pinned rust-lld" % pin["linkerWrapper"])
         workspace = check_workspace(HE)
         say("workspace: %d crates, a lock without registry or git packages, no build script or proc-macro" % len(workspace))
+        say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
+            "effect-gate links exactly %s" % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION,
+                                              ", ".join(LINKED_CRATES)))
         say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
         check_tree(rows, sysroot, targets)
@@ -824,8 +993,9 @@ def main() -> int:
                 check_crt_symbols(name, symbol_names((sysroot / "lib/rustlib" / target / "lib/self-contained" / name)
                                                      .read_bytes()))
         say("crt objects: compiler-rt's crtbegin and crtend on both targets")
-        say("start-up lint: %d workspace sources without a forbidden API (one excepted expression, %s once in %s)"
-            % (check_sources(HE), STATUS_READ, SEAL))
+        say("start-up lint: %d workspace sources without a forbidden API (excepted once each: %s)"
+            % (check_sources(HE), "; ".join("%s in %s" % (expression, rel) for rel, expressions
+                                             in STARTUP_EXCEPTIONS.items() for expression, _ in expressions)))
         say("included code: %d workspace sources pass the lexical tripwire (no path attribute, include!, raw "
             "identifier or inline assembly; no manifest target path, build key or symlink), crates' src/ hold only .rs "
             "files" % check_included_code(HE))
@@ -833,10 +1003,12 @@ def main() -> int:
             "glob no std module or item and do not name asm (lexical tripwire), crate roots forbid or deny unsafe_code"
             % check_linked_sources(HE))
         say("foreign items: %d sources of effect-gate, gate-sys and i05-protocol, every extern read with comments and "
-            "literal contents removed; %s declares exactly %s and %s exactly %s, no other declares a foreign item, none "
-            "is public or safe, no link_name, no macro in either (lexical tripwire)"
-            % (check_foreign_items(HE), OPENAT, ", ".join(sorted(FOREIGN_ITEMS[OPENAT])), SEAL,
-               ", ".join(sorted(FOREIGN_ITEMS[SEAL]))))
+            "literal contents removed; %s; no other declares a foreign item, none is public or safe, no link_name, no "
+            "macro in any of them (lexical tripwire)"
+            % (check_foreign_items(HE), "; ".join("%s declares exactly %s" % (rel, ", ".join(sorted(items)))
+                                                  for rel, items in FOREIGN_ITEMS.items())))
+        say("Debug: %d sources of effect-gate, gate-sys and i05-protocol derive Debug on no struct or enum whose field "
+            "types mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(DEBUG_HAZARDS)))
         say("post-seal: %d sources of effect-gate, gate-sys and i05-protocol name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
