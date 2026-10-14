@@ -1,4 +1,4 @@
-# HE-002, HE-002B and HE-002C: model-defined and R10-defined behaviour
+# HE-002, HE-002B, HE-002C and HE-002S: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -19,8 +19,13 @@ vectors pass (79 kind, 7 render, 22 outcome checks and 62 transcripts on both fr
 
 HE-002C adds the durable stores (`effect-gate`: `frame`, `store`, `file_store`; the new crate `gate-sys`). The pinned
 models keep their journal and marker in memory and define no byte format, so nothing in HE-002C is model-defined: its
-rules are the R10-defined R19-R30 and the disclosures in the HE-002C section at the end, each with the owner decision
+rules are the R10-defined R19-R30 and the disclosures in the HE-002C section, each with the owner decision
 that settled it (HE-002C design revision 4, §18).
+
+HE-002S adds the EFFECT_GATE process seal (`effect-gate`: `seal`; `gate-sys`: `seal.rs` and `Dir::file_ro`). No pinned
+model defines a seal, so nothing in it is model-defined: its sequence, accepted start states and checks are R10's, from
+HE-002S design revision 4 with §18 and the owner decisions quoted in the HE-002S section at the end, which also records
+the Rust 1.99.0 and musl 1.2.5 re-check (owner decision Q-HE2S-3 (a)).
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -258,3 +263,220 @@ Owner decisions (2026-10-13, relayed by the lane monitor; quoted from HE-002C de
   earlier-generation journal that can't be read whole refuses FileStores::open) stand as built and disclosed. Design
   revision 4 asked only for one committed marker of this generation (R22), and its R27 would have read the unread rest of
   an index or earlier journal as one ignored TORN entry (R23), which could hide a committed earlier BIND.
+
+## HE-002S: the EFFECT_GATE process seal (`seal`, crate `gate-sys`: `seal.rs`, `Dir::file_ro`)
+
+The seal implements HI-7's EFFECT_GATE row and SEC-4 for that role (HE-002S design revision 4, §2 as amended by §18's
+consequence of owner decision Q-HE2S-9 (a)): uid and gid 0, no capability left, permitted = effective = inheritable =
+bounding = ambient = {}, `no_new_privs` 1 before the filter, `RLIMIT_CORE` 0/0, and exactly the published EFFECT_GATE
+program installed in mode 2. It is a library: `seal_stage1() -> Result<Stage1, SealError>` and
+`seal_stage2(Stage1) -> Result<Sealed, SealError>`, Linux only, concrete over the Linux implementation of the
+crate-private `SealOps` trait; the generic engine (`run_stage1`, `run_stage2`, `plan`) is crate-private, and `Stage1`
+and `Sealed` have private fields and no `Clone`, `Copy` or `Default`, so no crate can obtain a token from a fake
+(design review round 3, D6). HE-003's `main` calls stage 1 first, reads and checks only the signed configuration,
+calls stage 2, and exits with a distinct status on any `SealError` (the library cannot exit). On other targets the two
+public functions are absent; the engine, the plan and the portable helpers compile and are host-tested everywhere.
+
+### The sequence, as built
+
+| Step | Calls (each read-back compared with its target) | `SealStep` on failure |
+|---|---|---|
+| precondition | the `Threads:` line of the process's status file is 1 (`Dir::at("/proc/self")`, `file_ro("status")`, at most 64 KiB) | `Threads(One)` |
+| precondition | `getresuid` and `getresgid`: all three ids 0 (`getuid` is killed by the filter, so this runs first) | `UserIds`, `GroupIds` |
+| start sets | `capget` (version 3, pid 0); `PR_CAPBSET_READ` 0..=40, then `PR_CAPBSET_READ(41)`, which must fail with EINVAL | `StartCapabilities`, `StartBounding` |
+| plan | the running architecture's program is 1 to 4096 whole instructions (checked before any change) | `Program` |
+| 1 | `prlimit(0, RLIMIT_CORE, {0, 0}, &old)` (musl issues `prlimit64`); read back with a null new limit: 0/0 | `CoreLimit`, `CoreLimitReadBack` |
+| 2 | `PR_CAP_AMBIENT_CLEAR_ALL`; read back with `PR_CAP_AMBIENT_IS_SET` 0..=40: empty | `AmbientClear`, `AmbientReadBack` |
+| 3 | `PR_CAPBSET_DROP` of every present capability but CAP_SETPCAP, ascending; read back 0..=41: {CAP_SETPCAP} ∩ start bounding | `BoundingDrop(One, n)`, `BoundingReadBack(One)` |
+| 4 | `capset` permitted = effective = {CAP_SETPCAP} ∩ start permitted, inheritable empty; `capget` read-back | `Capabilities(One)`, `CapabilitiesReadBack(One)` |
+| 5 | `PR_SET_NO_NEW_PRIVS` 1; `PR_GET_NO_NEW_PRIVS` reads 1 | `NoNewPrivs`, `NoNewPrivsReadBack` |
+| between | HE-003: only the signed configuration's read and check | |
+| 6 | the `Threads:` line is 1 again | `Threads(Two)` |
+| 7 | `PR_CAPBSET_DROP(CAP_SETPCAP)` if stage 1 left it in the bounding set; read back 0..=41: empty | `BoundingDrop(Two, 8)`, `BoundingReadBack(Two)` |
+| 8 | `capset` all three sets empty; `capget` read-back | `Capabilities(Two)`, `CapabilitiesReadBack(Two)` |
+| final state | `capget` (all empty), `PR_CAPBSET_READ` 0..=41 (empty), `PR_CAP_AMBIENT_IS_SET` 0..=40 (empty), `PR_GET_NO_NEW_PRIVS` (1), the core limit (0/0): the last reads, since the filter kills all of them (D4) | `FinalCapabilities` ... `FinalCoreLimit` |
+| 9 | `syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_TSYNC, &prog)` (317 on x86_64, 277 on aarch64; musl has no `seccomp` wrapper) with the running architecture's program; any return but 0 fails (a positive return is TSYNC's thread id, nothing installed) | `Filter` |
+
+Every failure is a `SealError { step, failure }`: the OS error of a failed call, `InvalidCapability(n)` for EINVAL from
+a capability read within 0..=40 (C9), `LastCapability` when `PR_CAPBSET_READ(41)` does not fail with EINVAL,
+`NotABoolean` for a read that is neither 0 nor 1, `SetMismatch`, `CapabilitiesMismatch`, `CoreLimitMismatch` and
+`NoNewPrivsUnset` for read-backs, `NotRoot`, `Threads(n)` and `StatusFormat` for the preconditions, `ProgramLength`,
+and `TsyncThread(id)` or `Returned(value)` for the filter. The seal stops at the first one. With a full root start the
+seal makes 309 calls (176 in stage 1, 133 in stage 2).
+
+Accepted start states (§18): the full root set, or any superset of {CAP_SETPCAP}; or a start already within
+{CAP_SETPCAP}, with nothing left to drop when CAP_SETPCAP is absent (HE-008's unit starts the gate in one of them).
+Every target derives from the start sets, so the kernel itself refuses the others: `PR_CAPBSET_DROP` needs CAP_SETPCAP
+effective even for an absent capability (EPERM at `BoundingDrop`), and `capset` can only shrink the permitted set.
+The host tests run each start through a fake kernel that models both rules: full root (also with an inheritable and an
+ambient capability), a superset of {CAP_SETPCAP}, {CAP_SETPCAP} only, {CAP_NET_BIND_SERVICE, CAP_SETPCAP}, empty, and
+CAP_SETPCAP permitted and effective but not bounding all seal; CAP_NET_BIND_SERVICE without CAP_SETPCAP, a full
+bounding set without capabilities, CAP_SETPCAP permitted but not effective, and CAP_SETPCAP only in the bounding set
+fail at `BoundingDrop` with EPERM. Two starts outside the list's wording also seal, because nothing is left to drop from
+their bounding sets and `capset` lowers the permitted set without a capability: a permitted set beyond the bounding set
+(D4's example) and another permitted capability with an empty bounding set and no CAP_SETPCAP. Both end with every set
+empty, which the final-state assertion checks, so HI-7's "bounding equal" holds for every start that seals.
+
+### Code and audit
+
+- `gate-sys/src/seal.rs` (Linux only; with `openat.rs` the only places of the workspace that may hold `unsafe`): one
+  `unsafe extern "C"` block declaring exactly `prlimit`, `prctl`, `capget`, `capset`, `getresuid`, `getresgid` and
+  `syscall`, private; each call in its own `unsafe` block with its own `// SAFETY:` argument, behind safe functions
+  (`own_status`, `user_ids`, `group_ids`, `read_capabilities`, `write_capabilities`, `process_control`, `core_limit`,
+  `install_filter`). `process_control` accepts only options 23, 24, 38, 39 and 47 with sub-option 1 or 4 (none of which
+  takes a pointer) and always passes exactly four `c_ulong` arguments; `install_filter` checks that the stated
+  instruction count is 1 to 4096 and exactly the program's size before the call, passes the program as a byte pointer
+  in `sock_fprog` (never cast to a typed slice) and gives `syscall` six `c_long` or pointer arguments (D5).
+  `read_capabilities` also refuses a header the kernel changed. Compile-time size, alignment and offset asserts cover
+  `CapHeader` (8/4), `CapData` (12/4; two words 24), `Rlimit` (16/8) and `SockFprog` (16/8, pointer at 8), checked by
+  both musl release builds.
+- `Dir::file_ro(name)`: `O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK`, the store-name check before the call and the
+  regular-file check (`fstat`) after it, as `Dir::file`; a missing name is `NotFound`. `O_NONBLOCK` (owner decision
+  Q-HE2S-11 (a), 2026-10-13, via the lane monitor, verbatim: "add O_NONBLOCK to Dir::file_ro in HE-002S (no effect on
+  regular files; a FIFO open returns at once and the fstat check refuses it), plus one host test that a FIFO is refused
+  without blocking; §6 gains the flag. Dir::file's R1-5 stays carried to HE-003.") is 0o4000 on both Linux targets
+  (musl's `pipe2` passes 2048 to `fcntl(F_SETFL)` in the pinned `libc.a`) and 0x4 on macOS. `Dir::at("/proc/self")` follows the `self`
+  link, and `O_NOFOLLOW` applies to `status` (D3).
+- `effect-gate/src/seal.rs` (safe; the root forbids `unsafe_code`): the plan, the engine, the typestate API, and the
+  portable helpers `capability_words` and `capability_sets` (the two version-3 words, capabilities 32-40 in the second),
+  `filter_length` (the `sock_fprog` length), `Prctl::arguments` (the option and its four arguments) and `status_threads`
+  (exactly one line starting `Threads:`, optional tabs or spaces, decimal digits, nothing else, no overflow). Both
+  programs are embedded with `include_bytes!` as `PROGRAM_X86_64` and `PROGRAM_AARCH64` on every target;
+  `RUNNING_ARCH` (`cfg(target_arch)`) selects the one installed.
+- `tools/gate.py`: the two programs among the contract files (15), pinned at the published digests; the word `unsafe`
+  also allowed in `gate-sys/src/seal.rs`; the start-up lint's one exception, one occurrence of the expression
+  `Dir::at("/proc/self")?.file_ro("status")` in that file (whitespace between its tokens ignored), removed before the
+  scan, so a second occurrence, the bare literal `"/proc/self"`, a raw string, `concat!("/proc/self", ..)`, another
+  name such as `file_ro("environ")`, `"/proc/self/status"`, a `/proc` in a comment or the expression in any other
+  file still refuses (HE-002S PR review round 1, R1-5). The lint matches text: a `concat!` split so that no part spells
+  `/proc` (for example `concat!("/pro", "c/self")`) passes it in any file, as it did before HE-002S; that form is code
+  review's (PR review round 2, R2-2). The per-file foreign-item allowlist over the linked crates'
+  sources (D8): `openat.rs` exactly `openat`, `seal.rs` exactly the seven symbols above, no other source an extern
+  block with an item, no `pub` or `safe` item in one, no `link_name`. It reads each source with its comments removed
+  and the contents of its string, raw-string and character literals emptied, so neither a comment nor a literal can
+  hide a block or end one early; every `extern` must be an extern block, `extern crate` or a function's ABI
+  (`extern "C" fn`); a block's body is read strictly (items ending in `;`, each a `fn`, `static` or `type` with its
+  name; a `!`, `$`, `#`, `=` or brace in a body refuses); and `openat.rs` and `seal.rs` define no macro (the word
+  `macro_rules`, or any `$` outside string and character literals). Anything the reader cannot lex or follow refuses,
+  so "exactly" holds for every extern block in the linked sources: a block behind a comment between the ABI and the
+  brace is read, a `}` in a comment or a literal does not end a block early, and a block a macro would generate is
+  refused (R1-1). The post-seal tripwire covers
+  `effect-gate`, `gate-sys` and `i05-protocol`, whose code also runs after the seal (no `i05-protocol` source named a
+  listed API when it was added; R1-2), and refuses `set_nonblocking`, `read_dir`, `current_exe`, `uname`,
+  `membarrier`, `set_len`, `set_permissions`, `set_times`, `set_modified`, `io::copy`, `is_terminal` and
+  `IsTerminal` (the std openers stay LINKED_FORBIDDEN's). That is its whole scope: the refused list of HE-002S DESIGN
+  §5 plus `set_modified` and `is_terminal`, over those three crates. A std API the list does not name (for example
+  `Debug` of a `File`, in the table below) is code review's and T04's, whose steady-state trace is the proof. The
+  linked-source tripwire also refuses, read with comments and literal contents removed, a `use` that renames (`as`)
+  a path any of whose segments is `std` or a name some linked source imports from std (R1-2): the union over the
+  three crates' sources, in any order, so `use std::io; use io as z;`, `use self::io as z;`, `use {std::io as z};`
+  and a `crate::` or `super::` path through a re-exported std name refuse, and a `use` tree the reader cannot follow
+  (a macro's `$crate`) refuses too. It is a rule over names, not over what a path resolves to: a crate-local item that
+  shares a std-imported name cannot be renamed either. A glob (`*`) whose path goes through `std` or such a name
+  refuses as well (PR review round 2, R2-1: `use std::io::{*};`, `use std::io; use io::*;`, `use std::io::{self, *};`
+  and `pub use super::io::*;` would name std's items without spelling them). No source used any of those names or
+  forms before the checks were added. HE-002C's carried R3-1 is closed for these forms (R1-4): in every workspace source the words
+  `global_asm` and `naked_asm`, `asm!`, the word `asm` after `arch::` (also inside a group, as in
+  `use core::arch::{asm as a};`) and before ` as` (`use core::arch::asm as a;`); and in the linked sources the word
+  `asm` itself, so no macro or renaming import there can assemble a call to it. R3-4 (the duplicate `import tomllib`;
+  the "allowlist" comment in `tools/test_gate.py`) is fixed; R3-2 and R3-3 stay HE-003's. Like the other tripwires
+  these match text, not Rust, and any other form is code review's.
+
+### The Rust 1.99.0 and musl 1.2.5 re-check (owner decision Q-HE2S-3 (a))
+
+Sources. Rust: HE-001's evidence copy `tools/w03/he001/closure/evidence/rust-src-1.99.0.tar.xz` (owner decision C7),
+sha256 `3f1f9b7ed48f4596fc87889b7b3c61747336a55c9c22db1ab0c697e0aadb77aa` re-hashed before use, read from a scratch
+extraction of `library/std/src` and `library/backtrace/src`; paths below are relative to `library/std/src` unless they
+name another directory. musl: the pinned toolchain's self-contained `libc.a`, sha256
+`e699c64b0c6b427d89ad5bf767bf78beb30c19930c5dedff635951636e8f9f70` (x86_64, 6406314 bytes) and
+`b03473b6f1efb72f700f561b4407a88885b37e0edb5cdb2a64de0df5499e813f` (aarch64, 6455370 bytes), both rows of the closure
+table: the archive symbol index (2002 entries over 1347 members on each), the members' ELF symbol tables, and the
+disassembly (llvm-objdump of the Command Line Tools) of the members named below. System call numbers are the
+immediates loaded into the number register (`eax`, `x8`) or into the first argument of `__syscall_cp` (`edi`, `x0`).
+The "After the seal" column is the vendored programs' own answer: each named call (with the argument that decides it,
+such as `FIONBIO`, `F_DUPFD_CLOEXEC`, the clone flags, `mremap`'s flags or the socket type) was run through a
+classic-BPF interpreter over `host-enforcement/contracts/seccomp-v3/`; "killed" is `SECCOMP_RET_KILL_PROCESS` and
+`clone3` gets `ERRNO(ENOSYS)`. After the filter the seal's own calls are all killed (`capget`, `capset`, `getresuid`,
+`getresgid`, `seccomp` and `prctl` options 23, 24, 38, 39 and 47, as are `getuid`, `setrlimit` and `getrlimit`) except
+`prlimit64`, which is allowed for this process and for another (§2: bounded by the hard limit 0 and by SELinux).
+
+Symbols (C5). Both archives define `prlimit` (prlimit.lo), `prctl` (prctl.lo), `capset` and `capget` (cap.lo),
+`getresuid` (getresuid.lo), `getresgid` (getresgid.lo) and `syscall` (syscall.lo), each referencing only
+`__syscall_ret`, and neither has `prlimit64`, `seccomp` or `clone3`. The wrappers issue: `prlimit` 302 (`prlimit64`) on
+x86_64 and 261 on aarch64; `prctl` 157 and 167; `capget` 125 and 90, `capset` 126 and 91; `getresuid` 118 and 148;
+`getresgid` 120 and 150.
+
+| §5 item | Rust 1.99.0 | musl 1.2.5 (`libc.a`, x86_64 / aarch64) | After the seal |
+|---|---|---|---|
+| thread naming | `sys/thread/unix.rs:434-451`: Linux `set_name` is `pthread_setname_np(pthread_self(), name)`, truncated to 16 bytes; `thread/lifecycle.rs:144-146`: a spawned thread names itself before its closure runs; `sys/pal/unix/mod.rs:42-49`: the main thread is renamed only on Apple targets | `pthread_setname_np.lo` calls `prctl` with option 15 (`PR_SET_NAME`) for the calling thread; for another thread it opens and writes its `comm` file (it references `open` and `write`), which std never does | `prctl(PR_SET_NAME)` allowed; a thread names only itself |
+| thread creation | `sys/thread/unix.rs:103`: `pthread_create`; no `clone3` anywhere in `library/std/src` | `pthread_create.lo` calls `__clone`; `clone.lo` issues `clone` (56 / 220) and `exit` (60 / 93); no member loads 435 (`clone3`) | `clone` with `CLONE_THREAD` allowed; no `clone3` issued |
+| abort, raise | `sys/pal/unix/mod.rs:299-301`: `abort_internal` is `libc::abort()` | `abort.lo` calls `raise`; `raise.lo` issues `tkill` (200 / 130) | allowed |
+| allocation | `sys/alloc/unix.rs:31`, `:53`, `:71`, `:99`: `malloc`, `calloc`, `realloc`, `posix_memalign` | mallocng's `realloc.lo` calls `__mremap` with flags 1 (`MREMAP_MAYMOVE`) on both; `mmap`, `munmap`, `brk` | allowed (`mremap` with flags 0 is killed: see `pthread_getattr_np` below) |
+| stdio, time, randomness | `sys/fd/unix.rs:376`, `:393`: `write`, `writev`; `sys/pal/unix/time.rs:107`: `clock_gettime`; `sys/random/linux.rs:72-122` (`:113`, `:119`, `:122`): `getrandom` by raw system call, falling back to `/dev/urandom` (opened at `:157` with `File::open`) only on ENOSYS or EPERM, or on EAGAIN after EINVAL for GRND_INSECURE (a kernel before 5.6, which the seal's `PR_CAPBSET_READ(40)` check refuses) | | allowed; `getrandom` is allowed, so the fallback's open (killed on x86_64) is not reached |
+| no `pthread_getattr_np` on the main thread | `sys/pal/unix/stack_overflow.rs:400-410` and `:447-452`: on musl the main-thread guard is `None`, without a call; `:246-253` and `:568-580`: a spawned thread calls `pthread_getattr_np(pthread_self())` on itself | `pthread_getattr_np.lo` calls `mremap` with flags 0 (the main-thread stack probe) | the probe is killed, but only the main thread would reach it and std never calls it there |
+| `available_parallelism` | `sys/thread/unix.rs:152` | | refused in every workspace source by the start-up lint |
+| `set_nonblocking` | `sys/fd/unix.rs:628-634` and `sys/net/connection/socket/unix.rs:591-595`: `ioctl(FIONBIO)` | `ioctl.lo`: 16 / 29 | killed; refused by the post-seal tripwire |
+| std path openers | `sys/fs/unix.rs:30-39`: on musl std uses `open`, `stat`, `lstat`, `fstat` and `ftruncate`; `:1241` (`open64` is `open`), `:1914` (`readlink`), `:1977` (`stat`), `:1994` (`lstat`); `statx` is glibc only (`:9`, `:63`) | `open.lo`: `__syscall_cp(2)` / `__syscall_cp(56)` (`openat`); `stat.lo` and `lstat.lo` call `fstatat.lo`: 4, 6, 5 and 262 / 79 and 80; `readlink.lo`: 89 / 78 | opens killed on x86_64 only (aarch64's `openat` is allowed); `stat`, `lstat` and `readlink` killed on both; LINKED_FORBIDDEN refuses `File::open`, `OpenOptions` and `std::path` |
+| `read_dir` | `sys/fs/unix.rs:1847`: `opendir`; `:868`: `readdir` | `getdents.lo`: 217 / 61 (`getdents64`) | killed; refused |
+| `current_exe` | `sys/paths/unix.rs:275-276`: `read_link("/proc/self/exe")` | `readlink.lo`: 89 / 78 | killed; refused |
+| `uname`, `membarrier` | no caller in `library/std/src` | `uname.lo`: 63 / 160; `membarrier.lo` is the only member loading 324 / 283 | killed; refused by name |
+| `File::set_len`, `set_permissions`, `set_times`, `set_modified` | `fs.rs:1115`, `:1215`, `:1262`, `:1271`; `sys/fs/unix.rs:1463-1466` (`ftruncate`), `:1553-1555` (`fchmod`), `:1617` (`futimens`) | `ftruncate.lo`: 77 / 46; `fchmod.lo`: 91 / 52; `utimensat.lo`: 280 / 88 | killed; refused |
+| `io::copy` between descriptors | `io/mod.rs:314` (re-exported from `alloc`'s io); `sys/io/kernel_copy/linux.rs:72-77` (the `File` specialization), `:295-332` (`copy_file_range`, then `sendfile` or `splice`), `:696-733` | `copy_file_range.lo`, `sendfile.lo`, `splice.lo` | killed; refused |
+| `is_terminal` (`IsTerminal`) | `io/stdio.rs:1250` (the trait), `:1265` (`File`, the std streams and their locks), `os/fd/owned.rs:254` (`BorrowedFd`, `OwnedFd`); `sys/io/is_terminal/isatty.rs:5`: `libc::isatty` | `isatty.lo`: `ioctl` (16 / 29) with `TIOCGWINSZ` (0x5413) | killed; refused by the post-seal tripwire (HE-002S PR review round 1, R1-2) |
+| `Debug` of a `File` | `fs.rs:1300` (std's `File` formats its inner file); `sys/fs/unix.rs:1771-1777`: `debug_path_fd` (`:286-315`), whose `get_path_from_fd` (`:317-322`) reads the link `/proc/self/fd/N` with `readlink` (`:1914`) | `readlink.lo`: 89 / 78 | killed. `gate-sys`'s `Dir` (`openat.rs:105`) and `effect-gate`'s `FileStores` (`file_store.rs:105`) derive `Debug` over a `File`; no non-test source formats one today. Not on the post-seal list: carried to HE-003 (no `{:?}` of either after the seal, or a `Debug` impl that does not format the `File`; R1-2) |
+| `try_clone` | `fs.rs:1177`; `sys/fd/unix.rs:654-656`; `os/fd/owned.rs:113-118`: `fcntl(F_DUPFD_CLOEXEC)` | | allowed |
+| HE-003: `connect_timeout`, AF_UNIX streams, `socketpair` | `sys/net/connection/socket/unix.rs:167-173` (`set_nonblocking` around `connect`, then `poll` at `:207`); `os/unix/net/stream.rs:112`, `:147`, `os/unix/net/listener.rs:75`, `:141` (`AF_UNIX`, `SOCK_STREAM`); `os/unix/net/stream.rs:177` and `sys/net/connection/socket/unix.rs:131`, `:135` (`socketpair`) | | killed (only AF_UNIX `SOCK_SEQPACKET` is granted); carried to HE-003 |
+| link hazard | | `pthread_create.lo` defines `__membarrier_init` WEAK; `membarrier.lo` defines it GLOBAL with `__membarrier` and a WEAK `membarrier`; no member references `membarrier` or `__membarrier` | absent unless something linked references them; HE-003's link check of the gate binary confirms it (HE-002S links no binary) |
+| `RUST_BACKTRACE` | `panic.rs:509-522` reads it; `panicking.rs:287-292` prints a backtrace through `backtrace_rs`; `library/backtrace/src/symbolize/gimli/parse_running_mmaps_unix.rs:48` opens `/proc/self/maps`, `libs_dl_iterate_phdr.rs:48`, `:77` call `current_exe`, `gimli.rs:193` opens the object | | a panic with it set dies by SIGSYS; HE-008's unit leaves it unset, T04 records the death signal |
+
+The post-seal tripwire refuses the rows marked refused above and nothing else: HE-002S DESIGN §5's list plus
+`set_modified` and `is_terminal`, over `effect-gate`, `gate-sys` and `i05-protocol`. Anything that list does not name
+is code review's and T04's; the Linux trace of the seal and of the steady state stays T04's.
+
+### Carried
+
+- HE-002C's R1-5 (a FIFO planted at a store name blocks `Dir::file`'s open until a writer appears) stays carried to
+  HE-003; `Dir::file_ro` sets `O_NONBLOCK` (Q-HE2S-11 (a)), so the signed configuration's read cannot wait on one.
+- HE-003: the call site (stage 1 first, only the configuration between the stages, stage 2, a distinct exit status on
+  any `SealError`), a source check that no socket or thread is created before `Sealed`, an allowance or another
+  mechanism for the exit if the binary crate joins the linked-source tripwire (D9), the refusal of a signed I04 port
+  below 1024 (Q-HE2S-9 (a)), the socket items above, the gate binary's link check for `__membarrier`, the
+  qualification of the broker without a ptrace-mode read (Q-HE2S-10 (a)), and `Debug` of a `File` (HE-002S PR review
+  round 1, R1-2): no `{:?}` of a `gate-sys` `Dir` or an `effect-gate` `FileStores` (or of anything holding one) after
+  the seal, or a `Debug` impl that does not format the `File`.
+- HE-008: the uid, an accepted start state, the SELinux self permissions (`capability { setpcap }`,
+  `process { setcap getcap setrlimit }`, and the status-file reads: `dir { search }` on `/proc` and the gate's own
+  directory, `lnk_file { read }` on the `self` link, `dir { open read }` on the directory and `file { open read
+  getattr }` on `status`; D2), no `process { setrlimit getrlimit }` on other domains, a `core_pattern` that is not a
+  pipe or a helper that honours `RLIMIT_CORE` 0, the gate kept dumpable, no systemd seccomp option and `RUST_BACKTRACE`
+  unset.
+- T04: for every thread `CapInh`, `CapPrm`, `CapEff`, `CapBnd` and `CapAmb` 0, `NoNewPrivs: 1`, `Seccomp: 2` and
+  `Seccomp_filters: 1`; the core limit 0/0; the installed filter equal to the published digest; SIGSYS on a refused
+  call, and no core from a seccomp kill or a panic; the broker's and the inspector's reads of the gate; only the
+  configuration's reads between the stages; the unit's start state; no AVC denial from the seal; the steady-state trace
+  inside the program; and the cross-process `prlimit64` reach denied by SELinux. Two host-test gaps are T04's too
+  (HE-002S PR review round 1, R1-7): gate-sys `seal.rs`'s own refusals (the `prctl` option allowlist, the filter length
+  check, the `capget` header check) are Linux-only and exercised only on Linux, since the host `cargo test` does not
+  compile the module; and `SealStep::Program` cannot be reached with the embedded programs, whose lengths are tested on
+  their own (`filter_length`), so no engine test reaches it.
+
+### Owner decisions (2026-10-13, via the lane monitor; quoted from HE-002S design revision 4, §11, §14, §15 and §18)
+
+- **Q-HE2S-1 = (a):** a harness-onion meta packet publishes the compiled seccomp programs as data files; its layer recompiles them with the pinned v3 compiler and checks them against the published digests; R10 vendors EFFECT_GATE's two files byte-identically, gate.py pins their sha256, and the seal embeds them.
+- **Q-HE2S-2 = (a), all 14:** a new small primary-lane meta packet publishes all 7 roles × 2 architectures plus edge registry record v2. It ALSO carries EDGE-2 (the R12 conformance-labs → harness-engineering edge record that rides the next registry-touching packet, owner A13) and W03-PLAN-AMEND-1 (the obligation-register amendment, owner Q-HE2B-2). HE-002S merges after it.
+- **Q-HE2S-3 = (a):** HE-002S does the source re-check of the Rust 1.99.0 std paths the gate uses after the seal, recorded in MODEL_DEFINED with source lines; the Linux trace stays with T04.
+- **Q-HE2S-4 = (a):** two-stage seal. Stage 1 before any input: core limit 0/0 with read-back, PR_SET_DUMPABLE 0, ambient cleared, bounding set and capset down to {CAP_SETPCAP, CAP_NET_BIND_SERVICE}. Between stages, only the signed configuration's read and check. Stage 2: drop to {kept}, no_new_privs, then the filter.
+- **Q-HE2S-5 = (a):** the seal checks "Threads: 1" in /proc/self/status before stage 1, with a reviewed start-up-lint exception limited to gate-sys's seal.rs and that one path; HE-003's source check and T04's per-thread checks stay.
+- **Q-HE2S-6 = (a):** download the official rust-src 1.99.0 component from static.rust-lang.org into the operator state dir and check it against the sha256 in the signed 1.99.0 channel manifest; operator-side evidence only, nothing enters R10. Conditions: unauthenticated HTTPS, a generic User-Agent, no personal data in any URL, header or UA, no token; record the URL, size, sha256 and manifest digest in a small manifest. Run it yourself, not via an agent, or with the PAUSE prefix if an agent runs it.
+- **Amendment scope = yes:** add SEC-4 and HI-7 (+HE-003 call site, +HE-008 uid, unit start state and SELinux self-permissions) and SEC-QW4 (+HE-002S steady-state re-check) to W03-PLAN-AMEND-1 in slot 232, then one more light contract review round before adoption.
+- **Q-HE2S-7 = (a) "Keep gate dumpable":** drop the PR_SET_DUMPABLE 0 step (amends Q-HE2S-4 (a)); keep the core limit at 0/0 with read-back. Carry to HE-008: core_pattern is not a pipe, or its helper honours RLIMIT_CORE 0. Carry to T04: a seccomp kill and a panic leave no core anywhere, and the broker's and inspector's reads of the gate succeed.
+- **Q-HE2S-8 = (a):** move no_new_privs into stage 1, and repeat the "Threads: 1" check at the start of stage 2; HE-003's source check also covers the code between the stages.
+- **C7 = use the existing copy:** skip the Q-HE2S-6 download and use HE-001's evidence copy tools/w03/he001/closure/evidence/rust-src-1.99.0.tar.xz (sha256 3f1f9b7e…, matching HE-001's evidence manifest; I re-checked it). Nothing is downloaded.
+- **Q-HE2S-9 = (a):** require a signed I04 port ≥ 1024, so `kept` is always empty and the gate holds no capability after the seal; HE-003's configuration check refuses a lower port. Reflect it in the slot-232 carry list and the HE-003 carry.
+- **Q-HE2S-10 = (a):** amend §4.3 so the gate qualifies the broker by label, cgroup, pidfd/start time and SO_PEERCRED; the broker's artifact identity comes from the observer's native-profile record (HE-004), not the gate's own /proc read. Carried to the HE-003 and HE-005 designs and to the §4.3 owner; the amendment vehicle is named later. Note: `architecture/host-interface-amendment*` is a parallel-lane ownedPath, so that packet needs my coordination. Don't create files there.
+- **D2 = carried note** in slot 232's status.json (an adoption-metadata edit, no round 5); HE-008 completes the /proc/self list.
+
+As built, Q-HE2S-7 (a) removed `PR_SET_DUMPABLE` from Q-HE2S-4 (a)'s stage 1, Q-HE2S-8 (a) moved `no_new_privs` into
+it, C7 replaced Q-HE2S-6 (a)'s download, and Q-HE2S-9 (a) narrowed stage 1's set; the design's consequence for §2,
+verbatim: "Stage 1 therefore reduces the bounding and permitted sets to {CAP_SETPCAP} ∩ start, stage 2 drops
+CAP_SETPCAP and leaves every set empty, and the API takes no `kept` value."
