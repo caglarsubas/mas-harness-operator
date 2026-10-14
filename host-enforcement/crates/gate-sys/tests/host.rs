@@ -11,9 +11,21 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::FileExt;
 use std::os::unix::fs::MetadataExt;
 use std::process::Command;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 
 use gate_sys::Dir;
 use gate_sys::FileMode;
+
+/// `flock` belongs to the open file description, and a child that a parallel test of this binary spawns holds a copy of
+/// every descriptor open at the spawn until its exec closes the close-on-exec ones, so for that moment it keeps a lock its
+/// holder has just closed. The lock test and the tests that spawn processes therefore take turns.
+static SPAWNS: Mutex<()> = Mutex::new(());
+
+/// This test's turn among the lock test and the spawning tests (a panicked holder does not poison the others).
+fn turn() -> MutexGuard<'static, ()> {
+    SPAWNS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 /// A fresh directory for one test.
 fn scratch(test: &str) -> String {
@@ -113,6 +125,7 @@ fn the_exclusive_create_falls_back_to_a_plain_open() {
 
 #[test]
 fn only_regular_files_are_store_files() {
+    let _turn = turn();
     let base = scratch("regular");
     let status = Command::new("/usr/bin/mkfifo").arg(format!("{base}/fifo")).status().expect("mkfifo runs");
     assert!(status.success(), "the FIFO was made");
@@ -127,6 +140,7 @@ fn only_regular_files_are_store_files() {
 
 #[test]
 fn store_descriptors_are_closed_on_exec() {
+    let _turn = turn();
     let base = scratch("cloexec");
     let directory = dir(&base);
     let (first, _) = directory.file("one", FileMode::CreateOrExisting).expect("one").expect("a file");
@@ -147,6 +161,7 @@ fn store_descriptors_are_closed_on_exec() {
 
 #[test]
 fn a_second_descriptor_cannot_take_the_lock() {
+    let _turn = turn();
     let base = scratch("lock");
     let directory = dir(&base);
     let (first, _) = directory.file("journal", FileMode::CreateOrExisting).expect("first").expect("a file");
