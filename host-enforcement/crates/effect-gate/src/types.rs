@@ -111,6 +111,9 @@ pub enum FatalReason {
     PeerChanged,
     /// R10-defined: the gate's own response would leave a schema bound (a sequence or counter past 2147483647).
     ResponseOutOfBounds,
+    /// R10-defined (HE-003A DESIGN §5.7, owner decision Q-HE3A-2 (b)): the gate could not answer a request within the
+    /// 2-second bound, so the answer was never sent.
+    AnswerLate,
 }
 
 impl FatalReason {
@@ -133,6 +136,7 @@ impl FatalReason {
             FatalReason::PeerLost => "PEER_LOST",
             FatalReason::PeerChanged => "PEER_CHANGED",
             FatalReason::ResponseOutOfBounds => "RESPONSE_OUT_OF_BOUNDS",
+            FatalReason::AnswerLate => "ANSWER_LATE",
         }
     }
 }

@@ -10,6 +10,7 @@
 //! stores open (and by tests). Every I/O error and every scan outcome is a value (R27).
 
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs::File;
 use std::io;
 use std::os::unix::fs::FileExt;
@@ -102,7 +103,6 @@ enum MarkerState {
 }
 
 /// The journal and marker files of one generation, opened by [`FileStores::open`].
-#[derive(Debug)]
 pub struct FileStores {
     generation: String,
     marker_dir: Dir,
@@ -117,6 +117,14 @@ pub struct FileStores {
     indexed_now: bool,
     journal_dir_syncs: u32,
     marker_dir_syncs: u32,
+}
+
+/// The type name and the generation only (HE-003A DESIGN §8): std's `Debug` of a `File` reads the descriptor's link in
+/// the proc filesystem, a call the EFFECT_GATE program kills, so no `File` (and no `Dir`) is formatted.
+impl fmt::Debug for FileStores {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("FileStores").field("generation", &self.generation).finish_non_exhaustive()
+    }
 }
 
 /// A whole-file scan: what it found, and whether every byte up to the file's length was read.

@@ -15,6 +15,10 @@
 //! HE-002C adds the durable constructors: `create` starts a new generation on file stores, and `open` is the process
 //! restart, which rebuilds the writes and the maintenance from the journal file exactly as GATE_RESTART does from the
 //! in-process journal (HE-002C DESIGN §8).
+//!
+//! HE-003A adds what the channel substrate reads (the base gate's `channel_state`, `bound_run` and
+//! `connection_open`, and `session_held`, `pending_write`; none changes any state) and the R10-defined
+//! `PolicyEvent::WAnswerLate` (HE-003A DESIGN §5.7); no existing event's answer changes.
 
 use std::collections::BTreeMap;
 
@@ -23,7 +27,7 @@ use i05_protocol::{decode_frame, frame, sha256, Datagram, FrameError, Schema, ZE
 
 use crate::config::{Config, ConfigError};
 use crate::file_store::FileStores;
-use crate::gate::{Event, EventError, FrameInput, Gate, GateError, Output, UpstreamResponse};
+use crate::gate::{BoundRun, ChannelState, Event, EventError, FrameInput, Gate, GateError, Output, UpstreamResponse};
 use crate::journal::{Entry, Record, WriteDetails};
 use crate::policy::{check_write, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
                     WriteOperation, WriteRequest};
@@ -113,6 +117,10 @@ pub enum PolicyEvent {
     WChannelLost,
     WPeerChanged,
     WUpstream { write_id: u16, outcome: UpstreamOutcome },
+    /// R10-defined (HE-003A DESIGN §5.7, owner decision Q-HE3A-2 (b)): the substrate did not send a synchronous answer
+    /// (MAINTENANCE_STATUS, WRITE_BEGIN, WRITE_END) because the 2-second bound had passed. The session ends FATAL with
+    /// `ANSWER_LATE` and the generation is HELD; without a session it answers `{}` (as W_PEER_CHANGED).
+    WAnswerLate,
 }
 
 /// Why a writer session ended fatally.
@@ -128,6 +136,8 @@ pub enum WriterFatal {
     PeerChanged,
     /// R13: the gate's response would leave the schema.
     ResponseOutOfBounds,
+    /// R10-defined (HE-003A DESIGN §5.7): a synchronous answer missed the 2-second bound and was not sent.
+    AnswerLate,
 }
 
 impl WriterFatal {
@@ -141,6 +151,7 @@ impl WriterFatal {
             WriterFatal::ChallengeMismatch => "CHALLENGE_MISMATCH",
             WriterFatal::PeerChanged => "PEER_CHANGED",
             WriterFatal::ResponseOutOfBounds => "RESPONSE_OUT_OF_BOUNDS",
+            WriterFatal::AnswerLate => FatalReason::AnswerLate.as_str(),
         }
     }
 }
@@ -444,6 +455,31 @@ impl PolicyGate {
         self.session.as_ref().map_or(ZERO_DIGEST, |session| session.last_digest.as_str())
     }
 
+    /// The base gate's channel state (read only; HE-003A DESIGN §5.1).
+    pub fn channel_state(&self) -> ChannelState {
+        self.gate.channel_state()
+    }
+
+    /// The base gate's bound execution and its expiry (read only; HE-003A DESIGN §5.1).
+    pub fn bound_run(&self) -> Option<BoundRun> {
+        self.gate.bound_run()
+    }
+
+    /// Whether the base gate holds the I04 connection `conn` open (read only; HE-003A DESIGN §6).
+    pub fn connection_open(&self, conn: &str) -> bool {
+        self.gate.connection_open(conn)
+    }
+
+    /// Whether a writer session exists, opened or not (read only; HE-003A DESIGN §5.1, §5.8).
+    pub fn session_held(&self) -> bool {
+        self.session.is_some()
+    }
+
+    /// The forwarded write awaiting its upstream outcome, if any (read only; HE-003A DESIGN §6).
+    pub fn pending_write(&self) -> Option<u16> {
+        self.pending.as_ref().map(|pending| pending.write_id)
+    }
+
     /// Applies one event (N7): an I05 event goes to the base gate (which settles its pending drain itself), with the
     /// I07 restart around GATE_RESTART; a writer event is handled here, then a pending I05 drain settles and its
     /// answer rides on this output. After either, the maintenance follows the fence.
@@ -472,6 +508,10 @@ impl PolicyGate {
             }
             PolicyEvent::WPeerChanged => {
                 let output = self.peer_changed();
+                self.with_drain(output)
+            }
+            PolicyEvent::WAnswerLate => {
+                let output = self.answer_late();
                 self.with_drain(output)
             }
         };
@@ -655,6 +695,20 @@ impl PolicyGate {
         self.gate.urgent(State::Held, Invalidation::WriterPeerDeviation);
         self.gate.set_state(State::Held);
         self.end_session(SessionEnd::Fatal, Some(WriterFatal::PeerChanged))
+    }
+
+    /// The gate missed the 2-second bound on a synchronous answer (HE-003A DESIGN §5.7, R10-defined), in N12's order:
+    /// abort the outstanding write (none on these answers; aborted as every other fatal session end aborts it), close
+    /// urgently toward HELD with the gate's own reason (`["INVALIDATED", "ANSWER_LATE", "HELD"]`, not
+    /// WRITER_PEER_DEVIATION), hold, end the session FATAL (and an owning session's maintenance).
+    fn answer_late(&mut self) -> PolicyOutput {
+        if self.session.is_none() {
+            return PolicyOutput::of(PolicyOutputKind::Empty);
+        }
+        self.abort_pending(AbortReason::WriterProtocolFailure);
+        self.gate.urgent(State::Held, Invalidation::Fatal(FatalReason::AnswerLate));
+        self.gate.set_state(State::Held);
+        self.end_session(SessionEnd::Fatal, Some(WriterFatal::AnswerLate))
     }
 
     /// One writer frame of the current session (N13): lockstep first, then the frame checks, direction, chain,

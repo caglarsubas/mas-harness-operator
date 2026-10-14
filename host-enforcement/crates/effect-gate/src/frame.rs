@@ -309,7 +309,7 @@ fn named<T: Copy>(value: &Value, candidates: &[T], name: impl Fn(T) -> &'static 
 const CLASSIFICATIONS: [Classification; 3] =
     [Classification::NotForwarded, Classification::DeliveredResult, Classification::IoAmbiguous];
 
-const FATAL_REASONS: [FatalReason; 17] = [
+const FATAL_REASONS: [FatalReason; 18] = [
     FatalReason::InvalidFrame(FrameError::F00),
     FatalReason::InvalidFrame(FrameError::F01),
     FatalReason::InvalidFrame(FrameError::F02),
@@ -327,6 +327,7 @@ const FATAL_REASONS: [FatalReason; 17] = [
     FatalReason::PeerLost,
     FatalReason::PeerChanged,
     FatalReason::ResponseOutOfBounds,
+    FatalReason::AnswerLate,
 ];
 
 const MAINTENANCE_ENDS: [MaintenanceEnd; 3] =

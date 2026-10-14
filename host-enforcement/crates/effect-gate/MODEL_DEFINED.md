@@ -1,4 +1,4 @@
-# HE-002, HE-002B, HE-002C and HE-002S: model-defined and R10-defined behaviour
+# HE-002, HE-002B, HE-002C, HE-002S and HE-003A: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -26,6 +26,12 @@ HE-002S adds the EFFECT_GATE process seal (`effect-gate`: `seal`; `gate-sys`: `s
 model defines a seal, so nothing in it is model-defined: its sequence, accepted start states and checks are R10's, from
 HE-002S design revision 4 with §18 and the owner decisions quoted in the HE-002S section at the end, which also records
 the Rust 1.99.0 and musl 1.2.5 re-check (owner decision Q-HE2S-3 (a)).
+
+HE-003A adds the effect gate's channel substrate (`effect-gate`: `substrate`, `peers`, `linux_os`; `gate-sys`:
+`channel.rs`, `peer_wire.rs`, `Dir::sub`) and two R10-defined events (`Event::AnswerLate`, `PolicyEvent::WAnswerLate`).
+No pinned model defines sockets, peer custody, the expiry clock or the answer bound, so nothing in HE-003A is
+model-defined: its rules are R31-R42 in the HE-003A section at the end, from HE-003A design revision 3 with its §16
+build amendment and the owner decisions quoted there. No existing event's answer changes.
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -480,3 +486,175 @@ As built, Q-HE2S-7 (a) removed `PR_SET_DUMPABLE` from Q-HE2S-4 (a)'s stage 1, Q-
 it, C7 replaced Q-HE2S-6 (a)'s download, and Q-HE2S-9 (a) narrowed stage 1's set; the design's consequence for §2,
 verbatim: "Stage 1 therefore reduces the bounding and permitted sets to {CAP_SETPCAP} ∩ start, stage 2 drops
 CAP_SETPCAP and leaves every set empty, and the API takes no `kept` value."
+
+## HE-003A: the channel substrate (`substrate`, `peers`, `linux_os`; crate `gate-sys`: `channel.rs`, `peer_wire.rs`)
+
+HE-003A (design revision 3 (sha256 `bc20dacc…`) with its §16 build amendment (sha256 `60e8d7da…`); design review
+round 2 PASS_FOR_BUILD) builds I05-6 (the AF_UNIX SOCK_SEQPACKET listener, one channel per generation, per-frame kernel
+custody, the 2-second answer bound), I07-5 (one writer session at a time on the maintenance socket, per-frame custody;
+I07 v1 Channel 4's 2-second bound on MAINTENANCE_STATUS, WRITE_BEGIN and WRITE_END), SEL-5 (setsockcreate) and the
+expiry clock (I05 Decision 9). It is a library: `Substrate<O: Os, I: I04Port, U: UpstreamPort>` over one `PolicyGate`,
+generic over the `Os` (the system calls and the two clocks) and over two ports through which HE-003B's I04 events and
+HE-003C's upstream events enter the same loop; `linux_os::LinuxOs` (Linux only) is the `Os` over gate-sys's `channel`
+module, and its constructor takes `&Sealed`. No binary links it yet (HE-003D), so the ten binaries and SBOMs are
+HE-002S's.
+
+### The loop, as built
+
+- **State** (§5.1). The substrate keeps only the connections it holds; the channel's state (`channel_state()`), the
+  bound execution and its expiry (`bound_run()`), whether a writer session exists (`session_held()`), the I04
+  connections' state (`connection_open()`) and the forwarded write (`pending_write()`) are read-only accessors of the
+  model. After every event a held connection the model no longer holds is closed.
+- **I05 connections** (§5.2): UNOPENED and none held: qualified (§4.2) and held, or a deviation before the first frame
+  (R31); UNOPENED and one pending: the new one is closed unfed; OPEN: `SecondChannel` (CHANNEL_EXISTS); CLOSED (also
+  after `PolicyGate::open`): `SecondChannel` (GENERATION_CHANNEL_USED). Each datagram: custody (§4.3), then the
+  expiry check and the I04 port's backlog drain, then `Frame(Bytes(..))` (a truncated datagram as its first 16,385
+  bytes; a zero-length one is a frame). `Eof` and any receive error are `ChannelLost`.
+- **Peers** (§4.1-§4.3, `peers.rs`, owner decision Q-HE3A-3 (a)): the broker is `system_u:system_r:planeon_broker_t:s0`
+  (selinux-matrix-v2 `domains[]`), uid 0 (spec §5.3), gid 0 (native-profile-v3's BROKER `gid` constant) and the cgroup
+  v2 line `0::/planeon.slice/planeon-capacity-broker.service/broker` (native-profile-v3's BROKER `cgroup.path` constant
+  without the cgroup filesystem's mount point; valid in the root cgroup namespace, HE-008); the writer is
+  `system_u:system_r:planeon_policy_writer_t:s0`, uid 0, its gid and cgroup recorded at accept. Qualification at
+  accept: SO_PEERCRED, SO_PEERSEC and SO_PEERPIDFD, then the peer's `/proc/<pid>` directory opened and read (`stat`
+  field 22, the whole `cgroup` file, `attr/current`), then the pidfd must not have fired; then the process label and
+  the socket label equal the expected label (one trailing NUL stripped), the uid, and for the broker the gid and the
+  cgroup line set. On every frame: exactly one SCM_CREDENTIALS and one SCM_SECURITY (no MSG_CTRUNC, nothing else), its
+  pid, uid and gid the qualified ones, its SCM_SECURITY byte-equal to the accept-time SO_PEERSEC bytes, the retained
+  directory's start time, cgroup (expected for the broker, recorded for the writer) and process label unchanged, and
+  the pidfd not fired. The control buffer is exactly `CMSG_SPACE(12) + CMSG_SPACE(L)` for the accept-time label length
+  L, so a descriptor-passing message after the two is never installed (MSG_CTRUNC, a deviation).
+- **The wake** (§5.6): the expiry, then the ports' due deadlines (the earlier port first); the I05 connection's
+  datagrams until it would block; the I07 connection's; the pidfds (I05 then I07: the connection's datagrams are read
+  first, and a connection still held whose process exited is a deviation); the ports' ready descriptors (I04 then
+  upstream); the listeners (I05 then I07); then the ports register. The wait's timeout is the earliest deadline, rounded
+  up to milliseconds, at most 1 second while an expiry is pending; EINTR is an empty wake.
+- **Expiry** (§5.6, owner decision Q-HE3A-5 (a)): the bound run's lifetime end (`Lifetimes`, run nonce to seconds
+  since the epoch) by the realtime clock, read at every check: at the start of every wake and right before any I05
+  frame or I04 request is fed, `Expire` first when the clock has reached it. After `Expire` the model's `expired` is
+  set and the deadline is gone (no spin); after `PolicyGate::open` the bound run and its expiry come from the journal's
+  rebuild, so an expiry that passed while the gate was down is fed at the first wake.
+- **Output tables** (§5.4): implemented as a `match` naming every `OutputKind` and `PolicyOutputKind` variant, so a new
+  variant fails the build; every output goes to the I04 port's `apply`, then the upstream port's, then both ports'
+  `sync` (with the `GateView` accessors). `RestartState` and `Restart` inside the loop stop it
+  (`LoopExit::UnexpectedOutput`).
+- **Exits** (§5.5): an `EventError` (the connection concerned closed first), a failed `accept4` other than EAGAIN or
+  ECONNABORTED, a failed poller call or registration, an unregistered token, and a port token past 56 bits return a
+  `LoopExit`; HE-003D exits the process with a distinct status, and the restart is deny-first.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R31 | A deviation before the first frame (at accept, or on the first datagram's custody, with the model's channel UNOPENED): the substrate feeds `PeerChanged`, which the model answers with nothing and which does not hold the generation, then `ChannelLost`, so `["CHANNEL_ENDED", "BEFORE_FIRST_FRAME"]` is journalled (output `{"channelEnd": "UNUSED"}`), the channel is CLOSED, the generation's state is kept and no later connection is accepted (the generation's one channel is used, as for a connection that ends before its first frame, T86) | DESIGN §5.3; owner decision Q-HE3A-4 (a) |
+| R32 | An I07 writer connection that fails qualification at accept is closed without feeding the model (no `WConnect`, no session, nothing journalled). Sessions are one at a time, not one per generation, so a qualified writer may connect later | DESIGN §5.3, §5.8; Q-HE3A-4 (a) |
+| R33 | ANSWER_LATE (I05): an answer is measured on the monotonic clock from the `recvmsg` that returned its request to its send and is never sent once 2 seconds have passed; the substrate feeds `Event::AnswerLate`, which on an OPEN channel closes it fatally with `ANSWER_LATE`: HELD in every state (an orderly CLOSED or INVALIDATED generation too, never the broker's orderly end), journalled `["INVALIDATED", "ANSWER_LATE", "HELD"]`, armed actions denied (as R1). On a channel that is not OPEN it is an `EventError` (R3's rule), which the substrate never feeds. Residual (not closed): the time a datagram waits in the socket queue before `recvmsg` is not counted; T04 measures the bound under load | DESIGN §5.7; owner decision Q-HE3A-2 (b) |
+| R34 | ANSWER_LATE (I07): the answers to MAINTENANCE_STATUS, WRITE_BEGIN and WRITE_END (read from the response frame's `operation`; a frame the substrate cannot read is bounded too) carry the bound; a WRITE_OBJECT answer (a refusal, or the deferred outcome) does not (the write bound is the upstream port's). A late one is never sent; `PolicyEvent::WAnswerLate` then, in N12's order: the outstanding write aborted (none on these answers; with `WRITER_PROTOCOL_FAILURE`, as every other fatal session end aborts it), `INVALIDATED` with the gate's own reason (`["INVALIDATED", "ANSWER_LATE", "HELD"]`, not WRITER_PEER_DEVIATION), the generation HELD, `["WRITER_SESSION_ENDED", "FATAL"]` and, for an owning session whose maintenance has not ended, `MAINT_ENDED` `SESSION_FATAL`; output `{"sessionEnd": "FATAL", "maintenance": .., "fatal": "ANSWER_LATE"}` (`WriterFatal::AnswerLate`). Without a session it answers `{}` (as W_PEER_CHANGED) | DESIGN §5.7, B4; Q-HE3A-2 (b) |
+| R35 | A failed send (B1): EAGAIN (under lockstep a full buffer means the peer stopped reading), EPIPE, ECONNRESET or any other errno is a peer failure; the answer is never retried: the connection is closed and `ChannelLost` (PEER_LOST and HELD outside an orderly state, `CHANNEL_ENDED ORDERLY` in one) or `WChannelLost` (the session ENDED) is fed. `MSG_NOSIGNAL` is set (std already ignores SIGPIPE) | DESIGN §3, §12 B1 |
+| R36 | The liveness argument (A6): SO_PEERPIDFD gives a pidfd for the struct pid the kernel recorded at `connect`, with no window between the credentials and the pidfd; the `/proc/<pid>` directory opened by number names whatever process held that number at the open; the pidfd not having fired after the open proves the recorded process was still alive then, so the directory is that process's, and it stays bound to it (after the process is reaped, reads through it fail and never reach a process that reused the number). A frame read after its sender exited therefore fails the retained directory's reads (once the sender is reaped) or the pidfd probe (the pidfd fires at the exit), whatever pid its credentials carry, even the qualified number reused by another process (the argument does not rely on the pid the kernel reports for an exited sender; T04 may confirm the reported value): a broker that exits with a frame unread ends the channel fatally, never orderly (under lockstep it never does). A pidfd `ppoll` error, POLLERR or POLLNVAL counts as an exit (a deviation) | DESIGN §3, §4.2, §4.3 |
+| R37 | The I07 custody gap: until the writer's executable check lands (owner decisions Q-HE3A-1 (c) and Q-HE3A-1b (a), below; decided, open), the writer is bound by the per-frame process label, cgroup, pidfd and start time, SO_PEERCRED and the per-frame credentials, while I07 v1 Channel 2 names the enrolled artefact. No HE-003A code reads a peer's executable | DESIGN §1, §4.3 |
+| R38 | `Debug` and descriptors: `gate-sys`'s `Dir` and `effect-gate`'s `FileStores` have manual `Debug` impls (the type name; for `FileStores` also the generation), and `Listener`, `Conn`, `PidFd`, `Poller`, `ProcDir` and `SockCreate` print their type name only. `tools/gate.py` refuses `derive(Debug)` (also under `cfg_attr`) on a struct or enum of the linked crates whose field types mention `File`, `Dir`, `FileStores`, `Conn`, `Listener`, `Poller`, `PidFd` or `ProcDir` (field and variant names are not types); manual impls, direct formatting (`{:?}`, `expect_err`, `assert_eq!`) and a derived generic type instantiated with a hazard type (`#[derive(Debug)] struct Wrap<T> { inner: T }` used as `Wrap<File>`) are code review's | DESIGN §8, A10 |
+| R39 | Refused by the linked-source tripwire: a top-level std group or glob (`std::{..}`, `std::*`) and a nested std glob (`std::…::*`, as `std::io::prelude::*`), with the renames and the globs through a name imported from std (HE-002S PR review R1-2 and R2-1). Left to code review, besides the forms listed in the HE-002C and HE-002S sections: type aliases (`type F = File;`, for the `Debug` rule too) and qualified paths such as `<T>::f` (HE-002C PR review round 3, R3-3) | DESIGN §8 |
+| R40 | musl's `accept4` falls back to the killed `accept` on EINVAL or ENOSYS (`accept4.lo`), so the gate issues `accept4` through `syscall` (288 on x86_64, 242 on aarch64) and never calls musl's `accept4`; musl's `socket` retries without the flags and then uses `fcntl` (allowed), and `epoll_pwait` falls back to `epoll_wait` only on ENOSYS (A14) | DESIGN §2, §3 |
+| R41 | A bound run with no lifetime in the `Lifetimes` input, and a realtime clock that cannot be read, expire at once (`Expire` at the next check; fail closed). A backward step of the realtime clock never fires the expiry early, a forward step is acted on within the 1-second cap and before the next frame or request | DESIGN §5.6 |
+| R42 | The journal file's decoder (`frame.rs`) knows `ANSWER_LATE` among the fatal reasons, so `["INVALIDATED", "ANSWER_LATE", "HELD"]` reads back as written after a process restart (not TORN), the restart is HELD, the state the record names, and the reopened journal's digest equals the one before the restart. `frame.rs` joined HE-003A's paths for this (the design's path list was amended after the build) | DESIGN §10 (amended) |
+
+### Code and audit
+
+- `gate-sys/src/channel.rs` (Linux only; with `openat.rs` and `seal.rs` the only places of the workspace that may hold
+  `unsafe`): one private `unsafe extern "C"` block declaring exactly `socket`, `bind`, `listen`, `setsockopt`,
+  `getsockopt`, `recvmsg`, `sendmsg`, `epoll_create1`, `epoll_ctl`, `epoll_pwait`, `ppoll` and `syscall`; each call in
+  its own `unsafe` block with its own `// SAFETY:` argument behind the safe functions `SockCreate::set` and `clear`,
+  `listen_seqpacket`, `accept`, `peer`, `ProcDir::open` and `read`, `PidFd::exited`, `recv`, `send` and `Poller`'s
+  `new`, `add`, `modify`, `delete` and `wait`. The sockcreate context is written with its trailing NUL in one `write`
+  and cleared by one zero-length `File::write` (a guard clears on drop; an explicit `clear` reports a failure, which
+  fails the listener). Compile-time size, alignment and offset asserts cover `sockaddr_un` (110/2), `ucred` (12/4),
+  `iovec` (16/8), musl's `msghdr` (56/8; `msg_iovlen` at 24 and `msg_controllen` at 40, each 32-bit with padding),
+  `epoll_event` (12/1 packed, data at 4, on x86_64; 16/8, data at 8, on aarch64), `pollfd` (8/4) and `timespec`
+  (16/8), checked by both musl release builds. `gate-sys/src/peer_wire.rs` (portable, no `unsafe`) holds the control
+  parser, the label rule, the `stat` and cgroup parsers and the buffer sizes, host-tested with fixed byte vectors.
+- `Dir::file` opens `O_RDWR|O_CLOEXEC|O_NOFOLLOW|O_NONBLOCK|O_NOCTTY` (owner decision Q-HE3-4 (a); HE-002C's R1-5 is
+  closed): `O_NOCTTY` keeps the gate, a session leader under systemd, from acquiring a controlling terminal through a
+  terminal node planted at a store name, and `O_NONBLOCK` keeps an open of a device node from waiting; neither changes
+  `pread`, `pwrite`, `fsync` or `flock` on a regular file, and the regular-file check refuses anything else. The host
+  tests pin the values and bits; the behaviour is T04's. `Dir::sub(name)` opens one directory component
+  (`O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW`) with the store-name check.
+- `tools/gate.py`: `channel.rs` joins the files allowed `unsafe` and has its foreign-symbol allowlist (the twelve
+  above); the `std::os::fd` items are allowed in `openat.rs` and `channel.rs` only (effect-gate holds gate-sys's opaque
+  types and names no descriptor); the start-up lint's exceptions are a per-file list of exact expressions, each removed
+  once (`seal.rs`: the status read; `channel.rs`: `Dir::at("/proc/thread-self/attr")` and
+  `Dir::at(&format!("/proc/{}", pid))`), so every other new file and its tests say "the proc filesystem" or "the cgroup
+  filesystem"; the `derive(Debug)` rule of R38; and HE-002C PR review round 3's R3-2 (1)-(4): every workspace member is
+  `crates/<name>`, `crates` is not a symlink, the crates effect-gate links (its path dependencies, transitively, with
+  itself) are exactly effect-gate, gate-sys and i05-protocol, and the workspace edition is 2024 and every member
+  inherits it (the unsafe tripwire relies on edition 2024's `unsafe extern` and `#[unsafe(no_mangle)]`), with no
+  target table of a member manifest (`[lib]`, `[[bin]]`, `[[test]]`, `[[bench]]`, `[[example]]`) giving its own
+  edition (HE-003A PR review round 1, R1-1). The contract table stays at 15 files.
+- Departures from the design, besides R42: the `Os` trait has no random source (DESIGN §5 lists `getrandom` among what
+  it wraps, but no substrate decision needs randomness: `WConnect`'s challenge is unused by the model); and a port
+  registers its descriptors through `SourceId`s its `Os` gives it, since HE-003A's ports are the tests' fakes (the
+  Linux `Os` refuses every port registration until HE-003B and HE-003C add their sources).
+
+### Constants and their evidence (for T04)
+
+From the pinned musl 1.2.5 `libc.a` (x86_64 sha256 `e699c64b…`, aarch64 `b03473b6…`), where its code shows the value
+(llvm-objdump of the named members):
+
+| Constant | x86_64 / aarch64 | Evidence |
+|---|---|---|
+| `accept4` system call | 288 / 242 | `accept4.lo` passes it to `__syscall_cp`, and falls back to `accept` on EINVAL or ENOSYS |
+| `AF_UNIX` | 1 | `syslog.lo` (`__openlog`) calls `socket(1, 0x80002, 0)` |
+| `SOCK_CLOEXEC`, `SOCK_NONBLOCK` (= `EPOLL_CLOEXEC`, `O_NONBLOCK`) | 0x80000, 0x800 | `socket.lo` and `accept4.lo` test exactly these bits (mask 0x80800) before their `fcntl(F_SETFD, FD_CLOEXEC)` and `fcntl(F_SETFL, 2048)` fallbacks |
+| `MSG_NOSIGNAL` | 0x4000 | `res_msend.lo` passes 16384 to `sendto` and `sendmsg` |
+| `MSG_DONTWAIT` | 0x40 | `netlink.lo` passes 64 to `recv` |
+| `POLLNVAL` | 0x20 | `__libc_start_main.lo` (`__init_libc`) tests bit 5 of `revents` at offset 6 of `struct pollfd` |
+| `O_NOCTTY` (`Dir::file`) | 0o400 (macOS 0x20000, SDK `sys/fcntl.h`) | `openpty.lo` opens the multiplexer with `O_RDWR|O_NOCTTY` = 0x102 |
+| `struct msghdr` padding | offsets 28 and 44 | `recvmsg.lo` and `sendmsg.lo` zero them in their copy (and `sendmsg.lo` each `cmsghdr`'s padding at offset 4) |
+| other system calls | `socket` 41 / 198, `bind` 49 / 200, `listen` 50 / 201, `setsockopt` 54 / 208, `getsockopt` 55 / 209, `recvmsg` 47 / 212, `sendmsg` 46 / 211, `epoll_create1` 291 / 20, `epoll_ctl` 233 / 21, `epoll_pwait` 281 / 22, `ppoll` 271 / 73 | the wrappers' immediates (for T04 and the EFFECT_GATE filter; the code names none of them) |
+
+From the kernel UAPI (the code shows none of them; T04 confirms): `SOCK_SEQPACKET` 5 (`linux/net.h`); `SOL_SOCKET` 1,
+`SO_PASSCRED` 16, `SO_PEERCRED` 17, `SO_PEERSEC` 31, `SO_PASSSEC` 34, `SO_PEERPIDFD` 77 (asm-generic `socket.h`, used by
+both architectures; SO_PEERPIDFD needs Linux 6.5); `SCM_RIGHTS` 1, `SCM_CREDENTIALS` 2, `SCM_SECURITY` 3, `MSG_CTRUNC`
+0x8, `MSG_TRUNC` 0x20, `MSG_CMSG_CLOEXEC` 0x40000000 (`linux/socket.h`); `EPOLL_CLOEXEC` 0x80000 (`linux/eventpoll.h`,
+`O_CLOEXEC`), `EPOLL_CTL_ADD` 1, `EPOLL_CTL_DEL` 2, `EPOLL_CTL_MOD` 3, `EPOLLIN` 0x1, `EPOLLOUT` 0x4, `EPOLLERR` 0x8,
+`EPOLLHUP` 0x10 (`linux/eventpoll.h`); `POLLIN` 0x1, `POLLERR` 0x8 (asm-generic `poll.h`). `struct epoll_event` is
+packed on x86_64 only (the kernel's `EPOLL_PACKED`, musl's `__packed__`). `AT_FDCWD` is not used by `channel.rs`. The
+socket contexts are `system_u:object_r:planeon_i05_socket_t:s0` and `system_u:object_r:planeon_i07_socket_t:s0`, the
+paths `/run/planeon/live-proxy/effect-admission.sock` and `/run/planeon/maintenance/policy-write.sock` (contract
+candidates).
+
+### Carried
+
+- HE-003D: one `PolicyGate` per process and a new generation only in a new process (R30's precondition); the production
+  journal and marker directories; the process exit on a `LoopExit`; the mutual qualification record and how
+  `peerQualificationDigest` relates to the identity the substrate keeps (`QualifiedIdentity`, §4.4); the `Lifetimes`
+  input from the gate's own copy of the signed capacity inputs, with a configuration refused when a run has none. A
+  standing duty (R42, built here): every later `FatalReason` joins `frame.rs`'s fatal-reason table (`FATAL_REASONS`).
+- The writer's executable check (Q-HE3A-1 (c), Q-HE3A-1b (a); decided, open), after the chain the owner set: (1) a
+  seccomp allowlist amendment adding the call to EFFECT_GATE with a first argument other than `AT_FDCWD` only (parallel
+  lane, with or after the slot-234 §4.3 amendment); (2) republished EFFECT_GATE programs and edge record v3 (primary
+  lane); (3) the R10 re-vendor and the check itself (HE-003D or HE-003A2). HE-007's obligations for it: (a) the writer's
+  real, effective and saved uid and gid are 0; (b) it stays dumpable at every frame; (c) its permitted capability set is
+  empty before it connects.
+- HE-008: empty runtime directories at every start (`RuntimeDirectory=planeon/live-proxy planeon/maintenance`,
+  `RuntimeDirectoryMode=0700`, `RuntimeDirectoryPreserve=no`, both `planeon_run_t`), `UMask=0177`, no private cgroup
+  namespace for the gate's unit; the gate's own proc entries for its sockcreate attribute and `process setsockcreate`;
+  the socket permissions on `planeon_i05_socket_t` and `planeon_i07_socket_t` and the two socket files' types; the
+  peer reads (`process getattr` on `planeon_broker_t` and `planeon_policy_writer_t`, `attr/current` included) and
+  whether the ignored ptrace-mode read check on that open is audited.
+- T04: the listeners' labels as seen through SO_PEERSEC from a client and their 0600 mode; the real broker's and
+  writer's custody; SCM_CREDENTIALS and SCM_SECURITY on every datagram (a zero-length one too); SO_PEERPIDFD;
+  reading `attr/current` of the broker and the writer (no ptrace-mode check blocks it); an exec'd holder detected by
+  the process label; the pidfd on exit; a refused second connection; the 2-second bound under load; a restart after a
+  crash (empty runtime directories); the constants above; and that no killed call is reached (the steady-state trace).
+
+### Owner decisions (2026-10-14, owner via the lane monitor; quoted from HE-003A design revision 3, §13)
+
+- Q-HE3A-1 = (c) "readlink exe": the gate checks the I07 writer's executable by readlink of /proc/<pid>/exe. This was NOT your recommendation, and it needs a seccomp amendment: EFFECT_GATE's v3 program kills readlink, `architecture/seccomp*` is a parallel-lane path, and the compiled EFFECT_GATE programs from slot 232 would have to be recompiled, republished and re-vendored. Before folding it in, please check feasibility and send me: (1) the exact amendment chain (which packets, which lane, in what order, and whether it gates HE-003A's merge); (2) whether the readlink can succeed at all under the ptrace capability-subset rule (HE-002S D1). The sealed gate holds no capability (Q-HE2S-9), so if harness-policy-write's permitted set is non-empty, /proc/<pid>/exe is unreadable whatever seccomp allows. If (2) makes (c) infeasible, I'll take that back to the owner with the facts. Don't switch options on your own.
+- Q-HE3A-2 = (b): new R10-defined fatal ANSWER_LATE; never sent late; the generation is HELD in every state; journalled as the gate's own failure.
+- Q-HE3A-3 = (a): cited R10 constants (matrix-v2 labels, native-profile-v3 broker-leaf constant, spec §5.3 uids), passed as an argument so a signed or HE-004 source can replace them; T04 confirms them.
+- Q-HE3A-4 = (a): a pre-first-frame deviation uses the one channel: PeerChanged then ChannelLost, CHANNEL_ENDED UNUSED, no reconnect, disclosed in MODEL_DEFINED; an I07 writer failing qualification at accept is closed without a session.
+- Q-HE3A-5 = (a): a separate substrate input (run nonce → signed lifetime end) built by HE-003D from the signed capacity inputs, with one per run required.
+
+"Fold Q-HE3A-2..5 into rev 2 now; hold Q-HE3A-1's part until (1) and (2) are answered."
+
+- Q-HE3A-1b = (a) "No, merge HE-003A first". HE-003A merges with the writer bound by the per-frame process label, cgroup, pidfd and start time, SO_PEERCRED and per-frame credentials. The Q-HE3A-1 (c) exe check (readlinkat on the retained /proc/<pid> dir fd, "exe") is recorded as decided but open, and lands in the R10 packet after the chain. No readlinkat code goes into HE-003A. Record it verbatim and dated, and carry: the chain: (1) a seccomp allowlist amendment adding readlinkat to EFFECT_GATE (parallel lane, with or after the slot-234 §4.3 amendment that states the duty); (2) republished EFFECT_GATE programs plus edge record v3 (your lane); (3) the R10 re-vendor plus the writer exe check (HE-003D or HE-003A2); HE-007 obligations a-c: writer real/effective/saved uid and gid all 0; dumpable kept; permitted set empty before connect. T04 confirms. (2026-10-14, owner via the lane monitor.)
