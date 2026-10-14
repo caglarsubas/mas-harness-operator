@@ -21,6 +21,16 @@
     "path": "/Library/Developer/CommandLineTools",
     "clang": "Apple clang version 14.0.3 (clang-1403.0.22.14.1)",
     "sdk": "13.3",
-    "reason": "Host dependency outside the profile's inventories (owner decision Q-HE2): cargo test links the aarch64-apple-darwin test binaries with the system linker. A missing path fails the gate; a different version is printed, not failed."
+    "reason": "Host dependency outside the profile's inventories (owner decision Q-HE2): cargo test links the aarch64-apple-darwin test binaries with the system linker, and HE-003B's ring C and assembly in the effect gate are compiled by this clang (owner decision Q-HE3B-3 (a)), so a missing path or a different clang --version first line or SDK version fails the gate."
+  },
+  "cToolchain": {
+    "compiler": "/Library/Developer/CommandLineTools/usr/bin/clang",
+    "archiver": "/Library/Developer/CommandLineTools/usr/bin/ar",
+    "cflags": {
+      "x86_64-unknown-linux-musl": "-nostdlibinc -ffreestanding -DRING_CORE_NOSTDLIBINC=1",
+      "aarch64-unknown-linux-musl": ""
+    },
+    "reason": "ring 0.17.14's C and pregenerated assembly for both musl targets are compiled by the Command Line Tools' clang and archived by its ar, set through the repository's .cargo/config.toml [env] (each forced); on x86_64 the flag line turns on ring's own no-libc-headers mode, which ring enables by itself on aarch64-musl. The darwin host build of ring keeps cc's default compiler (/usr/bin/cc, the same Command Line Tools through xcode-select). The gate derives the cargo config's [env] from this entry.",
+    "ownerDecisions": ["Q-HE3B-3 (a): Command Line Tools clang 14.0.3 plus ar through the repository's [env], with a failing version pin in toolchain.json and the gate (2026-10-14)", "Q-HE3B-4 (a): the x86_64 no-libc-headers flag line (2026-10-14)", "Q-HE3B-23 (a): [profile.release.build-override] strip = none; the darwin build keeps /usr/bin/cc, xcode-select and the first cc and ar on PATH checked (2026-10-14)"]
   }
 }

@@ -3,8 +3,9 @@
 //! HE-003D's source check (design review round 1, A17). Every descriptor stays inside gate-sys's opaque types, held
 //! here per connection and closed by drop; effect-gate names no descriptor.
 //!
-//! HE-003A's ports have no Linux sources (HE-003B and HE-003C add theirs), so the port side of the poller refuses
-//! every request, which stops the loop (fail closed).
+//! HE-003A's ports have no Linux sources, so `LinuxOs::new` refuses every port request, which stops the loop (fail
+//! closed). HE-003B (DESIGN §4.1) adds `LinuxOs::with_net`: the port side of the poller looks the source up in the
+//! shared stream table (`linux_net`), refuses one another owner holds, and watches its `TcpListener` or `TcpConn`.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -15,6 +16,7 @@ use std::time::UNIX_EPOCH;
 use gate_sys::channel::{Conn, ListenError, Listener, PidFd, Poller, ProcDir, Recv, Watched};
 use gate_sys::peer_wire::FRAME_BUFFER_BYTES;
 
+use crate::linux_net::SharedNet;
 use crate::peers::ListenerPlan;
 use crate::seal::Sealed;
 use crate::substrate::{ConnId, Interest, Listen, Os, OsFailure, Owner, PeerCredentials, PortPoll, ProcIdentity,
@@ -41,6 +43,8 @@ pub struct LinuxOs {
     i07: Listener,
     slots: BTreeMap<u64, Slot>,
     next: u64,
+    /// The stream table the ports' sources live in (`with_net`); `None` refuses every port request.
+    net: Option<SharedNet>,
 }
 
 /// Every watch of the substrate's own descriptors is for reading.
@@ -57,21 +61,44 @@ impl LinuxOs {
         };
         let i05 = listen(Listen::I05, i05)?;
         let i07 = listen(Listen::I07, i07)?;
-        Ok(LinuxOs { poller, i05, i07, slots: BTreeMap::new(), next: 1 })
+        Ok(LinuxOs { poller, i05, i07, slots: BTreeMap::new(), next: 1, net: None })
+    }
+
+    /// As [`LinuxOs::new`], with the ports' sources resolved through the shared stream table `net` (HE-003B DESIGN
+    /// §4.1, §4.4).
+    pub fn with_net(sealed: &Sealed, i05: &ListenerPlan, i07: &ListenerPlan, net: SharedNet) -> Result<LinuxOs, SetupError> {
+        let mut os = LinuxOs::new(sealed, i05, i07)?;
+        os.net = Some(net);
+        Ok(os)
+    }
+
+    /// One poller request for a port's source: the table borrowed, the source owned by `owner`, then `request`.
+    fn port_request(&self, owner: Owner, source: SourceId,
+                    request: impl FnOnce(&Poller, Watched<'_>) -> io::Result<()>) -> bool {
+        let Some(net) = self.net.as_ref() else { return false };
+        let Ok(table) = net.try_borrow() else { return false };
+        match table.watched(owner, source) {
+            Some(watched) => request(&self.poller, watched).is_ok(),
+            None => false,
+        }
     }
 }
 
+fn interest_of(interest: Interest) -> gate_sys::channel::Interest {
+    gate_sys::channel::Interest { readable: interest.readable, writable: interest.writable }
+}
+
 impl PortPoll for LinuxOs {
-    fn port_add(&mut self, _owner: Owner, _source: SourceId, _token: u64, _interest: Interest) -> bool {
-        false
+    fn port_add(&mut self, owner: Owner, source: SourceId, token: u64, interest: Interest) -> bool {
+        self.port_request(owner, source, |poller, watched| poller.add(watched, token, interest_of(interest)))
     }
 
-    fn port_modify(&mut self, _owner: Owner, _source: SourceId, _token: u64, _interest: Interest) -> bool {
-        false
+    fn port_modify(&mut self, owner: Owner, source: SourceId, token: u64, interest: Interest) -> bool {
+        self.port_request(owner, source, |poller, watched| poller.modify(watched, token, interest_of(interest)))
     }
 
-    fn port_delete(&mut self, _owner: Owner, _source: SourceId) -> bool {
-        false
+    fn port_delete(&mut self, owner: Owner, source: SourceId) -> bool {
+        self.port_request(owner, source, |poller, watched| poller.delete(watched))
     }
 }
 

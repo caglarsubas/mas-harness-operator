@@ -4,18 +4,24 @@
 //! behind safe functions that effect-gate's seal plan drives. HE-003A (DESIGN §3) adds the channel substrate's raw
 //! calls in `channel` (Linux only: the AF_UNIX SOCK_SEQPACKET listeners, accept, peer credentials, the proc
 //! filesystem's identity reads, pidfd probes, datagrams and the poller) and their portable byte parsers in
-//! `peer_wire`. Std only, no build script.
+//! `peer_wire`. HE-003B (DESIGN §3) adds the I04 listener's raw calls in `tcp` (Linux only: the TCP listener, accept,
+//! receive, send and the write-side shutdown) and the portable literal-address parser in `inet`. Std only, no build
+//! script.
 //!
-//! The crate root denies `unsafe_code`; `openat.rs`, `seal.rs` and `channel.rs` alone opt out, and `tools/gate.py`
-//! checks that they are the only places in the workspace that may, and which foreign symbols each declares.
+//! The crate root denies `unsafe_code`; `openat.rs`, `seal.rs`, `channel.rs` and `tcp.rs` alone opt out, and
+//! `tools/gate.py` checks that they are the only places in the workspace that may, and which foreign symbols each
+//! declares.
 #![deny(unsafe_code)]
 
 #[cfg(target_os = "linux")]
 pub mod channel;
+pub mod inet;
 pub mod openat;
 pub mod peer_wire;
 #[cfg(target_os = "linux")]
 pub mod seal;
+#[cfg(target_os = "linux")]
+pub mod tcp;
 
 pub use openat::Dir;
 pub use openat::FileMode;

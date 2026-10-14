@@ -9,3 +9,16 @@ rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"
 [target.aarch64-unknown-linux-musl]
 linker = "host-enforcement/tools/rust-lld"
 rustflags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "host-enforcement/vendor"
+
+[env]
+CC_x86_64_unknown_linux_musl = { value = "/Library/Developer/CommandLineTools/usr/bin/clang", force = true }
+CC_aarch64_unknown_linux_musl = { value = "/Library/Developer/CommandLineTools/usr/bin/clang", force = true }
+AR_x86_64_unknown_linux_musl = { value = "/Library/Developer/CommandLineTools/usr/bin/ar", force = true }
+AR_aarch64_unknown_linux_musl = { value = "/Library/Developer/CommandLineTools/usr/bin/ar", force = true }
+CFLAGS_x86_64_unknown_linux_musl = { value = "-nostdlibinc -ffreestanding -DRING_CORE_NOSTDLIBINC=1", force = true }

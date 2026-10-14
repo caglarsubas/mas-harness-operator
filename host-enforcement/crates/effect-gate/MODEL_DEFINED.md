@@ -1,4 +1,4 @@
-# HE-002, HE-002B, HE-002C, HE-002S and HE-003A: model-defined and R10-defined behaviour
+# HE-002, HE-002B, HE-002C, HE-002S, HE-003A and HE-003B: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -32,6 +32,12 @@ HE-003A adds the effect gate's channel substrate (`effect-gate`: `substrate`, `p
 No pinned model defines sockets, peer custody, the expiry clock or the answer bound, so nothing in HE-003A is
 model-defined: its rules are R31-R42 in the HE-003A section at the end, from HE-003A design revision 3 with its §16
 build amendment and the owner decisions quoted there. No existing event's answer changes.
+
+HE-003B adds the effect gate's I04 server (the new crate `gate-tls`; `effect-gate`: `net`, `linux_net`,
+`Event::Disconnect`, `Port::failure`, `LoopExit::Port`; `gate-sys`: `tcp.rs`, `inet.rs`) and vendors the TLS stack. No
+pinned model defines TLS, HTTP framing or sockets, so nothing in HE-003B is model-defined: its rules are R43-R58 in the
+HE-003B section at the end, from HE-003B's design (revision 3 with its build amendments §17-§20) and the owner decisions
+quoted there. No existing event's answer changes.
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -556,7 +562,7 @@ HE-002S's.
 | R39 | Refused by the linked-source tripwire: a top-level std group or glob (`std::{..}`, `std::*`) and a nested std glob (`std::…::*`, as `std::io::prelude::*`), with the renames and the globs through a name imported from std (HE-002S PR review R1-2 and R2-1). Left to code review, besides the forms listed in the HE-002C and HE-002S sections: type aliases (`type F = File;`, for the `Debug` rule too) and qualified paths such as `<T>::f` (HE-002C PR review round 3, R3-3) | DESIGN §8 |
 | R40 | musl's `accept4` falls back to the killed `accept` on EINVAL or ENOSYS (`accept4.lo`), so the gate issues `accept4` through `syscall` (288 on x86_64, 242 on aarch64) and never calls musl's `accept4`; musl's `socket` retries without the flags and then uses `fcntl` (allowed), and `epoll_pwait` falls back to `epoll_wait` only on ENOSYS (A14) | DESIGN §2, §3 |
 | R41 | A bound run with no lifetime in the `Lifetimes` input, and a realtime clock that cannot be read, expire at once (`Expire` at the next check; fail closed). A backward step of the realtime clock never fires the expiry early, a forward step is acted on within the 1-second cap and before the next frame or request | DESIGN §5.6 |
-| R42 | The journal file's decoder (`frame.rs`) knows `ANSWER_LATE` among the fatal reasons, so `["INVALIDATED", "ANSWER_LATE", "HELD"]` reads back as written after a process restart (not TORN), the restart is HELD, the state the record names, and the reopened journal's digest equals the one before the restart. `frame.rs` joined HE-003A's paths for this (the design's path list was amended after the build) | DESIGN §10 (amended) |
+| R42 | The journal file's decoder (`frame.rs`) knows `ANSWER_LATE` among the fatal reasons, so `["INVALIDATED", "ANSWER_LATE", "HELD"]` reads back as written after a process restart (not TORN), the restart is HELD, the state the record names, and the reopened journal's digest, over the records before the restart's own RESTARTED record, equals the digest before the restart (reworded by HE-003B: HE-003A PR review round 3, R3-1; `tests/answer_late.rs` digests the records before RESTARTED). `frame.rs` joined HE-003A's paths for this (the design's path list was amended after the build) | DESIGN §10 (amended) |
 
 ### Code and audit
 
@@ -658,3 +664,179 @@ candidates).
 "Fold Q-HE3A-2..5 into rev 2 now; hold Q-HE3A-1's part until (1) and (2) are answered."
 
 - Q-HE3A-1b = (a) "No, merge HE-003A first". HE-003A merges with the writer bound by the per-frame process label, cgroup, pidfd and start time, SO_PEERCRED and per-frame credentials. The Q-HE3A-1 (c) exe check (readlinkat on the retained /proc/<pid> dir fd, "exe") is recorded as decided but open, and lands in the R10 packet after the chain. No readlinkat code goes into HE-003A. Record it verbatim and dated, and carry: the chain: (1) a seccomp allowlist amendment adding readlinkat to EFFECT_GATE (parallel lane, with or after the slot-234 §4.3 amendment that states the duty); (2) republished EFFECT_GATE programs plus edge record v3 (your lane); (3) the R10 re-vendor plus the writer exe check (HE-003D or HE-003A2); HE-007 obligations a-c: writer real/effective/saved uid and gid all 0; dumpable kept; permitted set empty before connect. T04 confirms. (2026-10-14, owner via the lane monitor.)
+
+## HE-003B: the I04 TLS 1.3 mutual server (crate `gate-tls`; `effect-gate`: `net`, `linux_net`; `gate-sys`: `tcp.rs`, `inet.rs`)
+
+HE-003B (design revision 3, sha256 `4274603c…`, with its build amendments §17 (Q-HE3B-26 (a)), §18 (Q-HE3B-27 (a)), §19
+and §20; design review round 2 PASS_FOR_BUILD) builds the I04 server half of I05-3 and HI-10's connection stamping
+C1-C7: the gate's KUBERNETES_API_PROXY listener (TLS 1.3 with mandatory client certificates), HTTP/1.1 framing that
+hands the model the exact head, the body digest and the client certificate digest, and the exact rendering of the
+response the I04 client receives. It is a library: `gate_tls::I04Server<N: StreamNet>` is the substrate's `I04Port`; no
+binary links it yet (HE-003D), so the ten binaries and SBOMs are unchanged. HE-003C builds the upstream half.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R43 | Stamp at accept: every `accept4` on the I04 listener (at most 64 per readiness, and in the drain before every I05 frame) feeds `Backlog` and then `Accept` for the new connection before any TLS byte is read, so its stamp is the action armed when the kernel connection was accepted. The drain accepts until the queue is empty; if it cannot (an accept error other than EAGAIN, EINTR, ECONNABORTED and the TCP network errors, or more than 1,024 accepts in one drain), the loop stops with `LoopExit::Port` before the frame is fed. Over-cap connections drained before a frame are closed unfed. Residual: a connection that completes its TCP handshake after the drain and before the ARM record is accepted later with the new stamp; it cannot carry a buffered stale request, because with TLS 1.3, no early data, no resumption and no server-side TCP Fast Open (the listener sets none; HE-008 keeps the kernel's off) no request byte precedes the gate's handshake flight, which follows the accept. A request on it is a new send by the server, the resolved spec's §6.3 residual. A sustained connect flood during a pre-frame drain ends the generation: the loop stops, HE-003D exits, the restart is deny-first and the generation's single I05 channel is spent (fail closed; under the loopback-or-firewall assumption, HE-008; T04 measures it). Connection names are `i04-<n>`, never reused within a process | C2, C3; DESIGN §4.2, §6.3, §7.1 |
+| R44 | `Event::Disconnect { conn }` (R10-defined): fed only when the I04 port closes, on its own, a model-held connection on which it fed no request (TLS refused, a deadline, an oversize head or a truncated request, EOF or reset, no client certificate). The model removes that connection's entry; no counter changes and nothing is journalled; output nothing. A connection the model closed itself (a flush, a deny) is closed by the port without a `Disconnect` and stays as a CLOSED entry, at most the 16-connection cap per flushing event; the model rule still accepts a closed entry with no request (a defensive branch the port never reaches). An unknown connection, or one with a request, is `EventError` (R3) | DESIGN §4.3; Q-HE3B-14 |
+| R45 | At most 16 I04 connections are held; one accepted beyond that is closed at once and never fed: it has no stamp and never reaches TLS. Network exposure: the listener is meant for a loopback address or a firewalled one (HE-008); on a routable address mTLS, the cap, the accept bounds and the deadlines are its only protection. Under either assumption a sustained connect flood during a pre-frame drain ends the generation (fail closed, R43), which T04 measures | DESIGN §7.1, §7.4; Q-HE3B-21 |
+| R46 | The TLS profile: TLS 1.3 only (no other version compiled in); client authentication mandatory against the configured DER trust anchors, no CRLs; no session storage, no tickets, so no resumption; no early data and no half-RTT data; ALPN `http/1.1` only (a client offering none proceeds); the three TLS 1.3 suites and X25519, P-256, P-384 of the ring provider, set explicitly; no key log, no secret extraction; the server key PKCS#8 DER only. One builder serves production and the tests: `ServerConfig::builder_with_details(provider, time)` takes the time provider as an argument (§20) | C1; owner decisions Q-HE3B-5 (a), Q-HE3B-6 (a); Q-HE3B-20 |
+| R47 | The certificate digest fed with a request is `sha256:` and the lowercase hex SHA-256 of the client's leaf certificate DER, as presented in the handshake that verified it; the model compares it with the run's `serverCertificateDigest` | C4; Q-HE3B-15 |
+| R48 | Request framing: the head is the bytes through the first CRLF CRLF, at most 16,384; the body length comes from exactly one `Content-Length: <canonical decimal ≤ 16384>` line, or is zero with no length line (then the body digest is absent); any other length or Transfer-Encoding line makes the head unframeable, and it is fed at once without a body digest, so the model refuses and counts it. A head that is not UTF-8 is fed lossily. An oversize head, and a framed head whose body is truncated by the deadline, EOF or a reset, are refused as `Disconnect` and not counted (no request reached A1). This is the gate-side reading of MET-REPAIR-009's refusal of surplus and truncated data (:157-161). A manifest larger than 16,384 bytes can never be forwarded (HE-003D refuses one in the configuration) | I05 v3 Decision 4; MET-REPAIR-009 :157-162; Q-HE3B-25 |
+| R49 | One request per connection: after the request is fed the port never gives the connection's bytes to rustls again; bytes after the request's end are discarded unparsed, and the connection closes after its one response (MET-REPAIR-009 :157-161, surplus data, read on the gate's side) | C1; Q-HE3B-17 |
+| R50 | Deadlines on the monotonic clock: the handshake within 10 s of accept, the whole request within 10 s of the handshake, the relay and its linger within 10 s of the relay's start. A missed deadline closes the connection (`Disconnect` before a request; nothing after it). The upstream bound is HE-003C's | MET-REPAIR-009 :162-166; Q-HE3B-16, Q-HE3B-19 |
+| R51 | Closing: a refused request gets TLS `close_notify` and no HTTP byte; a connection the model holds closed closes at the next sync, exactly once, except one relaying or lingering after its response; an upstream outcome that is not relayed (lost, timed out, aborted, late) closes the consumed connection without a byte; a client gone while its request is in flight is closed and its relay skipped. After a relayed response the gate sends `close_notify`, shuts its write side once rustls has nothing left to write (at the deadline it closes without), and reads and discards until EOF or the deadline within the per-wake read budget, so a client's unread surplus cannot turn the close into a reset that destroys the response | I05 v3 Decisions 1, 6, 12; HE-002B R1-1's I04 analogue; Q-HE3B-17, Q-HE3B-18 |
+| R52 | The response rendering: `HTTP/1.1 <status> <reason>`, `Content-Type: application/json`, `Content-Length` (none for 204 and 304, which need an empty body), `Connection: close`, then the body unchanged; status 200-599; reason from a closed table of RFC 9110 §15's registered phrases, else empty; body at most 4,194,304 bytes; no upstream header is relayed; a status or size outside these closes without a byte | MET-REPAIR-009 :157-162; DESIGN §6.2 |
+| R53 | The exchange board: the request staged when it is fed (an occupied slot is a port failure), confirmed by `Forward`, dropped by `Close`. The response is staged only through `stage_response`, which computes the body digest and builds the `UpstreamResponse` event from the staged status, digest, UID and resourceVersion, so the values the model journals are those of the bytes relayed. The I04 port relays it only on `Upstream { relayed: true }`, after checking that it names the connection in flight and that the body hashes to the staged digest; every `Upstream` output and `LateUpstream` remove it; at most one of each at a time | I05 v3 Decisions 1, 2; DESIGN §7.5 |
+| R54 | Vendored crates (rustls 0.23.46, ring 0.17.14 and their closure) are outside the lexical tripwires and pinned file by file by the vendor table. gate-tls's own sources pass the TLS deny-list, matched case-sensitively and tolerant of whitespace around `=`, `(` and `::`, over the raw text (no `KeyLogFile`, `SSLKEYLOGFILE`, `KeyLog`, `key_log`, PEM reader, process-default provider or default-provider builder, `danger` module, unauthenticated or no client authentication, session cache, `Ticketer`, secret extraction) and, read with comments removed, set `max_early_data_size = 0`, `send_tls13_tickets = 0`, `send_half_rtt_data = false` and `NoServerSessionStorage` exactly once, and `tls.rs` names `with_cert_resolver(` and `SingleCertAndKey::from(` exactly once each (§20). The build's inventory of the std paths and libc calls the 11 linked crates name, with each occurrence's reachability from gate-tls judged by hand from its rustls entry points, is recorded below; it is a review record, and T04's trace is the proof. Their run-time system calls on the gate's paths are `getrandom` and `clock_gettime` beside memory allocation. HE-003D adds a symbol inventory of the binary with justified exceptions | DESIGN §2.6, §2.9; G4, G10 |
+| R55 | getrandom's file fallback is compiled out (`linux_disable_fallback`); the gate's randomness is the `getrandom` system call only, flags 0 | Q-HE3B-12 |
+| R56 | Port failures: a port's `failure()` stops the loop with `LoopExit::Port(owner, reason)` after the event, call or wake step that set it: checked after every event's output has been applied, wired and synced, after every port call, and before every wait; before a drained I05 frame is fed. HE-003D exits the process, and the restart is deny-first | DESIGN §4.2; Q-HE3B-13 |
+| R57 | Model-held connections: an accepted I04 connection counts as held by the model from the first sync that sees it open (the sync right after its `Accept`); the port's sync never closes a connection before that, and a wake that ends with one unconfirmed stops the loop. A `Fed` connection the model closes before its request is processed (an expiry fed first) is closed once and its request is refused CONNECTION_CLOSED | DESIGN §7.2; Q-HE3B-24 |
+| R58 | The server key: `TlsServerInputs` holds it in `Zeroizing`, so every drop path clears it; the key is consumed first, moved (not copied) into rustls, whose ring provider zeroizes its own parsing copy; `TlsServerInputs` prints lengths only, and `derive(Debug)` is refused on it and on rustls's key and configuration types; gate-tls never formats them. Residual: ring's parsed key pair keeps the key for the process's life without zeroization; the gate dumps no core (RLIMIT_CORE 0/0) though it stays dumpable by design (Q-HE2S-7 (a)), and selinux-matrix-v2 assertion A34 (no domain ptraces `planeon_gate_t`) bounds live-memory reads | DESIGN §5.1, §20; D1-4 |
+
+### Code and audit
+
+- `gate-sys/src/tcp.rs` (Linux only; with `openat.rs`, `seal.rs` and `channel.rs` the only places of the workspace that
+  may hold `unsafe`): one private `unsafe extern "C"` block declaring exactly `socket`, `setsockopt`, `bind`, `listen`,
+  `recv`, `send`, `shutdown` and `syscall`, each call in its own `unsafe` block with its own `// SAFETY:` argument behind
+  `listen_tcp` (port ≥ 1024 checked before any call; `SO_REUSEADDR`; `IPV6_V6ONLY` for IPv6; the exact address length;
+  no other TCP option), `accept_tcp` (`accept4` through `syscall`, no peer address; EAGAIN empty, EINTR retried,
+  ECONNABORTED and accept(2)'s network errors skipped, anything else a failure), `TcpConn::recv` (an empty buffer
+  refused before the call), `send` (`MSG_DONTWAIT|MSG_NOSIGNAL`) and `shutdown_write`. `TcpListener` and `TcpConn` hold
+  an `OwnedFd`, print their type name only, and give `channel.rs`'s poller the descriptor through a crate-private
+  accessor (`Watched::TcpListener`, `Watched::TcpConn`: the only change to `channel.rs`). Compile-time asserts cover
+  `sockaddr_in` (16/4; port at 2, address at 4) and `sockaddr_in6` (28/4; flowinfo 4, address 8, scope 24), checked by
+  both musl release builds. `gate-sys/src/inet.rs` (portable, no `unsafe`) parses the literal authority (`a.b.c.d:port`
+  or `[v6]:port`, RFC 4291 text forms, no zone, port 1-65535, at most 64 characters), host-tested.
+- `effect-gate`: `net.rs` (portable) defines `StreamNet` (listener, accept, recv, send, `shutdown_write`, close,
+  monotonic). `linux_net.rs` (Linux only) is the single-threaded stream table (`NetTable`, `SharedNet`) with source
+  numbers never reused, `NetTable::listen_i04(&net, &Sealed, &address)` (backlog 16) and `LinuxStreams`; every
+  `RefCell` borrow is a `try_borrow`. `LinuxOs::with_net` resolves a port's `SourceId` through the table and refuses one
+  another owner holds; `LinuxOs::new` still refuses every port request. `Event::Disconnect` (R44), the provided
+  `Port::failure` and `LoopExit::Port` (R56).
+- `gate-tls`: `tls.rs` (`TlsServerInputs`, `server_config`, `certificate_digest`), `http1.rs` (`frame`,
+  `render_response`), `exchange.rs` (the board) and `i04.rs` (`I04Server`). The root forbids `unsafe_code`.
+- `tools/gate.py`: `check_cargo_config` (formerly `check_linker`: exactly `[net]`, `[target]`, `[source]` and `[env]`,
+  `[env]` derived from `toolchain.json`'s `cToolchain`); the Command Line Tools' clang version and SDK, the pinned
+  compiler and archiver, `xcode-select -p` and the first `cc` and `ar` on `PATH` as failing checks; `check_vendor`
+  against the vendor table (`VENDOR_TABLE_SHA256`); `check_workspace` admitting gate-tls's three exact registry lines
+  only and a lock whose registry packages are exactly the table's rows with their checksums and dependency lists, no
+  `[patch]` or `[replace]`; `check_workspace_shape` over effect-gate's and gate-tls's closures; `tcp.rs` among the files
+  allowed `unsafe` and `std::os::fd` items, with its eight foreign items; `TcpListener`, `TcpConn`, `NetTable` and the
+  secret types in the `Debug` rule; `check_tls` (the deny-list and the exactly-once settings); `vendor/` skipped by the
+  source scans; the SBOM rule for vendored components (none until HE-003D links gate-tls). `tools/test_gate.py` has a
+  case per rule.
+- Departures from the design, each within its intent: `StreamNet` gains `shutdown_write` (§7.1 needs it; §4.1 listed
+  the other six methods); `NetTable::listen_i04` returns the listener's source; the substrate checks `failure()` after a
+  `due` or `ready` call before feeding that call's events (as it does for the drain); the early-data test leg uses a
+  test configuration with stateful tickets, because rustls 0.23.46 offers early data only with stateful tickets
+  (`server/tls13.rs:669-671`); the port-failure tests reuse HE-003A's unchanged `substrate_support` module rather than
+  a copy; the restart case of `i04_substrate.rs` uses the in-memory `GATE_RESTART` (deny-first) rather than a file-store
+  `PolicyGate::open`.
+
+### Vendored crates
+
+The vendor table `host-enforcement/licenses/vendor-crates.json` (schema `planeon.internal.he-vendor-table/v1`, sha256
+`32a6dc79a8bf47e04032b245cf2c6364e328074f3e81a2e2a3ee76f4fc19602e`) has 25 rows: 11 LINKED (cfg-if, getrandom, libc,
+once_cell, ring, rustls, rustls-pki-types, rustls-webpki, subtle, untrusted, zeroize), 3 BUILD_HOST (cc, find-msvc-tools,
+shlex), 11 LOCK_ONLY stubs (windows-sys, windows-targets, eight `windows_*`, wasi); 1,297 files. Each row records the
+approved sha256, size and URL, the licence and its classification, the licence files, whether a build script exists,
+the non-UTF-8 files (ring 32, rustls-pki-types 17, rustls-webpki 3; found by decoding), the suffix inventory, the
+C-family, assembly and perl files (ring 176; cc's two compiler probes, §19), the file count, the tree digest and the
+lock dependency list; ring's row also records the files its build script compiles (30 on x86_64, 24 on aarch64) and
+the files they reach. Build scripts: libc, ring, rustls among the linked and build-host crates; the eight `windows_*`
+stubs keep their `build.rs` (named by their manifests, never compiled for our targets). The stub rule (Q-HE3B-8 (a)):
+`Cargo.toml`, the licence files and every file the manifest names kept byte-identical (45 files: the eight `build.rs`,
+windows-sys's and windows-targets' `readme.md`, wasi's `README.md`, the manifests and licences), the library file empty,
+284 files dropped; the rows list kept and dropped paths with their sha256. Five vendored crates ship a `.gitignore`
+that hides five vendored files from `git add` (the `Cargo.lock` of cc, cfg-if, once_cell and shlex, untrusted's
+`Cargo.toml.orig`); they are committed and pinned like every other file (§19). The first, full-form zero-bill scan's
+hits (`(?i)LoadBalancer`, three files of windows-sys) are only in files the stub rule drops (§17); command 4 passes over
+the committed tree. Custody is `UPSTREAM_PINNED` keyed by the crate sha256 (§2.8); `PORTING.yaml` stays the sentinel.
+The C toolchain is the Command Line Tools' clang 14.0.3 and `ar` (`toolchain.json` `cToolchain`, a failing pin).
+
+### Build confirmations (B6) and the inventory (B7)
+
+- getrandom 0.2.17: `linux_disable_fallback` selects `linux_android.rs`, not the fallback (`src/lib.rs:261-305`); the
+  call is `syscall(SYS_getrandom, buf, len, 0)` (`src/util_libc.rs:151-160`).
+- rustls 0.23.46's ring provider: the three TLS 1.3 suites and X25519, P-256, P-384 (`src/crypto/ring/mod.rs:72-76,
+  180-181`). `ServerConfig`'s defaults (`src/server/builder.rs:106-130`): an in-memory session cache under `std` and
+  two tickets, both overridden; the never-producing ticketer, no early data, no half-RTT data, `NoKeyLog`, no secret
+  extraction, no certificate compression without its features (`src/compress.rs:50-82`).
+- The key is checked against the leaf by rustls itself (`CertifiedKey::from_der` → `keys_match`,
+  `src/crypto/signer.rs:159-200`); ring's RSA, ECDSA and Ed25519 signing keys give their public key
+  (`src/crypto/ring/sign.rs:130, 296, 392`), and the seed-only Ed25519 PKCS#8 form is accepted (`:364-377`), so the ring
+  dev-dependency fallback of §9 was not needed.
+- ALPN without overlap: a fatal `NoApplicationProtocol` alert; no ALPN offered: the handshake proceeds
+  (`src/server/hs.rs:98-119`). `handshake_kind()` (`src/common_state.rs:188, 856`).
+- pki-types 1.15.1 has no drop-zeroize (an explicit `Zeroize` only, `src/lib.rs:138, 331, 398, 466, 1050`); §20 holds
+  the key in `Zeroizing` and hands it to rustls first. ring's key pairs do not zeroize. rustls's `Debug` impls print no
+  key bytes (`ServerConnection` its name only; the ring signers their algorithm).
+- Host-test outcomes: a serverAuth-only client leaf is refused `InvalidPurposeContext { required: ClientAuth, presented:
+  [ServerAuth] }`; a `cA=true` client leaf `CaUsedAsEndEntity`; a TLS 1.2-only ClientHello
+  `PeerIncompatible(SupportedVersionsExtensionRequired)` with an alert; a PSK offer gets a full handshake; offered early
+  data is skipped and the handshake is full (none accepted or delivered).
+- The R54 inventory (50 occurrences in the 11 linked crates' `src/`): only getrandom's `syscall(SYS_getrandom, .., 0)`
+  is reached. Not reached: getrandom's `libc::open` (`use_file`, not compiled) and its `getrandom.rs`/`solaris.rs`;
+  libc's Apple-only `spawn` re-exports; once_cell's test-only `spawn` (rustls uses `race::OnceBox` only);
+  rustls's `key_log_file.rs` (`KeyLogFile`, refused by the deny-list), `stream.rs` and `message_test.rs` (tests) and
+  the aws-lc-rs `hpke.rs` (not compiled); pki-types' PEM file reader (refused) and its `std::net` server-name
+  conversions (a server builds none); webpki's test-only `ip_address.rs:678`.
+
+### Constants and their evidence (for T04)
+
+From the pinned musl 1.2.5 `libc.a` (x86_64 sha256 `e699c64b…`, aarch64 `b03473b6…`; llvm-objdump with relocations):
+
+| Constant | x86_64 / aarch64 | Evidence |
+|---|---|---|
+| `recv` | `recvfrom` 45 / 207 | `recv.lo` zeroes the address arguments and jumps to `recvfrom`, which passes 45 / 207 |
+| `send` | `sendto` 44 / 206 | `send.lo` likewise to `sendto` |
+| `shutdown` | 48 / 210 | a direct system call |
+| `AF_INET` | 2 | `res_msend.lo` (`__res_msend_rc`) calls `socket(2, 0x80802, 0)` with a 16-byte address |
+| `AF_INET6` | 10 | `res_msend.lo` sets family 10 with a 28-byte address |
+| `SOCK_STREAM` | 1 | `res_msend.lo`'s TCP fallback calls `socket(family, 0x80801, ..)` |
+| `IPPROTO_TCP` | 6 | `res_msend.lo` calls `setsockopt(fd, 6, 30, ..)` |
+| `IPPROTO_IPV6`, `IPV6_V6ONLY` | 41, 26 | `res_msend.lo` calls `setsockopt(fd, 41, 26, ..)` |
+
+From the kernel UAPI (T04 confirms): `SOL_SOCKET` 1, `SO_REUSEADDR` 2 (the generic `socket.h`); `SHUT_WR` 1
+(`linux/net.h`); errno (the generic `errno.h`): EINTR 4, EAGAIN 11, EINVAL 22, ENONET 64, EPROTO 71, ENOPROTOOPT 92,
+EOPNOTSUPP 95, ENETDOWN 100, ENETUNREACH 101, ECONNABORTED 103, EHOSTDOWN 112, EHOSTUNREACH 113. Already recorded by
+HE-003A: `socket` 41 / 198, `setsockopt` 54 / 208, `bind` 49 / 200, `listen` 50 / 201, `accept4` 288 / 242,
+`SOCK_NONBLOCK` 0x800, `SOCK_CLOEXEC` 0x80000, `MSG_DONTWAIT` 0x40, `MSG_NOSIGNAL` 0x4000.
+
+### Carried
+
+- HE-003C: the upstream TLS client and its port; Decision 12's 900-second bound and I07's 10-second write bound as real
+  deadlines; typed upstream responses (R12, R15, HE003-REQ-1); R1-4 (`gate_sys::inet` is there for it); `connect` on
+  the stream table; the board's upstream side (take a staged request only when confirmed with the `Forward`'s action
+  ID; build `UpstreamResponse` only through `stage_response`, which a lexical rule can keep to `exchange.rs`); the TLS
+  deny-list's scope for client code (`danger`, `with_no_client_auth`; D2-2).
+- HE-003D: `planeon-gate`'s `main`, the seal call site and the composition (`NetTable::new`, `listen_i04`,
+  `LinuxOs::with_net`, `I04Server::new`); the configuration items (the I04 authority, the server chain and PKCS#8 key,
+  the client CAs, all DER) and a manifest larger than 16,384 bytes refused; the key file's read-buffer hygiene; the
+  deny-list and the secret-type rule over the gate binary's sources, with rustls's default time provider passed there;
+  the symbol inventory of the binary; the vendored components in `planeon-gate`'s SBOM (§13.1 (ii)); and the
+  vendored-source-path residual (§18, Q-HE3B-27 (a)): after `strip = "debuginfo"` the panic locations of the vendored
+  crates keep their absolute source paths, so `check_binary` would refuse `planeon-gate` once it links `gate-tls`
+  (choices: workspace path dependencies, `--remap-path-prefix`, or a reviewed gate exception).
+- T04: the listener under the installed EFFECT_GATE filter (`socket`, `setsockopt`, `bind`, `listen`, `accept4`,
+  `recvfrom`, `sendto`, `shutdown`, `close`), IPv4 and IPv6, `SO_REUSEADDR` after a crash; the real I04 client
+  completing TLS 1.3 with its run certificate (ECDSA or RSA) and reading the rendered response, also after surplus bytes
+  (no reset); the deadlines in real time; `getrandom` and `clock_gettime` under the filter and no blocking at start; C2
+  and C3 under load and restart with the kernel's server-side TCP Fast Open off; the I05 answer bound with I04 traffic
+  and under a connect flood; the constants above; the steady-state trace (no killed call reached by vendored code).
+- HE-008: `planeon_gate_t`'s `tcp_socket` permissions, `name_bind` on `planeon_i04_port_t` and `node_bind` on the
+  signed address's node type; `planeon_server_t`'s `name_connect` as the only local connector; the I04 port outside
+  `net.ipv4.ip_local_port_range`; a loopback I04 address or a host firewall admitting only the server; the kernel's
+  server-side TCP Fast Open bits off; `LimitNOFILE` headroom; the I04 server credential's files (root, 0400) and their
+  SELinux type (the matrix names none: `planeon_gate_effect_cred_t` or a matrix amendment; §13.2).
+
+### Owner decisions (verbatim as relayed, dated)
+
+- 2026-10-14 (APPROVAL.md §4): Q-HE3B-1 = (a): download all 25 crates (11,430,251 bytes: the 14 used plus the 11 Windows/wasi ones never compiled) from static.crates.io/crates/<name>/<name>-<version>.crate, each verified against its sha256 in APPROVAL.md. Unauthenticated, generic UA, no personal data, no token; abort on any size or sha mismatch. The design decides vendored-as-is versus stubs for the 11. Q-HE3B-2 = (a): rustls 0.23.46. Q-HE3B-3 = (a): Command Line Tools clang 14.0.3 plus ar through the repository's [env], with a failing version pin in toolchain.json and the gate; no download, no root change. Q-HE3B-4 = (a): the x86_64 no-libc-headers flag line. Q-HE3B-5 = (a): TLS 1.3 only for HE-003B and HE-003C. Q-HE3B-6 = (a): DER-only CA input.
+- 2026-10-14, on design revision 2 (sha256 `8bf0acb6…`): "Accept all recommended": Q-HE3B-7..Q-HE3B-25 = (a), including the reviewer-amended Q8, Q13, Q14, Q17, Q21 and Q22 and the new Q24 and Q25, and §13 (i) = yes (the sysroot closure table stays byte-identical and the crates get a separate vendor table); (ii) noted (SBOM evidence for the crates comes with HE-003D).
+- 2026-10-14: "Q-HE3B-26 = (a): B1 is judged on the tree as it will be committed. GO to resume phase 1 in this order: 1. B3: build the stubs. 2. Re-run command 4 (ci/zero_bill_scan.py) over that exact committed tree. It must pass with zero hits. Any hit stops the build and comes back to me. 3. B2: the ring probe. Then stop and report. No ci/ change."
+- 2026-10-15: "Q-HE3B-27 = (a): carry the host-path choice to HE-003D's design, and keep DESIGN §18 as written."
+- Build amendments 3 and 4 (§19, §20) are the author's design-level amendments (cc's two compiler probes and ring's
+  polyfill licences; who zeroizes the server key); they narrow nothing the owner decided.

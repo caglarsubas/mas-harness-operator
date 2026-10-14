@@ -21,6 +21,15 @@ mention a type whose `Debug` would format a `File` or a descriptor; and checks t
 round 3, R3-2: members under crates/, crates not a symlink, the crates effect-gate links, edition 2024 inherited and
 not overridden by a target table).
 
+HE-003B (the effect gate's I04 TLS server; DESIGN sections 2, 19 and 20) vendors 25 crates under host-enforcement/vendor/
+(rustls 0.23.46, ring 0.17.14 and their closure; 11 of them lock-only stubs) and pins them file by file against the
+vendor table (check_vendor), which the source scans therefore skip; the cargo configuration gains the vendored source
+replacement and the C toolchain's [env] (check_cargo_config, derived from toolchain.json's cToolchain, and the Command
+Line Tools' version becomes a failing pin); the lock names exactly the vendored packages with their checksums and
+edges; gate-tls joins the linked crates, gate-sys's tcp module the files allowed `unsafe` with its eight foreign items;
+derive(Debug) is refused on the secret-holding types; gate-tls's sources pass a TLS deny-list and name the closed
+settings exactly once; and the SBOM lists the vendored crates a binary links (none until HE-003D).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -31,6 +40,7 @@ import hashlib
 import io
 import json
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -46,6 +56,25 @@ VERSION = "0.1.0"
 BINARIES = ("planeon-containment", "planeon-broker", "planeon-observer", "planeon-gate", "planeon-writer")
 TABLE = HE / "licenses/closure-1.99.0.json"
 TABLE_SHA256 = "e085f1b784c1635b609734575d23d858beaffdd5b8b63a7fce585a38984e54a1"
+# HE-003B DESIGN section 2.7: the vendor table (one row per vendored crate), pinned like the sysroot table.
+VENDOR = HE / "vendor"
+VENDOR_TABLE = HE / "licenses/vendor-crates.json"
+VENDOR_TABLE_SHA256 = "32a6dc79a8bf47e04032b245cf2c6364e328074f3e81a2e2a3ee76f4fc19602e"
+REGISTRY = "registry+https://github.com/rust-lang/crates.io-index"
+# HE-003B DESIGN sections 2.4 and 20: the only registry dependency lines of the workspace, all in gate-tls's
+# [dependencies] (the ring dev-dependency fallback of section 9 was not needed, B6).
+REGISTRY_LINES = {"crates/gate-tls": {
+    "rustls": {"version": "=0.23.46", "default-features": False, "features": ["ring", "std"]},
+    "getrandom": {"version": "=0.2.17", "default-features": False, "features": ["linux_disable_fallback"]},
+    "zeroize": {"version": "=1.9.1", "default-features": False, "features": ["alloc"]},
+}}
+# DESIGN sections 2.2 and 19: C-family, assembly and perl suffixes; only ring holds such files, and cc its two
+# compiler-probe sources, each pinned by path and sha256.
+NATIVE_SUFFIXES = {".c", ".h", ".inl", ".inc", ".cpp", ".cc", ".hpp", ".S", ".s", ".asm", ".pl", ".pm"}
+CC_PROBES = {"src/detect_compiler_family.c": "97ca4b021495611e828becea6187add37414186a16dfedd26c2947cbce6e8b2f",
+             "src/detect_cpp_stdlib.cpp": "b2ef811b2eaec1bfa305241d3a2ba26ed4c9898dc3a5a076a4ec6fcab8410540"}
+# DESIGN section 2.6: among the linked and build-host crates, exactly these have a build script.
+BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # harness-onion contract files R10 holds, byte-exact, registered in harness-onion's operator -> harness-engineering
 # buildArtifact edge record (owner decision Q-HE2-A; the two EFFECT_GATE programs in its record v2, MET-ENFORCE-025,
 # pinned at the published digests); provenance in contracts/PROVENANCE.md.
@@ -72,16 +101,18 @@ RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
 FORBIDDEN_SOURCE = ("available_parallelism", "current_exe", "current_dir", "env::var", "var_os", "vars", "/proc", "/sys")
 HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 # HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/).
-LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
+LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls")
 OPENAT = "crates/gate-sys/src/openat.rs"
 SEAL = "crates/gate-sys/src/seal.rs"
 CHANNEL = "crates/gate-sys/src/channel.rs"
+TCP = "crates/gate-sys/src/tcp.rs"
+GATE_TLS = "crates/gate-tls"
 # The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6, HE-003A
-# DESIGN section 8).
-UNSAFE_FILES = (OPENAT, SEAL, CHANNEL)
+# DESIGN section 8, HE-003B DESIGN section 3).
+UNSAFE_FILES = (OPENAT, SEAL, CHANNEL, TCP)
 # The linked sources that may name std::os::fd items (HE-003A DESIGN section 8): effect-gate holds gate-sys's opaque
 # types and names no descriptor.
-FD_FILES = (OPENAT, CHANNEL)
+FD_FILES = (OPENAT, CHANNEL, TCP)
 # HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5) and HE-003A DESIGN section 8:
 # the start-up lint's exceptions, a per-file list of exact expressions (whitespace between their tokens ignored), each
 # removed once before the scan: in gate-sys's seal module the expression that opens the process's own status file, in
@@ -105,13 +136,20 @@ STARTUP_EXCEPTIONS = {
 FOREIGN_ITEMS = {OPENAT: {"openat"},
                  SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"},
                  CHANNEL: {"socket", "bind", "listen", "setsockopt", "getsockopt", "recvmsg", "sendmsg", "epoll_create1",
-                           "epoll_ctl", "epoll_pwait", "ppoll", "syscall"}}
+                           "epoll_ctl", "epoll_pwait", "ppoll", "syscall"},
+                 # HE-003B DESIGN section 3.1: the I04 listener's eight (accept4 only through syscall).
+                 TCP: {"socket", "setsockopt", "bind", "listen", "recv", "send", "shutdown", "syscall"}}
 # HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
 # with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
 # struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
 # impls and direct formatting are code review's.
-DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir")
-DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS))
+DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir", "TcpListener", "TcpConn",
+                 "NetTable")
+# HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
+# derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
+SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
+                "ServerConnection")
+DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS + SECRET_TYPES))
 OUTER_ATTRIBUTE = re.compile(r"#\s*\[")
 ITEM_AFTER_ATTRIBUTES = re.compile(r"\s*(?:#\s*\[|(?:pub\s*(?:\([^)]*\)\s*)?)?(struct|enum|union)\s+([A-Za-z_]\w*))")
 FIELD_NAME = re.compile(r"\b[A-Za-z_]\w*\s*:(?!:)")
@@ -134,7 +172,7 @@ LIFETIME = re.compile(r"'(?:r#)?[^\W\d]\w*")
 # LINKED_FORBIDDEN's. try_clone (fcntl F_DUPFD_CLOEXEC) is allowed. PR review round 1, R1-2: i05-protocol's code runs
 # after the seal too, and is_terminal (musl's isatty: ioctl TIOCGWINSZ) joins the list. It is a list, not a proof:
 # anything it does not name is code review's and T04's (the steady-state trace).
-POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol")
+POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls")
 POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)"),
                        (r"\bread_dir\b", "read_dir (getdents64)"),
                        (r"\bcurrent_exe\b", "current_exe (readlink, readlinkat)"),
@@ -150,7 +188,27 @@ POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)
                        (r"\bIsTerminal\b", "IsTerminal (isatty: ioctl TIOCGWINSZ)"))
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
-               "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]"}
+               "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]",
+               "crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]"}
+# HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
+# each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`.
+TLS_FORBIDDEN = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"KeyLogFile", "KeyLogFile"), (r"SSLKEYLOGFILE", "SSLKEYLOGFILE"), (r"KeyLog", "KeyLog"), (r"key_log", "key_log"),
+    (r"PemObject", "PemObject"), (r"pem\s*::", "pem::"), (r"from_pem", "from_pem"),
+    (r"install_default", "install_default"), (r"get_default", "get_default"), (r"::\s*builder\s*\(", "::builder("),
+    (r"danger", "danger"), (r"allow_unauthenticated", "allow_unauthenticated"),
+    (r"with_no_client_auth", "with_no_client_auth"), (r"NoClientAuth", "NoClientAuth"),
+    (r"ServerSessionMemoryCache", "ServerSessionMemoryCache"), (r"Ticketer", "Ticketer"),
+    (r"ticketer\s*=(?!=)", "ticketer ="), (r"enable_secret_extraction", "enable_secret_extraction"),
+    (r"dangerous_extract_secrets", "dangerous_extract_secrets")))
+# The settings gate-tls's sources (read with comments removed and literal contents emptied) name exactly once, each as
+# this assignment; and, in tls.rs, the certificate resolver of DESIGN section 20.
+TLS_SETTINGS = (("max_early_data_size", r"\bmax_early_data_size\s*=\s*0\b"),
+                ("send_tls13_tickets", r"\bsend_tls13_tickets\s*=\s*0\b"),
+                ("send_half_rtt_data", r"\bsend_half_rtt_data\s*=\s*false\b"),
+                ("session_storage", r"\bsession_storage\s*=\s*Arc\s*::\s*new\s*\(\s*NoServerSessionStorage\s*\{\s*\}\s*\)"))
+TLS_RESOLVER = ((r"\bwith_cert_resolver\s*\(", "with_cert_resolver("),
+                (r"\bSingleCertAndKey\s*::\s*from\s*\(", "SingleCertAndKey::from("))
 # The linked-source patterns below are matched against the source with the whitespace around every `::` removed
 # (PATH_SPACE), so `std :: process` is `std::process` to them.
 PATH_SPACE = re.compile(r"\s*::\s*")
@@ -365,22 +423,56 @@ def check_toolchain(pin: dict) -> str:
     sdk = json.loads(settings.read_text(encoding="utf-8"))["Version"]
     say("toolchain: rustc %s (%s), %s; Command Line Tools: %s, SDK %s"
         % (fields["release"], fields["commit-hash"][:9], pin["cargo"], found, sdk))
-    if (found, sdk) != (pin["commandLineTools"]["clang"], pin["commandLineTools"]["sdk"]):
-        say("note: the Command Line Tools differ from toolchain.json (printed, not failed)")
+    # HE-003B DESIGN section 2.5 (owner decision Q-HE3B-3 (a)): ring's C and assembly in the effect gate are compiled by
+    # this clang, so a different clang version or SDK fails; the pinned compiler and archiver are the Command Line
+    # Tools' own, xcode-select names them (so the /usr/bin/cc shim of the darwin build resolves to the same clang), and
+    # nothing earlier on PATH shadows cc or ar (Q-HE3B-23 (a)).
+    require((found, sdk) == (pin["commandLineTools"]["clang"], pin["commandLineTools"]["sdk"]),
+            "the Command Line Tools differ from toolchain.json (clang %r, SDK %r)" % (found, sdk))
+    c_toolchain = pin["cToolchain"]
+    require(c_toolchain["compiler"] == str(clang), "the pinned C compiler is not the Command Line Tools' clang")
+    require(c_toolchain["archiver"] == str(tools / "usr/bin/ar") and Path(c_toolchain["archiver"]).is_file(),
+            "the pinned archiver is not the Command Line Tools' ar")
+    require(run(["xcode-select", "-p"]).strip() == str(tools), "xcode-select does not name the pinned Command Line Tools")
+    require(shutil.which("cc") == "/usr/bin/cc" and shutil.which("ar") == "/usr/bin/ar",
+            "the first cc and ar on PATH are not /usr/bin/cc and /usr/bin/ar")
     return sysroot
 
 
-def check_linker(pin: dict, root: Path) -> None:
-    """The repository-root cargo config links both musl targets through the wrapper, and the wrapper execs the pinned
-    rust-lld with the pinned sysroot's lib/ on the dylib search path (so a pin change cannot miss the wrapper)."""
+def cargo_env(pin: dict) -> dict:
+    """The cargo config's [env], derived from toolchain.json's cToolchain (HE-003B DESIGN section 2.3): the pinned
+    compiler and archiver for both musl targets and the x86_64 flag line, each in its `force = true` form."""
+    c_toolchain = pin["cToolchain"]
+    env = {}
+    for target in pin["targets"]:
+        key = target.replace("-", "_")
+        env["CC_" + key] = {"value": c_toolchain["compiler"], "force": True}
+        env["AR_" + key] = {"value": c_toolchain["archiver"], "force": True}
+        if c_toolchain["cflags"].get(target):
+            env["CFLAGS_" + key] = {"value": c_toolchain["cflags"][target], "force": True}
+    return env
+
+
+VENDORED_SOURCE = {"crates-io": {"replace-with": "vendored-sources"},
+                   "vendored-sources": {"directory": "host-enforcement/vendor"}}
+
+
+def check_cargo_config(pin: dict, root: Path) -> None:
+    """The repository-root cargo config (HE-003B DESIGN section 2.6, formerly check_linker): exactly [net], [target],
+    [source] and [env]; it links both musl targets through the wrapper, and the wrapper execs the pinned rust-lld with
+    the pinned sysroot's lib/ on the dylib search path (so a pin change cannot miss the wrapper); crates.io is replaced
+    by the vendored directory source; [env] is the table derived from cToolchain."""
     config = tomllib.loads((root / ".cargo/config.toml").read_text(encoding="utf-8"))
-    require(set(config) == {"net", "target"}, "the cargo config must hold only [net] and [target]")
+    require(set(config) == {"net", "target", "source", "env"},
+            "the cargo config must hold only [net], [target], [source] and [env]")
     require(config.get("net") == {"offline": True}, "the cargo config must set [net] offline = true and nothing else")
     flags = ["-C", "link-self-contained=yes", "-C", "target-feature=+crt-static"]
     require(set(config.get("target", {})) == set(pin["targets"]), "the cargo config must name exactly the pinned targets")
     for target in pin["targets"]:
         require(config["target"][target] == {"linker": pin["linkerWrapper"], "rustflags": flags},
                 "the cargo config for %s is not the wrapper with the static flags" % target)
+    require(config.get("source") == VENDORED_SOURCE, "the cargo config's [source] is not the vendored directory source")
+    require(config.get("env") == cargo_env(pin), "the cargo config's [env] is not the table toolchain.json pins")
     lines = (root / pin["linkerWrapper"]).read_text(encoding="utf-8").splitlines()
     require(lines[:1] == ["#!/bin/sh"], "the linker wrapper must start with #!/bin/sh")
     commands = [line for line in lines if line and not line.startswith("#")]
@@ -411,9 +503,13 @@ def linked(dependencies: dict, name: str) -> set:
     return seen
 
 
-def check_workspace(base: Path) -> dict:
-    """The workspace members, each with its direct workspace (path) dependencies."""
+def check_workspace(base: Path, vendor: list[dict] | None = None) -> dict:
+    """The workspace members, each with its direct workspace (path) dependencies. HE-003B DESIGN section 2.6: besides
+    path dependencies, only REGISTRY_LINES (gate-tls's exact registry lines); no [patch] or [replace]; in Cargo.lock the
+    packages without a source are exactly the workspace crates, and the packages with one are exactly the vendor table's
+    rows (`vendor`), each from crates.io with the row's checksum and dependency list."""
     workspace = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
+    require("patch" not in workspace and "replace" not in workspace, "the workspace manifest has a [patch] or [replace]")
     names, paths = {}, {}
     manifests = []
     for member in workspace["workspace"]["members"]:
@@ -427,18 +523,32 @@ def check_workspace(base: Path) -> dict:
         paths[(base / member).resolve()] = package["name"]
         manifests.append((member, package["name"], manifest))
     for member, name, manifest in manifests:
+        lines = REGISTRY_LINES.get(member, {})
         for table in ("dependencies", "dev-dependencies"):
             for dependency, spec in manifest.get(table, {}).items():
+                if table == "dependencies" and dependency in lines:
+                    require(spec == lines[dependency], "the registry dependency %s of %s is not its pinned line"
+                            % (dependency, member))
+                    continue
                 require(type(spec) is dict and set(spec) == {"path"} and (base / member / spec["path"]).resolve() in paths
                         and paths[(base / member / spec["path"]).resolve()] == dependency,
                         "a dependency outside the workspace in " + member)
                 if table == "dependencies":
                     names[name].add(dependency)
     packages = tomllib.loads((base / "Cargo.lock").read_text(encoding="utf-8"))["package"]
-    require(sorted(package["name"] for package in packages) == sorted(names),
+    local = [package for package in packages if "source" not in package]
+    require(sorted(package["name"] for package in local) == sorted(names) and all("checksum" not in package for package in local),
             "Cargo.lock does not list exactly the workspace crates")
-    require(all("source" not in package and "checksum" not in package for package in packages),
-            "Cargo.lock names a registry or git package")
+    rows = {(row["name"], row["version"]): row for row in (vendor or [])}
+    registry = [package for package in packages if "source" in package]
+    require(len(registry) == len(rows) and all(package["source"] == REGISTRY and (package["name"], package["version"]) in rows
+                                               for package in registry),
+            "Cargo.lock names a registry or git package outside the vendor table")
+    for package in registry:
+        row = rows[(package["name"], package["version"])]
+        require(package.get("checksum") == row["sha256"], "Cargo.lock's checksum of %s is not the approved one" % row["name"])
+        require(sorted(package.get("dependencies", [])) == row["dependencies"],
+                "Cargo.lock's dependencies of %s are not the vendor table's" % row["name"])
     return names
 
 
@@ -471,7 +581,7 @@ def check_sources(base: Path) -> int:
     refuses)."""
     count = 0
     for path in sorted(base.rglob("*.rs")):
-        if path.relative_to(base).parts[0] == "target":   # the build directory only
+        if path.relative_to(base).parts[0] in ("target", "vendor"):   # the build directory; the pinned vendored crates
             continue
         rel = path.relative_to(base).as_posix()
         text = path.read_text(encoding="utf-8")
@@ -484,8 +594,9 @@ def check_sources(base: Path) -> int:
 
 
 def workspace_sources(base: Path) -> list[Path]:
-    """Every .rs file of the workspace outside the build directory (tests and binaries included)."""
-    return [path for path in sorted(base.rglob("*.rs")) if path.relative_to(base).parts[0] != "target"]
+    """Every .rs file of the workspace outside the build directory and the vendored crates (tests and binaries
+    included). HE-003B DESIGN section 2.1: vendor/ is excluded because check_vendor pins every file under it."""
+    return [path for path in sorted(base.rglob("*.rs")) if path.relative_to(base).parts[0] not in ("target", "vendor")]
 
 
 def check_included_code(base: Path) -> int:
@@ -893,6 +1004,8 @@ def check_debug_derives(base: Path) -> int:
                             cursor = bracket_end(code, item.end() - 1)
                             continue
                         break
+                    require(item.group(2) not in SECRET_TYPES, "%s derives Debug on %s %s, a secret type (Debug check)"
+                            % (rel, item.group(1), item.group(2)))
                     types = field_types(item.group(1), item_rest(code, item.end()))
                     hazard = DEBUG_HAZARD.search(types)
                     require(not hazard, "%s derives Debug on %s %s, whose field types mention %s (Debug check)"
@@ -932,14 +1045,169 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
                         "%s gives a %s target its own edition (workspace shape)" % (member, kind))
         names[package.get("name")] = member
     require("effect-gate" in names and "effect-gate" in workspace, "no effect-gate member (workspace shape)")
-    closure = {names.get(name) for name in linked(workspace, "effect-gate")}
-    require(closure == set(LINKED_CRATES), "the crates effect-gate links are %s, not %s (workspace shape)"
+    # HE-003B DESIGN section 2.6: the linked crates are the union of effect-gate's and gate-tls's closures (gate-tls
+    # depends on effect-gate, not the reverse).
+    roots = ["effect-gate"] + [name for name in ("gate-tls",) if name in names and name in workspace]
+    closure = {names.get(name) for root in roots for name in linked(workspace, root)}
+    require(closure == set(LINKED_CRATES), "the crates effect-gate and gate-tls link are %s, not %s (workspace shape)"
             % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
     return len(members)
 
 
-def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set) -> bytes:
-    """workspace: the workspace crates in the binary's dependency closure."""
+def printable_path(rel: str) -> bool:
+    return all(0x20 <= ord(char) <= 0x7E for char in rel)
+
+
+def build_script(manifest: dict, files: set[str]) -> bool:
+    """Whether a crate has a build script: the file its manifest's `build` names, or an implicit build.rs."""
+    build = manifest.get("package", {}).get("build")
+    if isinstance(build, str):
+        return build in files
+    return build is not False and "build.rs" in files
+
+
+def check_vendor(base: Path, raw: bytes, expected: str = VENDOR_TABLE_SHA256) -> tuple[list[dict], int]:
+    """HE-003B DESIGN sections 2.2, 2.6, 17 and 19: the vendor table is the reviewed one; vendor/ holds exactly one
+    directory per row, and every file under it is pinned. Per crate: no symlink, no executable bit, printable-ASCII and
+    letter-case-distinct paths; .cargo-checksum.json's package is the approved sha256 and its files are exactly the files
+    present with their sha256; the tree digest and file count are the row's; the manifest's name and version are the
+    row's and it is no proc-macro; it has a build script exactly when the row says so, and among the linked and
+    build-host crates exactly libc, ring and rustls do; the non-UTF-8 files (found by decoding), the suffix inventory
+    and the C-family, assembly and perl files are the row's, and only ring and cc (its two compiler probes, pinned
+    here) have any of the last; a stub holds exactly its kept files, its empty library file and the checksum file. The
+    rows and the number of files."""
+    require(sha256(raw) == expected, "the vendor table is not the reviewed table")
+    table = json.loads(raw)
+    require(table["acceptedOutcomes"] == list(ACCEPTED), "the vendor table's accepted outcomes changed")
+    rows = table["rows"]
+    require(all(row["outcome"] in ACCEPTED for row in rows), "a vendored crate's outcome is not accepted")
+    names = ["%s-%s" % (row["name"], row["version"]) for row in rows]
+    require(len(set(names)) == len(names), "duplicate vendor rows")
+    vendor = base / "vendor"
+    require(vendor.is_dir() and not vendor.is_symlink(), "vendor/ is missing or a symlink")
+    require(sorted(entry.name for entry in vendor.iterdir()) == sorted(names) and all(
+        (vendor / name).is_dir() and not (vendor / name).is_symlink() for name in names),
+        "vendor/ does not hold exactly one directory per vendor row")
+    with_scripts = set()
+    files_seen = 0
+    for row, name in zip(rows, names):
+        root = vendor / name
+        files: dict[str, bytes] = {}
+        for path in sorted(root.rglob("*")):
+            rel = path.relative_to(root).as_posix()
+            require(not path.is_symlink(), "%s/%s is a symlink (vendor check)" % (name, rel))
+            require(printable_path(rel), "%s holds a path that is not printable ASCII (vendor check)" % name)
+            if path.is_file():
+                require(not path.stat().st_mode & 0o111, "%s/%s is executable (vendor check)" % (name, rel))
+                files[rel] = path.read_bytes()
+            else:
+                require(path.is_dir(), "%s/%s is neither a file nor a directory (vendor check)" % (name, rel))
+        require(len({rel.lower() for rel in files}) == len(files), "%s holds paths that differ in case only" % name)
+        files_seen += len(files)
+        digests = {rel: sha256(data) for rel, data in files.items()}
+        require(".cargo-checksum.json" in files, "%s has no .cargo-checksum.json (vendor check)" % name)
+        checksum = json.loads(files[".cargo-checksum.json"])
+        require(checksum.get("package") == row["sha256"], "%s's checksum package is not the approved sha256" % name)
+        require(checksum.get("files") == {rel: digest for rel, digest in digests.items() if rel != ".cargo-checksum.json"},
+                "%s's .cargo-checksum.json does not list exactly its files (vendor check)" % name)
+        require(sha256(canonical(digests)) == row["treeDigest"] and len(files) == row["fileCount"],
+                "%s's files differ from its vendor row (vendor check)" % name)
+        manifest = tomllib.loads(files["Cargo.toml"].decode("utf-8"))
+        require((manifest["package"]["name"], manifest["package"]["version"]) == (row["name"], row["version"]),
+                "%s's manifest names another crate (vendor check)" % name)
+        library = manifest.get("lib", {})
+        require(not library.get("proc-macro") and not library.get("proc_macro"), "%s is a proc-macro crate" % name)
+        script = build_script(manifest, set(files))
+        require(script == row["buildScript"], "%s's build script differs from its vendor row (vendor check)" % name)
+        if script and row["role"] in ("LINKED", "BUILD_HOST"):
+            with_scripts.add(row["name"])
+        non_utf8 = []
+        for rel, data in files.items():
+            try:
+                data.decode("utf-8")
+            except UnicodeDecodeError:
+                non_utf8.append({"path": rel, "sha256": digests[rel]})
+        require(non_utf8 == row["nonUtf8"], "%s's non-UTF-8 files differ from its vendor row (vendor check)" % name)
+        suffixes: dict[str, int] = {}
+        for rel in files:
+            suffix = Path(rel).suffix
+            suffixes[suffix] = suffixes.get(suffix, 0) + 1
+        require(suffixes == row["suffixes"], "%s's suffix inventory differs from its vendor row (vendor check)" % name)
+        native = [{"path": rel, "sha256": digests[rel]} for rel in files if Path(rel).suffix in NATIVE_SUFFIXES]
+        require(native == row["nativeFiles"], "%s's C-family, assembly or perl files differ from its row" % name)
+        if row["name"] == "cc":
+            require({entry["path"]: entry["sha256"] for entry in native} == CC_PROBES,
+                    "cc holds C-family files other than its two compiler probes (vendor check)")
+        elif row["name"] != "ring":
+            require(not native, "%s holds a C-family, assembly or perl file (vendor check)" % name)
+        if row["form"] == "STUB":
+            stub = row["stub"]
+            expected_files = {entry["path"] for entry in stub["kept"]} | {stub["emptyLibrary"], ".cargo-checksum.json"}
+            require(set(files) == expected_files and files[stub["emptyLibrary"]] == b"",
+                    "%s is not exactly its stub (vendor check)" % name)
+            require(all(digests[entry["path"]] == entry["sha256"] for entry in stub["kept"]),
+                    "%s's kept files differ from its vendor row (vendor check)" % name)
+            require(row["role"] == "LOCK_ONLY", "%s is a stub but not lock-only" % name)
+        else:
+            require(row["form"] == "FULL" and row["role"] in ("LINKED", "BUILD_HOST"), "%s's role or form" % name)
+        require(all(digests.get(entry["path"]) == entry["sha256"] for entry in row["licenseFiles"]) and row["licenseFiles"],
+                "%s's licence files differ from its vendor row (vendor check)" % name)
+    require(with_scripts == BUILD_SCRIPTS, "the linked and build-host crates with a build script are %s, not %s"
+            % (sorted(with_scripts), sorted(BUILD_SCRIPTS)))
+    return rows, files_seen
+
+
+def check_tls(base: Path) -> int:
+    """HE-003B DESIGN sections 2.6 and 20 (D1-5, D2-1): gate-tls's non-test sources hold none of TLS_FORBIDDEN in their
+    raw text (comments included); read with comments removed and literal contents emptied, they name each of the
+    closed settings exactly once, as its assignment, and tls.rs names the certificate resolver exactly once each. Text,
+    not Rust: a renamed import or a macro could evade it, and code review stays."""
+    sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
+               for path in sorted((base / GATE_TLS / "src").rglob("*.rs"))]
+    require(sources, "gate-tls has no sources (TLS deny-list)")
+    code = ""
+    for rel, text in sources:
+        for pattern, name in TLS_FORBIDDEN:
+            require(not pattern.search(text), "%s names %s (TLS deny-list)" % (rel, name))
+        try:
+            code += rust_code(text) + "\n"
+        except GateError as error:
+            raise GateError("%s: %s (TLS deny-list)" % (rel, error)) from None
+    for name, assignment in TLS_SETTINGS:
+        require(len(re.findall(r"\b%s\b" % name, code)) == 1 and len(re.findall(assignment, code)) == 1,
+                "gate-tls does not set %s exactly once, as the closed setting (TLS deny-list)" % name)
+    tls = base / GATE_TLS / "src/tls.rs"
+    require(tls.is_file(), "gate-tls has no tls.rs (TLS deny-list)")
+    tls_code = rust_code(tls.read_text(encoding="utf-8"))
+    for pattern, name in TLS_RESOLVER:
+        require(len(re.findall(pattern, tls_code)) == 1, "tls.rs does not name %s exactly once (TLS deny-list)" % name)
+    return len(sources)
+
+
+def lock_closure(packages: list[dict], name: str) -> set:
+    """The package names a lock package reaches through its `dependencies`, itself included."""
+    by_name = {package["name"]: package for package in packages}
+    seen, todo = set(), [name]
+    while todo:
+        current = todo.pop()
+        if current in seen or current not in by_name:
+            continue
+        seen.add(current)
+        todo.extend(dependency.split(" ")[0] for dependency in by_name[current].get("dependencies", []))
+    return seen
+
+
+def vendor_components(vendor_rows: list[dict], closure: set) -> list[dict]:
+    """HE-003B DESIGN section 2.7: an SBOM component for each LINKED vendor row in a binary's lock closure."""
+    return [{"type": "library", "name": row["name"], "version": row["version"],
+             "licenses": [{"expression": row["canonical"]}], "hashes": [{"alg": "SHA-256", "content": row["sha256"]}],
+             "properties": [{"name": "planeon:path", "value": "host-enforcement/vendor/%s-%s" % (row["name"], row["version"])},
+                            {"name": "planeon:outcome", "value": row["outcome"]}]}
+            for row in vendor_rows if row["role"] == "LINKED" and row["name"] in closure]
+
+
+def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set, vendored: list[dict] = ()) -> bytes:
+    """workspace: the workspace crates in the binary's dependency closure; vendored: its vendored components."""
     components = [{"type": "library", "name": row["component"], "version": row["version"],
                    "licenses": [{"expression": row["canonical"]}], "hashes": [{"alg": "SHA-256", "content": row["sha256"]}],
                    "properties": [{"name": "planeon:path", "value": row["path"]},
@@ -948,6 +1216,7 @@ def sbom(binary: str, target: str, digest: str, rows: list[dict], workspace: set
     components += [{"type": "library", "name": name, "version": VERSION, "licenses": [{"expression": "Apache-2.0"}],
                     "properties": [{"name": "planeon:path", "value": "host-enforcement (workspace crate)"}]}
                    for name in sorted(workspace)]
+    components += list(vendored)
     components.sort(key=lambda item: canonical(item))
     document = {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "components": components,
                 "metadata": {"component": {"type": "application", "name": binary, "version": VERSION,
@@ -977,13 +1246,28 @@ def main() -> int:
         targets = list(pin["targets"])
         require(sorted(targets) == sorted(MACHINE), "toolchain.json must name both musl targets")
         require(TABLE.name == "closure-%s.json" % pin["rustc"]["release"], "the closure table is not the pinned release's")
-        check_linker(pin, ROOT)
-        say("linker: the cargo config links both targets through %s, which execs the pinned rust-lld" % pin["linkerWrapper"])
-        workspace = check_workspace(HE)
-        say("workspace: %d crates, a lock without registry or git packages, no build script or proc-macro" % len(workspace))
+        c_toolchain = pin["cToolchain"]
+        say("C toolchain: %s and %s, x86_64 flags %r (a failing pin: the Command Line Tools' version and SDK, "
+            "xcode-select, the first cc and ar on PATH)" % (c_toolchain["compiler"], c_toolchain["archiver"],
+                                                              c_toolchain["cflags"]["x86_64-unknown-linux-musl"]))
+        check_cargo_config(pin, ROOT)
+        say("cargo config: [net] offline; both targets linked through %s, which execs the pinned rust-lld; crates.io "
+            "replaced by the vendored directory source host-enforcement/vendor; [env] is %s, each forced"
+            % (pin["linkerWrapper"], ", ".join(sorted(cargo_env(pin)))))
+        vendor_rows, vendor_files = check_vendor(HE, VENDOR_TABLE.read_bytes())
+        roles = {role: sum(row["role"] == role for row in vendor_rows) for role in ("LINKED", "BUILD_HOST", "LOCK_ONLY")}
+        say("vendor: %d crates (%d linked, %d build-host, %d lock-only stubs), %d files match the vendor table %s; "
+            "build scripts only in %s among the linked and build-host crates; C-family, assembly and perl files only in "
+            "ring and cc's two compiler probes" % (len(vendor_rows), roles["LINKED"], roles["BUILD_HOST"],
+                                                   roles["LOCK_ONLY"], vendor_files, VENDOR_TABLE_SHA256,
+                                                   ", ".join(sorted(BUILD_SCRIPTS))))
+        workspace = check_workspace(HE, vendor_rows)
+        say("workspace: %d crates, no build script or proc-macro; the only registry dependencies are %s of gate-tls; "
+            "Cargo.lock's %d registry packages are exactly the vendor table's, with their checksums and dependency "
+            "lists" % (len(workspace), ", ".join(sorted(REGISTRY_LINES["crates/gate-tls"])), len(vendor_rows)))
         say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
-            "effect-gate links exactly %s" % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION,
-                                              ", ".join(LINKED_CRATES)))
+            "effect-gate and gate-tls link exactly %s" % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION,
+                                                          ", ".join(LINKED_CRATES)))
         say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
         check_tree(rows, sysroot, targets)
@@ -999,21 +1283,27 @@ def main() -> int:
         say("included code: %d workspace sources pass the lexical tripwire (no path attribute, include!, raw "
             "identifier or inline assembly; no manifest target path, build key or symlink), crates' src/ hold only .rs "
             "files" % check_included_code(HE))
-        say("linked sources: %d sources of effect-gate, gate-sys and i05-protocol name no refused std path, rename or "
-            "glob no std module or item and do not name asm (lexical tripwire), crate roots forbid or deny unsafe_code"
-            % check_linked_sources(HE))
-        say("foreign items: %d sources of effect-gate, gate-sys and i05-protocol, every extern read with comments and "
+        linked_names = ", ".join(crate.split("/")[1] for crate in LINKED_CRATES)
+        say("linked sources: %d sources of %s name no refused std path, rename or glob no std module or item and do not "
+            "name asm (lexical tripwire), crate roots forbid or deny unsafe_code" % (check_linked_sources(HE), linked_names))
+        say("foreign items: %d sources of the linked crates, every extern read with comments and "
             "literal contents removed; %s; no other declares a foreign item, none is public or safe, no link_name, no "
             "macro in any of them (lexical tripwire)"
             % (check_foreign_items(HE), "; ".join("%s declares exactly %s" % (rel, ", ".join(sorted(items)))
                                                   for rel, items in FOREIGN_ITEMS.items())))
-        say("Debug: %d sources of effect-gate, gate-sys and i05-protocol derive Debug on no struct or enum whose field "
-            "types mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(DEBUG_HAZARDS)))
-        say("post-seal: %d sources of effect-gate, gate-sys and i05-protocol name none of HE-002S DESIGN section 5's "
+        say("Debug: %d sources of the linked crates derive Debug on no struct or enum named %s or whose field types "
+            "mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(SECRET_TYPES),
+                                               ", ".join(DEBUG_HAZARDS + SECRET_TYPES)))
+        say("TLS deny-list: %d gate-tls sources name none of its %d refused tokens; max_early_data_size, "
+            "send_tls13_tickets, send_half_rtt_data and session_storage are each set exactly once as the closed "
+            "setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once each" % (check_tls(HE),
+                                                                                                len(TLS_FORBIDDEN)))
+        say("post-seal: %d sources of the linked crates name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
+        lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
         markers = comment_markers(pin)
         host_paths = HOST_PATHS + tuple(path.encode() for path in (str(ROOT), str(Path.home())) if len(path) > 1)
         for target in targets:
@@ -1022,7 +1312,8 @@ def main() -> int:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
                 check_binary(raw, target, shape, markers, host_paths)
                 digest = sha256(raw)
-                document = sbom(binary, target, digest, rows, linked(workspace, binary))
+                vendored = vendor_components(vendor_rows, lock_closure(lock, binary))
+                document = sbom(binary, target, digest, rows, linked(workspace, binary), vendored)
                 out = HE / "target/sbom" / target / (binary + ".cdx.json")
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(document)

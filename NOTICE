@@ -3,3 +3,16 @@ Copyright 2026 Planeon contributors
 
 This product includes software developed by the Kubernetes project and other
 open-source projects identified by go.mod and go.sum.
+
+The effect gate's I04 server (host-enforcement/crates/gate-tls) links vendored
+Rust crates from crates.io, kept under host-enforcement/vendor/<name>-<version>/:
+rustls 0.23.46, ring 0.17.14, rustls-webpki 0.103.15, rustls-pki-types 1.15.1,
+getrandom 0.2.17, libc 0.2.190, once_cell 1.21.4, subtle 2.6.1, untrusted 0.9.0,
+zeroize 1.9.1 and cfg-if 1.0.5, built with cc 1.8.0, find-msvc-tools 0.1.14 and
+shlex 2.0.1; eleven Windows and WASI crates are kept as stubs for the lock only.
+Their licences, the licence expressions and their files are listed in
+host-enforcement/licenses/vendor-crates.json, and each crate directory holds its
+own licence files (ring: LICENSE, LICENSE-BoringSSL, LICENSE-other-bits,
+third_party/fiat/LICENSE and src/polyfill/once_cell/LICENSE-APACHE and
+LICENSE-MIT; the others their LICENSE files). None of the vendored crates ships a
+NOTICE file.
