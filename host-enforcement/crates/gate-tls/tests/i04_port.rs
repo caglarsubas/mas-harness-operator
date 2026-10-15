@@ -205,6 +205,51 @@ fn a_refused_handshake_and_an_eof_end_in_a_disconnect() {
 }
 
 #[test]
+fn a_request_and_close_notify_in_one_flight_feed_the_request_then_close_after_its_answer() {
+    // PR review R1-1: the client writes a whole request and shuts TLS down at once; both records arrive together.
+    let mut rig = rig();
+    let source = rig.accept();
+    let (mut peer, events) = rig.handshake(source, Some(rig.pki.client.clone()));
+    assert!(events.is_empty(), "{events:?}");
+    std::io::Write::write_all(&mut peer.tls.writer(), GET).expect("the client takes the plaintext");
+    peer.tls.send_close_notify();
+    peer.push(&rig.net);
+    let events = rig.port.ready(source, readable());
+    let name = format!("i04-{source}");
+    match &events[..] {
+        [PolicyEvent::Base(Event::Request { conn, head, .. })] => {
+            assert_eq!(conn, &name);
+            assert_eq!(head.as_bytes(), GET);
+        }
+        other => panic!("the Request is fed, not {other:?}"),
+    }
+    rig.feed(&events);
+    // The model's answer (here a refusal) closes the connection with close_notify and no HTTP byte.
+    rig.port.apply(&output(OutputKind::Close(ConnectionRefusal::RequestMismatch)));
+    peer.pull(&rig.net);
+    assert!(peer.received.is_empty(), "no HTTP byte");
+    assert!(rig.wire_closed(source));
+    assert!(rig.exchange.borrow().request().is_none(), "the staged request is dropped");
+}
+
+#[test]
+fn a_post_cut_short_by_close_notify_ends_in_a_disconnect() {
+    let mut rig = rig();
+    let source = rig.accept();
+    let (mut peer, events) = rig.handshake(source, Some(rig.pki.client.clone()));
+    assert!(events.is_empty(), "{events:?}");
+    let short = b"POST /api/v1/namespaces/planeon-qual/configmaps HTTP/1.1\r\nHost: 198.51.100.7:6443\r\n\
+                  Accept: application/json\r\nContent-Type: application/json\r\nContent-Length: 40\r\n\r\n{\"kind\":";
+    std::io::Write::write_all(&mut peer.tls.writer(), short).expect("the client takes the plaintext");
+    peer.tls.send_close_notify();
+    peer.push(&rig.net);
+    let events = rig.port.ready(source, readable());
+    assert!(matches!(&events[..], [PolicyEvent::Base(Event::Disconnect { .. })]), "{events:?}");
+    assert!(rig.exchange.borrow().request().is_none(), "nothing staged");
+    assert!(rig.wire_closed(source));
+}
+
+#[test]
 fn the_request_carries_the_head_the_digests_and_is_staged() {
     let mut rig = rig();
     let (source, _, events) = rig.request(GET);

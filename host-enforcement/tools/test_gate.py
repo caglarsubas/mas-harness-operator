@@ -307,6 +307,10 @@ class WorkspaceAndSourceTests(unittest.TestCase):
         (self.base / "crates/a/Cargo.toml").write_text('[package]\nname = "a"\n\n[build-dependencies]\nb = { path = "../b" }\n')
         with self.assertRaisesRegex(gate.GateError, "build or target dependencies"):
             gate.check_workspace(self.base)
+        # PR review R1-3: a [features] table is refused (it could enable rustls/tls12 with Cargo.lock unchanged).
+        (self.base / "crates/a/Cargo.toml").write_text('[package]\nname = "a"\n\n[features]\ndefault = ["b/x"]\n')
+        with self.assertRaisesRegex(gate.GateError, "a \\[features\\] table in crates/a"):
+            gate.check_workspace(self.base)
 
     def test_build_scripts_and_proc_macros(self):
         (self.base / "crates/a/build.rs").write_text("fn main() {}\n")
@@ -1380,6 +1384,7 @@ class TlsTests(Tree):
                      "config.key_log = x;", "use rustls::pki_types::pem::PemObject;", "let _ = pem :: from_slice;",
                      "let _ = CertificateDer::from_pem_slice(b);", "provider.install_default();",
                      "let _ = CryptoProvider::get_default();", "let _ = ServerConfig::builder();",
+                     "let _ = ServerConfig::builder_with_protocol_versions(&[&TLS13]);",
                      "let _ = WebPkiClientVerifier :: builder (roots);", "use rustls::server::danger;",
                      "verifier.allow_unauthenticated();", "builder.with_no_client_auth();", "let _ = NoClientAuth;",
                      "let _ = ServerSessionMemoryCache::new(1);", "let _ = Ticketer::new();", "config.ticketer = t;",

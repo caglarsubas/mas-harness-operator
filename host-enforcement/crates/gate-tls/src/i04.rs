@@ -326,13 +326,15 @@ impl<N: StreamNet> I04Server<N> {
             return Step::Continue;
         }
         let mut chunk = [0u8; 4096];
+        // rustls hands back buffered plaintext before Ok(0) (the client's close_notify), so a whole request and the
+        // close_notify can arrive in one batch: frame what was received first (PR review R1-1). Only a request that is
+        // still incomplete, or an oversize head, ends in a Disconnect.
+        let mut closed = false;
         loop {
             match io::Read::read(&mut conn.tls.reader(), &mut chunk) {
                 Ok(0) => {
-                    // The client's close_notify before a whole request: a truncated request.
-                    let mut events = Vec::new();
-                    self.disconnect(id, &mut events);
-                    return Step::Done(events);
+                    closed = true;
+                    break;
                 }
                 Ok(count) => {
                     let room = REQUEST_LIMIT.saturating_sub(conn.plaintext.len());
@@ -347,6 +349,12 @@ impl<N: StreamNet> I04Server<N> {
             }
         }
         match frame(&conn.plaintext) {
+            Frame::NeedMore if closed => {
+                // The client's close_notify before a whole request: a truncated request.
+                let mut events = Vec::new();
+                self.disconnect(id, &mut events);
+                Step::Done(events)
+            }
             Frame::NeedMore => Step::Continue,
             Frame::OversizeHead => {
                 let mut events = Vec::new();

@@ -196,6 +196,7 @@ TLS_FORBIDDEN = tuple((re.compile(pattern), name) for pattern, name in (
     (r"KeyLogFile", "KeyLogFile"), (r"SSLKEYLOGFILE", "SSLKEYLOGFILE"), (r"KeyLog", "KeyLog"), (r"key_log", "key_log"),
     (r"PemObject", "PemObject"), (r"pem\s*::", "pem::"), (r"from_pem", "from_pem"),
     (r"install_default", "install_default"), (r"get_default", "get_default"), (r"::\s*builder\s*\(", "::builder("),
+    (r"builder_with_protocol_versions", "builder_with_protocol_versions"),
     (r"danger", "danger"), (r"allow_unauthenticated", "allow_unauthenticated"),
     (r"with_no_client_auth", "with_no_client_auth"), (r"NoClientAuth", "NoClientAuth"),
     (r"ServerSessionMemoryCache", "ServerSessionMemoryCache"), (r"Ticketer", "Ticketer"),
@@ -519,6 +520,8 @@ def check_workspace(base: Path, vendor: list[dict] | None = None) -> dict:
         library = manifest.get("lib", {})
         require(not library.get("proc-macro") and not library.get("proc_macro"), "a proc-macro crate in " + member)
         require("build-dependencies" not in manifest and "target" not in manifest, "build or target dependencies in " + member)
+        # A feature could enable a registry crate's features (rustls/tls12) without changing Cargo.lock (PR review R1-3).
+        require("features" not in manifest, "a [features] table in " + member)
         names[package["name"]] = set()
         paths[(base / member).resolve()] = package["name"]
         manifests.append((member, package["name"], manifest))
