@@ -1,4 +1,4 @@
-# HE-002, HE-002B, HE-002C, HE-002S, HE-003A and HE-003B: model-defined and R10-defined behaviour
+# HE-002, HE-002B, HE-002C, HE-002S, HE-003A, HE-003B and HE-003C: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -38,6 +38,13 @@ HE-003B adds the effect gate's I04 server (the new crate `gate-tls`; `effect-gat
 pinned model defines TLS, HTTP framing or sockets, so nothing in HE-003B is model-defined: its rules are R43-R58 in the
 HE-003B section at the end, from HE-003B's design (revision 3 with its build amendments §17-§20) and the owner decisions
 quoted there. No existing event's answer changes.
+
+HE-003C adds the effect gate's upstream apiserver client (`gate-tls`: `upstream`, `tls_client`, `http1`'s client side,
+`exchange::write_response`; `effect-gate`: `net::ConnectNet`, `linux_net::LinuxConnector`, `GateView::forwarded_write`,
+R16's loopback parse; `gate-sys`: `connect_tcp`, `connect_result`). No pinned model defines sockets, TLS or HTTP
+framing, so nothing in HE-003C is model-defined: its rules are R59-R68 in the HE-003C section at the end and the R16
+rewording below, from HE-003C design revision 2.1 and the owner decisions quoted there. No existing event's answer
+changes.
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -167,7 +174,7 @@ Lines are the I07 model's (`scripts/i07_policy_write_v3.py` at `a2eab93`) unless
 | R13 | Response bound (PolicyGate): a writer frame whose sequence + 1 would pass the I07 v3 schema's maximum (2147483647) ends the session fatally with `RESPONSE_OUT_OF_BOUNDS` after the chain and challenge checks and before its operation runs, so only WRITER_SESSION_ENDED (and the owning session's MAINT_ENDED) is recorded and a WRITE_OBJECT is never forwarded without a response that can be framed. Any other response outside the schema (unreachable: the v3 W1 constraints describe answers the gate never gives, and R15 keeps the upstream answer inside the patterns) ends the session the same way after the operation, and a deferred WRITE_OBJECT answer is then not relayed | HE-002B DESIGN §13; the I07 model forwards, records the outcome and then raises (:304) |
 | R14 | Invalid events (PolicyGate): a W_FRAME without a session and a W_UPSTREAM naming a write the gate never forwarded return `EventError` with no state change; W_CONNECT, W_CHANNEL_LOST and W_PEER_CHANGED are always valid | the I07 model raises there (:269, :338) |
 | R15 | Typed upstream outcomes (PolicyGate): `Lost`, `Timeout`, or a `Response` with an integer status 100-599, a body digest matching `^sha256:[0-9a-f]{64}$`, a uid null or matching `^[A-Za-z0-9-]{1,128}$` and a resourceVersion null or matching `^[A-Za-z0-9]{1,64}$` (the I07 v3 WRITE_OBJECT answer's patterns). Anything else is `EventError` before any state change: the write stays outstanding and nothing is recorded. Carried to HE-003: the substrate reports an apiserver response outside these patterns as LOST (IO_AMBIGUOUS), never as a Response | HE-002B DESIGN §13 (review C1); a relayed answer always stays inside the schema |
-| R16 | Configuration (PolicyGate): `policyWriter` is required and parsed by PolicyGate itself: exactly `qualificationNamespace` (a DNS-1123 label of at most 63 characters) and `apiserverAuthority` (printable ASCII without space, CR or LF, 1 to 255 characters); a missing, unknown, mistyped or out-of-rule member refuses the configuration, and the rest goes to the unchanged I05 `Config`, which still refuses `policyWriter` itself. The policy-kind table is read into closed types: version `planeon.internal.i07-policy-kinds/v2`, writable rows with scope QUALIFICATION_NAMESPACE or QUALIFICATION_NAMESPACE_OBJECT (the retired CLUSTER scope is refused), operations among CREATE, UPDATE, DELETE, the three known dispositions; members the gate does not use are ignored | HE-002B DESIGN §13, B4; the I07 model reads both with dictionary lookups |
+| R16 | Configuration (PolicyGate): `policyWriter` is required and parsed by PolicyGate itself: exactly `qualificationNamespace` (a DNS-1123 label of at most 63 characters) and `apiserverAuthority` (HE-003C, HE-002B R1-4, Q-HE3C-1 (a) amended: an IP literal with port as gate-sys's `parse_authority` reads it, at most 64 bytes and no name, and loopback: an IPv4 address in 127.0.0.0/8 or the IPv6 address ::1 exactly, IPv4-mapped forms such as `::ffff:127.0.0.1` refused; no valid literal reaches 64 bytes, the longest loopback literals being 47 and 21 bytes; parsed once and kept by PolicyGate, whose `apiserver_address()` gives the upstream port of both channels its one address, while the string itself stays the I07 requests' `Host`); a missing, unknown, mistyped or out-of-rule member refuses the configuration, and the rest goes to the unchanged I05 `Config`, which still refuses `policyWriter` itself. The policy-kind table is read into closed types: version `planeon.internal.i07-policy-kinds/v2`, writable rows with scope QUALIFICATION_NAMESPACE or QUALIFICATION_NAMESPACE_OBJECT (the retired CLUSTER scope is refused), operations among CREATE, UPDATE, DELETE, the three known dispositions; members the gate does not use are ignored | HE-002B DESIGN §13, B4; the I07 model reads both with dictionary lookups |
 | R17 | Counters (PolicyGate) saturate at `u64::MAX` instead of overflowing; the writes map is bounded by the schema's write ID (1-256), so it never holds more than 256 writes | no panics |
 | R18 | The upstream answer with no session (I07 model :370-371) is unreachable, because every session end aborts the outstanding write first (N9, N11) and GATE_RESTART drops it; it is kept as no-panic code (`{classification, relayed: false}`) and unit-tested on a constructed state. The other unreachable fallbacks fail closed the same way: a WRITE_OBJECT payload the schema passed but the gate cannot type is a fatal F00 frame, and a checked write that does not render is refused OBJECT_RULE | no panics (as R4, R5) |
 
@@ -840,3 +847,111 @@ HE-003A: `socket` 41 / 198, `setsockopt` 54 / 208, `bind` 49 / 200, `listen` 50 
 - 2026-10-15: "Q-HE3B-27 = (a): carry the host-path choice to HE-003D's design, and keep DESIGN §18 as written."
 - Build amendments 3 and 4 (§19, §20) are the author's design-level amendments (cc's two compiler probes and ring's
   polyfill licences; who zeroizes the server key); they narrow nothing the owner decided.
+
+## HE-003C: the upstream apiserver client (crate `gate-tls`: `upstream`, `tls_client`, `http1`'s client side, `exchange`; `effect-gate`: `net`, `linux_net`, `substrate`, `policy_gate`; `gate-sys`: `tcp.rs`)
+
+HE-003C (design revision 2.1, sha256 `184922d6…`; design review round 2 PASS_FOR_BUILD with D2-1..D2-3 applied; owner
+decisions Q-HE3C-1..7, quoted at the end) builds the upstream half of I05-3 and I07-6: the effect gate's apiserver
+client over TLS 1.3 with the gate's two client identities, the real I05 upstream bound (I05-2, Decision 12's 900
+seconds) and the real I07 write timer (v3 W2's 10 seconds, N15), typed upstream responses (R12, R15, HE003-REQ-1: an
+answer outside the I07 v3 patterns reaches the model as LOST), `apiserverAuthority` parsed as a loopback address (HE-002B
+R1-4) and the board's upstream side (HE-003B D2-4). It is a library: `gate_tls::UpstreamClient<C: ConnectNet>` is the
+substrate's `UpstreamPort`; no binary links it yet (HE-003D), so the ten binaries and SBOMs are unchanged. No pinned
+model defines sockets, TLS or HTTP framing, so nothing in HE-003C is model-defined: its rules are R59-R68 below and the
+R16 rewording above. No answer, record or vector changes; the only existing test touched is R16's unit test.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R59 | The exchange (one port for both channels, at most one exchange open): `apply` and `sync` return no events, so a start only arms. I05: on `Forward { action_id }` the board's staged request is taken only when it was confirmed with that action ID; verb, kind and name come from the staged head's method, resource plural and path, which the model already matched against the consumed action (Decision 4). I07: in `sync`, when `pending_write()` names a write the port has not started, from the provided `GateView::forwarded_write()` (None by default, so HE-003A's and HE-003B's fakes are unchanged; `PolicyGate`'s outstanding write keeps its `RenderedWrite`); operation, resource plural and name come from the rendered head. A missing or unconfirmed request, a head outside the rendered forms, a pending write without its rendered request, or a start while an exchange is open is a port failure (`LoopExit::Port`, R56). The bound is anchored at the arming call on the connector's monotonic clock: 900 s for I05, 10 s for I07. The anchor follows the CONSUMED or WRITE_FORWARDED record of the same delivery, so the bound runs at least 900 s (10 s) from consumption, never less (the excess is the apply latency, the millisecond rounding of the wait and the wake's work). A start deadline at the anchor makes the next wait zero; that `due` connects | DESIGN §2.1; D1-1, D1-11, D2-4 |
+| R60 | Connect and I/O: `socket(AF_INET or AF_INET6, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, IPPROTO_TCP)` and one `connect` to the one loopback apiserver address (R16). EINPROGRESS waits for writability, then SO_ERROR must be 0; a return of 0 proceeds as connected; any other errno (ECONNREFUSED, EMFILE, EINTR: no retry), an error or hang-up readiness during the connect, or a non-zero SO_ERROR is exactly one LOST, fed from that `due` or `ready`. I05 has a connect and a handshake phase deadline of 10 s each (R10-defined, from the I04 phase limits); I07 has none (its 10-second bound covers them). The interest follows rustls's `wants_read` and `wants_write` (writable only while connecting), so level-triggered epoll never spins; at most 64 KiB is read per wake. After an outcome every deadline is cleared and the descriptor is only closed: closing removes it from epoll, and a closed source is never deleted from the poller (an explicit delete would fail on Linux and stop the loop). A readiness for a closed exchange's token, or another token, feeds nothing | §2.2, §2.4, §2.6; D1-9, D2-1 |
+| R61 | Deadlines (R1-9): `due` checks the bound first; when it has fallen due, `UpstreamTimeout { conn }` or `WUpstream { Timeout }` is fed and the exchange closed, whatever phase deadline is due too (so a tie is a TIMEOUT); a phase deadline gives LOST only when it is strictly earlier than the bound. Deadlines are fed before reads in a wake; an answer completed later in the same wake (or in any wake past the bound) first re-checks the bound on the connector's clock: past it nothing is fed, the descriptor closes and the TIMEOUT follows at the next (zero) wait. HE-003A's ordering of the two ports' due events suits this port: its deadlines concern one exchange | §2.5, §2.8; D1-2 |
+| R62 | Outcomes, exactly one per exchange: Response; LOST (a refused or failed connect, a reset, EOF before a complete answer, a handshake failure including a protocol other than TLS 1.3, a refused answer (R63), a final answer whose identity cannot be read where the model journals it (R65), a board Status or Size refusal); or TIMEOUT. Seal and session end: when the model no longer holds the I05 connection open (it sealed the consumed action, Decision 1) or the I07 write pending (session end), `sync` closes the exchange at once, clears its deadlines and feeds nothing (a TIMEOUT fed then would be an `EventError`). Because the port closes the exchange at its outcome or the seal (Decisions 1 and 12 and I07 v3 W2 require it), it never receives a later response: the model's LATE_UPSTREAM and WRITE_LATE_UPSTREAM records are unreachable from R10's port, consistent with the contracts | §2.6, §2.7, §2.9; D1-11 |
+| R63 | The answer's framing (`http1::ResponseReader`, incremental): the status line exactly `HTTP/1.1 SP 3DIGIT SP reason CRLF`, status 100-599, the reason holding tabs, spaces, visible bytes and obs-text only; 100, 102 and 103 skipped (at most four), 101 and 104-199 LOST; all heads together (interim and final) at most 16,384 bytes; field lines `token ":" value`, names case-insensitive, no obs-fold, bare CR or LF, or control byte other than a tab; one `Content-Length` of 1-7 ASCII digits at most 4 MiB, or one `Transfer-Encoding: chunked` (case-insensitive), never both and never duplicated; `Content-Encoding` only `identity`; 204 and 304 without a body (a `Transfer-Encoding` or a non-zero length LOST); every other status needs a length or `chunked` (no body delimited by the close; Q-HE3C-4 (a)). Chunked strictly: sizes of 1-7 hex digits without extensions or whitespace, CRLF after each chunk, the zero chunk then CRLF (no trailers), decoded at most 4 MiB and raw (framing included) at most 4 MiB + 64 KiB, which assumes chunks of about 0.5 KiB or more for a body near 4 MiB (T04 confirms the selected apiserver's chunk sizes). Surplus: any byte after the complete answer in the same read is LOST; "the same read" is the plaintext drained after the one `process_new_packets` that completed the answer. The rule is best-effort: bytes after the answer's last read are never read, since the exchange closes at once; a server `close_notify` after the answer is not surplus, nor are TLS post-handshake messages. The I04 answer is always re-rendered by `render_response` (exact, `Content-Length`), so I04 never sees chunked bytes; non-2xx and non-JSON bodies are relayed and digested byte-exact whatever their media type (the mapping's non-2xx rows use object ANY); the digest is over the decoded body | §4; Q-HE3C-4 (a); D1-5, D1-13, D2-4 |
+| R64 | The TLS client profile (`tls_client.rs`): one builder `client_config(identity, roots, time)`, called once per identity: the gate effect identity (`planeon:effect-gate`) for I05 and the gate writer identity (`planeon:policy-writer`) for I07 (resolved spec §2.3, :405); `ClientConfig::builder_with_details(provider, time)` with `tls.rs`'s `provider()` (now `pub(crate)`: the three TLS 1.3 suites, X25519, P-256, P-384), TLS 1.3 only; `with_webpki_verifier(WebPkiServerVerifier::builder_with_provider(roots, provider))` over the configured apiserver serving CA (DER; Q-HE3C-2 (a): no custom verifier and no `danger` API); `with_client_auth_cert` with the identity's DER chain and its PKCS#8 DER key, held in `Zeroizing` until it is moved into rustls, which runs `CertifiedKey::from_der` and checks the key against the leaf; no session store (`Resumption::disabled()`), no early data, no SNI (rustls sends SNI only for a DNS name, `client/hs.rs:280-282`; set explicitly), ALPN `http/1.1`. The server name is the apiserver's literal IP: pki-types' own `Ipv4Addr` from the four octets or `Ipv6Addr` from the sixteen bytes read as eight big-endian pairs; the certificate must carry that IP SAN. `TlsClientIdentity` prints lengths only. Residual (as R58): each identity's ring key pair lives for the process | §3; Q-HE3C-2 (a), Q-HE3C-3 (a); D1-8, D1-12 |
+| R65 | Identity fields, read only where the model journals them (Q-HE3C-6 (a) as amended): I05 GET 200, CREATE 201 and DELETE 200/202 (the mapping's IDENTITY_MATCH and DELETE_BODY_IF_PRESENT rows; other GET 2xx carry none), I07 `operation.is_success(status)`. There the body is pre-scanned for depth at most 16 (brackets outside strings, before any value is built), must be UTF-8, and is parsed by the agreement-mode decoder (whitespace and floats allowed, duplicates and NaN refused), an object at the top. Forms: the object (`metadata.uid` and `metadata.resourceVersion`; a body whose `kind` is `Status` is not an object); a v1 `Status` (`apiVersion` v1, `kind` Status, `status` Success, `details.name` equal to the request's name, `details.kind` equal to the resource plural, `details.uid`; resourceVersion None; `details.group` is not compared, the plural and name being the request's). I05 GET 200 and CREATE 201 take the object only; I05 DELETE the form `deleteResponseBody` names (Pod and Service: OBJECT; ConfigMap: STATUS; the other form, such as a ConfigMap answered by the object of a deletion that is not immediate, is LOST); I07 CREATE and UPDATE successes the object; an I07 DELETE success either form (Q-HE3C-7 (a), re-checked on the selected distribution in W03). Patterns: uid `^[A-Za-z0-9-]{1,128}$`, resourceVersion `^[A-Za-z0-9]{1,64}$` (I05 v3 ACTION_OUTCOME, identical to R15). A body that does not parse or whose fields fail is LOST (fail closed); every other status passes uid and resourceVersion None, so Decision 0's reconciliation path runs (status and digest kept, the response relayed) | §4; Q-HE3C-6 (a), Q-HE3C-7 (a); D1-3, D1-4, D2-2 |
+| R66 | The outcome events: an I05 answer goes through the board's `stage_response` and the port feeds exactly the event it returns (`BoardError::Status` or `Size` LOST, `Occupied` a port failure); an I07 answer goes through the free function `exchange::write_response(write_id, status, body, uid, resourceVersion)`, which computes the digest and checks R15's patterns (status 100-599, uid, resourceVersion) and returns `WUpstream { Lost }` when they fail (HE003-REQ-1); it never touches the board's request or response slots (I07 answers are not relayed through I04). Among gate-tls's non-test sources only `exchange.rs` constructs `UpstreamResponse {` (a gate rule; effect-gate's constructions are test-only). Then `close_notify` and the close | §2.5, §5; D1-13, HE-003B D2-4 |
+| R67 | The gate (`tools/gate.py`): the TLS deny-list stays one global list over gate-tls's sources (Q-HE3C-5 (b)), kept whole and amended with the client hazards `in_memory_sessions`, `Resumption::store`, `ClientSessionMemoryCache`, `tls12_resumption`, `with_ech`, `EchMode` (ECH sends an outer SNI whatever `enable_sni` says), `with_client_cert_resolver` and `send_ticket_request`; the exactly-once settings gain `resumption = Resumption::disabled()`, `enable_early_data = false` and `enable_sni = false`; `tls_client.rs` names `with_client_auth_cert(` and `with_webpki_verifier(` exactly once each (and no other source names them); the secret types gain `ClientConfig`, `ClientConnection` and `TlsClientIdentity`, the Debug hazards `LinuxConnector`; `tcp.rs` declares exactly ten foreign items (with `connect` and `getsockopt`). Text, not Rust: a type alias, a renamed import or a macro could evade it, and code review stays | §5; D1-8 |
+| R68 | The I04 port's side of the outcome (PR review R1-7, D1-11): an `Upstream` output takes the connection in flight (the relay or the not-relayed close clears it at once), and an `Upstream` output with no connection in flight is a port failure (fail closed) instead of being ignored | §6 |
+
+### Code and audit
+
+- `gate-sys/src/tcp.rs`: `connect_tcp(&InetAddress) -> Result<(TcpConn, Connecting), errno>` (the listener's `socket`
+  call, then one `connect` with the exact `sockaddr_in` or `sockaddr_in6` length; 0 is `Connected`, EINPROGRESS
+  `InProgress`, any other errno returned with the socket closed) and `connect_result(&TcpConn) -> Result<(), errno>`
+  (`getsockopt(SOL_SOCKET, SO_ERROR)` into an `int`, its length checked), each call in its own `unsafe` block with its
+  own `// SAFETY:` argument; `connect` and `getsockopt` join the private extern block (whose
+  `#[allow(clashing_extern_declarations)]` covers it), `getsockopt` declared identically to `channel.rs:252`. The layouts
+  were already asserted; the listener-only port rule does not apply to connect.
+- `effect-gate`: `net.rs` gains the second trait `ConnectNet` (`connect`, `connect_result`, `recv`, `send`,
+  `shutdown_write`, `close`, `monotonic`) and the portable `Connecting`, and re-exports gate-sys's `InetAddress` and
+  `IpLiteral` for gate-tls (which depends on no new crate); `StreamNet` is unchanged. `linux_net.rs` gains
+  `NetTable::connect(&net, &Sealed, &address)` and `LinuxConnector::new(&Sealed, net)` (no socket before the seal, as
+  `listen_i04`), whose sources are owned by `Owner::Upstream`, so `LinuxOs::with_net` resolves them for the upstream port
+  only. `substrate.rs`: the provided `GateView::forwarded_write` and its `PolicyGate` impl. `policy_gate.rs`: the
+  outstanding write keeps its `RenderedWrite` (`PolicyGate::forwarded_write`), and R16's parse
+  (`PolicyGate::apiserver_address`).
+- `gate-tls`: `upstream.rs` (`UpstreamClient`, `UPSTREAM_BOUND`, `WRITE_BOUND`, `CONNECT_DEADLINE`,
+  `HANDSHAKE_DEADLINE`), `tls_client.rs` (`TlsClientIdentity`, `client_config`, `server_name`), `http1.rs`
+  (`ResponseReader`, `ResponseProgress`, `ResponseRefusal`, `INTERIM_LIMIT`, `CHUNKED_RAW_LIMIT`), `exchange.rs`
+  (`write_response`, `is_uid`, `is_resource_version`), `i04.rs` (R68), `tls.rs` (`provider()` `pub(crate)`). The root
+  forbids `unsafe_code`.
+- Tests (host): `gate-tls/tests/upstream_port.rs`, `upstream_framing.rs`, `upstream_identity.rs`, `upstream_client.rs`,
+  `upstream_substrate.rs`, `i04_outcome.rs` and the shared `upstream_support/mod.rs` (a fake `ConnectNet` on
+  `tls_support`'s fake clock, a scripted rustls apiserver that verifies the client certificate, Ed25519 test PKI from
+  fixed seeds); R16's unit test in `policy_gate.rs`; the gate's self-test cases for every new rule.
+- Departures from the design, each within its intent: `client_config` takes the time provider as a third argument (as
+  `server_config` does, §20 of HE-003B), and the serving CAs as a slice; the identity's key is moved into rustls at
+  `with_client_auth_cert` (the last builder step, since the design's deny-list refuses `with_client_cert_resolver`), so
+  every earlier refusal drops it inside its `Zeroizing`; `effect_gate::net` re-exports `InetAddress` and `IpLiteral` so
+  gate-tls needs no new dependency; the I07 operation, plural and name are read from the rendered head (the design's
+  `forwarded_write` returns the rendered write only); a v1 `Status` also needs `apiVersion` v1 and `kind` Status, and
+  the object form refuses a body of kind Status; an error readiness during the handshake or the exchange is LOST after
+  the reads (so a complete answer read in that wake still counts).
+
+### Constants and their evidence (for T04)
+
+From the pinned musl 1.2.5 `libc.a` (llvm-objdump with relocations; `tools/w03/he003c/CONSTANTS_EVIDENCE.md`):
+
+| Constant | x86_64 / aarch64 | Evidence |
+|---|---|---|
+| `connect` | 42 / 203 | `connect.lo` passes it to `__syscall_cp` (a cancellation point; the gate is single-threaded and never cancelled, so it is the plain system call) |
+| `getsockopt` | 55 / 209 | `getsockopt.lo` |
+| `EINPROGRESS` | 115 | `res_msend.lo` compares errno with 115 right after its `connect` call |
+
+From the kernel UAPI (T04 confirms): `SOL_SOCKET` 1 and `SO_ERROR` 4 (the generic `socket.h`, read by no musl object).
+
+### Carried
+
+- T04 (Linux under load): the client's calls under the installed EFFECT_GATE filter (`socket`, `connect`, `getsockopt`,
+  `sendto`, `recvfrom`, `shutdown`, `close`) in the steady-state trace; Linux's immediate loopback connect results (0
+  or ECONNREFUSED from a non-blocking connect); ECDSA and RSA apiserver certificates (the host tests use Ed25519); the
+  selected apiserver's chunk sizes against the raw cap (R63) and its real chunked answers; the bounds in real time; the
+  constants above.
+- HE-008 (credentials and policy): the apiserver serving certificate carries the loopback IP SAN of
+  `apiserverAuthority`, issued by a CA that issues no other certificate with that SAN (ideally a dedicated serving CA),
+  since webpki accepts any certificate the configured CA issued for that IP; `planeon_gate_t`'s `name_connect` to
+  `planeon_kubeapi_port_t` and the `tcp_socket` connect permissions; the two client credential files (root, 0400) and
+  their SELinux type (matrix amendment, owner decision 2026-10-15 item 3); the clientAuth EKU and the RBAC of the two
+  identities.
+- W03 distribution check: real chunked answers and DELETE success bodies of the selected distribution (I05's
+  `deleteResponseBody`, R65's I07 DELETE forms, `details.kind` the plural); that the apiserver does not route on the
+  forwarded I05 head's `Host` (the I04 endpoint).
+- HE-003D: the composition (`LinuxConnector::new(&sealed, net)`, `UpstreamClient::new` with
+  `PolicyGate::apiserver_address()` and the two `client_config` results, rustls's default time provider), the signed
+  configuration's items (the apiserver serving CA and the two identities' DER chains and PKCS#8 keys), the key files'
+  read-buffer hygiene, and the deny-list and secret-type rules over the binary's sources.
+
+### Owner decisions (verbatim as relayed, 2026-10-15)
+
+The lane monitor (owner-delegated, "reasonable logic"; the owner may override), recorded against DESIGN rev 2.1
+(184922d6…):
+
+- Q-HE3C-1 = (a), amended: one apiserverAuthority from HE-003D's signed config, parsed once as an IP:port literal and refused unless loopback (127.0.0.0/8 or exactly ::1; IPv4-mapped refused).
+- Q-HE3C-2 = (a): standard webpki against the configured serving CA with an IP SAN; no custom verifier, no `danger` API. Carried to HE-008: a dedicated serving CA that issues no other certificate with the apiserver's loopback IP SAN.
+- Q-HE3C-3 = (a): two identities (effect-gate for I05, policy-writer for I07), with the per-channel identity test.
+- Q-HE3C-4 = (a): strict chunked on the gate→apiserver leg only, bounded at 4 MiB decoded plus the raw cap, re-rendered with Content-Length toward I04. T04 confirms it.
+- Q-HE3C-5 = (b): one global deny-list, kept whole and amended with the client hazards and the exactly-once settings.
+- Q-HE3C-6 = (a), amended: LOST only where the model journals the identity; None elsewhere, so I05 Decision 0's reconciliation still runs.
+- Q-HE3C-7 = (a): accept the deleted object, or the v1 Status form I05 already pins, checked by name, plural and uid. It's re-checked on the selected distribution in W03.

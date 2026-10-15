@@ -719,6 +719,8 @@ TCP_DECLARATIONS = ("#[allow(clashing_extern_declarations)]\nunsafe extern \"C\"
                     "    fn setsockopt(fd: c_int, l: c_int, n: c_int, v: *const c_void, s: c_uint) -> c_int;\n"
                     "    fn bind(fd: c_int, address: *const c_void, length: c_uint) -> c_int;\n"
                     "    fn listen(fd: c_int, backlog: c_int) -> c_int;\n"
+                    "    fn connect(fd: c_int, address: *const c_void, length: c_uint) -> c_int;\n"
+                    "    fn getsockopt(fd: c_int, l: c_int, n: c_int, v: *mut c_void, s: *mut c_uint) -> c_int;\n"
                     "    fn recv(fd: c_int, b: *mut c_void, n: usize, flags: c_int) -> c_long;\n"
                     "    fn send(fd: c_int, b: *const c_void, n: usize, flags: c_int) -> c_long;\n"
                     "    fn shutdown(fd: c_int, how: c_int) -> c_int;\n"
@@ -1321,22 +1323,28 @@ TCP = "crates/gate-sys/src/tcp.rs"
 
 
 class TcpModuleTests(Tree):
-    """HE-003B DESIGN section 3.1: gate-sys's tcp module is the fourth file allowed `unsafe`, declares exactly its eight
-    foreign symbols, and may name the std::os::fd items."""
+    """HE-003B DESIGN section 3.1: gate-sys's tcp module is the fourth file allowed `unsafe`, declares exactly its
+    foreign symbols (HE-003C DESIGN sections 5 and 6: ten, with connect and getsockopt), and may name the std::os::fd
+    items."""
 
     TREE = FOREIGN_TREE
 
-    def test_the_tcp_module_declares_exactly_its_eight_symbols(self):
+    def test_the_tcp_module_declares_exactly_its_ten_symbols(self):
         self.assertEqual(gate.check_foreign_items(self.base), 10)
-        self.assertEqual(gate.FOREIGN_ITEMS[TCP], {"socket", "setsockopt", "bind", "listen", "recv", "send", "shutdown",
-                                                    "syscall"})
+        self.assertEqual(gate.FOREIGN_ITEMS[TCP], {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt",
+                                                    "recv", "send", "shutdown", "syscall"})
         message = "tcp.rs declares the foreign items .* not exactly"
         for text in (FOREIGN_TREE[TCP].replace("    fn shutdown(fd: c_int, how: c_int) -> c_int;\n", ""),
                      FOREIGN_TREE[TCP].replace("fn recv(", "fn recvfrom("),
                      FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn accept(f: c_int) -> c_int; }\n",
                      FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn accept4(f: c_int) -> c_int; }\n",
                      FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn ioctl(f: c_int, ...) -> c_int; }\n",
-                     FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn connect(f: c_int) -> c_int; }\n"):
+                     # HE-003C: connect and getsockopt are required, and the client needs no other call.
+                     FOREIGN_TREE[TCP].replace("    fn connect(fd: c_int, address: *const c_void, length: c_uint) -> c_int;\n",
+                                               ""),
+                     FOREIGN_TREE[TCP].replace("fn getsockopt(", "fn getpeername("),
+                     FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn connectx(f: c_int) -> c_int; }\n",
+                     FOREIGN_TREE[TCP] + "unsafe extern \"C\" { fn fcntl(f: c_int, c: c_int, ...) -> c_int; }\n"):
             self.refused(gate.check_foreign_items, TCP, text, message)
         (self.base / TCP).unlink()
         with self.assertRaisesRegex(gate.GateError, "tcp.rs is missing"):
@@ -1367,16 +1375,34 @@ pub fn server_config() {
 """
 
 
+GOOD_CLIENT = """//! The client configuration.
+pub fn client_config() {
+    let verifier = WebPkiServerVerifier::builder_with_provider(roots, provider()).build();
+    let mut config = ClientConfig::builder_with_details(provider, time)
+        .with_protocol_versions(&[&TLS13])
+        .with_webpki_verifier(verifier)
+        .with_client_auth_cert(chain, key);
+    config.resumption = Resumption::disabled();
+    config.enable_early_data = false;
+    config.enable_sni = false;
+}
+"""
+GOOD_EXCHANGE = "pub fn stage() { let _ = UpstreamResponse { http_status: 200 }; }\n"
+
+
 class TlsTests(Tree):
     """HE-003B DESIGN sections 2.6 and 20 (D1-5, D2-1): the TLS deny-list over gate-tls's sources and the
-    exactly-once settings."""
+    exactly-once settings; HE-003C DESIGN section 5: the client's tokens and settings in the same global list, its
+    authentication and verifier once in tls_client.rs, and UpstreamResponse constructed in exchange.rs only."""
 
     TREE = {"crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]\npub mod tls;\n",
             "crates/gate-tls/src/tls.rs": GOOD_TLS,
+            "crates/gate-tls/src/tls_client.rs": GOOD_CLIENT,
+            "crates/gate-tls/src/exchange.rs": GOOD_EXCHANGE,
             "crates/gate-tls/tests/tls_server.rs": "// tests may build a Ticketer, a KeyLogFile, ServerConfig::builder()\n"}
 
     def test_the_closed_configuration_passes(self):
-        self.assertEqual(gate.check_tls(self.base), 2)
+        self.assertEqual(gate.check_tls(self.base), 4)
 
     def test_every_refused_token(self):
         tls = "crates/gate-tls/src/tls.rs"
@@ -1392,7 +1418,7 @@ class TlsTests(Tree):
                      "let _ = connection.dangerous_extract_secrets();"):
             self.refused(gate.check_tls, tls, GOOD_TLS + line + "\n", "names .* .TLS deny-list")
         # The deny-list is not applied to the tests.
-        self.assertEqual(gate.check_tls(self.base), 2)
+        self.assertEqual(gate.check_tls(self.base), 4)
 
     def test_the_settings_are_set_exactly_once(self):
         tls = "crates/gate-tls/src/tls.rs"
@@ -1411,7 +1437,7 @@ class TlsTests(Tree):
                      message % "send_tls13_tickets")
         # Whitespace variants of the settings are accepted; the lower-case ticketer read is not a refused token.
         self.write(tls, GOOD_TLS.replace("config.send_tls13_tickets = 0;", "config.send_tls13_tickets=0;"))
-        self.assertEqual(gate.check_tls(self.base), 2)
+        self.assertEqual(gate.check_tls(self.base), 4)
 
     def test_the_resolver_is_named_exactly_once(self):
         tls = "crates/gate-tls/src/tls.rs"
@@ -1419,6 +1445,67 @@ class TlsTests(Tree):
                      "SingleCertAndKey::from. exactly once")
         self.refused(gate.check_tls, tls, GOOD_TLS + "fn again() { let _ = with_cert_resolver(x); }\n",
                      "with_cert_resolver. exactly once")
+
+    def test_every_refused_client_token(self):
+        # HE-003C (Q-HE3C-5 (b)): one global list, so the client hazards refuse in any gate-tls source, comments
+        # included, and the server's tokens refuse in the client's sources too.
+        for rel in ("crates/gate-tls/src/tls_client.rs", "crates/gate-tls/src/upstream.rs", "crates/gate-tls/src/tls.rs"):
+            text = self.TREE.get(rel, "")
+            for line in ("config.resumption = Resumption::in_memory_sessions(8);", "let _ = Resumption :: store(s);",
+                         "let _ = ClientSessionMemoryCache::new(8);", "let r = r.tls12_resumption(t);",
+                         "let b = b.with_ech(mode);", "let _: Option<EchMode> = None;",
+                         "let c = b.with_client_cert_resolver(r);", "let _ = config.send_ticket_request;",
+                         "// with_ech is not called", "let _ = ClientConfig::builder();", "let b = b.dangerous();",
+                         "let c = b.with_no_client_auth();", "config.key_log = k;",
+                         "let _ = ClientConfig::builder_with_protocol_versions(&[&TLS13]);",
+                         "let _ = WebPkiServerVerifier::builder(roots);"):
+                self.refused(gate.check_tls, rel, text + line + "\n", "names .* .TLS deny-list")
+        self.assertEqual(gate.check_tls(self.base), 4)
+
+    def test_the_client_settings_are_set_exactly_once(self):
+        client = "crates/gate-tls/src/tls_client.rs"
+        message = "does not set %s exactly once"
+        for name, line in (("resumption", "    config.resumption = Resumption::disabled();\n"),
+                           ("enable_early_data", "    config.enable_early_data = false;\n"),
+                           ("enable_sni", "    config.enable_sni = false;\n")):
+            self.refused(gate.check_tls, client, GOOD_CLIENT.replace(line, ""), message % name)
+            self.refused(gate.check_tls, client, GOOD_CLIENT.replace(line, "    // " + line.strip() + "\n"), message % name)
+            self.refused(gate.check_tls, client, GOOD_CLIENT + line, message % name)
+            self.refused(gate.check_tls, "crates/gate-tls/src/upstream.rs", line, message % name)
+        for old, new, name in (("enable_early_data = false", "enable_early_data = true", "enable_early_data"),
+                               ("enable_sni = false", "enable_sni = true", "enable_sni"),
+                               ("Resumption::disabled()", "Resumption::default()", "resumption")):
+            self.refused(gate.check_tls, client, GOOD_CLIENT.replace(old, new), message % name)
+        # Whitespace variants pass; the type name Resumption is not the setting.
+        self.write(client, GOOD_CLIENT.replace("config.enable_sni = false;", "config.enable_sni=false;")
+                   + "fn kind() -> Resumption { Resumption::disabled() }\n")
+        self.assertEqual(gate.check_tls(self.base), 4)
+
+    def test_client_auth_and_the_verifier_are_named_once_in_tls_client(self):
+        client = "crates/gate-tls/src/tls_client.rs"
+        for name, call in (("with_client_auth_cert", ".with_client_auth_cert(chain, key)"),
+                           ("with_webpki_verifier", ".with_webpki_verifier(verifier)")):
+            message = "%s. exactly once, in tls_client.rs" % name
+            self.refused(gate.check_tls, client, GOOD_CLIENT.replace(call, ""), message)
+            self.refused(gate.check_tls, client, GOOD_CLIENT + "fn again() { x%s; }\n" % call, message)
+            self.refused(gate.check_tls, "crates/gate-tls/src/upstream.rs", "fn other() { x%s; }\n" % call, message)
+            self.refused(gate.check_tls, client, GOOD_CLIENT.replace(call, "/* %s */" % call), message)
+        (self.base / client).rename(self.base / "crates/gate-tls/src/client.rs")
+        with self.assertRaisesRegex(gate.GateError, "no tls_client.rs"):
+            gate.check_tls(self.base)
+
+    def test_only_exchange_constructs_upstream_response(self):
+        message = "constructs UpstreamResponse outside crates/gate-tls/src/exchange.rs"
+        for rel, text in (("crates/gate-tls/src/upstream.rs", "fn f() { let _ = UpstreamResponse { http_status: 200 }; }\n"),
+                          ("crates/gate-tls/src/upstream.rs", "fn f() { let _ = effect_gate::UpstreamResponse{ x }; }\n"),
+                          ("crates/gate-tls/src/i04.rs", "fn f() { let _ = UpstreamResponse\n    { x }; }\n")):
+            self.refused(gate.check_tls, rel, text, message)
+        # A use, a type, a comment, a literal, the tests and effect-gate's sources are not constructions in gate-tls.
+        self.write("crates/gate-tls/src/upstream.rs", "use effect_gate::UpstreamResponse;\n// UpstreamResponse { .. }\n"
+                   "const A: &str = \"UpstreamResponse { }\";\nfn f(r: UpstreamResponse) {}\n")
+        self.write("crates/gate-tls/tests/upstream.rs", "let _ = UpstreamResponse { http_status: 200 };\n")
+        self.write("crates/effect-gate/src/gate.rs", "pub struct UpstreamResponse { pub http_status: i64 }\n")
+        self.assertEqual(gate.check_tls(self.base), 5)
 
 
 SECRET_TREE = {**DEBUG_TREE, "crates/gate-tls/src/tls.rs": "#[derive(Debug)]\npub enum TlsSetupError { Key(rustls::Error) }\n"
@@ -1448,6 +1535,20 @@ class SecretDebugTests(Tree):
                              ("#[derive(Debug)]\nstruct S { c: TcpConn }", "TcpConn"),
                              ("#[derive(Debug)]\nstruct S { l: gate_sys::tcp::TcpListener }", "TcpListener"),
                              ("#[derive(Debug)]\nstruct S { n: Rc<RefCell<NetTable>> }", "NetTable")):
+            self.refused(gate.check_debug_derives, rel, text + "\n", "mention %s .Debug check" % hazard)
+
+    def test_client_secret_names_and_fields_refuse(self):
+        # HE-003C DESIGN section 5: the client's configuration, connection and identity, and the connector.
+        rel = "crates/gate-tls/src/extra.rs"
+        for text in ("#[derive(Debug)]\npub struct TlsClientIdentity { key: Vec<u8> }",
+                     "#[derive(Clone, Debug)]\nstruct ClientConnection(u8);",
+                     "#[cfg_attr(test, derive(Debug))]\nstruct ClientConfig;"):
+            self.refused(gate.check_debug_derives, rel, text + "\n", "a secret type .Debug check")
+        for text, hazard in (("#[derive(Debug)]\nstruct S { config: Arc<ClientConfig> }", "ClientConfig"),
+                             ("#[derive(Debug)]\nstruct Open { tls: Option<ClientConnection> }", "ClientConnection"),
+                             ("#[derive(Debug)]\nenum E { I(TlsClientIdentity) }", "TlsClientIdentity"),
+                             ("#[derive(Debug)]\nstruct S { net: effect_gate::linux_net::LinuxConnector }",
+                              "LinuxConnector")):
             self.refused(gate.check_debug_derives, rel, text + "\n", "mention %s .Debug check" % hazard)
 
 
