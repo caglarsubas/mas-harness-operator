@@ -30,18 +30,21 @@ Every R10 packet from HE-001 on runs these after HE-000's and HE-000B's commands
 3. `cargo test --locked --offline --frozen --manifest-path host-enforcement/Cargo.toml`
 4. `python3 -I -B host-enforcement/tools/gate.py`
 
-The gate checks the toolchain pin, the cargo config and linker wrapper, the workspace and lock, the closure table against the installed toolchain, the crt
+The gate checks the toolchain pin (the Command Line Tools' clang and ar included, since HE-003B), the cargo config and
+linker wrapper, the vendored crates against the vendor table, the workspace and lock, the closure table against the installed toolchain, the crt
 objects (compiler-rt, not GCC), each binary's ELF shape, the start-up lint, and writes one deterministic CycloneDX 1.5
 SBOM per binary and target under `target/sbom/`. Every line it prints starts with `he-gate: `.
 
 ## Rules
 
 - **Forward-fix only.** A merged packet is never reverted or rewritten; a defect is fixed by a new packet.
-- **Offline builds.** `[net] offline = true`, `--locked --offline --frozen`, no registry or git dependency. The first
-  packet that vendors a crate extends the gate and the closure table.
+- **Offline builds.** `[net] offline = true`, `--locked --offline --frozen`, no git dependency. Registry packages come
+  only from the vendored directory source `host-enforcement/vendor/` (`.cargo/config.toml` `[source]`), pinned file by
+  file by `licenses/vendor-crates.json` (`VENDOR_TABLE_SHA256` in `tools/gate.py`); HE-003B extended the gate and added
+  that table beside the sysroot closure table.
 - **No build scripts or proc-macros** in the workspace.
 - **Start-up lint.** Workspace sources must not use `available_parallelism`, `current_exe`, `current_dir`, `env::var`,
-  `var_os`, `vars`, `/proc` or `/sys` (every `.rs` file outside `target/`). It is a source lint, not proof of behaviour
+  `var_os`, `vars`, `/proc` or `/sys` (every `.rs` file outside `target/` and `vendor/`). It is a source lint, not proof of behaviour
   (that is T04's trace).
 - **Units must not set `RUST_BACKTRACE`** (HE-008).
 - **The closure table is anchored by the packet.** `TABLE_SHA256` in `tools/gate.py` pins the reviewed table; a change

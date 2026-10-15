@@ -37,6 +37,11 @@
 //!
 //! The executable of a peer is not read (§4.3): Q-HE2S-10 leaves the broker's artifact identity to HE-004's record,
 //! and the writer's executable check (owner decisions Q-HE3A-1 (c), Q-HE3A-1b (a)) lands in a later R10 packet.
+//!
+//! HE-003B (DESIGN §4.2, Q-HE3B-13 (a), MODEL_DEFINED R56) adds the provided [`Port::failure`] and
+//! [`LoopExit::Port`]: the loop checks both ports' `failure()` after every event's output has been applied, wired and
+//! synced; after every `due`, `ready` and `drain_backlog` call, before that call's events (and, for the drain, before
+//! the I05 frame) are fed; and before every wait. With the default `failure()` the loop is HE-003A's.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -209,6 +214,8 @@ pub enum LoopExit {
     Poll,
     /// A port asked for a token value past its 56 bits.
     PortToken(Owner),
+    /// A port reported a failure it cannot continue after (HE-003B DESIGN §4.2): the owner and the port's reason.
+    Port(Owner, &'static str),
 }
 
 /// A port's access to the poller during [`Port::register`]: its own tokens only.
@@ -281,6 +288,11 @@ pub trait Port {
     fn apply(&mut self, output: &PolicyOutput);
     /// Closes what the model holds closed.
     fn sync(&mut self, view: &dyn GateView);
+    /// A failure the port cannot continue after (HE-003B DESIGN §4.2): the loop stops with [`LoopExit::Port`] at its
+    /// next check. None by default.
+    fn failure(&self) -> Option<&'static str> {
+        None
+    }
 }
 
 /// The I04 port (HE-003B).
@@ -460,6 +472,8 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
     /// One wake (§5.6): wait, then the deadlines, the I05 and I07 connections, the pidfds, the ports' descriptors and
     /// the listeners, in this order, then the ports' registrations.
     pub fn turn(&mut self) -> Result<(), LoopExit> {
+        // A failed port never sits in a wait (HE-003B DESIGN §4.2).
+        self.check_ports()?;
         let timeout = self.timeout_ms();
         let ready = self.os.wait(timeout).ok_or(LoopExit::Poll)?;
         let mut own = [false; 7];
@@ -497,10 +511,12 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
         // 5. The ports' descriptors.
         for (value, readiness) in i04_ready {
             let events = self.i04.ready(value, readiness);
+            self.check_ports()?;
             self.feed_port_events(events)?;
         }
         for (value, readiness) in upstream_ready {
             let events = self.upstream.ready(value, readiness);
+            self.check_ports()?;
             self.feed_port_events(events)?;
         }
         // 6. The listeners.
@@ -558,6 +574,17 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
         }
     }
 
+    /// R56: stops the loop when a port reports a failure (the I04 port first).
+    fn check_ports(&self) -> Result<(), LoopExit> {
+        if let Some(reason) = self.i04.failure() {
+            return Err(LoopExit::Port(Owner::I04, reason));
+        }
+        match self.upstream.failure() {
+            Some(reason) => Err(LoopExit::Port(Owner::Upstream, reason)),
+            None => Ok(()),
+        }
+    }
+
     fn register_ports(&mut self) -> Result<(), LoopExit> {
         self.i04.register(&mut Registry { poll: &mut self.os, owner: Owner::I04 })?;
         self.upstream.register(&mut Registry { poll: &mut self.os, owner: Owner::Upstream })
@@ -590,6 +617,7 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
         self.i04.sync(&self.gate);
         self.upstream.sync(&self.gate);
         self.reconcile();
+        self.check_ports()?;
         if let Some((event, concern)) = follow_up {
             self.deliver(event, concern, None)?;
         }
@@ -731,6 +759,7 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
                 Owner::I04 => self.i04.due(now),
                 Owner::Upstream => self.upstream.due(now),
             };
+            self.check_ports()?;
             self.feed_port_events(events)?;
         }
         Ok(())
@@ -867,6 +896,8 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
                     // The pre-frame steps: the expiry, then the I04 backlog.
                     self.check_expiry()?;
                     let backlog = self.i04.drain_backlog();
+                    // C2: a drain that could not finish stops the loop before its events and the frame.
+                    self.check_ports()?;
                     self.feed_port_events(backlog)?;
                     if self.i05.is_none() {
                         return Ok(());

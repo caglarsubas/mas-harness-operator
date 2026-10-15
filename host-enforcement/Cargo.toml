@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/host-common", "crates/containment", "crates/broker", "crates/observer", "crates/gate", "crates/writer",
-           "crates/i05-protocol", "crates/effect-gate", "crates/gate-sys"]
+           "crates/i05-protocol", "crates/effect-gate", "crates/gate-sys", "crates/gate-tls"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,3 +15,8 @@ lto = true
 codegen-units = 1
 debug = 0
 strip = "debuginfo"
+
+# HE-003B (Q-HE3B-23 (a)): build scripts (ring's, libc's, rustls's) are not stripped, so rustc never runs
+# rust-objcopy on the darwin build-script binaries (it cannot load libLLVM.dylib through its rpath).
+[profile.release.build-override]
+strip = "none"

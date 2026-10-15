@@ -14,6 +14,9 @@
 //! HE-003A adds what the channel substrate reads (`channel_state`, `bound_run`, `connection_open`, none of which
 //! changes any state) and the R10-defined `Event::AnswerLate` (HE-003A DESIGN §5.1, §5.7); no existing event's answer
 //! changes.
+//!
+//! HE-003B adds the R10-defined `Event::Disconnect` (HE-003B DESIGN §4.3, MODEL_DEFINED R44): an I04 connection the
+//! port ended on its own before any request leaves the model; no existing event's answer changes.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -80,6 +83,11 @@ pub enum Event {
     /// R10-defined (HE-003A DESIGN §5.7, owner decision Q-HE3A-2 (b)): the substrate did not send an answer because
     /// the 2-second bound had passed. Fatal `ANSWER_LATE` (HELD) on an OPEN channel; an `EventError` otherwise.
     AnswerLate,
+    /// R10-defined (HE-003B DESIGN §4.3, Q-HE3B-14 (a), R44): the I04 port closed, on its own, a connection the model
+    /// holds and on which it fed no request (TLS refused, a deadline, an oversize head or a truncated request, EOF or
+    /// reset, no client certificate). The entry is removed; no counter changes and nothing is journalled; output
+    /// nothing. An unknown connection, or one with a request, is an `EventError`.
+    Disconnect { conn: String },
 }
 
 /// The model's channel, as the substrate reads it (HE-003A DESIGN §5.1).
@@ -947,6 +955,7 @@ impl Gate {
                 Output::of(OutputKind::Nothing)
             }
             Event::Accept { conn } => self.accept(conn)?,
+            Event::Disconnect { conn } => self.disconnect(&conn)?,
             Event::Request { conn, certificate_digest, head, body_digest } => {
                 self.request(&conn, &certificate_digest, &head, body_digest.as_deref())?
             }
@@ -1049,6 +1058,18 @@ impl Gate {
         }
         self.connections.insert(conn, Connection { stamp: stamp.clone(), open: true, requests: 0, consumed: false });
         Ok(Output::of(OutputKind::Stamp(stamp)))
+    }
+
+    /// R44: removes the entry of a connection that ended before its request, open or (defensively) closed.
+    fn disconnect(&mut self, conn: &str) -> Result<Output, EventError> {
+        match self.connections.get(conn) {
+            None => Err(EventError("disconnect of an unaccepted connection")),
+            Some(connection) if connection.requests > 0 => Err(EventError("disconnect after a request")),
+            Some(_) => {
+                self.connections.remove(conn);
+                Ok(Output::of(OutputKind::Nothing))
+            }
+        }
     }
 
     fn request(&mut self, conn: &str, certificate: &str, head: &str, body_digest: Option<&str>) -> Result<Output, EventError> {

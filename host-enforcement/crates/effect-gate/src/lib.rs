@@ -6,8 +6,10 @@
 //! stages, then the published seccomp program, over gate-sys's raw calls. HE-003A adds the channel substrate
 //! (`substrate`, with the expected peers in `peers` and the Linux `Os` in `linux_os`): the I05 and I07 listeners, peer
 //! qualification and per-frame custody, the expiry clock and the 2-second answer bound, with ports for the I04 and
-//! upstream events of HE-003B and HE-003C. Std only and safe Rust (the root forbids `unsafe_code`), no panics on any
-//! input. The TLS ports and the binary's `main` (HE-003B to HE-003D) are not here.
+//! upstream events of HE-003B and HE-003C. HE-003B adds the R10-defined `Event::Disconnect`, the ports' `failure()`
+//! with `LoopExit::Port`, the I04 port's stream I/O trait (`net`) and the Linux stream table (`linux_net`, with
+//! `LinuxOs::with_net`). Std only and safe Rust (the root forbids `unsafe_code`), no panics on any input. The TLS
+//! ports live in the `gate-tls` crate; the binary's `main` (HE-003D) is not here.
 //!
 //! Behaviour taken from the pinned models or validator rather than the READMEs, and the R10-defined behaviour, is
 //! listed in `MODEL_DEFINED.md`.
@@ -19,7 +21,10 @@ pub mod frame;
 pub mod gate;
 pub mod journal;
 #[cfg(target_os = "linux")]
+pub mod linux_net;
+#[cfg(target_os = "linux")]
 pub mod linux_os;
+pub mod net;
 pub mod peers;
 pub mod policy;
 pub mod policy_gate;
@@ -33,6 +38,7 @@ pub use file_store::{FileStores, OpenError, StoreDir};
 pub use gate::{BoundRun, ChannelRefusal, ChannelState, ConnectionRefusal, Event, EventError, FrameInput, Gate, GateError,
                Output, OutputKind, Stamp, UpstreamResponse};
 pub use journal::{ChannelEnd, Entry, Record, TerminalDetails, WriteDetails};
+pub use net::{Accepted, StreamNet, Transfer};
 pub use peers::{ExpectedPeer, ExpectedPeers, ListenerPlan};
 pub use policy::{check_write, classify, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
                  Prior, RenderedWrite, ResourceRef, WritableKind, WriteOperation, WriteRefusal, WriteRequest};

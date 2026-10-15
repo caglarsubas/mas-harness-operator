@@ -716,11 +716,13 @@ pub fn send(conn: &Conn, bytes: &[u8]) -> io::Result<()> {
 
 // ------------------------------------------------------------------------------------------ the poller
 
-/// A descriptor the poller watches.
+/// A descriptor the poller watches (HE-003B adds the I04 listener and its connections, from `tcp.rs`).
 pub enum Watched<'a> {
     Listener(&'a Listener),
     Conn(&'a Conn),
     PidFd(&'a PidFd),
+    TcpListener(&'a crate::tcp::TcpListener),
+    TcpConn(&'a crate::tcp::TcpConn),
 }
 
 impl Watched<'_> {
@@ -729,6 +731,8 @@ impl Watched<'_> {
             Watched::Listener(listener) => listener.fd.as_raw_fd(),
             Watched::Conn(conn) => conn.fd.as_raw_fd(),
             Watched::PidFd(pidfd) => pidfd.fd.as_raw_fd(),
+            Watched::TcpListener(listener) => listener.descriptor(),
+            Watched::TcpConn(conn) => conn.descriptor(),
         }
     }
 }
