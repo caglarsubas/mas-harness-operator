@@ -30,6 +30,12 @@ edges; gate-tls joins the linked crates, gate-sys's tcp module the files allowed
 derive(Debug) is refused on the secret-holding types; gate-tls's sources pass a TLS deny-list and name the closed
 settings exactly once; and the SBOM lists the vendored crates a binary links (none until HE-003D).
 
+HE-003C (the upstream apiserver client; DESIGN section 5, Q-HE3C-5 (b)) keeps the TLS deny-list one global list over
+gate-tls's sources and amends it with the client hazards; the client's three closed settings join the exactly-once
+rule, tls_client.rs names with_client_auth_cert( and with_webpki_verifier( exactly once each, and among gate-tls's
+sources only exchange.rs constructs `UpstreamResponse {`; gate-sys's tcp module gains connect and getsockopt; the
+client's configuration, connection and identity types join the secret types and its connector the Debug hazards.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -137,18 +143,20 @@ FOREIGN_ITEMS = {OPENAT: {"openat"},
                  SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"},
                  CHANNEL: {"socket", "bind", "listen", "setsockopt", "getsockopt", "recvmsg", "sendmsg", "epoll_create1",
                            "epoll_ctl", "epoll_pwait", "ppoll", "syscall"},
-                 # HE-003B DESIGN section 3.1: the I04 listener's eight (accept4 only through syscall).
-                 TCP: {"socket", "setsockopt", "bind", "listen", "recv", "send", "shutdown", "syscall"}}
+                 # HE-003B DESIGN section 3.1: the I04 listener's eight (accept4 only through syscall); HE-003C DESIGN
+                 # sections 5 and 6: the upstream client's connect and getsockopt (SO_ERROR), ten in all.
+                 TCP: {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt", "recv", "send", "shutdown",
+                       "syscall"}}
 # HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
 # with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
 # struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
 # impls and direct formatting are code review's.
 DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir", "TcpListener", "TcpConn",
-                 "NetTable")
+                 "NetTable", "LinuxConnector")
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
-                "ServerConnection")
+                "ServerConnection", "ClientConfig", "ClientConnection", "TlsClientIdentity")
 DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS + SECRET_TYPES))
 OUTER_ATTRIBUTE = re.compile(r"#\s*\[")
 ITEM_AFTER_ATTRIBUTES = re.compile(r"\s*(?:#\s*\[|(?:pub\s*(?:\([^)]*\)\s*)?)?(struct|enum|union)\s+([A-Za-z_]\w*))")
@@ -191,7 +199,9 @@ CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]",
                "crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]"}
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
-# each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`.
+# each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
+# (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
+# resumption, ECH, which sends an outer SNI whatever enable_sni says, a client certificate resolver, ticket requests).
 TLS_FORBIDDEN = tuple((re.compile(pattern), name) for pattern, name in (
     (r"KeyLogFile", "KeyLogFile"), (r"SSLKEYLOGFILE", "SSLKEYLOGFILE"), (r"KeyLog", "KeyLog"), (r"key_log", "key_log"),
     (r"PemObject", "PemObject"), (r"pem\s*::", "pem::"), (r"from_pem", "from_pem"),
@@ -201,15 +211,32 @@ TLS_FORBIDDEN = tuple((re.compile(pattern), name) for pattern, name in (
     (r"with_no_client_auth", "with_no_client_auth"), (r"NoClientAuth", "NoClientAuth"),
     (r"ServerSessionMemoryCache", "ServerSessionMemoryCache"), (r"Ticketer", "Ticketer"),
     (r"ticketer\s*=(?!=)", "ticketer ="), (r"enable_secret_extraction", "enable_secret_extraction"),
-    (r"dangerous_extract_secrets", "dangerous_extract_secrets")))
+    (r"dangerous_extract_secrets", "dangerous_extract_secrets"),
+    (r"in_memory_sessions", "in_memory_sessions"), (r"Resumption\s*::\s*store", "Resumption::store"),
+    (r"ClientSessionMemoryCache", "ClientSessionMemoryCache"), (r"tls12_resumption", "tls12_resumption"),
+    (r"with_ech", "with_ech"), (r"EchMode", "EchMode"), (r"with_client_cert_resolver", "with_client_cert_resolver"),
+    (r"send_ticket_request", "send_ticket_request")))
 # The settings gate-tls's sources (read with comments removed and literal contents emptied) name exactly once, each as
 # this assignment; and, in tls.rs, the certificate resolver of DESIGN section 20.
 TLS_SETTINGS = (("max_early_data_size", r"\bmax_early_data_size\s*=\s*0\b"),
                 ("send_tls13_tickets", r"\bsend_tls13_tickets\s*=\s*0\b"),
                 ("send_half_rtt_data", r"\bsend_half_rtt_data\s*=\s*false\b"),
-                ("session_storage", r"\bsession_storage\s*=\s*Arc\s*::\s*new\s*\(\s*NoServerSessionStorage\s*\{\s*\}\s*\)"))
+                ("session_storage", r"\bsession_storage\s*=\s*Arc\s*::\s*new\s*\(\s*NoServerSessionStorage\s*\{\s*\}\s*\)"),
+                # HE-003C DESIGN section 5: the client's positive settings, each counted once across gate-tls too.
+                ("resumption", r"\bresumption\s*=\s*Resumption\s*::\s*disabled\s*\(\s*\)"),
+                ("enable_early_data", r"\benable_early_data\s*=\s*false\b"),
+                ("enable_sni", r"\benable_sni\s*=\s*false\b"))
 TLS_RESOLVER = ((r"\bwith_cert_resolver\s*\(", "with_cert_resolver("),
                 (r"\bSingleCertAndKey\s*::\s*from\s*\(", "SingleCertAndKey::from("))
+# HE-003C DESIGN section 5 (D1-8): the client's authentication and its webpki verifier, each named exactly once, in
+# tls_client.rs (mirroring TLS_RESOLVER).
+TLS_CLIENT_AUTH = ((r"\bwith_client_auth_cert\s*\(", "with_client_auth_cert("),
+                   (r"\bwith_webpki_verifier\s*\(", "with_webpki_verifier("))
+# HE-003C DESIGN section 5 (D2-4 of HE-003B): among gate-tls's non-test sources only exchange.rs constructs an
+# UpstreamResponse (stage_response and write_response build it from the bytes they digest). Effect-gate's constructions
+# are test-only, and its non-test mentions are the definition and patterns, so the rule is scoped to gate-tls.
+UPSTREAM_RESPONSE = re.compile(r"\bUpstreamResponse\s*\{")
+UPSTREAM_RESPONSE_HOME = "crates/gate-tls/src/exchange.rs"
 # The linked-source patterns below are matched against the source with the whitespace around every `::` removed
 # (PATH_SPACE), so `std :: process` is `std::process` to them.
 PATH_SPACE = re.compile(r"\s*::\s*")
@@ -1163,8 +1190,10 @@ def check_vendor(base: Path, raw: bytes, expected: str = VENDOR_TABLE_SHA256) ->
 def check_tls(base: Path) -> int:
     """HE-003B DESIGN sections 2.6 and 20 (D1-5, D2-1): gate-tls's non-test sources hold none of TLS_FORBIDDEN in their
     raw text (comments included); read with comments removed and literal contents emptied, they name each of the
-    closed settings exactly once, as its assignment, and tls.rs names the certificate resolver exactly once each. Text,
-    not Rust: a renamed import or a macro could evade it, and code review stays."""
+    closed settings exactly once, as its assignment, and tls.rs names the certificate resolver exactly once each.
+    HE-003C DESIGN section 5: the list and the settings include the client's, tls_client.rs names TLS_CLIENT_AUTH
+    exactly once each, and no source but exchange.rs constructs `UpstreamResponse {` (read without comments and
+    literal contents). Text, not Rust: a renamed import, a type alias or a macro could evade it, and code review stays."""
     sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
                for path in sorted((base / GATE_TLS / "src").rglob("*.rs"))]
     require(sources, "gate-tls has no sources (TLS deny-list)")
@@ -1173,9 +1202,12 @@ def check_tls(base: Path) -> int:
         for pattern, name in TLS_FORBIDDEN:
             require(not pattern.search(text), "%s names %s (TLS deny-list)" % (rel, name))
         try:
-            code += rust_code(text) + "\n"
+            source_code = rust_code(text)
         except GateError as error:
             raise GateError("%s: %s (TLS deny-list)" % (rel, error)) from None
+        require(rel == UPSTREAM_RESPONSE_HOME or not UPSTREAM_RESPONSE.search(source_code),
+                "%s constructs UpstreamResponse outside %s (TLS deny-list)" % (rel, UPSTREAM_RESPONSE_HOME))
+        code += source_code + "\n"
     for name, assignment in TLS_SETTINGS:
         require(len(re.findall(r"\b%s\b" % name, code)) == 1 and len(re.findall(assignment, code)) == 1,
                 "gate-tls does not set %s exactly once, as the closed setting (TLS deny-list)" % name)
@@ -1184,6 +1216,12 @@ def check_tls(base: Path) -> int:
     tls_code = rust_code(tls.read_text(encoding="utf-8"))
     for pattern, name in TLS_RESOLVER:
         require(len(re.findall(pattern, tls_code)) == 1, "tls.rs does not name %s exactly once (TLS deny-list)" % name)
+    client = base / GATE_TLS / "src/tls_client.rs"
+    require(client.is_file(), "gate-tls has no tls_client.rs (TLS deny-list)")
+    client_code = rust_code(client.read_text(encoding="utf-8"))
+    for pattern, name in TLS_CLIENT_AUTH:
+        require(len(re.findall(pattern, code)) == 1 and len(re.findall(pattern, client_code)) == 1,
+                "gate-tls does not name %s exactly once, in tls_client.rs (TLS deny-list)" % name)
     return len(sources)
 
 
@@ -1297,10 +1335,11 @@ def main() -> int:
         say("Debug: %d sources of the linked crates derive Debug on no struct or enum named %s or whose field types "
             "mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(SECRET_TYPES),
                                                ", ".join(DEBUG_HAZARDS + SECRET_TYPES)))
-        say("TLS deny-list: %d gate-tls sources name none of its %d refused tokens; max_early_data_size, "
-            "send_tls13_tickets, send_half_rtt_data and session_storage are each set exactly once as the closed "
-            "setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once each" % (check_tls(HE),
-                                                                                                len(TLS_FORBIDDEN)))
+        say("TLS deny-list: %d gate-tls sources name none of its %d refused tokens; %s are each set exactly once as "
+            "the closed setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once each; tls_client.rs "
+            "names with_client_auth_cert( and with_webpki_verifier( once each; only exchange.rs constructs "
+            "UpstreamResponse {" % (check_tls(HE), len(TLS_FORBIDDEN),
+                                    ", ".join(name for name, _ in TLS_SETTINGS)))
         say("post-seal: %d sources of the linked crates name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))

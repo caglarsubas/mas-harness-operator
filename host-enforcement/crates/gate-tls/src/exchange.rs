@@ -6,11 +6,15 @@
 //! - The response is staged only through [`Exchange::stage_response`], which computes the body digest and builds the
 //!   upstream event from the same status, digest, UID and resourceVersion, so the values the model journals are those
 //!   of the bytes the I04 port relays. Every `Upstream` output and `LateUpstream` remove it.
+//!
+//! HE-003C (DESIGN §2.5, D1-13; MODEL_DEFINED R66) adds [`write_response`], the I07 counterpart of `stage_response`:
+//! it only builds the write's upstream event (I07 answers are not relayed through I04) and touches no slot, so the
+//! construction of `UpstreamResponse` stays in this module only (a gate rule).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use effect_gate::{Event, PolicyEvent, UpstreamResponse};
+use effect_gate::{Event, PolicyEvent, UpstreamOutcome, UpstreamResponse};
 use i05_protocol::sha256;
 
 use crate::http1::RESPONSE_BODY_LIMIT;
@@ -136,4 +140,31 @@ impl Exchange {
     pub fn has_response(&self) -> bool {
         self.response.is_some()
     }
+}
+
+/// The I05 v3 ACTION_OUTCOME and I07 v3 (R15) UID pattern: `^[A-Za-z0-9-]{1,128}$`.
+pub fn is_uid(text: &str) -> bool {
+    (1..=128).contains(&text.len()) && text.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+}
+
+/// The I05 v3 ACTION_OUTCOME and I07 v3 (R15) resourceVersion pattern: `^[A-Za-z0-9]{1,64}$`.
+pub fn is_resource_version(text: &str) -> bool {
+    (1..=64).contains(&text.len()) && text.bytes().all(|byte| byte.is_ascii_alphanumeric())
+}
+
+/// An I07 write's upstream answer as the event the upstream port feeds (HE-003C DESIGN §2.5): the body's digest and,
+/// when the status (100-599), UID and resourceVersion pass R15's patterns, `WUpstream { Response }`; otherwise
+/// `WUpstream { Lost }`, so an answer outside the I07 v3 patterns reaches the model as LOST, never as a Response
+/// (HE003-REQ-1). It builds the event only and never touches the board's request or response slots (D1-13).
+pub fn write_response(write_id: u16, status: u16, body: &[u8], uid: Option<String>, resource_version: Option<String>)
+                      -> PolicyEvent {
+    let in_patterns = (100..=599).contains(&status)
+        && uid.as_deref().is_none_or(is_uid)
+        && resource_version.as_deref().is_none_or(is_resource_version);
+    if !in_patterns {
+        return PolicyEvent::WUpstream { write_id, outcome: UpstreamOutcome::Lost };
+    }
+    let response = UpstreamResponse { http_status: i64::from(status), body_digest: sha256::prefixed(body), uid,
+                                      resource_version };
+    PolicyEvent::WUpstream { write_id, outcome: UpstreamOutcome::Response(response) }
 }

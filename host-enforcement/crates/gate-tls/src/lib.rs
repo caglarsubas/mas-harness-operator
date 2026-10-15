@@ -11,8 +11,14 @@ pub mod exchange;
 pub mod http1;
 pub mod i04;
 pub mod tls;
+pub mod tls_client;
+pub mod upstream;
 
-pub use exchange::{BoardError, Exchange, SharedExchange, StagedRequest, StagedResponse};
+pub use exchange::{is_resource_version, is_uid, write_response, BoardError, Exchange, SharedExchange, StagedRequest,
+                   StagedResponse};
 pub use http1::{frame, render_response, Frame, RenderRefusal, BODY_LIMIT, HEAD_LIMIT, RESPONSE_BODY_LIMIT};
+pub use http1::{ResponseProgress, ResponseReader, ResponseRefusal, CHUNKED_RAW_LIMIT, INTERIM_LIMIT};
 pub use i04::{I04Server, ACCEPTS_PER_READY, CONNECTION_CAP, DRAIN_LIMIT, PHASE_DEADLINE, READ_BUDGET};
 pub use tls::{certificate_digest, server_config, TlsServerInputs, TlsSetupError, ALPN_HTTP11};
+pub use tls_client::{client_config, server_name, TlsClientIdentity, TlsClientSetupError};
+pub use upstream::{UpstreamClient, CONNECT_DEADLINE, HANDSHAKE_DEADLINE, UPSTREAM_BOUND, WRITE_BOUND};

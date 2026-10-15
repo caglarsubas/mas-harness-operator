@@ -19,9 +19,14 @@
 //! HE-003A adds what the channel substrate reads (the base gate's `channel_state`, `bound_run` and
 //! `connection_open`, and `session_held`, `pending_write`; none changes any state) and the R10-defined
 //! `PolicyEvent::WAnswerLate` (HE-003A DESIGN §5.7); no existing event's answer changes.
+//!
+//! HE-003C (DESIGN §2.1, §6) keeps the rendered request with the outstanding write (`forwarded_write`, read by the
+//! upstream port's `sync`), and R16 parses `apiserverAuthority` once as a loopback IP literal with port
+//! (`apiserver_address`, the one address both channels connect to). No answer, record or vector changes.
 
 use std::collections::BTreeMap;
 
+use gate_sys::inet::{parse_authority, InetAddress, IpLiteral};
 use i05_protocol::json::{Doc, JStr, Value};
 use i05_protocol::{decode_frame, frame, sha256, Datagram, FrameError, Schema, ZERO_DIGEST};
 
@@ -30,7 +35,7 @@ use crate::file_store::FileStores;
 use crate::gate::{BoundRun, ChannelState, Event, EventError, FrameInput, Gate, GateError, Output, UpstreamResponse};
 use crate::journal::{Entry, Record, WriteDetails};
 use crate::policy::{check_write, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
-                    WriteOperation, WriteRequest};
+                    RenderedWrite, WriteOperation, WriteRequest};
 use crate::types::{AbortReason, Classification, DrainAnswer, FatalReason, Invalidation, Maintenance, MaintenanceEnd,
                    MaintenanceReason, SessionEnd, State};
 
@@ -55,13 +60,24 @@ fn is_dns_label(text: &str) -> bool {
     (1..=63).contains(&bytes.len()) && bytes.iter().all(inner) && edge(bytes.first()) && edge(bytes.last())
 }
 
-/// `host[:port]` as printable ASCII without space, CR or LF: 1 to 255 bytes in `!`..`~`.
-fn is_authority(text: &str) -> bool {
-    (1..=255).contains(&text.len()) && text.bytes().all(|byte| (0x21..=0x7E).contains(&byte))
+/// The IPv6 loopback address ::1.
+const LOOPBACK_V6: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+
+/// R16 (HE-002B R1-4; HE-003C DESIGN §6, Q-HE3C-1 (a) amended): `apiserverAuthority` is an IP literal with port, as
+/// gate-sys's `parse_authority` reads it (at most 64 bytes, no name), and loopback: an IPv4 address in 127.0.0.0/8 or
+/// the IPv6 address ::1 exactly; an IPv4-mapped form such as `::ffff:127.0.0.1` is refused (fail closed).
+fn loopback_authority(text: &str) -> Option<InetAddress> {
+    let address = parse_authority(text).ok()?;
+    let loopback = match address.ip {
+        IpLiteral::V4([first, ..]) => first == 127,
+        IpLiteral::V6(octets) => octets == LOOPBACK_V6,
+    };
+    loopback.then_some(address)
 }
 
 impl PolicyWriter {
-    fn from_member(member: Option<&Value>) -> Result<PolicyWriter, PolicyGateError> {
+    /// The member and the parsed apiserver address.
+    fn from_member(member: Option<&Value>) -> Result<(PolicyWriter, InetAddress), PolicyGateError> {
         let refuse = |message: &str| Err(PolicyGateError::PolicyWriter(message.to_string()));
         let Some(member) = member.and_then(Value::as_object) else { return refuse("policyWriter is missing or not an object") };
         if member.len() != 2 {
@@ -76,10 +92,11 @@ impl PolicyWriter {
         if !is_dns_label(namespace) {
             return refuse("policyWriter.qualificationNamespace is not a DNS-1123 label");
         }
-        if !is_authority(authority) {
-            return refuse("policyWriter.apiserverAuthority is not a printable host[:port] of at most 255 characters");
-        }
-        Ok(PolicyWriter { qualification_namespace: namespace.to_string(), apiserver_authority: authority.to_string() })
+        let Some(address) = loopback_authority(authority) else {
+            return refuse("policyWriter.apiserverAuthority is not a loopback IP literal with a port (127.0.0.0/8 or ::1)");
+        };
+        Ok((PolicyWriter { qualification_namespace: namespace.to_string(), apiserver_authority: authority.to_string() },
+            address))
     }
 }
 
@@ -293,7 +310,8 @@ impl WriteEntry {
 }
 
 /// The one write sent upstream and not yet answered, with what its deferred response needs: the request frame's
-/// sequence and digest (on the byte path, the received datagram's), and the request digest.
+/// sequence and digest (on the byte path, the received datagram's), and the request digest; and the rendered request
+/// itself, which the upstream port sends (HE-003C DESIGN §2.1).
 #[derive(Clone, Debug)]
 struct PendingWrite {
     write_id: u16,
@@ -301,6 +319,7 @@ struct PendingWrite {
     request_digest: String,
     sequence: i64,
     frame_digest: String,
+    rendered: RenderedWrite,
 }
 
 /// A typed writer request; the frame passed the closed schema, so its payload is the operation's request variant.
@@ -356,6 +375,7 @@ pub struct PolicyGate {
     kinds: PolicyKinds,
     schema: Schema,
     writer: PolicyWriter,
+    apiserver_address: InetAddress,
     maintenance: Maintenance,
     maintenance_reason: Option<MaintenanceReason>,
     session: Option<Session>,
@@ -364,9 +384,11 @@ pub struct PolicyGate {
     counters: WriteCounters,
 }
 
-/// What a PolicyGate holds besides its base gate: the writer member, the kinds table and the I07 schema.
+/// What a PolicyGate holds besides its base gate: the writer member and its parsed address, the kinds table and the
+/// I07 schema.
 struct Parts {
     writer: PolicyWriter,
+    address: InetAddress,
     kinds: PolicyKinds,
     schema: Schema,
 }
@@ -378,13 +400,13 @@ impl Parts {
         let Some(root) = config_value.as_object() else {
             return Err(PolicyGateError::PolicyWriter("the configuration is not an object".to_string()));
         };
-        let writer = PolicyWriter::from_member(root.get("policyWriter"))?;
+        let (writer, address) = PolicyWriter::from_member(root.get("policyWriter"))?;
         let mut rest = root.clone();
         rest.remove(&JStr::new("policyWriter"));
         let config = Config::from_value(&Value::Object(rest)).map_err(PolicyGateError::Config)?;
         let kinds = PolicyKinds::from_value(kinds_value).map_err(PolicyGateError::Kinds)?;
         let schema = i05_protocol::i07_v3_schema().map_err(|error| PolicyGateError::Schema(error.0))?;
-        Ok((config, Parts { writer, kinds, schema }))
+        Ok((config, Parts { writer, address, kinds, schema }))
     }
 
     fn around(self, gate: Gate) -> PolicyGate {
@@ -393,6 +415,7 @@ impl Parts {
             kinds: self.kinds,
             schema: self.schema,
             writer: self.writer,
+            apiserver_address: self.address,
             maintenance: Maintenance::NotBegun,
             maintenance_reason: None,
             session: None,
@@ -445,6 +468,12 @@ impl PolicyGate {
         &self.writer
     }
 
+    /// `apiserverAuthority` as parsed once by R16 (a loopback IP literal with port): the address the upstream port of
+    /// both channels connects to (HE-003C DESIGN §6; HE-003D hands it to the port's constructor).
+    pub fn apiserver_address(&self) -> InetAddress {
+        self.apiserver_address
+    }
+
     /// The sequence the next writer frame must carry: the current session's (opened or not), else 1.
     pub fn writer_next_sequence(&self) -> i64 {
         self.session.as_ref().map_or(1, |session| session.next_sequence)
@@ -478,6 +507,12 @@ impl PolicyGate {
     /// The forwarded write awaiting its upstream outcome, if any (read only; HE-003A DESIGN §6).
     pub fn pending_write(&self) -> Option<u16> {
         self.pending.as_ref().map(|pending| pending.write_id)
+    }
+
+    /// The forwarded write awaiting its upstream outcome and the exact request rendered for it (read only; HE-003C
+    /// DESIGN §2.1): the bytes the upstream port sends.
+    pub fn forwarded_write(&self) -> Option<(u16, &RenderedWrite)> {
+        self.pending.as_ref().map(|pending| (pending.write_id, &pending.rendered))
     }
 
     /// Applies one event (N7): an I05 event goes to the base gate (which settles its pending drain itself), with the
@@ -967,6 +1002,7 @@ impl PolicyGate {
             request_digest: digest,
             sequence,
             frame_digest: frame_digest.to_string(),
+            rendered,
         });
         WriterReply::Forwarded(request.write_id)
     }
@@ -1277,9 +1313,36 @@ mod tests {
         for (index, config) in refused.iter().enumerate() {
             assert!(matches!(PolicyGate::new(config, &kinds), Err(PolicyGateError::PolicyWriter(_))), "case {index}");
         }
-        let longest = with_member(&config, "policyWriter",
-                                  Some(writer(Value::str(&"a".repeat(63)), Value::str(&"h".repeat(255)))));
-        assert!(PolicyGate::new(&longest, &kinds).is_ok());
+        // HE-003C (DESIGN §6, Q-HE3C-1 (a) amended): an IP literal with port, at most 64 bytes, and loopback; the
+        // longest accepted authorities are the longest loopback literals (no valid literal reaches 64 bytes).
+        let longest_v6 = "[0000:0000:0000:0000:0000:0000:0000:0001]:65535";
+        let longest_v4 = "127.255.255.255:65535";
+        assert_eq!((longest_v6.len(), longest_v4.len()), (47, 21));
+        for (authority, address) in [
+            (longest_v6, InetAddress { ip: IpLiteral::V6(LOOPBACK_V6), port: 65535 }),
+            (longest_v4, InetAddress { ip: IpLiteral::V4([127, 255, 255, 255]), port: 65535 }),
+        ] {
+            let longest = with_member(&config, "policyWriter",
+                                      Some(writer(Value::str(&"a".repeat(63)), Value::str(authority))));
+            match PolicyGate::new(&longest, &kinds) {
+                Ok(gate) => {
+                    assert_eq!(gate.writer().apiserver_authority, authority);
+                    assert_eq!(gate.apiserver_address(), address, "parsed once: {authority}");
+                }
+                Err(error) => panic!("{authority} is accepted: {error:?}"),
+            }
+        }
+        let longest_routable = "[ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255]:65535";
+        let sixty_five = format!("127.0.0.1:{}", "6".repeat(55));
+        assert_eq!((longest_routable.len(), sixty_five.len()), (53, 65));
+        assert!(parse_authority(longest_routable).is_ok(), "the longest literal parse_authority accepts");
+        for authority in ["kubernetes.default.svc:443", "localhost:6443", "127.0.0.1", "[::1]", "10.0.0.1:6443",
+                          "128.0.0.1:6443", "[::2]:6443", longest_routable, "[::ffff:127.0.0.1]:6443",
+                          "[0:0:0:0:0:ffff:7f00:1]:6443", sixty_five.as_str()] {
+            let config = with_member(&config, "policyWriter", Some(writer(Value::str("planeon-qual"), Value::str(authority))));
+            assert!(matches!(PolicyGate::new(&config, &kinds), Err(PolicyGateError::PolicyWriter(_))), "{authority}");
+        }
+        assert_eq!(gate().apiserver_address(), InetAddress { ip: IpLiteral::V4([127, 0, 0, 1]), port: 6443 });
         // The rest of the configuration still goes through the unchanged I05 Config, which refuses policyWriter itself.
         assert!(Config::from_value(&config).is_err());
         assert!(Config::from_value(&with_member(&config, "policyWriter", None)).is_ok());

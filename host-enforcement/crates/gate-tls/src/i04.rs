@@ -15,6 +15,9 @@
 //!   is model-held; a connection the model closed is closed by `sync` without one; a refusal gets `close_notify` and no
 //!   HTTP byte; a relayed response is followed by `close_notify`, the write-side shutdown once rustls has nothing left
 //!   to write, and a bounded linger that reads and discards.
+//! - **The outcome** (HE-003C DESIGN §6, PR review R1-7, D1-11; MODEL_DEFINED R68): an `Upstream` output takes the
+//!   connection in flight (the relay or the close clears it); an `Upstream` output with no connection in flight is a
+//!   port failure (fail closed) rather than ignored.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -447,17 +450,18 @@ impl<N: StreamNet> I04Server<N> {
         }
     }
 
-    /// Starts the relay of the staged response for the connection in flight (`Upstream { relayed: true }`).
+    /// Starts the relay of the staged response for the connection in flight (`Upstream { relayed: true }`), which it
+    /// takes (R1-7); with no connection in flight the port fails (R68).
     fn start_relay(&mut self) {
         let Some(staged) = self.exchange.try_borrow_mut().map(|mut board| board.take_response()).ok() else {
             self.fail("the exchange board was busy");
             return;
         };
-        let Some(id) = self.in_flight else { return };
-        let Some(conn) = self.conns.get(&id) else {
-            self.in_flight = None;
+        let Some(id) = self.in_flight.take() else {
+            self.fail("an upstream outcome with no connection in flight");
             return;
         };
+        let Some(conn) = self.conns.get(&id) else { return };
         let Some(response) = staged else {
             self.fail("a relayed outcome without a staged response");
             self.close(id, false);
@@ -632,8 +636,9 @@ impl<N: StreamNet> Port for I04Server<N> {
                 } else {
                     self.fail("the exchange board was busy");
                 }
-                if let Some(id) = self.in_flight {
-                    self.close(id, false); // R51: not relayed, closed without a byte
+                match self.in_flight.take() {
+                    Some(id) => self.close(id, false), // R51: not relayed, closed without a byte
+                    None => self.fail("an upstream outcome with no connection in flight"),
                 }
             }
             OutputKind::LateUpstream => {

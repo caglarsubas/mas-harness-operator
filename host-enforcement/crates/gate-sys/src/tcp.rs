@@ -1,7 +1,8 @@
-//! The I04 listener's raw calls (HE-003B DESIGN §3.1), Linux only: the fourth module of the workspace allowed to hold
-//! `unsafe` code (with `openat.rs`, `seal.rs` and `channel.rs`), each call in its own block with its own `// SAFETY:`
-//! argument behind a safe function. The foreign symbols are exactly `socket`, `setsockopt`, `bind`, `listen`, `recv`,
-//! `send`, `shutdown` and `syscall`; `tools/gate.py` checks that this file declares exactly them.
+//! The I04 listener's raw calls (HE-003B DESIGN §3.1) and the upstream client's (HE-003C DESIGN §6), Linux only: the
+//! fourth module of the workspace allowed to hold `unsafe` code (with `openat.rs`, `seal.rs` and `channel.rs`), each
+//! call in its own block with its own `// SAFETY:` argument behind a safe function. The foreign symbols are exactly
+//! `socket`, `setsockopt`, `bind`, `listen`, `connect`, `getsockopt`, `recv`, `send`, `shutdown` and `syscall`;
+//! `tools/gate.py` checks that this file declares exactly them.
 //!
 //! - [`listen_tcp`]: a TCP listener on a literal address (port 1024 or above): `socket(family,
 //!   SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, IPPROTO_TCP)`, SO_REUSEADDR (so a restarted gate binds while the crashed
@@ -9,6 +10,10 @@
 //!   other TCP option (no TCP_NODELAY, keepalive, linger or TCP_FASTOPEN).
 //! - [`accept_tcp`]: `accept4` issued through `syscall` (musl's `accept4` falls back to `accept`, which the EFFECT_GATE
 //!   program kills), asking for no peer address.
+//! - [`connect_tcp`] (HE-003C): a non-blocking TCP connection to a literal address: the same `socket` call, then
+//!   `connect` with the exact address length; a return of 0 is connected at once, EINPROGRESS is in progress, any other
+//!   error is the caller's (no retry, no other option; the listener-only port rule does not apply).
+//!   [`connect_result`] reads SO_ERROR once the socket is writable.
 //! - [`TcpConn::recv`], [`TcpConn::send`] and [`TcpConn::shutdown_write`]: one call each, never waiting.
 //!
 //! Every descriptor is an `OwnedFd` inside an opaque type (`TcpListener`, `TcpConn`), closed by drop; their manual
@@ -24,6 +29,10 @@
 //! `recvfrom(fd, buf, len, flags, 0, 0)` (system call 45 / 207) and `send` is `sendto(.., 0, 0)` (44 / 206);
 //! `shutdown` is 48 / 210. From the kernel UAPI: `SOL_SOCKET` 1 and `SO_REUSEADDR` 2 (the generic `socket.h`),
 //! `SHUT_WR` 1 (`linux/net.h`), and the errno values below (the generic `errno.h`, which both architectures use).
+//! HE-003C (`CONSTANTS_EVIDENCE.md`, llvm-objdump with relocations of the same `libc.a`): `connect` is 42 / 203
+//! (`connect.lo` passes it to `__syscall_cp`; the gate is single-threaded and never cancelled, so it is the plain
+//! system call); `getsockopt` is 55 / 209 (`getsockopt.lo`); `EINPROGRESS` 115 (`res_msend.lo` compares errno with 115
+//! right after its `connect` call); `SO_ERROR` 4 (the generic `socket.h`, read by no musl object; T04 confirms it).
 #![allow(unsafe_code)]
 
 use std::ffi::c_int;
@@ -58,6 +67,7 @@ const IPPROTO_IPV6: c_int = 41;
 const IPV6_V6ONLY: c_int = 26;
 const SOL_SOCKET: c_int = 1;
 const SO_REUSEADDR: c_int = 2;
+const SO_ERROR: c_int = 4;
 const MSG_DONTWAIT: c_int = 0x40;
 const MSG_NOSIGNAL: c_int = 0x4000;
 const SHUT_WR: c_int = 1;
@@ -76,6 +86,8 @@ pub mod errno {
     pub const ECONNABORTED: i32 = 103;
     pub const EHOSTDOWN: i32 = 112;
     pub const EHOSTUNREACH: i32 = 113;
+    /// A non-blocking `connect` that has not finished yet (HE-003C).
+    pub const EINPROGRESS: i32 = 115;
 }
 
 const _: () = assert!(SOCK_NONBLOCK == 0x800 && SOCK_CLOEXEC == 0x80000);
@@ -122,6 +134,8 @@ unsafe extern "C" {
     fn setsockopt(fd: c_int, level: c_int, name: c_int, value: *const c_void, length: c_uint) -> c_int;
     fn bind(fd: c_int, address: *const c_void, length: c_uint) -> c_int;
     fn listen(fd: c_int, backlog: c_int) -> c_int;
+    fn connect(fd: c_int, address: *const c_void, length: c_uint) -> c_int;
+    fn getsockopt(fd: c_int, level: c_int, name: c_int, value: *mut c_void, length: *mut c_uint) -> c_int;
     fn recv(fd: c_int, buffer: *mut c_void, length: usize, flags: c_int) -> c_long;
     fn send(fd: c_int, buffer: *const c_void, length: usize, flags: c_int) -> c_long;
     fn shutdown(fd: c_int, how: c_int) -> c_int;
@@ -322,6 +336,83 @@ pub fn accept_tcp(listener: &TcpListener) -> Accepted {
             error => return Accepted::Failed(error),
         }
     }
+}
+
+// ------------------------------------------------------------------------------------------ connect (HE-003C)
+
+/// How a non-blocking [`connect_tcp`] started.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Connecting {
+    /// `connect` returned 0: the connection is established.
+    Connected,
+    /// EINPROGRESS: wait for writability, then read [`connect_result`].
+    InProgress,
+}
+
+/// A non-blocking TCP connection to `address` (HE-003C DESIGN §6): `socket(family,
+/// SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, IPPROTO_TCP)`, then one `connect` with the exact address length. The
+/// connection and how it started, or the errno of the failed `socket` or `connect` (ECONNREFUSED, EMFILE, ...; the
+/// socket is closed then). No other call and no retry: EINTR is an error like any other.
+pub fn connect_tcp(address: &InetAddress) -> Result<(TcpConn, Connecting), i32> {
+    let family = match address.ip {
+        IpLiteral::V4(_) => AF_INET,
+        IpLiteral::V6(_) => AF_INET6,
+    };
+    // SAFETY: socket takes three integers and reads or writes no memory; its new descriptor is adopted at once.
+    let fd = checked(unsafe { socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP) })
+        .map(adopt)
+        .map_err(|error| error.raw_os_error().unwrap_or(-1))?;
+    let value = match address.ip {
+        IpLiteral::V4(octets) => {
+            let socket_address = SockaddrIn {
+                family: AF_INET as u16,
+                port: address.port.to_be(),
+                address: u32::from_ne_bytes(octets),
+                zero: [0; 8],
+            };
+            // SAFETY: `socket_address` is a live `sockaddr_in` that connect reads and does not write; the length
+            // passed is exactly its size.
+            unsafe {
+                connect(fd.as_raw_fd(), (&socket_address as *const SockaddrIn).cast(), size_of::<SockaddrIn>() as c_uint)
+            }
+        }
+        IpLiteral::V6(octets) => {
+            let socket_address = SockaddrIn6 {
+                family: AF_INET6 as u16,
+                port: address.port.to_be(),
+                flowinfo: 0,
+                address: octets,
+                scope_id: 0,
+            };
+            // SAFETY: `socket_address` is a live `sockaddr_in6` that connect reads and does not write; the length
+            // passed is exactly its size.
+            unsafe {
+                connect(fd.as_raw_fd(), (&socket_address as *const SockaddrIn6).cast(), size_of::<SockaddrIn6>() as c_uint)
+            }
+        }
+    };
+    if value == 0 {
+        return Ok((TcpConn { fd }, Connecting::Connected));
+    }
+    match last_errno() {
+        errno::EINPROGRESS => Ok((TcpConn { fd }, Connecting::InProgress)),
+        error => Err(error),
+    }
+}
+
+/// `getsockopt(fd, SOL_SOCKET, SO_ERROR)` of a connecting socket once it is writable: `Ok(())` when the connection
+/// is established, otherwise the pending error (or the call's own errno, EINVAL for an unexpected length).
+pub fn connect_result(conn: &TcpConn) -> Result<(), i32> {
+    let mut error: c_int = 0;
+    let mut length = size_of::<c_int>() as c_uint;
+    // SAFETY: `error` is a live `int` and `length` its size; getsockopt writes at most `length` bytes into `error`
+    // and the written length into `length`.
+    checked(unsafe { getsockopt(conn.fd.as_raw_fd(), SOL_SOCKET, SO_ERROR, (&mut error as *mut c_int).cast(), &mut length) })
+        .map_err(|error| error.raw_os_error().unwrap_or(-1))?;
+    if length as usize != size_of::<c_int>() {
+        return Err(errno::EINVAL);
+    }
+    if error == 0 { Ok(()) } else { Err(error) }
 }
 
 // ------------------------------------------------------------------------------------------ transfers

@@ -1,9 +1,11 @@
 //! The Linux stream table (HE-003B DESIGN §4.1, Q-HE3B-13 (a)): one single-threaded table, shared by `LinuxOs` (which
-//! resolves a port's `SourceId` to the descriptor it watches) and the I04 port's [`LinuxStreams`] (which does the
-//! port's I/O). A source number is a counter never reused within the process; each entry has its owner and a
-//! `TcpListener` or `TcpConn` of gate-sys, closed by drop. Closing removes the entry, and the descriptor's close
-//! removes it from the poller (no descriptor is ever duplicated), so a port never deletes a closed source. Every
-//! `RefCell` borrow is `try_borrow` or `try_borrow_mut`; a failed borrow refuses (no panic). Linux only.
+//! resolves a port's `SourceId` to the descriptor it watches), the I04 port's [`LinuxStreams`] and the upstream port's
+//! [`LinuxConnector`] (HE-003C DESIGN §6; each does its port's I/O). A source number is a counter never reused within
+//! the process; each entry has its owner and a `TcpListener` or `TcpConn` of gate-sys, closed by drop. Closing removes
+//! the entry, and the descriptor's close removes it from the poller (no descriptor is ever duplicated), so a port
+//! never deletes a closed source. Every `RefCell` borrow is `try_borrow` or `try_borrow_mut`; a failed borrow refuses
+//! (no panic). No socket exists before the seal: `listen_i04`, `connect` and `LinuxConnector::new` take `&Sealed`.
+//! Linux only.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -15,7 +17,7 @@ use gate_sys::channel::Watched;
 use gate_sys::inet::InetAddress;
 use gate_sys::tcp::{TcpConn, TcpListenError, TcpListener};
 
-use crate::net::{Accepted, StreamNet, Transfer};
+use crate::net::{Accepted, ConnectNet, Connecting, StreamNet, Transfer};
 use crate::seal::Sealed;
 use crate::substrate::{Owner, SourceId};
 
@@ -58,6 +60,24 @@ impl NetTable {
                 error: std::io::Error::other("the stream table is busy"),
             }),
         }
+    }
+
+    /// Opens a non-blocking TCP connection to `address` (after the seal), owned by the upstream port (HE-003C DESIGN
+    /// §6): its source and how it started, or the errno of the failed `socket` or `connect`.
+    pub fn connect(net: &SharedNet, _sealed: &Sealed, address: &InetAddress) -> Result<(SourceId, Connecting), i32> {
+        NetTable::open_upstream(net, address)
+    }
+
+    /// `connect`'s body, shared with [`LinuxConnector`] (whose constructor took `&Sealed`).
+    fn open_upstream(net: &SharedNet, address: &InetAddress) -> Result<(SourceId, Connecting), i32> {
+        // The table is borrowed first, so a busy table refuses before any socket exists.
+        let Ok(mut table) = net.try_borrow_mut() else { return Err(NO_SOURCE) };
+        let (conn, started) = gate_sys::tcp::connect_tcp(address)?;
+        let started = match started {
+            gate_sys::tcp::Connecting::Connected => Connecting::Connected,
+            gate_sys::tcp::Connecting::InProgress => Connecting::InProgress,
+        };
+        Ok((table.insert(Owner::Upstream, Stream::Conn(conn)), started))
     }
 
     fn insert(&mut self, owner: Owner, stream: Stream) -> SourceId {
@@ -156,6 +176,72 @@ impl StreamNet for LinuxStreams {
     fn close(&mut self, source: SourceId) {
         if let Ok(mut table) = self.net.try_borrow_mut()
             && table.conn(self.owner, source).is_some()
+        {
+            table.entries.remove(&source.0);
+        }
+    }
+
+    fn monotonic(&self) -> Instant {
+        Instant::now()
+    }
+}
+
+/// The upstream port's [`ConnectNet`] over the shared table (HE-003C DESIGN §6): its sources are owned by
+/// `Owner::Upstream`.
+pub struct LinuxConnector {
+    net: SharedNet,
+}
+
+impl fmt::Debug for LinuxConnector {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("LinuxConnector")
+    }
+}
+
+impl LinuxConnector {
+    /// The connector over `net`, after the seal (no socket exists before it, as for `listen_i04`).
+    pub fn new(_sealed: &Sealed, net: SharedNet) -> LinuxConnector {
+        LinuxConnector { net }
+    }
+}
+
+impl ConnectNet for LinuxConnector {
+    fn connect(&mut self, address: &InetAddress) -> Result<(SourceId, Connecting), i32> {
+        NetTable::open_upstream(&self.net, address)
+    }
+
+    fn connect_result(&mut self, source: SourceId) -> Result<(), i32> {
+        let Ok(table) = self.net.try_borrow() else { return Err(NO_SOURCE) };
+        match table.conn(Owner::Upstream, source) {
+            Some(conn) => gate_sys::tcp::connect_result(conn),
+            None => Err(NO_SOURCE),
+        }
+    }
+
+    fn recv(&mut self, source: SourceId, buffer: &mut [u8]) -> Transfer {
+        let Ok(table) = self.net.try_borrow() else { return Transfer::Failed(NO_SOURCE) };
+        match table.conn(Owner::Upstream, source) {
+            Some(conn) => transfer(conn.recv(buffer)),
+            None => Transfer::Failed(NO_SOURCE),
+        }
+    }
+
+    fn send(&mut self, source: SourceId, bytes: &[u8]) -> Transfer {
+        let Ok(table) = self.net.try_borrow() else { return Transfer::Failed(NO_SOURCE) };
+        match table.conn(Owner::Upstream, source) {
+            Some(conn) => transfer(conn.send(bytes)),
+            None => Transfer::Failed(NO_SOURCE),
+        }
+    }
+
+    fn shutdown_write(&mut self, source: SourceId) -> bool {
+        let Ok(table) = self.net.try_borrow() else { return false };
+        table.conn(Owner::Upstream, source).is_some_and(|conn| conn.shutdown_write().is_ok())
+    }
+
+    fn close(&mut self, source: SourceId) {
+        if let Ok(mut table) = self.net.try_borrow_mut()
+            && table.conn(Owner::Upstream, source).is_some()
         {
             table.entries.remove(&source.0);
         }

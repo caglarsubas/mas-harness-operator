@@ -70,8 +70,9 @@ pub enum TlsSetupError {
     Tickets,
 }
 
-/// The ring provider with the three TLS 1.3 suites and the three key-exchange groups, explicitly.
-fn provider() -> CryptoProvider {
+/// The ring provider with the three TLS 1.3 suites and the three key-exchange groups, explicitly (shared with the
+/// upstream client's `tls_client.rs`, HE-003C DESIGN §3, so the two cannot drift).
+pub(crate) fn provider() -> CryptoProvider {
     let mut provider = default_provider();
     provider.cipher_suites = vec![
         cipher_suite::TLS13_AES_256_GCM_SHA384,

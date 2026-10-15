@@ -42,6 +42,10 @@
 //! [`LoopExit::Port`]: the loop checks both ports' `failure()` after every event's output has been applied, wired and
 //! synced; after every `due`, `ready` and `drain_backlog` call, before that call's events (and, for the drain, before
 //! the I05 frame) are fed; and before every wait. With the default `failure()` the loop is HE-003A's.
+//!
+//! HE-003C (DESIGN §2.1, §6) adds the provided [`GateView::forwarded_write`] (None by default, so HE-003A's and
+//! HE-003B's fakes are unchanged), implemented for `PolicyGate`: the upstream port starts an I07 write in `sync` from
+//! the rendered request the model forwarded. No answer, record or vector changes.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -53,6 +57,7 @@ use i05_protocol::json;
 
 use crate::gate::{ChannelState, Event, FrameInput, Output, OutputKind};
 use crate::peers::{ExpectedPeer, ExpectedPeers};
+use crate::policy::RenderedWrite;
 use crate::policy_gate::{PolicyEvent, PolicyGate, PolicyOutput, PolicyOutputKind};
 
 /// The 2-second answer bound (I05 Channel item 4; I07 v1 Channel 4).
@@ -253,6 +258,11 @@ pub trait GateView {
     fn connection_open(&self, conn: &str) -> bool;
     /// The forwarded write awaiting its outcome, if any.
     fn pending_write(&self) -> Option<u16>;
+    /// The forwarded write awaiting its outcome with the exact request the model rendered for it (HE-003C DESIGN
+    /// §2.1, D1-1). None by default.
+    fn forwarded_write(&self) -> Option<(u16, &RenderedWrite)> {
+        None
+    }
 }
 
 impl GateView for PolicyGate {
@@ -262,6 +272,10 @@ impl GateView for PolicyGate {
 
     fn pending_write(&self) -> Option<u16> {
         PolicyGate::pending_write(self)
+    }
+
+    fn forwarded_write(&self) -> Option<(u16, &RenderedWrite)> {
+        PolicyGate::forwarded_write(self)
     }
 }
 
