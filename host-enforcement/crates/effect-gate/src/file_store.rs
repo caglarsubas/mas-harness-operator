@@ -8,6 +8,11 @@
 //! and a frame whose `C` byte was written is revoked to `R` (R29). The mirror changes exactly as HE-002's in-memory
 //! journal does, so `journalDigest` and every in-process rebuild are the model's; the file is scanned only when the
 //! stores open (and by tests). Every I/O error and every scan outcome is a value (R27).
+//!
+//! HE-003D (DESIGN section 3.3, owner decision Q-HE3D-13 (b), amending HE-002C's R19-R30) binds a generation to the
+//! signed configuration that started it: [`FileStores::open_bound`] writes `<generation>.document` in the journal
+//! directory as exactly one committed frame `["DOCUMENT", generation, digest]` before the generation's index entry, and
+//! compares it when the generation is already indexed (R75 in MODEL_DEFINED.md).
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -17,7 +22,7 @@ use std::os::unix::fs::FileExt;
 
 use gate_sys::Dir;
 use gate_sys::FileMode;
-use i05_protocol::json::Doc;
+use i05_protocol::json::{self, Doc};
 
 use crate::config::PriorBindings;
 use crate::frame::{self, Scanned, Scanner};
@@ -70,6 +75,67 @@ pub fn marker_name(generation: &str) -> String {
     format!("{generation}.marker")
 }
 
+/// A generation's document file name in the journal directory (HE-003D DESIGN section 3.3). It cannot collide with
+/// `<g>.journal`, the index `generations` (no dot) or a marker (the other directory).
+pub fn document_name(generation: &str) -> String {
+    format!("{generation}.document")
+}
+
+/// The document frame's payload, `["DOCUMENT", generation, digest]`.
+fn document_payload(generation: &str, digest: &str) -> Vec<u8> {
+    Doc::Array(vec![Doc::str("DOCUMENT"), Doc::str(generation), Doc::str(digest)]).canonical()
+}
+
+/// A document frame's generation and digest, from a payload that is UTF-8 JSON in its canonical encoding (R21's rule).
+fn decode_document(payload: &[u8]) -> Option<(String, String)> {
+    let value = json::parse(std::str::from_utf8(payload).ok()?).ok()?;
+    if json::canonical(&value).ok()? != payload {
+        return None;
+    }
+    match value.as_array()? {
+        [tag, generation, digest] if tag.as_str() == Some("DOCUMENT") => {
+            Some((generation.as_str()?.to_string(), digest.as_str()?.to_string()))
+        }
+        _ => None,
+    }
+}
+
+/// Whether a document file holds exactly one committed frame binding `generation` to `digest`, and nothing else (a
+/// torn or uncommitted frame cannot be repaired after the seal, since truncation is killed).
+fn document_matches(file: &File, generation: &str, digest: &str) -> bool {
+    let scan = scan_file(file);
+    match scan.found.as_slice() {
+        [Scanned::Frame(payload)] if scan.complete => {
+            decode_document(payload).is_some_and(|(written, bound)| written == generation && bound == digest)
+        }
+        _ => false,
+    }
+}
+
+/// HE-003D DESIGN section 3.3: under the index lock, after the marker read and before the journal's creation. An
+/// indexed generation's document must exist and match; for an unindexed one the file is created and its one frame
+/// appended (two-phase, R29), or a file an earlier failed opening left is reused only when it already matches. Missing,
+/// torn, empty, uncommitted or different is [`OpenError::Document`]; I/O errors are values (R27).
+fn bind_document(journals: &Dir, generation: &str, digest: &str, indexed: bool, plan: Option<&FaultHandle>)
+                 -> Result<(), OpenError> {
+    let name = document_name(generation);
+    if indexed {
+        let Some((file, _)) = journals.file(&name, FileMode::Existing).map_err(OpenError::Io)? else {
+            return Err(OpenError::Document);
+        };
+        return if document_matches(&file, generation, digest) { Ok(()) } else { Err(OpenError::Document) };
+    }
+    let (file, created) = opened(journals, &name, FileMode::CreateOrExisting)?;
+    if !created {
+        return if document_matches(&file, generation, digest) { Ok(()) } else { Err(OpenError::Document) };
+    }
+    let points = plan.map(|plan| plan.with(|plan| plan.take(StoreFile::Document))).unwrap_or_default();
+    if append_frame(&file, &document_payload(generation, digest), &points) != Appended::Durable {
+        return Err(OpenError::Document);
+    }
+    Ok(())
+}
+
 /// Why `FileStores::open` refused.
 #[derive(Debug)]
 pub enum OpenError {
@@ -87,6 +153,9 @@ pub enum OpenError {
     JournalLocked,
     /// §7 step 7: the index append failed, so the open fails.
     IndexAppend,
+    /// HE-003D DESIGN section 3.3 (Q-HE3D-13 (b)): the generation's document file is missing (indexed generation),
+    /// torn, empty, uncommitted or binds another document, or its frame could not be written.
+    Document,
     /// An I/O error, or an index or earlier journal that could not be read whole.
     Io(io::Error),
 }
@@ -296,9 +365,30 @@ impl FileStores {
     ///    append the generation's index entry (R26: also a journal an earlier, failed opening created), locked for the
     ///    stores' life (R25), and scanned into the mirror;
     /// 7. the index entry, if the generation has none (`indexed_now`).
+    ///
+    /// This is HE-002C's opening without the generation binding; the gate binary opens its stores with
+    /// [`FileStores::open_bound`].
     pub fn open(journal_dir: &str, marker_dir: &str, generation: &str,
                 probe: &dyn Fn(StoreDir, &Dir) -> io::Result<u64>, plan: Option<FaultHandle>)
                 -> Result<FileStores, OpenError> {
+        FileStores::opening(journal_dir, marker_dir, generation, None, probe, plan)
+    }
+
+    /// [`FileStores::open`] with the generation binding of HE-003D DESIGN section 3.3 (owner decision Q-HE3D-13 (b)):
+    /// between steps 5 and 6, still under the index lock and before anything is appended, `<generation>.document`
+    /// must hold exactly one committed frame `["DOCUMENT", generation, document_digest]` when the generation is
+    /// indexed; otherwise it is written so (or an equal file an earlier failed opening left is reused). The file is
+    /// created before the journal, so the journal directory sync of step 6 covers it and R26's counts stay as they
+    /// are. Anything else is [`OpenError::Document`].
+    pub fn open_bound(journal_dir: &str, marker_dir: &str, generation: &str, document_digest: &str,
+                      probe: &dyn Fn(StoreDir, &Dir) -> io::Result<u64>, plan: Option<FaultHandle>)
+                      -> Result<FileStores, OpenError> {
+        FileStores::opening(journal_dir, marker_dir, generation, Some(document_digest), probe, plan)
+    }
+
+    fn opening(journal_dir: &str, marker_dir: &str, generation: &str, document: Option<&str>,
+               probe: &dyn Fn(StoreDir, &Dir) -> io::Result<u64>, plan: Option<FaultHandle>)
+               -> Result<FileStores, OpenError> {
         if !valid_generation(generation) {
             return Err(OpenError::Name);
         }
@@ -339,6 +429,9 @@ impl FileStores {
         }
         let marker = markers.file(&marker_name(generation), FileMode::Existing).map_err(OpenError::Io)?.map(|(file, _)| file);
         let marker_state = marker.as_ref().map_or(MarkerState::Absent, |file| marker_state(file, generation));
+        if let Some(digest) = document {
+            bind_document(&journals, generation, digest, indexed, plan.as_ref())?;
+        }
         let (journal, journal_created) = opened(&journals, &journal_name(generation), FileMode::CreateOrExisting)?;
         if journal_created || !indexed {
             journals.sync().map_err(OpenError::Io)?;

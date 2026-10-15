@@ -138,6 +138,9 @@ pub enum StoreFile {
     Journal,
     Marker,
     Index,
+    /// HE-003D DESIGN section 3.3 (Q-HE3D-13 (b)): the generation's `<generation>.document` file, whose one frame
+    /// binds the generation to the signed configuration's digest.
+    Document,
 }
 
 /// The contract's injections and the armed file-level points.

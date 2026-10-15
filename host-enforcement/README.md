@@ -3,15 +3,17 @@
 The Rust workspace for the Planeon host-enforcement modules (W03). HE-001 adds only the scaffold: a closed configuration
 library, five binaries that parse their argv and exit, the toolchain pin, a reviewed closure table and an in-repo gate.
 Module logic arrives in HE-002 to HE-007. HE-002 adds the effect gate's I05 v3 logic as two libraries, tested against
-the published contract vectors; no binary links them yet.
+the published contract vectors; HE-003D's `planeon-gate` is the first binary that links them (with gate-sys and
+gate-tls).
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `Cargo.toml`, `Cargo.lock` | Workspace (edition 2024, Apache-2.0); the lock lists only workspace crates |
+| `Cargo.toml`, `Cargo.lock` | Workspace (edition 2024, Apache-2.0); the lock lists the workspace crates, the 11 LINKED vendored crates as path packages (HE-003D's `[patch.crates-io]`) and the other vendor rows as registry packages with their checksums |
 | `crates/host-common/` | Closed configuration parser; thread counts come from configuration, never from the host |
-| `crates/{containment,broker,observer,gate,writer}/` | Binaries `planeon-*`; argv only, no file access |
+| `crates/{containment,broker,observer,writer}/` | Binaries `planeon-*`; argv only, no file access |
+| `crates/gate/` | `planeon-gate` (HE-003D): the effect gate binary; seal stage 1, the signed configuration, stage 2, the composition and the loop; path dependencies on `effect-gate` and `gate-tls` only |
 | `crates/i05-protocol/` | Library (HE-002): the I05 v3 wire codec, canonical encoder, SHA-256 (NIST CAVP tested), schema subset, outcome mapping and request rendering |
 | `crates/effect-gate/` | Library (HE-002): the I05 v3 gate state machine with an in-memory journal and failure marker; `MODEL_DEFINED.md` lists what the pinned model, not the READMEs, defines |
 | `contracts/` | The I05 and I07 contract data and READMEs copied byte for byte from harness-onion `a2eab93`, and the I05 v3 supplementary vectors (S01-S06) from `93d32e1`; `PROVENANCE.md` |
@@ -41,7 +43,13 @@ SBOM per binary and target under `target/sbom/`. Every line it prints starts wit
 - **Offline builds.** `[net] offline = true`, `--locked --offline --frozen`, no git dependency. Registry packages come
   only from the vendored directory source `host-enforcement/vendor/` (`.cargo/config.toml` `[source]`), pinned file by
   file by `licenses/vendor-crates.json` (`VENDOR_TABLE_SHA256` in `tools/gate.py`); HE-003B extended the gate and added
-  that table beside the sysroot closure table.
+  that table beside the sysroot closure table. HE-003D (owner decision Q-HE3B-27 (a), the host-path direction) maps
+  the 11 LINKED vendored crates through the workspace manifest's `[patch.crates-io]` table to path packages under
+  `vendor/<name>-<version>` (vendored bytes unchanged), so cargo passes rustc workspace-relative source paths and
+  `planeon-gate` carries no build-host path; in `Cargo.lock` they have no `source` or `checksum`, the gate admits
+  exactly that table and holds their names, versions and edges to the vendor rows, and `check_vendor` stays their
+  file-level pin (cargo does not verify a path package's `.cargo-checksum.json`). The directory source stays for the
+  build-host crates and the lock-only stubs.
 - **No build scripts or proc-macros** in the workspace.
 - **Start-up lint.** Workspace sources must not use `available_parallelism`, `current_exe`, `current_dir`, `env::var`,
   `var_os`, `vars`, `/proc` or `/sys` (every `.rs` file outside `target/` and `vendor/`). It is a source lint, not proof of behaviour

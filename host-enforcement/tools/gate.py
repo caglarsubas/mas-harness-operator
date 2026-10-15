@@ -36,6 +36,14 @@ rule, tls_client.rs names with_client_auth_cert( and with_webpki_verifier( exact
 sources only exchange.rs constructs `UpstreamResponse {`; gate-sys's tcp module gains connect and getsockopt; the
 client's configuration, connection and identity types join the secret types and its connector the Debug hazards.
 
+HE-003D (the gate binary; DESIGN sections 2, 3.1 and 5) admits exactly one [patch] table (the 11 LINKED vendored crates
+as path packages, so planeon-gate carries no build-host path) and gate-tls's ring line; the binary's crate joins the
+linked crates with one exit import; main.rs follows the seal-order grammar and names no socket or thread before the
+second stage (nor do the configuration's two modules); gate-sys's socket modules are reached only from effect-gate's
+two Linux modules; no linked source names threads, code before main or printing; the TLS rules cover the binary, count
+any mention and refuse every UpstreamResponse mention outside exchange.rs; the signer key file is 0 or 32 bytes; and
+planeon-gate's symbol table has no membarrier and only reviewed wrappers of killed calls.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -68,12 +76,22 @@ VENDOR_TABLE = HE / "licenses/vendor-crates.json"
 VENDOR_TABLE_SHA256 = "32a6dc79a8bf47e04032b245cf2c6364e328074f3e81a2e2a3ee76f4fc19602e"
 REGISTRY = "registry+https://github.com/rust-lang/crates.io-index"
 # HE-003B DESIGN sections 2.4 and 20: the only registry dependency lines of the workspace, all in gate-tls's
-# [dependencies] (the ring dev-dependency fallback of section 9 was not needed, B6).
+# [dependencies] (the ring dev-dependency fallback of section 9 was not needed, B6). HE-003D DESIGN section 3.1
+# (Q-HE3D-6 (a)): ring's Ed25519 for the signed configuration, `ring = "=0.17.14"` exactly in that form.
 REGISTRY_LINES = {"crates/gate-tls": {
     "rustls": {"version": "=0.23.46", "default-features": False, "features": ["ring", "std"]},
     "getrandom": {"version": "=0.2.17", "default-features": False, "features": ["linux_disable_fallback"]},
     "zeroize": {"version": "=1.9.1", "default-features": False, "features": ["alloc"]},
+    "ring": "=0.17.14",
 }}
+# HE-003D DESIGN sections 2 and 5 (phase 1): the workspace manifest's only [patch] table maps exactly these 11 LINKED
+# vendored crates to their vendor/ directories (path packages inside the workspace root, so rustc receives
+# workspace-relative paths and planeon-gate carries no build-host path); in Cargo.lock they are path packages (no
+# source, no checksum) whose names, versions and edges are their vendor rows'. check_vendor stays their file-level pin
+# (cargo no longer verifies a patched package's .cargo-checksum.json digests, phase 1).
+PATCH_CRATES = (("cfg-if", "1.0.5"), ("getrandom", "0.2.17"), ("libc", "0.2.190"), ("once_cell", "1.21.4"),
+                ("ring", "0.17.14"), ("rustls", "0.23.46"), ("rustls-pki-types", "1.15.1"), ("rustls-webpki", "0.103.15"),
+                ("subtle", "2.6.1"), ("untrusted", "0.9.0"), ("zeroize", "1.9.1"))
 # DESIGN sections 2.2 and 19: C-family, assembly and perl suffixes; only ring holds such files, and cc its two
 # compiler-probe sources, each pinned by path and sha256.
 NATIVE_SUFFIXES = {".c", ".h", ".inl", ".inc", ".cpp", ".cc", ".hpp", ".S", ".s", ".asm", ".pl", ".pm"}
@@ -106,8 +124,165 @@ MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
 RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
 FORBIDDEN_SOURCE = ("available_parallelism", "current_exe", "current_dir", "env::var", "var_os", "vars", "/proc", "/sys")
 HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
-# HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/).
-LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls")
+# HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/). HE-003D
+# DESIGN section 5 (O4): the gate binary's own crate joins them.
+LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate")
+GATE_MAIN = "crates/gate/src/main.rs"
+GATE_CONFIG = "crates/effect-gate/src/gate_config.rs"
+SIGNED_CONFIG = "crates/gate-tls/src/signed_config.rs"
+# HE-003D DESIGN section 5 (O4, the STARTUP_EXCEPTIONS pattern): the binary's exit, std::process::ExitCode, is allowed
+# only as this one use declaration of main.rs (whitespace around its tokens ignored), removed once before the
+# LINKED_FORBIDDEN scan; a second one, another std::process item or another file still refuses. No std::env (no argv).
+EXIT_USE = "use std::process::ExitCode;"
+LINKED_EXCEPTIONS = {GATE_MAIN: ((EXIT_USE, re.compile(r"\buse\s+std::process::ExitCode\s*;")),)}
+# HE-003D DESIGN section 5 (O2; D1-3, D2-2): the seal-order grammar over main.rs read without comments. Exactly one
+# `#[cfg(target_os = "linux")] fn main() -> ExitCode` (and at most one non-Linux stub that only returns status::NOT_LINUX);
+# its body starts with `let <name> = match seal_stage1() {`; between that `seal_stage1(` and the single `seal_stage2(`
+# only identifiers, paths, literals, `::`, `=>`, `=`, `&`, `,`, `;`, braces and parentheses, the keywords let, match and
+# return, the calls below (status::seal( only as the argument of ExitCode::from( ), the patterns Ok( and Err(, and
+# tuple-variant patterns (an upper-case last segment whose parentheses close straight into `=>`): no method call,
+# closure, macro, `?` or other call.
+SEAL_CALLS = ("signed_config::load", "GateConfig::parse", "ExitCode::from", "status::seal", "Ok", "Err")
+LINUX_MAIN = re.compile(r'#\s*\[\s*cfg\s*\(\s*target_os\s*=\s*"linux"\s*\)\s*\]\s*fn\s+main\s*\(\s*\)\s*->\s*ExitCode\s*\{')
+LINUX_MAIN_CODE = re.compile(r'#\s*\[\s*cfg\s*\(\s*target_os\s*=\s*""\s*\)\s*\]\s*fn\s+main\s*\(\s*\)\s*->\s*ExitCode\s*\{')
+OTHER_MAIN = re.compile(r'#\s*\[\s*cfg\s*\(\s*not\s*\(\s*target_os\s*=\s*"linux"\s*\)\s*\)\s*\]\s*fn\s+main\s*\(\s*\)\s*->\s*'
+                        r'ExitCode\s*\{\s*ExitCode\s*::\s*from\s*\(\s*status\s*::\s*NOT_LINUX\s*\)\s*\}')
+FN_MAIN = re.compile(r"\bfn\s+main\b")
+STAGE1_BINDING = re.compile(r"\s*let\s+([A-Za-z_]\w*)\s*=\s*match\s+seal_stage1\s*\(\s*\)\s*\{")
+# PR review round 1, R1-1 (Q-HE3D-R1 (a)): the whole stage-2 statement, exactly (comments removed, whitespace free):
+# `let <n> = match seal_stage2(<stage-1 binding>) { Ok(<x>) => <x>, Err(<e>) => return ExitCode::from(status::seal(&<e>)), };`
+# so no code runs in its argument (before the second stage) or in either arm.
+STAGE2_STATEMENT = re.compile(
+    r"\blet\s+([A-Za-z_]\w*)\s*=\s*match\s+seal_stage2\s*\(\s*([A-Za-z_]\w*)\s*\)\s*\{\s*Ok\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>"
+    r"\s*([A-Za-z_]\w*)\s*,\s*Err\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*return\s+ExitCode\s*::\s*from\s*\(\s*status\s*::\s*seal\s*"
+    r"\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*\)\s*,?\s*\}\s*;")
+# R1-2: main.rs's exact imports (path, rename) as a multiset: the top level's and serve's in-body ones; its only items
+# are the Linux main, the non-Linux stub and serve; its only attributes are these three (whitespace removed).
+MAIN_USES = tuple(sorted(
+    [(("std", "process", "ExitCode"), None), (("effect_gate", "status"), None)]
+    + [(("effect_gate", name), None) for name in ("seal_stage1", "seal_stage2", "GateConfig", "Sealed")]
+    + [(("gate_tls", "signed_config", "self"), None), (("gate_tls", "signed_config", "LoadError"), None)]
+    + [(("effect_gate", "file_store", "fstat_device"), None), (("effect_gate", "linux_os", "LinuxOs"), None)]
+    + [(("effect_gate", "linux_net", name), None) for name in ("LinuxConnector", "LinuxStreams", "NetTable")]
+    + [(("effect_gate", name), None) for name in ("ExpectedPeers", "FileStores", "ListenerPlan", "Owner", "PolicyGate",
+                                                  "Stores", "Substrate")]
+    + [(("gate_tls", name), None) for name in ("client_config", "credentials", "server_config", "Exchange", "I04Server",
+                                               "UpstreamClient")]))
+MAIN_FUNCTIONS = ["main", "main", "serve"]
+MAIN_ATTRIBUTES = ("#![forbid(unsafe_code)]", '#[cfg(target_os="linux")]', '#[cfg(not(target_os="linux"))]')
+MAIN_ITEMS = re.compile(r"(?<!')\b(mod|struct|enum|union|trait|type|impl|const|static|macro_rules|macro|extern)\b")
+SEAL_TOKEN = re.compile(r"\s*(::|=>|b\"\"|\"\"|''|[A-Za-z_]\w*|[0-9]\w*|[(){},;=&])")
+SEAL_KEYWORDS = {"let", "match", "return"}
+RUST_KEYWORDS = {"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "fn",
+                 "for", "gen", "if", "impl", "in", "loop", "mod", "move", "mut", "pub", "ref", "self", "Self", "static",
+                 "struct", "super", "trait", "type", "union", "unsafe", "use", "where", "while", "yield", "box", "try",
+                 "macro", "become", "do", "final", "override", "priv", "typeof", "unsized", "virtual", "abstract"}
+# The socket and thread names refused in main.rs before `seal_stage2(` and in all of gate_config.rs and
+# signed_config.rs (comments removed, whitespace around `::` removed). signed_config.rs reads its two files through
+# gate-sys's read-only opener (DESIGN section 3.1; departure A2, accepted 2026-10-15), so exactly one statement
+# `use gate_sys::Dir;` at the start of a line is removed there first; a second one, `pub use`, a group, a rename,
+# another gate-sys path or a qualified `gate_sys::` expression still refuses.
+BEFORE_SEAL_REFUSED = (r"\bgate_sys\b", r"\bPoller\b", r"\blisten_", r"\bconnect_", r"\bNetTable\b", r"\bLinuxOs\b",
+                       r"\bLinuxConnector\b", r"\bstd::net\b", r"\bstd::thread\b", r"\bthread::")
+SIGNED_CONFIG_DIR = re.compile(r"(?m)^[ \t]*use\s+gate_sys::Dir\s*;")
+# HE-003D DESIGN section 5 (D1-3, D2-6): gate-sys's socket modules are reached only from effect-gate's linux_os.rs and
+# linux_net.rs (whose public constructors take &Sealed), which re-export nothing (no `pub use`), and from gate-sys.
+SOCKET_FILES = ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs")
+SOCKET_MODULES = ("channel", "tcp")
+SOCKET_TEXT = re.compile(r"\bgate_sys::(?:channel|tcp)\b")
+PUB_USE = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b")
+# PR review round 1, R1-3 (Q-HE3D-R1 (a)): in SOCKET_FILES no `pub` (or `pub(..)`) type alias, const, static or fn
+# signature names a gate-sys channel or tcp item (through an import, a module import or a qualified path), except these
+# data types, which create nothing: the two listen errors and the borrowed view of an existing descriptor (today's
+# `NetTable::listen_i04` returns a TcpListenError and `NetTable::watched`, pub(crate), a Watched).
+SOCKET_DATA_TYPES = ("ListenError", "TcpListenError", "Watched")
+PUB_ITEM = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?(?:(?:unsafe|const|async|extern)\s+(?:\"\"\s*)?)*(fn|type|const|static)\b")
+# PR review round 2, R2-1 (Q-HE3D-R2 (a)): also in SOCKET_FILES, no private type alias (an alias chain would hide a
+# socket item from a pub one; none exists), no pub struct field whose type names a channel or tcp item (other than
+# SOCKET_DATA_TYPES) or is a fn pointer, and no pub const or static of a fn-pointer type (a pointer to a private fn).
+TYPE_ITEM = re.compile(r"\btype\s+[A-Za-z_]\w*")
+PUB_PREFIX = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?$")
+STRUCT_ITEM = re.compile(r"\bstruct\s+[A-Za-z_]\w*")
+FN_POINTER = re.compile(r"\bfn\s*\(|\bextern\s*(?:\"\"\s*)?fn\b")
+# R1-3: no macro in any linked crate's non-test sources or the binary (a macro could complete a gate-sys socket path
+# that neither the use-tree reading nor the text scan sees): macro_rules, a `macro` item, #[macro_export].
+MACROS = ((re.compile(r"\bmacro_rules\b"), "macro_rules"), (re.compile(r"(?<![\w$])macro\s+[A-Za-z_]"), "a macro item"),
+          (re.compile(r"#\s*!?\s*\[\s*macro_export\b"), "#[macro_export]"))
+THREADS = (re.compile(r"\bstd::thread\b"), re.compile(r"\bthread::"))
+# HE-003D departure A1 (accepted 2026-10-15): the binary opens its stores only with FileStores::open_bound (the
+# generation binding of DESIGN section 3.3); in crates/gate's sources (comments removed, whitespace around `::`
+# removed) `FileStores::open_bound(` appears exactly once, `::open` appears only as `PolicyGate::open`, and neither
+# FileStores nor PolicyGate is renamed, aliased or used as a rename's name.
+OPEN_BOUND = re.compile(r"\bFileStores::open_bound\s*\(")
+# PR review round 1, R1-4: no linked source (file_store.rs included, whose `pub fn open` is the definition) calls
+# FileStores::open, so a library wrapper cannot hand the binary an unbound opening; file_store.rs not `Self::open` either.
+UNBOUND_OPEN = re.compile(r"\bFileStores\s*>?::open\b")
+SELF_OPEN = re.compile(r"\bSelf\s*>?::open\b")
+FILE_STORE = "crates/effect-gate/src/file_store.rs"
+POLICY_OPEN = re.compile(r"(?<![\w>])PolicyGate::open\b")
+ANY_OPEN = re.compile(r"::open\b")
+STORE_ALIASES = (re.compile(r"\b(?:FileStores|PolicyGate)\s+as\b"), re.compile(r"\bas\s+(?:FileStores|PolicyGate)\b"),
+                 re.compile(r"\btype\s+\w+\s*(?:<[^>]*>)?\s*=\s*[\w:<> ]*\b(?:FileStores|PolicyGate)\b"),
+                 re.compile(r"\btype\s+(?:FileStores|PolicyGate)\b"))
+# DESIGN section 5 (D1-3): no code that runs before main, in any linked crate or the binary.
+PRE_MAIN = ((re.compile(r"\blink_section\b"), "link_section"), (re.compile(r"#\s*!?\s*\[\s*used\b"), "#[used]"),
+            (re.compile(r"\binit_array\b"), "init_array"), (re.compile(r"\bno_mangle\b"), "no_mangle"),
+            (re.compile(r"\bexport_name\b"), "export_name"))
+# DESIGN sections 4 and 5 (D1-10, D2-6): nothing printed; any mention of stdout or stderr (any case) refuses.
+PRINTS = ((re.compile(r"\bprint\s*!"), "print!"), (re.compile(r"\bprintln\s*!"), "println!"),
+          (re.compile(r"\beprint\s*!"), "eprint!"), (re.compile(r"\beprintln\s*!"), "eprintln!"),
+          (re.compile(r"\bdbg\s*!"), "dbg!"), (re.compile(r"(?i)\bstd(?:out|err)\b"), "stdout or stderr"))
+# DESIGN section 3.1 (Q-HE3D-7 (d)): the compiled-in signer key file holds exactly 0 (not yet set) or 32 bytes.
+SIGNER_KEY = "crates/gate-tls/config-signer.pub"
+# HE-003D DESIGN section 5 (O3, C8): planeon-gate's symbol inventory. MEMBARRIER must be absent (musl's membarrier.lo
+# defines both; its __membarrier_init is WEAK in pthread_create.lo and harmless). KILLED_WRAPPERS are the musl 1.2.5
+# wrappers whose system call the pinned EFFECT_GATE programs kill unconditionally on at least one target: each name's
+# primary system call number (x86_64, aarch64) run through a classic-BPF interpreter over contracts/seccomp-v3/ with
+# 147 argument vectors, every one SECCOMP_RET_KILL_PROCESS (argument-filtered calls such as socket, prctl, mremap and
+# fcntl are not listed; T04's steady-state trace stays the proof). A present one must be in WRAPPER_JUSTIFICATIONS, the
+# reviewed list built from phase 2's actual set (both targets of the shipped binary, which holds the composed gate
+# since Q-HE3D-B1 (a); the same twelve as a scratch build with a 32-byte stand-in key) and recorded in MODEL_DEFINED
+# (R77).
+MEMBARRIER = ("membarrier", "__membarrier")
+# Owner decision Q-HE3D-B1 (a): the shipped planeon-gate holds the composed gate (signed_config::load passes the
+# compiled-in key through core::hint::black_box, so LTO cannot drop what follows it while the key is empty). Its
+# .symtab must hold symbols of gate-tls and rustls (a Rust path whose crate root is that crate, legacy or v0 mangling)
+# and of ring's C and assembly core (the ring_core_0_17_14_ prefix).
+CRATE_SYMBOLS = (("gate_tls", re.compile(r"(?:^_ZN|C(?:s[0-9A-Za-z]*_)?)8gate_tls(?=[0-9A-Z]|$)")),
+                 ("rustls", re.compile(r"(?:^_ZN|C(?:s[0-9A-Za-z]*_)?)6rustls(?=[0-9A-Z]|$)")),
+                 ("ring", re.compile(r"^ring_core_0_17_14_")))
+KILLED_WRAPPERS = ("__membarrier", "accept", "access", "capget", "capset", "chdir", "chmod", "chown", "chroot",
+                   "clock_settime", "copy_file_range", "creat", "dup", "dup2", "dup3", "eventfd", "execv", "execve",
+                   "execvp", "faccessat", "fchdir", "fchmod", "fchmodat", "fchown", "fexecve", "fork", "ftruncate",
+                   "futimens", "getcwd", "getdents", "getegid", "geteuid", "getgid", "getpriority", "getresgid",
+                   "getresuid", "getuid", "inotify_init1", "ioctl", "isatty", "kill", "link", "lstat", "lstat64",
+                   "membarrier", "memfd_create", "mkdir", "mkdirat", "mknod", "mlock", "mount", "msync", "open",
+                   "open64", "pause", "personality", "pipe", "pipe2", "popen", "posix_spawn", "process_vm_readv",
+                   "ptrace", "readdir", "readlink", "readlinkat", "realpath", "rename", "renameat", "rmdir",
+                   "sched_setaffinity", "seccomp", "sendfile", "setgid", "setpgid", "setpriority", "setrlimit",
+                   "setsid", "settimeofday", "setuid", "shmget", "signalfd", "socketpair", "splice", "stat",
+                   "stat64", "statx", "symlink", "sysinfo", "system", "tcgetattr", "tee", "timerfd_create",
+                   "truncate", "uname", "unlink", "unlinkat", "utimensat", "utimes", "vfork")
+WRAPPER_JUSTIFICATIONS = {
+    "capget": "the seal's own read (gate-sys seal.rs), made only before the filter is installed (stage 2 step 9)",
+    "capset": "the seal's own write (gate-sys seal.rs), made only in stages 1 and 2 before the filter",
+    "getresuid": "the seal's precondition (gate-sys seal.rs), before stage 1's first change",
+    "getresgid": "the seal's precondition (gate-sys seal.rs), before stage 1's first change",
+    "open": "std's start-up, before main (a closed fd 0-2 is reopened on /dev/null); on aarch64 musl's open is openat, "
+            "allowed; the linked crates name no std opener (LINKED_FORBIDDEN); no direct call in the composed text",
+    "readlink": "called only by realpath; std's File Debug and current_exe paths (no File is formatted after the seal, "
+                "DEBUG_HAZARDS; current_exe is refused by the start-up lint)",
+    "realpath": "std's canonicalize and backtrace paths; no direct call or jump in the composed text; std::path and Path "
+                "are refused in the linked crates; a panic with RUST_BACKTRACE set dies by SIGSYS (HE-008 leaves it unset)",
+    "getcwd": "called only by realpath (and std's current_dir, refused by the start-up lint)",
+    "stat": "std's path-based metadata (std::path and Path are refused in the linked crates); no direct call in the "
+            "composed text",
+    "dup": "linked from std's runtime, no direct call or jump in the composed text; the gate's code duplicates no "
+           "descriptor (try_clone is fcntl F_DUPFD_CLOEXEC, allowed)",
+    "pause": "linked from musl or std, no direct call or jump in the composed text; on aarch64 it is ppoll, allowed",
+    "sysinfo": "called only by musl's sysconf for _SC_PHYS_PAGES and _SC_AVPHYS_PAGES; std asks sysconf only for the page "
+               "size (from the auxiliary vector, no system call)",
+}
 OPENAT = "crates/gate-sys/src/openat.rs"
 SEAL = "crates/gate-sys/src/seal.rs"
 CHANNEL = "crates/gate-sys/src/channel.rs"
@@ -156,7 +331,9 @@ DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "Pid
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
-                "ServerConnection", "ClientConfig", "ClientConnection", "TlsClientIdentity")
+                "ServerConnection", "ClientConfig", "ClientConnection", "TlsClientIdentity",
+                # HE-003D DESIGN section 3.4 (D1-7): the credential read's helper and key holder.
+                "CredentialFile", "KeyBytes")
 DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS + SECRET_TYPES))
 OUTER_ATTRIBUTE = re.compile(r"#\s*\[")
 ITEM_AFTER_ATTRIBUTES = re.compile(r"\s*(?:#\s*\[|(?:pub\s*(?:\([^)]*\)\s*)?)?(struct|enum|union)\s+([A-Za-z_]\w*))")
@@ -180,7 +357,7 @@ LIFETIME = re.compile(r"'(?:r#)?[^\W\d]\w*")
 # LINKED_FORBIDDEN's. try_clone (fcntl F_DUPFD_CLOEXEC) is allowed. PR review round 1, R1-2: i05-protocol's code runs
 # after the seal too, and is_terminal (musl's isatty: ioctl TIOCGWINSZ) joins the list. It is a list, not a proof:
 # anything it does not name is code review's and T04's (the steady-state trace).
-POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls")
+POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate")
 POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)"),
                        (r"\bread_dir\b", "read_dir (getdents64)"),
                        (r"\bcurrent_exe\b", "current_exe (readlink, readlinkat)"),
@@ -197,7 +374,8 @@ POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]",
-               "crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]"}
+               "crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]",
+               GATE_MAIN: "#![forbid(unsafe_code)]"}
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -215,7 +393,9 @@ TLS_FORBIDDEN = tuple((re.compile(pattern), name) for pattern, name in (
     (r"in_memory_sessions", "in_memory_sessions"), (r"Resumption\s*::\s*store", "Resumption::store"),
     (r"ClientSessionMemoryCache", "ClientSessionMemoryCache"), (r"tls12_resumption", "tls12_resumption"),
     (r"with_ech", "with_ech"), (r"EchMode", "EchMode"), (r"with_client_cert_resolver", "with_client_cert_resolver"),
-    (r"send_ticket_request", "send_ticket_request")))
+    (r"send_ticket_request", "send_ticket_request"),
+    # HE-003D DESIGN section 5 (HE-003C PR R1-1, D1-2): a second way to set the client's trust anchors.
+    (r"with_root_certificates", "with_root_certificates")))
 # The settings gate-tls's sources (read with comments removed and literal contents emptied) name exactly once, each as
 # this assignment; and, in tls.rs, the certificate resolver of DESIGN section 20.
 TLS_SETTINGS = (("max_early_data_size", r"\bmax_early_data_size\s*=\s*0\b"),
@@ -229,14 +409,21 @@ TLS_SETTINGS = (("max_early_data_size", r"\bmax_early_data_size\s*=\s*0\b"),
 TLS_RESOLVER = ((r"\bwith_cert_resolver\s*\(", "with_cert_resolver("),
                 (r"\bSingleCertAndKey\s*::\s*from\s*\(", "SingleCertAndKey::from("))
 # HE-003C DESIGN section 5 (D1-8): the client's authentication and its webpki verifier, each named exactly once, in
-# tls_client.rs (mirroring TLS_RESOLVER).
-TLS_CLIENT_AUTH = ((r"\bwith_client_auth_cert\s*\(", "with_client_auth_cert("),
-                   (r"\bwith_webpki_verifier\s*\(", "with_webpki_verifier("))
+# tls_client.rs (mirroring TLS_RESOLVER). HE-003D DESIGN section 5 (HE-003C PR R1-1, D1-2): any mention counts (read
+# without comments), over gate-tls's and the binary's sources together.
+TLS_CLIENT_AUTH = ((r"\bwith_client_auth_cert\b", "with_client_auth_cert"),
+                   (r"\bwith_webpki_verifier\b", "with_webpki_verifier"))
 # HE-003C DESIGN section 5 (D2-4 of HE-003B): among gate-tls's non-test sources only exchange.rs constructs an
 # UpstreamResponse (stage_response and write_response build it from the bytes they digest). Effect-gate's constructions
-# are test-only, and its non-test mentions are the definition and patterns, so the rule is scoped to gate-tls.
-UPSTREAM_RESPONSE = re.compile(r"\bUpstreamResponse\s*\{")
+# are test-only, and its non-test mentions are the definition and patterns, so the rule is scoped to gate-tls. HE-003D
+# DESIGN section 5 (R1-1, D1-2): outside exchange.rs no gate-tls source and no source of the binary names it at all
+# (read without comments: a use, a rename, an alias, a where-clause, a clone are all mentions), and neither defines a
+# macro (macro_rules), which could assemble the name.
+UPSTREAM_RESPONSE = re.compile(r"\bUpstreamResponse\b")
 UPSTREAM_RESPONSE_HOME = "crates/gate-tls/src/exchange.rs"
+MACRO_RULES = re.compile(r"\bmacro_rules\b")
+# The crates check_tls reads: gate-tls (which must have sources) and the binary (HE-003D DESIGN section 5, C7).
+TLS_CRATES = (GATE_TLS, "crates/gate")
 # The linked-source patterns below are matched against the source with the whitespace around every `::` removed
 # (PATH_SPACE), so `std :: process` is `std::process` to them.
 PATH_SPACE = re.compile(r"\s*::\s*")
@@ -531,13 +718,28 @@ def linked(dependencies: dict, name: str) -> set:
     return seen
 
 
+def patch_table() -> dict:
+    """The one [patch] table the workspace manifest may hold (HE-003D DESIGN section 2)."""
+    return {"crates-io": {name: {"path": "vendor/%s-%s" % (name, version)} for name, version in PATCH_CRATES}}
+
+
 def check_workspace(base: Path, vendor: list[dict] | None = None) -> dict:
     """The workspace members, each with its direct workspace (path) dependencies. HE-003B DESIGN section 2.6: besides
-    path dependencies, only REGISTRY_LINES (gate-tls's exact registry lines); no [patch] or [replace]; in Cargo.lock the
-    packages without a source are exactly the workspace crates, and the packages with one are exactly the vendor table's
-    rows (`vendor`), each from crates.io with the row's checksum and dependency list."""
+    path dependencies, only REGISTRY_LINES (gate-tls's exact registry lines); no [replace]; in Cargo.lock the packages
+    with a source are exactly the vendor table's rows (`vendor`) that are not patched, each from crates.io with the row's
+    checksum and dependency list. HE-003D DESIGN sections 2 and 5: when the vendor table has LINKED rows, they must be
+    exactly PATCH_CRATES, the manifest's [patch] must be exactly patch_table(), and the packages without a source are
+    exactly the workspace crates plus those rows, each patched package with the row's version and dependency list and
+    no checksum; without LINKED rows (the self-tests' tables) no [patch] is allowed."""
     workspace = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
-    require("patch" not in workspace and "replace" not in workspace, "the workspace manifest has a [patch] or [replace]")
+    patched = {(row["name"], row["version"]) for row in (vendor or []) if row.get("role") == "LINKED"}
+    require("replace" not in workspace, "the workspace manifest has a [patch] or [replace]")
+    if patched:
+        require(patched == set(PATCH_CRATES), "the vendor table's LINKED crates are not the [patch] table's")
+        require(workspace.get("patch") == patch_table(),
+                "the workspace manifest's [patch] or [replace] is not exactly the vendored path table")
+    else:
+        require("patch" not in workspace, "the workspace manifest has a [patch] or [replace]")
     names, paths = {}, {}
     manifests = []
     for member in workspace["workspace"]["members"]:
@@ -567,12 +769,21 @@ def check_workspace(base: Path, vendor: list[dict] | None = None) -> dict:
                     names[name].add(dependency)
     packages = tomllib.loads((base / "Cargo.lock").read_text(encoding="utf-8"))["package"]
     local = [package for package in packages if "source" not in package]
-    require(sorted(package["name"] for package in local) == sorted(names) and all("checksum" not in package for package in local),
+    is_patched = lambda package: (package["name"], package.get("version")) in patched
+    require(sorted(package["name"] for package in local if not is_patched(package)) == sorted(names)
+            and all("checksum" not in package for package in local),
             "Cargo.lock does not list exactly the workspace crates")
     rows = {(row["name"], row["version"]): row for row in (vendor or [])}
+    require(sorted((package["name"], package["version"]) for package in local if is_patched(package)) == sorted(patched),
+            "Cargo.lock does not list exactly the patched vendored crates as path packages")
+    for package in local:
+        if is_patched(package):
+            require(sorted(package.get("dependencies", [])) == rows[(package["name"], package["version"])]["dependencies"],
+                    "Cargo.lock's dependencies of the patched %s are not the vendor table's" % package["name"])
     registry = [package for package in packages if "source" in package]
-    require(len(registry) == len(rows) and all(package["source"] == REGISTRY and (package["name"], package["version"]) in rows
-                                               for package in registry),
+    require(len(registry) == len(rows) - len(patched)
+            and all(package["source"] == REGISTRY and (package["name"], package["version"]) in rows
+                    and not is_patched(package) for package in registry),
             "Cargo.lock names a registry or git package outside the vendor table")
     for package in registry:
         row = rows[(package["name"], package["version"])]
@@ -657,11 +868,12 @@ def check_included_code(base: Path) -> int:
     return count
 
 
-def rust_code(text: str, comments: bool = False) -> str:
+def rust_code(text: str, comments: bool = False, literals: bool = False) -> str:
     """A source as the lexical checks read it (HE-002S PR review round 1, R1-1): line and nested block comments become
     one space (kept as they are with `comments`), string, byte-string and C-string literals keep only their quotes and
     prefix (`""`, `b""`), raw-string literals become `""`, and character and byte literals become `''` (`b''`);
-    lifetimes and labels stay. Anything it cannot lex
+    lifetimes and labels stay; with `literals` (HE-003D, the seal-order grammar's cfg attributes) every literal is
+    kept as written. Anything it cannot lex
     refuses: an unterminated block comment or literal, or a quote that starts neither a character literal nor a
     lifetime."""
     out, index, length = [], 0, len(text)
@@ -687,7 +899,7 @@ def rust_code(text: str, comments: bool = False) -> str:
         elif char in "bcr" and (raw := RAW_STRING.match(text, index)):
             end = text.find('"' + raw.group(1), raw.end())
             require(end >= 0, "an unterminated raw string literal")
-            out.append('""')
+            out.append(text[index:end + 1 + len(raw.group(1))] if literals else '""')
             index = end + 1 + len(raw.group(1))
         elif char == '"':
             cursor = index + 1
@@ -699,12 +911,12 @@ def rust_code(text: str, comments: bool = False) -> str:
                     break
                 else:
                     cursor += 1
-            out.append('""')
+            out.append(text[index:cursor + 1] if literals else '""')
             index = cursor + 1
         elif char == "'":
             literal = CHAR_LITERAL.match(text, index)
             if literal:
-                out.append("''")
+                out.append(literal.group(0) if literals else "''")
                 index = literal.end()
             else:
                 lifetime = LIFETIME.match(text, index)
@@ -811,8 +1023,11 @@ def check_linked_sources(base: Path) -> int:
     count = 0
     for rel, raw in sources:
         text = PATH_SPACE.sub("::", raw)
+        scanned = text
+        for _, expression in LINKED_EXCEPTIONS.get(rel, ()):   # HE-003D (O4): the binary's one exit import
+            scanned = expression.sub("", scanned, count=1)
         for pattern in LINKED_FORBIDDEN:
-            require(not re.search(pattern, text), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
+            require(not re.search(pattern, scanned), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
         require(rel in FD_FILES or not FD_ITEMS.search(text),
                 "%s names a std::os::fd item outside %s" % (rel, " and ".join(FD_FILES)))
         rest = text
@@ -1050,7 +1265,8 @@ def check_debug_derives(base: Path) -> int:
 
 def check_workspace_shape(base: Path, workspace: dict) -> int:
     """HE-002C PR review round 3, R3-2 (1)-(4): every workspace member is `crates/<name>`; `crates` itself is not a
-    symlink; the crates effect-gate links (its path dependencies, transitively, with itself) are exactly LINKED_CRATES;
+    symlink; the crates effect-gate, gate-tls and planeon-gate link (their path dependencies, transitively, with
+    themselves) are exactly LINKED_CRATES;
     the workspace edition is 2024 and every member inherits it (the unsafe tripwire relies on edition 2024's `unsafe
     extern` and `#[unsafe(no_mangle)]`), and no target table of a member manifest ([lib], [[bin]], [[test]], [[bench]],
     [[example]]) overrides the edition (HE-003A PR review round 1, R1-1). `workspace` is check_workspace's result."""
@@ -1076,11 +1292,11 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
         names[package.get("name")] = member
     require("effect-gate" in names and "effect-gate" in workspace, "no effect-gate member (workspace shape)")
     # HE-003B DESIGN section 2.6: the linked crates are the union of effect-gate's and gate-tls's closures (gate-tls
-    # depends on effect-gate, not the reverse).
-    roots = ["effect-gate"] + [name for name in ("gate-tls",) if name in names and name in workspace]
+    # depends on effect-gate, not the reverse). HE-003D DESIGN section 5: and planeon-gate's, the binary's.
+    roots = ["effect-gate"] + [name for name in ("gate-tls", "planeon-gate") if name in names and name in workspace]
     closure = {names.get(name) for root in roots for name in linked(workspace, root)}
-    require(closure == set(LINKED_CRATES), "the crates effect-gate and gate-tls link are %s, not %s (workspace shape)"
-            % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
+    require(closure == set(LINKED_CRATES), "the crates effect-gate, gate-tls and planeon-gate link are %s, not %s "
+            "(workspace shape)" % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
     return len(members)
 
 
@@ -1192,11 +1408,14 @@ def check_tls(base: Path) -> int:
     raw text (comments included); read with comments removed and literal contents emptied, they name each of the
     closed settings exactly once, as its assignment, and tls.rs names the certificate resolver exactly once each.
     HE-003C DESIGN section 5: the list and the settings include the client's, tls_client.rs names TLS_CLIENT_AUTH
-    exactly once each, and no source but exchange.rs constructs `UpstreamResponse {` (read without comments and
-    literal contents). Text, not Rust: a renamed import, a type alias or a macro could evade it, and code review stays."""
+    exactly once each, and no source but exchange.rs constructs an UpstreamResponse. HE-003D DESIGN section 5 (C7,
+    HE-003C PR R1-1): the binary's sources join every one of these rules (TLS_CRATES); TLS_CLIENT_AUTH counts any
+    mention; outside exchange.rs no source names UpstreamResponse at all, and none defines a macro (macro_rules); the
+    list gains with_root_certificates. Text, not Rust: what a renamed import, an alias or a macro could do is refused by
+    the any-mention and macro rules, and code review stays for values handed out of exchange.rs."""
     sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
-               for path in sorted((base / GATE_TLS / "src").rglob("*.rs"))]
-    require(sources, "gate-tls has no sources (TLS deny-list)")
+               for crate in TLS_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
+    require(any(rel.startswith(GATE_TLS + "/") for rel, _ in sources), "gate-tls has no sources (TLS deny-list)")
     code = ""
     for rel, text in sources:
         for pattern, name in TLS_FORBIDDEN:
@@ -1206,7 +1425,8 @@ def check_tls(base: Path) -> int:
         except GateError as error:
             raise GateError("%s: %s (TLS deny-list)" % (rel, error)) from None
         require(rel == UPSTREAM_RESPONSE_HOME or not UPSTREAM_RESPONSE.search(source_code),
-                "%s constructs UpstreamResponse outside %s (TLS deny-list)" % (rel, UPSTREAM_RESPONSE_HOME))
+                "%s names UpstreamResponse outside %s (TLS deny-list)" % (rel, UPSTREAM_RESPONSE_HOME))
+        require(not MACRO_RULES.search(source_code), "%s defines a macro with macro_rules (TLS deny-list)" % rel)
         code += source_code + "\n"
     for name, assignment in TLS_SETTINGS:
         require(len(re.findall(r"\b%s\b" % name, code)) == 1 and len(re.findall(assignment, code)) == 1,
@@ -1221,8 +1441,353 @@ def check_tls(base: Path) -> int:
     client_code = rust_code(client.read_text(encoding="utf-8"))
     for pattern, name in TLS_CLIENT_AUTH:
         require(len(re.findall(pattern, code)) == 1 and len(re.findall(pattern, client_code)) == 1,
-                "gate-tls does not name %s exactly once, in tls_client.rs (TLS deny-list)" % name)
+                "gate-tls and the binary do not mention %s exactly once, in tls_client.rs (TLS deny-list)" % name)
     return len(sources)
+
+
+def call_end(tokens: list[str], start: int) -> int:
+    """The index after the `)` that closes the `(` at `start`."""
+    depth = 0
+    for index in range(start, len(tokens)):
+        depth += {"(": 1, ")": -1}.get(tokens[index], 0)
+        if depth == 0:
+            return index + 1
+    raise GateError("a call without its closing parenthesis (seal-order grammar)")
+
+
+def check_seal_order(base: Path) -> str:
+    """HE-003D DESIGN section 5 (O2; D1-3, D2-2): the seal-order grammar over the binary's main.rs read without
+    comments (SEAL_CALLS and the patterns above), then the socket and thread names of BEFORE_SEAL_REFUSED in main.rs
+    up to `seal_stage2(` and in all of gate_config.rs and signed_config.rs (one `use gate_sys::Dir;` excepted in the
+    latter). What the functions called between the stages call in turn, and new public functions in linux_os.rs and
+    linux_net.rs, stay code review's (MODEL_DEFINED R72). Returns the calls found between the stages."""
+    for rel in (GATE_MAIN, GATE_CONFIG, SIGNED_CONFIG):
+        require((base / rel).is_file(), "%s is missing (seal-order grammar)" % rel)
+    raw = (base / GATE_MAIN).read_text(encoding="utf-8")
+    try:
+        written, code = rust_code(raw, literals=True), rust_code(raw)
+    except GateError as error:
+        raise GateError("%s: %s (seal-order grammar)" % (GATE_MAIN, error)) from None
+    linux = list(LINUX_MAIN.finditer(written))
+    others = list(OTHER_MAIN.finditer(written))
+    require(len(linux) == 1 and len(LINUX_MAIN_CODE.findall(code)) == 1 and len(others) <= 1
+            and len(FN_MAIN.findall(code)) == 1 + len(others),
+            "%s must hold exactly one #[cfg(target_os = \"linux\")] fn main() -> ExitCode and at most a non-Linux stub "
+            "returning status::NOT_LINUX (seal-order grammar)" % GATE_MAIN)
+    body = LINUX_MAIN_CODE.search(code).end()
+    binding = STAGE1_BINDING.match(code, body)
+    require(binding, "main does not start with `let <name> = match seal_stage1() {` (seal-order grammar)")
+    require(len(re.findall(r"\bseal_stage1\s*\(", code)) == 1 and len(re.findall(r"\bseal_stage2\s*\(", code)) == 1,
+            "%s does not call seal_stage1 and seal_stage2 exactly once each (seal-order grammar)" % GATE_MAIN)
+    stage2 = re.search(r"\bseal_stage2\s*\(", code).start()
+    require(stage2 > binding.end(), "seal_stage2 comes before seal_stage1 (seal-order grammar)")
+    statements = [match for match in STAGE2_STATEMENT.finditer(code)]
+    statement = next((match for match in statements if match.start(2) > stage2 > match.start()), None)
+    require(statement and len(statements) == 1,
+            "the second stage is not exactly `let <name> = match seal_stage2(<stage-1 binding>) { Ok(<x>) => <x>, "
+            "Err(<e>) => return ExitCode::from(status::seal(&<e>)), };` (seal-order grammar)")
+    require(statement.group(2) == binding.group(1) and statement.group(3) == statement.group(4)
+            and statement.group(5) == statement.group(6),
+            "the second stage's argument or arms are not the stage-1 binding and the bound names (seal-order grammar)")
+    check_main_shape(raw, written, code, linux[0])
+    depth = 1
+    for index in range(body, statement.end()):
+        depth += {"{": 1, "}": -1}.get(code[index], 0)
+        require(depth > 0, "seal_stage2 is not called inside main (seal-order grammar)")
+    segment = code[re.search(r"\bseal_stage1\s*\(", code).end():statement.start()]
+    tokens, index = [], 0
+    while segment[index:].strip():
+        token = SEAL_TOKEN.match(segment, index)
+        require(token, "main names %r between the seal's stages, which the seal-order grammar does not allow"
+                % segment[index:].strip()[:24])
+        tokens.append(token.group(1))
+        index = token.end()
+    calls, patterns = set(), set()
+    position = 0
+    while position < len(tokens):
+        token = tokens[position]
+        if not re.match(r"[A-Za-z_]", token):
+            position += 1
+            continue
+        require(token not in RUST_KEYWORDS or token in SEAL_KEYWORDS,
+                "main uses the keyword %s between the seal's stages (seal-order grammar)" % token)
+        path, cursor = [token], position + 1
+        while cursor + 1 < len(tokens) and tokens[cursor] == "::" and re.match(r"[A-Za-z_]", tokens[cursor + 1]):
+            path.append(tokens[cursor + 1])
+            cursor += 2
+        name = "::".join(path)
+        if cursor < len(tokens) and tokens[cursor] == "(":
+            end = call_end(tokens, cursor)
+            rest = end
+            while rest < len(tokens) and tokens[rest] == ")":
+                rest += 1
+            pattern = path[-1][:1].isupper() and rest < len(tokens) and tokens[rest] == "=>"
+            require(name in SEAL_CALLS or pattern,
+                    "main calls %s( between the seal's stages (seal-order grammar)" % name)
+            if name == "status::seal":
+                require(tokens[max(0, position - 4):position] == ["ExitCode", "::", "from", "("],
+                        "status::seal( is not the argument of ExitCode::from( (seal-order grammar)")
+            (calls if name in SEAL_CALLS else patterns).add(name)
+        position = cursor
+    for rel, text in ((GATE_MAIN, code[:statement.end()]), (GATE_CONFIG, None), (SIGNED_CONFIG, None)):
+        if text is None:
+            try:
+                text = rust_code((base / rel).read_text(encoding="utf-8"))
+            except GateError as error:
+                raise GateError("%s: %s (seal-order grammar)" % (rel, error)) from None
+        text = PATH_SPACE.sub("::", text)
+        if rel == SIGNED_CONFIG:
+            text = SIGNED_CONFIG_DIR.sub("", text, count=1)
+        for pattern in BEFORE_SEAL_REFUSED:
+            require(not re.search(pattern, text), "%s names %s before the seal (seal-order grammar)"
+                    % (rel, pattern.replace("\\b", "")))
+    return "%s (and the tuple-variant patterns %s)" % (", ".join(sorted(calls)), ", ".join(sorted(patterns)) or "none")
+
+
+def check_main_shape(raw: str, written: str, code: str, linux: re.Match) -> None:
+    """PR review round 1, R1-2 (Q-HE3D-R1 (a)): main.rs (read without comments) imports exactly MAIN_USES (no rename,
+    no glob, nothing else), defines no item but the two `fn main` and `fn serve` (no mod, struct, enum, union, trait,
+    type, impl, const, static, macro or extern), carries only MAIN_ATTRIBUTES, and nothing but its cfg precedes the
+    Linux main. So no code defined in main.rs runs between the stages under an allowed name."""
+    uses = source_uses(GATE_MAIN, raw)
+    for path, rename in uses:
+        require(rename is None, "main.rs renames an import (seal-order grammar)")
+        require(path[-1] != "*", "main.rs imports a glob (seal-order grammar)")
+    require(tuple(sorted(uses)) == MAIN_USES, "main.rs's imports are not exactly the pinned set (seal-order grammar)")
+    item = MAIN_ITEMS.search(code)
+    require(not item, "main.rs defines a %s item (the keyword); only fn main and fn serve are allowed (seal-order "
+            "grammar)" % (item.group(1) if item else ""))
+    require(sorted(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code)) == MAIN_FUNCTIONS,
+            "main.rs defines functions other than the two fn main and fn serve (seal-order grammar)")
+    for attribute in OUTER_ATTRIBUTE.finditer(written):
+        text = re.sub(r"\s+", "", written[attribute.start():bracket_end(written, attribute.start())])
+        require(text in MAIN_ATTRIBUTES, "main.rs carries the attribute %s (seal-order grammar)" % text)
+    for inner in re.finditer(r"#\s*!\s*\[", written):
+        text = re.sub(r"\s+", "", written[inner.start():bracket_end(written, inner.start())])
+        require(text in MAIN_ATTRIBUTES, "main.rs carries the attribute %s (seal-order grammar)" % text)
+    require(not written[:linux.start()].rstrip().endswith("]"),
+            "an attribute other than its cfg precedes the Linux main (seal-order grammar)")
+
+
+def linked_sources(base: Path) -> list[tuple[str, str]]:
+    """(relative path, text) of every non-test source of the linked crates (the binary included)."""
+    return [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
+            for crate in LINKED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
+
+
+def check_socket_modules(base: Path) -> int:
+    """HE-003D DESIGN section 5 (D1-3, D2-6): read from every linked source's use trees (groups, globs and renames
+    included), a path through gate_sys to channel or tcp, a glob of gate_sys and a rename of gate_sys itself appear
+    only in SOCKET_FILES and gate-sys; the fully qualified gate_sys::channel and gate_sys::tcp (read without comments,
+    whitespace around `::` removed) likewise; SOCKET_FILES re-export nothing (no `pub use`); and no linked source names
+    std::thread or `thread::` (the gate is single-threaded)."""
+    sources = linked_sources(base)
+    for rel in SOCKET_FILES:
+        require((base / rel).is_file(), "%s is missing (socket-module check)" % rel)
+    for rel, raw in sources:
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (socket-module check)" % (rel, error)) from None
+        for pattern in THREADS:
+            require(not pattern.search(code), "%s names std::thread or thread:: (socket-module check)" % rel)
+        if rel in SOCKET_FILES:
+            require(not PUB_USE.search(code), "%s re-exports with pub use (socket-module check)" % rel)
+            check_socket_items(rel, raw, code)
+            continue
+        if rel.startswith("crates/gate-sys/"):
+            continue
+        for path, rename in source_uses(rel, raw):
+            if "gate_sys" not in path:
+                continue
+            rest = path[path.index("gate_sys") + 1:]
+            require(not rest or rest[0] not in SOCKET_MODULES + ("*",),
+                    "%s imports gate-sys's socket modules (socket-module check)" % rel)
+            require(rename is None or rest not in ((), ("self",)), "%s renames gate_sys (socket-module check)" % rel)
+        require(not SOCKET_TEXT.search(code), "%s names gate_sys::channel or gate_sys::tcp (socket-module check)" % rel)
+    return len(sources)
+
+
+def check_gate_stores(base: Path) -> int:
+    """HE-003D departure A1 (accepted 2026-10-15): crates/gate's sources, read without comments and with the whitespace
+    around `::` removed, call FileStores::open_bound exactly once, name `::open` only as PolicyGate::open, and neither
+    rename nor alias FileStores or PolicyGate (as far as text allows: a call through a value the binary does not name
+    stays code review's). The number of sources."""
+    sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
+               for path in sorted((base / "crates/gate/src").rglob("*.rs"))]
+    calls = 0
+    for rel, raw in sources:
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (store opening rule)" % (rel, error)) from None
+        calls += len(OPEN_BOUND.findall(code))
+        require(not ANY_OPEN.search(POLICY_OPEN.sub("", code)),
+                "%s names ::open other than PolicyGate::open, so not only FileStores::open_bound (store opening rule)" % rel)
+        for pattern in STORE_ALIASES:
+            require(not pattern.search(code), "%s renames or aliases FileStores or PolicyGate (store opening rule)" % rel)
+    require(calls == 1, "crates/gate calls FileStores::open_bound %d times, not exactly once (store opening rule)" % calls)
+    for rel, raw in linked_sources(base):
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (store opening rule)" % (rel, error)) from None
+        require(not UNBOUND_OPEN.search(code) and not (rel == FILE_STORE and SELF_OPEN.search(code)),
+                "%s calls FileStores::open, the unbound opening (store opening rule)" % rel)
+    return len(sources)
+
+
+def item_text(code: str, start: int, kind: str) -> str:
+    """An item's text from `start`: a fn up to its body's `{` (or `;`), anything else up to its `;`, at depth 0."""
+    depth = 0
+    for index in range(start, len(code)):
+        char = code[index]
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif char == "{":
+            if kind == "fn" and depth == 0:
+                return code[start:index]
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        elif char == ";" and depth == 0:
+            return code[start:index]
+    raise GateError("an item the socket-module check cannot read")
+
+
+def struct_fields(code: str, start: int) -> list[str]:
+    """The field texts of the struct whose name ends at `start`: its braced or tuple body, split at the commas outside
+    brackets (`->` read as no bracket); a unit struct has none. A body the reader cannot close refuses."""
+    opening = re.compile(r"[{(;]").search(code, start)
+    require(opening, "a struct the socket-module check cannot read")
+    if opening.group(0) == ";":
+        return []
+    close = {"{": "}", "(": ")"}[opening.group(0)]
+    depth, index = 0, opening.start()
+    while index < len(code):
+        depth += {opening.group(0): 1, close: -1}.get(code[index], 0)
+        if depth == 0:
+            break
+        index += 1
+    require(depth == 0, "a struct the socket-module check cannot read")
+    inner = code[opening.start() + 1:index].replace("->", "  ")
+    fields, depth, begin = [], 0, 0
+    for position, char in enumerate(inner):
+        if char in "([{<":
+            depth += 1
+        elif char in ")]}>":
+            depth -= 1
+        elif char == "," and depth == 0:
+            fields.append(inner[begin:position])
+            begin = position + 1
+    fields.append(inner[begin:])
+    return [field for field in fields if field.strip()]
+
+
+def check_socket_items(rel: str, raw: str, code: str) -> None:
+    """R1-3: in a SOCKET_FILES source (code read without comments, `::` spacing removed), no `pub` type alias, const,
+    static or fn signature names a gate-sys channel or tcp item other than SOCKET_DATA_TYPES; no glob of those modules.
+    R2-1: no private type alias, no pub const or static of a fn-pointer type, and no pub struct field whose type names
+    such an item or is a fn pointer. A text tripwire over names: a wrapper type or a pub fn's body stays code review's."""
+    modules, items = set(), {}
+    for path, rename in source_uses(rel, raw):
+        if len(path) < 2 or path[0] != "gate_sys" or path[1] not in SOCKET_MODULES:
+            continue
+        require(path[-1] != "*", "%s imports a glob of gate-sys's socket module (socket-module check)" % rel)
+        if len(path) == 2 or path[2:] == ("self",):
+            modules.add(rename or path[1])
+        else:
+            items[rename or path[-1]] = path[-1]
+    def hazards(text: str) -> list[str]:
+        named = set(re.findall(r"\bgate_sys::(?:channel|tcp)::(\w+)", text))
+        for module in modules:
+            named |= set(re.findall(r"(?<!::)\b%s::(\w+)" % re.escape(module), text))
+        named |= {original for binding, original in items.items() if re.search(r"(?<!::)\b%s\b" % re.escape(binding), text)}
+        return sorted(named - set(SOCKET_DATA_TYPES))
+
+    for item in PUB_ITEM.finditer(code):
+        text = item_text(code, item.start(), item.group(1))
+        found = hazards(text)
+        require(not found, "%s has a pub item naming gate-sys's socket items %s (socket-module check)" % (rel, found))
+        if item.group(1) in ("const", "static"):
+            require(not FN_POINTER.search(text.split("=", 1)[0]),
+                    "%s has a pub %s of a fn-pointer type (socket-module check)" % (rel, item.group(1)))
+    for alias in TYPE_ITEM.finditer(code):
+        require(PUB_PREFIX.search(code[:alias.start()]), "%s defines a private type alias (socket-module check)" % rel)
+    for struct in STRUCT_ITEM.finditer(code):
+        for field in struct_fields(code, struct.end()):
+            if not re.match(r"\s*(?:#\s*\[[^\]]*\]\s*)*pub\b", field):
+                continue
+            found = hazards(field)
+            require(not found, "%s has a pub field naming gate-sys's socket items %s (socket-module check)" % (rel, found))
+            require(not FN_POINTER.search(field), "%s has a pub field of a fn-pointer type (socket-module check)" % rel)
+
+
+def check_macros(base: Path) -> int:
+    """R1-3 (Q-HE3D-R1 (a)): no linked source (the binary included), read without comments, defines a macro_rules
+    macro, a `macro` item or carries #[macro_export] (none exists today)."""
+    sources = linked_sources(base)
+    for rel, raw in sources:
+        try:
+            code = rust_code(raw)
+        except GateError as error:
+            raise GateError("%s: %s (macro rule)" % (rel, error)) from None
+        for pattern, name in MACROS:
+            require(not pattern.search(code), "%s defines %s (macro rule)" % (rel, name))
+    return len(sources)
+
+
+def check_pre_main(base: Path) -> int:
+    """HE-003D DESIGN section 5 (D1-3): no linked source (the binary included), read without comments, names
+    link_section, #[used], init_array, no_mangle or export_name: no code runs before main (none exists today)."""
+    sources = linked_sources(base)
+    for rel, raw in sources:
+        code = rust_code(raw)
+        for pattern, name in PRE_MAIN:
+            require(not pattern.search(code), "%s names %s (code before main)" % (rel, name))
+    return len(sources)
+
+
+def check_prints(base: Path) -> int:
+    """HE-003D DESIGN sections 4 and 5 (D1-10, D2-6): no linked source (the binary included), read without comments,
+    names print!, println!, eprint!, eprintln!, dbg!, or stdout or stderr in any case: nothing is printed by design (a
+    panic message may still reach fd 2, a residual)."""
+    sources = linked_sources(base)
+    for rel, raw in sources:
+        code = rust_code(raw)
+        for pattern, name in PRINTS:
+            require(not pattern.search(code), "%s names %s (print rule)" % (rel, name))
+    return len(sources)
+
+
+def check_signer_key(base: Path) -> int:
+    """HE-003D DESIGN section 3.1 (Q-HE3D-7 (d)): the compiled-in signer key file is a regular file of exactly 0 (not
+    yet set: every document is refused) or 32 bytes. Its size."""
+    path = base / SIGNER_KEY
+    require(path.is_file() and not path.is_symlink(), "%s is missing (signer key)" % SIGNER_KEY)
+    size = len(path.read_bytes())
+    require(size in (0, 32), "%s holds %d bytes, not 0 or 32 (signer key)" % (SIGNER_KEY, size))
+    return size
+
+
+def check_gate_symbols(names: set[str]) -> list[str]:
+    """HE-003D DESIGN section 5 (O3, C8): planeon-gate's .symtab has no membarrier or __membarrier (musl's
+    membarrier.lo would kill the first thread after the seal), and the musl wrappers of KILLED_WRAPPERS it holds are
+    each in WRAPPER_JUSTIFICATIONS (a reviewed list; an unlisted one fails). Owner decision Q-HE3D-B1 (a): it also
+    holds gate-tls, rustls and ring symbols (CRATE_SYMBOLS), so the evidence describes the composed gate. The
+    wrappers present."""
+    for crate, pattern in CRATE_SYMBOLS:
+        require(any(pattern.search(name) for name in names),
+                "planeon-gate's symbol table holds no %s symbol: the composed gate is not linked (composition check)"
+                % crate)
+    require(not names & set(MEMBARRIER), "planeon-gate links %s (membarrier check)" % sorted(names & set(MEMBARRIER)))
+    present = sorted(names & set(KILLED_WRAPPERS))
+    unlisted = [name for name in present if name not in WRAPPER_JUSTIFICATIONS]
+    require(not unlisted, "planeon-gate links the musl wrappers %s of calls the EFFECT_GATE filter kills, without a "
+            "reviewed justification (symbol inventory)" % unlisted)
+    return present
 
 
 def lock_closure(packages: list[dict], name: str) -> set:
@@ -1304,11 +1869,14 @@ def main() -> int:
                                                    ", ".join(sorted(BUILD_SCRIPTS))))
         workspace = check_workspace(HE, vendor_rows)
         say("workspace: %d crates, no build script or proc-macro; the only registry dependencies are %s of gate-tls; "
-            "Cargo.lock's %d registry packages are exactly the vendor table's, with their checksums and dependency "
-            "lists" % (len(workspace), ", ".join(sorted(REGISTRY_LINES["crates/gate-tls"])), len(vendor_rows)))
+            "the only [patch] maps the %d LINKED vendored crates to their vendor/ paths, and Cargo.lock lists them as "
+            "path packages with their vendor rows' versions and edges; its %d registry packages are exactly the other "
+            "vendor rows, with their checksums and dependency lists"
+            % (len(workspace), ", ".join(sorted(REGISTRY_LINES["crates/gate-tls"])), len(PATCH_CRATES),
+               len(vendor_rows) - len(PATCH_CRATES)))
         say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
-            "effect-gate and gate-tls link exactly %s" % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION,
-                                                          ", ".join(LINKED_CRATES)))
+            "effect-gate, gate-tls and planeon-gate link exactly %s"
+            % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION, ", ".join(LINKED_CRATES)))
         say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
         check_tree(rows, sysroot, targets)
@@ -1335,11 +1903,31 @@ def main() -> int:
         say("Debug: %d sources of the linked crates derive Debug on no struct or enum named %s or whose field types "
             "mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(SECRET_TYPES),
                                                ", ".join(DEBUG_HAZARDS + SECRET_TYPES)))
-        say("TLS deny-list: %d gate-tls sources name none of its %d refused tokens; %s are each set exactly once as "
-            "the closed setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once each; tls_client.rs "
-            "names with_client_auth_cert( and with_webpki_verifier( once each; only exchange.rs constructs "
-            "UpstreamResponse {" % (check_tls(HE), len(TLS_FORBIDDEN),
-                                    ", ".join(name for name, _ in TLS_SETTINGS)))
+        say("TLS deny-list: %d gate-tls and binary sources name none of its %d refused tokens; %s are each set "
+            "exactly once as the closed setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once "
+            "each; with_client_auth_cert and with_webpki_verifier are mentioned once each, in tls_client.rs; outside "
+            "exchange.rs none names UpstreamResponse, and none defines a macro_rules macro"
+            % (check_tls(HE), len(TLS_FORBIDDEN), ", ".join(name for name, _ in TLS_SETTINGS)))
+        say("seal order: %s holds one Linux main that starts with seal stage 1, calls between the stages only %s "
+            "(status::seal inside ExitCode::from) and runs stage 2 as the exact statement `let <n> = match "
+            "seal_stage2(<stage 1>) { Ok(<x>) => <x>, Err(<e>) => return ExitCode::from(status::seal(&<e>)), };`; its "
+            "imports are the pinned set, its only items fn main (two) and fn serve, its only attributes the crate's "
+            "forbid and the two cfgs; no socket or thread name through that statement, nor in %s and %s (one use "
+            "gate_sys::Dir; excepted in the latter)" % (GATE_MAIN, check_seal_order(HE), GATE_CONFIG, SIGNED_CONFIG))
+        say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
+            "nothing and name those modules' items in no pub type, const, static or fn signature except the data types "
+            "%s) and gate-sys, by use tree or qualified path; none names std::thread or thread::"
+            % (check_socket_modules(HE), " and ".join(SOCKET_FILES), ", ".join(SOCKET_DATA_TYPES)))
+        say("store opening: %d sources of crates/gate call FileStores::open_bound exactly once, name ::open only as "
+            "PolicyGate::open and rename or alias neither type; no linked source calls FileStores::open"
+            % check_gate_stores(HE))
+        say("macros: %d linked sources define no macro_rules or macro item and carry no #[macro_export]"
+            % check_macros(HE))
+        say("code before main: %d linked sources name no link_section, #[used], init_array, no_mangle or export_name"
+            % check_pre_main(HE))
+        say("print rule: %d linked sources name no print!, println!, eprint!, eprintln!, dbg!, stdout or stderr"
+            % check_prints(HE))
+        say("signer key: %s holds %d bytes (0: not yet set, every document refused)" % (SIGNER_KEY, check_signer_key(HE)))
         say("post-seal: %d sources of the linked crates name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
@@ -1353,6 +1941,11 @@ def main() -> int:
             for binary in BINARIES:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
                 check_binary(raw, target, shape, markers, host_paths)
+                if binary == "planeon-gate":
+                    present = check_gate_symbols(symbol_names(raw))
+                    say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "
+                        "or __membarrier; the musl wrappers of killed calls present are %s, each with its reviewed "
+                        "justification" % (target, ", ".join(present) or "none"))
                 digest = sha256(raw)
                 vendored = vendor_components(vendor_rows, lock_closure(lock, binary))
                 document = sbom(binary, target, digest, rows, linked(workspace, binary), vendored)

@@ -4,7 +4,8 @@ Copyright 2026 Planeon contributors
 This product includes software developed by the Kubernetes project and other
 open-source projects identified by go.mod and go.sum.
 
-The effect gate's I04 server (host-enforcement/crates/gate-tls) links vendored
+The effect gate's TLS crate (host-enforcement/crates/gate-tls), and through it
+the effect gate binary planeon-gate (host-enforcement/crates/gate), link vendored
 Rust crates from crates.io, kept under host-enforcement/vendor/<name>-<version>/:
 rustls 0.23.46, ring 0.17.14, rustls-webpki 0.103.15, rustls-pki-types 1.15.1,
 getrandom 0.2.17, libc 0.2.190, once_cell 1.21.4, subtle 2.6.1, untrusted 0.9.0,

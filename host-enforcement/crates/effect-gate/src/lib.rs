@@ -9,7 +9,9 @@
 //! upstream events of HE-003B and HE-003C. HE-003B adds the R10-defined `Event::Disconnect`, the ports' `failure()`
 //! with `LoopExit::Port`, the I04 port's stream I/O trait (`net`) and the Linux stream table (`linux_net`, with
 //! `LinuxOs::with_net`). Std only and safe Rust (the root forbids `unsafe_code`), no panics on any input. The TLS
-//! ports live in the `gate-tls` crate; the binary's `main` (HE-003D) is not here.
+//! ports live in the `gate-tls` crate; the binary's `main` (HE-003D) is not here. HE-003D adds what `main` needs
+//! portably: the signed configuration's canonical form, schema and checks (`gate_config`), the exit-status table
+//! (`status`) and the generation binding of the file stores (`FileStores::open_bound`).
 //!
 //! Behaviour taken from the pinned models or validator rather than the READMEs, and the R10-defined behaviour, is
 //! listed in `MODEL_DEFINED.md`.
@@ -19,6 +21,7 @@ pub mod config;
 pub mod file_store;
 pub mod frame;
 pub mod gate;
+pub mod gate_config;
 pub mod journal;
 #[cfg(target_os = "linux")]
 pub mod linux_net;
@@ -29,12 +32,15 @@ pub mod peers;
 pub mod policy;
 pub mod policy_gate;
 pub mod seal;
+pub mod status;
 pub mod store;
 pub mod substrate;
 pub mod types;
 
 pub use config::{Config, ConfigError, PriorBindings};
 pub use file_store::{FileStores, OpenError, StoreDir};
+pub use gate_config::{CredentialFiles, FileRef, GateConfig, GateConfigError, IdentityFiles};
+pub use gate_sys::inet::parse_authority;
 pub use gate::{BoundRun, ChannelRefusal, ChannelState, ConnectionRefusal, Event, EventError, FrameInput, Gate, GateError,
                Output, OutputKind, Stamp, UpstreamResponse};
 pub use journal::{ChannelEnd, Entry, Record, TerminalDetails, WriteDetails};
