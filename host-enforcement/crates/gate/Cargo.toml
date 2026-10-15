@@ -5,5 +5,8 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# HE-003D DESIGN sections 3.5 and 4: the gate binary links effect-gate and gate-tls by path, and no registry crate
+# directly (Q-HE3D-11 (a): gate-tls returns the credential types and the time provider).
 [dependencies]
-host-common = { path = "../host-common" }
+effect-gate = { path = "../effect-gate" }
+gate-tls = { path = "../gate-tls" }

@@ -5,10 +5,14 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-# HE-003B DESIGN section 2.4 and section 20: exactly three registry lines, from the vendored directory source (host-enforcement/vendor).
+# HE-003B DESIGN section 2.4 and section 20: the registry lines, from the vendored crates (host-enforcement/vendor).
+# HE-003D DESIGN section 3.1 (Q-HE3D-6 (a)): ring's Ed25519 for the signed configuration, one more exact line (ring is
+# vendored and LINKED already; no package or feature changes); gate-sys by path for the read-only opener `Dir`.
 [dependencies]
 effect-gate = { path = "../effect-gate" }
+gate-sys = { path = "../gate-sys" }
 i05-protocol = { path = "../i05-protocol" }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std"] }
 getrandom = { version = "=0.2.17", default-features = false, features = ["linux_disable_fallback"] }
 zeroize = { version = "=1.9.1", default-features = false, features = ["alloc"] }
+ring = "=0.17.14"

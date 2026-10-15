@@ -20,3 +20,20 @@ strip = "debuginfo"
 # rust-objcopy on the darwin build-script binaries (it cannot load libLLVM.dylib through its rpath).
 [profile.release.build-override]
 strip = "none"
+
+# HE-003D DESIGN sections 2 and 5 (owner decision Q-HE3B-27 (a), the host-path direction; phase 1 PASS): the 11 LINKED
+# vendored crates as path packages inside the workspace root, so cargo passes rustc workspace-relative source paths and
+# planeon-gate carries no build-host path. Vendored bytes unchanged; the directory [source] replacement of
+# .cargo/config.toml stays for the build-host crates and the lock-only stubs. tools/gate.py admits exactly this table.
+[patch.crates-io]
+cfg-if = { path = "vendor/cfg-if-1.0.5" }
+getrandom = { path = "vendor/getrandom-0.2.17" }
+libc = { path = "vendor/libc-0.2.190" }
+once_cell = { path = "vendor/once_cell-1.21.4" }
+ring = { path = "vendor/ring-0.17.14" }
+rustls = { path = "vendor/rustls-0.23.46" }
+rustls-pki-types = { path = "vendor/rustls-pki-types-1.15.1" }
+rustls-webpki = { path = "vendor/rustls-webpki-0.103.15" }
+subtle = { path = "vendor/subtle-2.6.1" }
+untrusted = { path = "vendor/untrusted-0.9.0" }
+zeroize = { path = "vendor/zeroize-1.9.1" }
