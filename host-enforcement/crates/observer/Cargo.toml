@@ -5,5 +5,12 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# HE-004A DESIGN section 3 (owner decision Q-HE4A-7 (a)): a library target (src/lib.rs: the seal and the status table)
+# and the binary (src/main.rs); the seal's raw calls are gate-sys's, by path, and no registry crate.
 [dependencies]
-host-common = { path = "../host-common" }
+gate-sys = { path = "../gate-sys" }
+
+# The tests pin the embedded programs' sha256 with i05-protocol's CAVP-tested SHA-256, as effect-gate's seal tests do;
+# a test-only edge, not linked into the binary.
+[dev-dependencies]
+i05-protocol = { path = "../i05-protocol" }

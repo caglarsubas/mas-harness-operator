@@ -98,7 +98,8 @@ dependencies = [
 name = "planeon-observer"
 version = "0.1.0"
 dependencies = [
- "host-common",
+ "gate-sys",
+ "i05-protocol",
 ]
 
 [[package]]

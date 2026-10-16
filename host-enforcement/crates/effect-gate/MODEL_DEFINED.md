@@ -1,4 +1,4 @@
-# HE-002, HE-002B, HE-002C, HE-002S, HE-003A, HE-003B, HE-003C, HE-003D and HE-003A2: model-defined and R10-defined behaviour
+# HE-002, HE-002B, HE-002C, HE-002S, HE-003A, HE-003B, HE-003C, HE-003D, HE-003A2 and HE-004A: model-defined and R10-defined behaviour
 
 HE-002 implements the I05 v3 contract (harness-onion `a2eab93`, copied under `host-enforcement/contracts/`) from its
 READMEs, schemas, tables and vectors (owner decision B (a)). Where the READMEs are silent, the pinned reference model
@@ -60,6 +60,13 @@ HE-003A2 re-vendors the EFFECT_GATE seccomp programs from allowlists v4 (harness
 the executable read or the configuration, so nothing in HE-003A2 is model-defined: its rules are R79-R85 in the HE-003A2
 section at the end, with the R36, R37, R38, R40, R69, R70, R72 and R77 amendments, from HE-003A2 design revision 2.1 and
 the owner decisions quoted there. No event, answer, record, vector, schema, journal format or `FatalReason` changes.
+
+HE-004A adds the policy observer's substrate: the OBSERVER process seal and the observer binary (the crate
+`planeon-observer`, now a library, `seal` and `status`, and a binary), the vendored OBSERVER seccomp programs and the
+gate rules for a second linked binary. No pinned model defines a seal or a binary, so nothing in HE-004A is
+model-defined: its rules are R86-R90 in the HE-004A section at the end, from HE-004A design revision 2.1 and the owner
+decisions quoted there; it records the open item OBSERVER-WRAPPER-INVENTORY. The effect gate's crates, binary and
+behaviour do not change.
 
 Correspondence (HE-002 PR review round 1, R1-2): `i05-protocol` has no counterpart in the model, which relies on CPython's
 `json`, `jsonschema`, `base64` and `hashlib`. `effect-gate`'s `Gate` does follow the model's `Gate` class in its
@@ -1212,3 +1219,106 @@ lines the design's §8 lists (R85).
 > - Q-A2-13: a live writer replacement HELDs the generation; carried to HE-007/HE-008 as "end the writer session before any writer upgrade".
 > The carried host preconditions and the path-not-content residual (fs-verity at enrollment) are noted.
 > GO for the build under capped.zsh. It waits on HOLD_CARGO until PERF-040's measurements end; I'll lift it then. The sim and push go on my word.
+
+## HE-004A: the observer substrate (crate `planeon-observer`: `seal`, `status`, the binary; `contracts/seccomp-v3/OBSERVER.*`)
+
+HE-004A (design revision 2.1, sha256 `bc8d076e…`; design reviews round 1 CHANGES_REQUIRED (D1-1..D1-10), round 2
+PASS_FOR_BUILD with D2-1 and D2-2 applied in revision 2.1 and D2-3..D2-5 followed; PR review round 1
+CHANGES_REQUIRED (R1-1, R1-2 MINOR, R1-3..R1-5 NOTE), each applied; owner decisions Q-HE4A-1..7, Q-HE4A-B1
+and Q-HE4A-B2, quoted at the end) is the first part of HE-004 under the owner's split (Q-HE4-2 (a): A substrate, then B
+the I06/ADM-4 logic, C the apiserver client, D captures and NP-3). It holds SEC-4 and HI-7 for OBSERVER: the observer
+installs exactly the published OBSERVER programs, and seals to uid/gid 0, exactly CAP_NET_ADMIN and CAP_BPF in permitted
+= effective = bounding, ambient and inheritable empty, no_new_privs, RLIMIT_CORE 0/0 and seccomp mode 2 with TSYNC. No
+configuration is read (Q-HE4A-1 (b)); nothing serves after the seal (Q-HE4A-2 (a)). Its rules are R86-R90. The effect
+gate's crates and binary do not change; the earlier test files do not change.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R86 | The observer binary (`crates/observer/src/main.rs`) and its exit statuses (`status.rs`): on Linux `main` runs seal stage 1 as its first statement, seal stage 2 as the next statement with nothing between them, and then exits with `status::NOT_YET_SERVING` (10), the pinned tail; on other targets a stub exits with `status::NOT_LINUX` (2). No argv, no environment, nothing printed. Each failure point has its own status, distinct, non-zero and below 200 (systemd reserves 200-243): stage 1 in 40-54 (`Threads(One)` 40, `UserIds` 41, `GroupIds` 42, `StartCapabilities` 43, `StartBounding` 44, `StartAmbient` 45, `StartState` 46, `Program` 47, `CoreLimit` 48, `CoreLimitReadBack` 49, `Ambient` 50, `Capabilities` 51, `CapabilitiesReadBack` 52, `NoNewPrivs` 53, `NoNewPrivsReadBack` 54), stage 2 in 60-66 (`Threads(Two)` 60, `FinalCapabilities` 61, `FinalBounding` 62, `FinalAmbient` 63, `FinalNoNewPrivs` 64, `FinalCoreLimit` 65, `Filter` 66), one total mapping per `SealStep` variant. After a successful seal only the not-yet-serving exit runs under the filter: return from `main`, the runtime's cleanup and musl's exit (exit_group, munmap, sigaltstack, rt_sigprocmask, lseek, close and write on that path, each allowed by both OBSERVER programs per the design review's probes; T04 traces it). HE-008 must not deploy the unit with `Restart=` before HE-004B and HE-004C | DESIGN §5; Q-HE4A-2 (a); D1-10, D2-3 |
+| R87 | The observer's seal (`crates/observer/src/seal.rs`, safe Rust over `gate_sys::seal`, unchanged and role-neutral). Preconditions: one thread (the `Threads:` line of the process's own status file) and real, effective and saved uid and gid 0. Start state: `capget`, `PR_CAPBSET_READ` 0..=40 with `PR_CAPBSET_READ(41)` failing with EINVAL, and `PR_CAP_AMBIENT_IS_SET` 0..=40; accepted only when the bounding set already equals {CAP_NET_ADMIN, CAP_BPF}, the permitted set holds both and the ambient set is empty, checked in that order before any write (`planeon_observer_t` has no `setpcap` in matrix v5, so a bounding drop is impossible and `PR_CAPBSET_DROP` is never called; a refused start makes no write). Stage 1: the core limit 0/0 read back (dumpability kept: nothing calls `PR_SET_DUMPABLE`, which gate-sys's `process_control` cannot reach); the ambient set asserted empty (not cleared); `capset` to permitted = effective = the two with inheritable empty, read back; no_new_privs 1, read back. Stage 2: one thread again; the final-state assertion (`capget`, the bounding and ambient sets, no_new_privs, the core limit), the last reads before the running architecture's OBSERVER program, installed with `SECCOMP_FILTER_FLAG_TSYNC` (a positive return is the id of a thread that could not be synchronised; any return but 0 fails). Nothing follows the install. Every step's failure and read-back mismatch is a typed `SealError`; the library never exits. The engine over the crate-private `SealOps` is crate-private and `seal_stage1`/`seal_stage2` are public only on Linux and concrete over gate-sys, so `Stage1` and `Sealed` are constructible only by the real stages (effect-gate's D6). The private helpers are copied from effect-gate's seal with its test cases (owner decision Q-HE4A-6 (a)); the observer's `Prctl` has no `BoundingDrop` and no `AmbientClearAll` variant (a departure accepted by the monitor, owner-delegated, 2026-10-16), so the seal engine cannot make either call; gate-sys's public `process_control` still accepts `PR_CAPBSET_DROP`, and the kernel refuses a bounding drop without CAP_SETPCAP, which `planeon_observer_t` lacks (PR review round 1, R1-5) | DESIGN §4; Q-HE4A-6 (a); D1-9, D2-4, D2-5; PR R1-5 |
+| R88 | The programs (owner decision Q-HE4A-4 (a)): `contracts/seccomp-v3/OBSERVER.{aarch64,x86_64}.bpf` are edge records v2's and v3's two HE-004 rows byte for byte (harness-onion MET-ENFORCE-025, `5da1265`; read at `d2ef7083`; 1816 B, 227 instructions, sha256 `d31c8410…`; 1904 B, 238 instructions, sha256 `e793aae5…`; mode 100644), pinned in `CONTRACTS` (17 → 19) with their provenance in `contracts/PROVENANCE.md`. The seal embeds both on every target with `include_bytes!` into statics typed `&[u8; 1904]` and `&[u8; 1816]` (the length is pinned at compile time) and instruction counts 238 and 227 asserted at compile time and checked by `plan`; the tests pin their sha256, lengths and classic-BPF shape (five opcodes, argument low words only, one ERRNO(ENOSYS) return for clone3). `RUNNING_ARCH` selects the installed one | DESIGN §2, §4; Q-HE4A-4 (a); D1-10 |
+| R89 | The crate's shape (owner decision Q-HE4A-7 (a)): `planeon-observer` has a library target (`src/lib.rs`: `seal`, `status`, both roots `#![forbid(unsafe_code)]`) and its binary; it depends on `gate-sys` by path and drops `host-common`; its SBOM's workspace set is {planeon-observer, gate-sys}. Its tests pin the programs' sha256 with i05-protocol's CAVP-tested SHA-256 through a test-only `[dev-dependencies]` path edge, not linked into the binary and not in its closure; `Cargo.lock`'s `planeon-observer` package therefore lists `gate-sys` and `i05-protocol` (a departure accepted by the monitor, owner-delegated, 2026-10-16) | DESIGN §3; Q-HE4A-7 (a); D1-5, D2-4 |
+| R90 | Gate rules (`tools/gate.py`): `OBSERVER_LINKED_CRATES` = {crates/observer, crates/gate-sys} is exactly planeon-observer's closure (a path dependency outside it, effect-gate's crates included, refuses); crates/observer joins every linked-crate scan (`SCANNED_CRATES`: the linked-source tripwire, foreign items, Debug, socket modules, read_link, macros, code before main, prints, and the store-opening rule's unbound-open scan), and `CRATE_ROOTS` gains its `lib.rs` and `main.rs` with `#![forbid(unsafe_code)]`; its `main.rs` has the binary's one exit import (`use std::process::ExitCode;`, removed once before the refused-path scan); the seal-order grammar and the main.rs shape rules are parameterised by a site (main.rs, the files read before the seal, the calls allowed between the stages, the pinned imports and functions): the gate's is unchanged and the observer's (D2-3) has no configuration file, allows between the stages only `Ok`, `Err`, `ExitCode::from` and `status::seal` (the stage-1 statement's own arms), pins its four imports and two `fn main`, and requires the stage-1 statement exact, the exact stage-2 statement right after it (nothing between) and then exactly `ExitCode::from(status::NOT_YET_SERVING)` closing `main`; crates/observer (only it: gate-sys's own `Dir::file` and `Dir::sync` definitions stay) names none of `POST_SEAL_FORBIDDEN` and, in its code with comments and literal contents removed, none of the words `file`, `FileMode`, `sync`, `sync_all`, `sync_data`, `lock_shared`, `try_lock`/`try_lock_shared`, `unlock`, `lock` (Mutex::lock too, in the single-threaded observer), `write_at` and `write_all_at` (D2-2) in any form: method call, path call, function item, turbofish, type path or import, only `sync` followed by `::` passing as a module path segment (`std::sync::atomic`) (PR review round 1, R1-1), nor `Drop`, so no destructor defined in crates/observer runs under the filter (R1-4; gate-sys's one Drop impl, SockCreate's, is in the channel module, which the socket-module rule keeps from the observer); and each built `planeon-observer` has no `membarrier` or `__membarrier` symbol (D1-1: musl's wrapper passes no zero third argument, which the OBSERVER row's exact-argument rule kills; HE-004D, if it needs a fence, calls `SYS_membarrier` directly with all six arguments, and musl's `membarrier.lo` stays unlinked in every native binary) and holds its architecture's OBSERVER program bytes exactly once (D1-10, D2-5; SEC-4 evidence: stage 1 also names the program, so a dropped stage 2 is the seal-order grammar's to catch, PR review round 1, R1-3). No observer wrapper inventory (owner decision Q-HE4A-B2 (a); see below). The gate's own rules, lists and inventory (R77) are unchanged | DESIGN §6; D1-1..D1-3, D1-10, D2-2..D2-5; Q-HE4A-B2 (a); PR R1-1, R1-3, R1-4 |
+
+### SEC-4 for OBSERVER, and the open item OBSERVER-WRAPPER-INVENTORY
+
+SEC-4 for OBSERVER rests on: the digest- and length-pinned OBSERVER programs (R88), present exactly once in each built
+`planeon-observer` (R90); the post-seal and linked-source rules over the observer's crates (R90), with the pinned tail
+that leaves only the not-yet-serving exit under the filter (R86); and T04's proof on the real kernel that the installed
+filter equals the OBSERVER digest.
+
+OBSERVER-WRAPPER-INVENTORY (open): the design's symbol inventory for `planeon-observer` (DESIGN §6, D1-2, D2-1: musl
+wrappers whose system call the OBSERVER filter kills for some argument vector, each present one with a reviewed
+justification) is not part of HE-004A. It was dropped by owner decision Q-HE4A-B2 (a) after both classifier attempts
+were stopped before any file was written; its later route is the owner's call (for example a human-curated list or a
+T04 trace), with no agent tooling. Until it lands, `planeon-observer`'s symbol table is checked only for membarrier.
+
+### Evidence
+
+- Host tests, `planeon-observer`: 15 unit tests over a fake kernel in `src/seal.rs` (the planned calls in order, 222 for
+  a seal; stage 1 alone; six accepted start states; eleven refused start states, each making only the 87 start reads and
+  no write; uid/gid refusals; a second thread at either stage; every call failure at its own step; capset EPERM; C9's
+  EINVAL for capabilities 0..=40 in five reads and capability 41 answered; every read-back mismatch; prctl values other
+  than 0 and 1; TSYNC and other non-zero returns; the final-state assertion last before the filter and every ignored
+  write caught by its read-back; and D2-5's three assertions, checked after every run and over 1346 runs: no
+  `PR_CAPBSET_DROP`, no write for a refused start, nothing after the filter); `tests/observer_seal.rs` (6: the copied
+  helpers against effect-gate's cases, the programs' sha256, lengths, counts and decode); `tests/observer_status.rs` (2:
+  the table distinct, non-zero, below 200, in its ranges, `NOT_YET_SERVING` apart from every seal status).
+- The gate's self-test gains cases for every new rule: the observer's seal grammar (nothing between the stages, the
+  exact first stage, the pinned tail, imports, items, the gate's site unchanged), every linked-crate scan over
+  crates/observer, the exit import, the post-seal list (each form, gate-sys's definitions allowed), the closure, the
+  binary check (no membarrier, the program exactly once, not zero or more times, not truncated).
+- Both musl builds of `planeon-observer` hold their own OBSERVER program exactly once; the x86_64 build does not hold the
+  aarch64 bytes, the aarch64 build holds the x86_64 bytes once as well (both are compiled in; the rule is about each
+  binary's own program).
+
+### Code and audit
+
+- `crates/observer/src/seal.rs`: no `unsafe`; the raw calls are gate-sys's `seal.rs`, unchanged (its module comment
+  still names effect-gate as the only plan, now out of date by one; left unedited so planeon-gate stays byte-identical,
+  D1-9). `status.rs`, `lib.rs`, `main.rs`: sequencing and tables only.
+- `crates/observer/Cargo.toml` and `Cargo.lock` (only planeon-observer's edges); `contracts/seccomp-v3/OBSERVER.*` and
+  `contracts/PROVENANCE.md`; `tools/gate.py` and `tools/test_gate.py`.
+- Departures, each accepted (monitor, owner-delegated, 2026-10-16): the test-only `i05-protocol` dev-dependency (R89) and
+  the smaller `Prctl` enum (R87). The wrapper inventory is not built (Q-HE4A-B2 (a)).
+
+### Carried
+
+- HE-008 (the observer's unit and host policy; G5-G7): uid and gid 0; the final bounding set {CAP_NET_ADMIN, CAP_BPF} at
+  start (matrix v5 grants no `setpcap`); no `AmbientCapabilities=`; `RUST_BACKTRACE` unset; fds 0-2 open at start; no
+  systemd seccomp option; `core_pattern`; the self-permissions `process setcap getcap setrlimit` and the reads of its own
+  `/proc/self/status`; no `setrlimit`/`getrlimit` on other domains (`prlimit64` is unconditional in the OBSERVER row);
+  dumpability kept; the RBAC grants; no `Restart=` before HE-004B and HE-004C (R86).
+- T04: the installed filter equals the OBSERVER digest; `Seccomp_filters: 1`; the trace of the exit path after the seal;
+  `PR_CAPBSET_READ(41)` returns EINVAL on the target kernel (CAP_LAST_CAP 40); TSYNC and dumpability at exec.
+- HE-005..HE-007: a shared, role-neutral seal module extracted before they add their seals (Q-HE4A-6 (a)), so the
+  observer's copied helpers do not become one of four copies.
+- HE-004D: any membarrier fence as a direct six-argument system call (R90); captures, inspector policy and NP-3.
+- The I05-v4 adoption packet takes STRUCT-ANGLE with both fixes (Q-HE4A-5 (a)): struct fields split at commas only where
+  the depths of `(`, `[`, `{` and of generic angle brackets are all zero (`<`/`>` counted only as a generic argument list
+  after a type path; shift and comparison operators inside brackets never affect the split), and the struct body found
+  after the generic parameter list and any where-clause.
+- OBSERVER-WRAPPER-INVENTORY (above): the owner's call.
+- Out of HE-004A: I01 (after the OBSERVER listener seccomp successor, Q-HE4-1 (a)), the I06/ADM-4 logic (HE-004B), the
+  apiserver client and the observer's signed configuration (HE-004C).
+
+### Owner decisions (as relayed, 2026-10-16: Q-HE4A-1..7 and Q-HE4A-B2 verbatim, Q-HE4A-B1 in excerpt)
+
+> [lane monitor] HE-004A: Q-HE4A-1 to Q-HE4A-7 = (a), as recommended and agreed by the reviewer. Monitor (owner-delegated), 2026-10-16, against DESIGN-A rev 2.1 (bc8d076e…). Record verbatim. The HE-008/T04 carried items are noted.
+
+> [lane monitor] Owner decision Q-HE4A-B1 = (a), 2026-10-16: the table method with no disassembly automation, the same method HE-003A2's v1 used.
+> […]
+> Monitor (owner-delegated): both build departures accepted. i05-protocol is a dev-dependency for the digest-pin tests only (not linked; record the lock edge), and the Prctl enum has no BoundingDrop/AmbientClearAll variants.
+
+> [lane monitor] Owner decision Q-HE4A-B2 = (a), 2026-10-16. Record verbatim, with both classifier stops.
+> - Build the non-dependent parts of steps 5-7 now.
+> - Drop the observer wrapper inventory from HE-004A and carry it as the explicit open item OBSERVER-WRAPPER-INVENTORY in MODEL_DEFINED.
+> - SEC-4 for OBSERVER rests on: the digest- and length-pinned programs, present exactly once per binary; the post-seal and linked-source rules; and T04's installed-filter proof.
+> - The inventory's later route is the owner's call (e.g. a human-curated list or a T04 trace). No agent attempts at any classifier or inventory tooling, by any route.
+> Continue. The sim goes on my word.
+
+Q-HE4A-B1's omitted lines describe the table method, which was not built (Q-HE4A-B2 (a)). The complete messages, with
+their context (both classifier attempts stopped before any file was written, neither retried), are recorded in the
+operator's `tools/w03/he004/OWNER_DECISIONS.md`.
