@@ -1,6 +1,7 @@
-//! `openat(2)` behind a safe API (HE-002C DESIGN §3): one of the three modules of the workspace where `unsafe` code may
-//! appear (the others are the process seal's `seal.rs`, HE-002S, and the channel substrate's `channel.rs`, HE-003A),
-//! and here only in two places, the call itself and the conversion of the descriptor it returns into a `File`.
+//! `openat(2)` behind a safe API (HE-002C DESIGN §3): one of the modules of the workspace where `unsafe` code may
+//! appear (the others are the process seal's `seal.rs`, HE-002S, the channel substrate's `channel.rs`, HE-003A, and the
+//! I04 listener's `tcp.rs`, HE-003B), and here only in three places: the `openat` call, the conversion of the
+//! descriptor it returns into a `File`, and the `readlinkat` call of [`Dir::read_link`] (HE-003A2).
 //!
 //! - [`Dir::at`] opens a store directory by absolute path (`openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC)`).
 //! - [`Dir::file`] opens one store file inside it by name, read and write, never following a final symbolic link,
@@ -17,6 +18,10 @@
 //! - [`Dir::sub`] (HE-003A DESIGN §7) opens one directory inside it by name, never following a symbolic link
 //!   (`O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW`), with the same name check: `attr` under a peer's process directory.
 //! - [`Dir::sync`] and [`Dir::device`] are `fsync` and `fstat`'s `st_dev` on the directory.
+//! - [`Dir::read_link`] (HE-003A2 DESIGN §3, owner decision Q-A2-2 (a)) reads one symbolic link inside it by name,
+//!   with the same name check, through musl's `readlinkat` wrapper on the directory's own descriptor (never `AT_FDCWD`,
+//!   and the name is never absolute, so the descriptor is never ignored): the gate's read of its writer peer's `exe`
+//!   link through the retained process directory. A full buffer, an empty result and any error are refused.
 //!
 //! `Dir`'s `Debug` prints `Dir` and no descriptor: std's `Debug` of a `File` reads the descriptor's link in the proc
 //! filesystem, a call the EFFECT_GATE program kills (HE-003A DESIGN §8).
@@ -109,6 +114,7 @@ const MAX_NAME_BYTES: usize = 255;
 
 unsafe extern "C" {
     fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;
+    fn readlinkat(dirfd: c_int, path: *const c_char, buffer: *mut c_char, size: usize) -> isize;
 }
 
 /// How [`Dir::file`] opens a name.
@@ -240,5 +246,31 @@ impl Dir {
     /// The device the directory is on (`st_dev`).
     pub fn device(&self) -> io::Result<u64> {
         Ok(self.handle.metadata()?.dev())
+    }
+
+    /// Reads the symbolic link `name` in this directory into `buffer` (HE-003A2 DESIGN §3): [`Dir::file`]'s name check
+    /// before any call (one relative component, so the directory's descriptor is never ignored), then one
+    /// `readlinkat` on this directory's own descriptor, which is non-negative by construction (never `AT_FDCWD`). The
+    /// kernel writes no NUL and truncates a longer link without an error, so the count is refused when it fills the
+    /// buffer; it is refused when it is 0, and an empty buffer is refused before the call. Any other result is the
+    /// count of bytes the link's text holds in `buffer`. The comparison with an expected value is the caller's.
+    pub fn read_link(&self, name: &str, buffer: &mut [u8]) -> io::Result<usize> {
+        let name = store_name(name)?;
+        if buffer.is_empty() {
+            return Err(refusal("a link buffer must hold at least one byte"));
+        }
+        let size = buffer.len();
+        // SAFETY: `name` is NUL-terminated and outlives the call; `buffer` is a live, writable slice of `size` bytes,
+        // so `readlinkat` writes at most that many bytes into it and reads nothing else through pointers; the
+        // descriptor is this directory's own and stays open while `self` lives.
+        let count = unsafe { readlinkat(self.handle.as_raw_fd(), name.as_ptr(), buffer.as_mut_ptr().cast(), size) };
+        if count < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        match usize::try_from(count) {
+            Ok(0) => Err(refusal("a symbolic link read back empty")),
+            Ok(count) if count < buffer.len() => Ok(count),
+            _ => Err(refusal("a symbolic link filled its buffer and may be longer")),
+        }
     }
 }

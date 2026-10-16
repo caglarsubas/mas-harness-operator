@@ -1,6 +1,6 @@
 //! The seal's portable parts on the build host (HE-002S DESIGN §7): the marshalling helpers (the capability words, the
 //! `sock_fprog` length, the prctl argument vectors, the status file's `Threads:` parser) and the two embedded programs
-//! (sha256 and length equal v3's, and a classic-BPF decode). The engine's tests run over a fake kernel inside
+//! (sha256 and length equal v4's, and a classic-BPF decode). The engine's tests run over a fake kernel inside
 //! `src/seal.rs`, because the engine is crate-private (design review round 3, D6); the raw calls wait for T04.
 
 use effect_gate::seal::{capability_sets, capability_words, filter_length, status_threads, Arch, CapabilitySets, Prctl,
@@ -57,8 +57,8 @@ fn capability_sets_split_into_two_version_3_words() {
 
 #[test]
 fn the_sock_fprog_length_counts_whole_instructions() {
-    assert_eq!(filter_length(PROGRAM_X86_64), Some(194));
-    assert_eq!(filter_length(PROGRAM_AARCH64), Some(183));
+    assert_eq!(filter_length(PROGRAM_X86_64), Some(200));
+    assert_eq!(filter_length(PROGRAM_AARCH64), Some(189));
     assert_eq!(filter_length(&[]), None);
     assert_eq!(filter_length(&[0; 7]), None);
     assert_eq!(filter_length(&[0; 8]), Some(1));
@@ -104,8 +104,8 @@ fn the_threads_line_is_parsed_strictly() {
 #[test]
 fn the_embedded_programs_are_the_published_bytes() {
     for (program, digest, bytes) in [
-        (PROGRAM_X86_64, "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115", 1552),
-        (PROGRAM_AARCH64, "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a", 1464),
+        (PROGRAM_X86_64, "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3", 1600),
+        (PROGRAM_AARCH64, "8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044", 1512),
     ] {
         assert_eq!(program.len(), bytes);
         assert_eq!(sha256::hex(&sha256::digest(program)), digest);
@@ -118,7 +118,7 @@ fn the_embedded_programs_are_the_published_bytes() {
 
 #[test]
 fn a_classic_bpf_decode_of_each_program() {
-    for (arch, count, audit) in [(Arch::X86_64, 194, AUDIT_ARCH_X86_64), (Arch::Aarch64, 183, AUDIT_ARCH_AARCH64)] {
+    for (arch, count, audit) in [(Arch::X86_64, 200, AUDIT_ARCH_X86_64), (Arch::Aarch64, 189, AUDIT_ARCH_AARCH64)] {
         let program = decode(arch.program());
         assert_eq!(program.len(), count, "{arch:?}");
         // The architecture check: load seccomp_data.arch, kill unless it is this architecture's.

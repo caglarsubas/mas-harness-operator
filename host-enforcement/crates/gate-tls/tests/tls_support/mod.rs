@@ -658,6 +658,10 @@ impl Os for LoopOs {
         false
     }
 
+    fn writer_exe_ok(&mut self, _conn: ConnId) -> bool {
+        false
+    }
+
     fn recv(&mut self, _conn: ConnId, _control_capacity: usize) -> Received {
         self.lab.borrow_mut().inbox.pop_front().unwrap_or(Received::WouldBlock)
     }

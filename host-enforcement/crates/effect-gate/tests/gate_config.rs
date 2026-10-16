@@ -53,6 +53,7 @@ fn document() -> Value {
             ("effectIdentity", identity("/etc/planeon/effect-gate/effect", '6', '2')),
             ("writerIdentity", identity("/etc/planeon/effect-gate/writer", '8', '3')),
         ])),
+        ("enrolledWriter", object(vec![("executable", Value::str("/opt/planeon/bin/harness-policy-write"))])),
     ])
 }
 
@@ -272,7 +273,7 @@ fn objects_are_closed() {
     refused_schema(|value| remove(value, &["credentials", "writerIdentity"]));
     refused_schema(|value| set(value, &["credentials", "i04ClientCa", "mode"], Value::int(256)));
     refused_schema(|value| set(value, &["credentials", "i04Server", "extra"], Value::int(1)));
-    refused_schema(|value| set(value, &["format"], Value::str("planeon.effect-gate-config/v2")));
+    refused_schema(|value| set(value, &["format"], Value::str("planeon.effect-gate-config/v1")));
     // The gate member is the I05 Config with policyWriter: an unknown member there is the Config's refusal.
     assert!(matches!(mutated(|value| set(value, &["gate", "extra"], Value::int(1))), Err(GateConfigError::Gate(_))));
     assert!(matches!(mutated(|value| remove(value, &["gate", "policyWriter"])), Err(GateConfigError::Gate(_))));

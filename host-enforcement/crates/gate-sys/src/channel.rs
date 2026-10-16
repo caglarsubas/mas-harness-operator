@@ -13,7 +13,8 @@
 //!   ENOSYS, a call the EFFECT_GATE program kills).
 //! - [`peer`]: SO_PEERCRED, SO_PEERSEC (the returned length kept exactly) and SO_PEERPIDFD.
 //! - [`ProcDir`]: the peer's directory in the proc filesystem, opened by number and kept, and its three identity reads
-//!   (`stat`, `cgroup`, `attr/current`), parsed by `peer_wire`.
+//!   (`stat`, `cgroup`, `attr/current`), parsed by `peer_wire`; HE-003A2 (DESIGN §3) adds [`ProcDir::exe`], the `exe`
+//!   link read through the kept directory with `openat.rs`'s `Dir::read_link` (no new `unsafe` here).
 //! - [`PidFd::exited`]: a zero-timeout `ppoll` on the pidfd.
 //! - [`recv`] and [`send`]: one `recvmsg` or `sendmsg`, never waiting.
 //! - [`Poller`]: `epoll_create1`, `epoll_ctl` and `epoll_pwait` (aarch64 has no `epoll_wait` system call).
@@ -593,6 +594,14 @@ impl ProcDir {
         let cgroup = whole(self.dir.file_ro("cgroup")?)?;
         let label = whole(self.dir.sub("attr")?.file_ro("current")?)?;
         ProcIdentity::from_files(&stat, cgroup, label).ok_or_else(|| invalid("an identity file of another shape"))
+    }
+
+    /// The process's `exe` link, read through the kept directory into `buffer` (HE-003A2 DESIGN §3): the count of
+    /// bytes, refused as [`Dir::read_link`] refuses (any error, an empty link, or one that fills the buffer). The
+    /// caller sizes the buffer and compares the bytes (effect-gate's `peers::writer_exe_buffer_len` and
+    /// `peers::writer_exe_matches`).
+    pub fn exe(&self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.dir.read_link("exe", buffer)
     }
 }
 

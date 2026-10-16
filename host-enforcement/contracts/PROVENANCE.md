@@ -45,6 +45,27 @@ BYTE_IDENTICAL, consumer packet HE-002S). Each file is the kernel's `struct sock
 - `contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf` from `architecture/compiled-filter-programs/programs/EFFECT_GATE.aarch64.bpf`, sha256 `0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a`, 1464 bytes (183 instructions)
 - `contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf` from `architecture/compiled-filter-programs/programs/EFFECT_GATE.x86_64.bpf`, sha256 `ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115`, 1552 bytes (194 instructions)
 
+Since HE-003A2 both files are held, still pinned by `tools/gate.py`, but no longer embedded (owner decision Q-A2-1 (a)):
+edge record v3 carries v2's two HE-002S rows as recorded, and its rule that the consumer holds exactly those bytes stays
+true. The seal embeds the seccomp-v4 programs below.
+
+## Compiled seccomp programs v4 (HE-003A2)
+
+Copied byte for byte from the harness-onion repository's `architecture/compiled-filter-programs-v2/programs/`, packet
+MET-ENFORCE-029 (slot 240, PROGRAMS-REPUBLISH; owner decisions Q-HE3A-1 (c), Q-HE3A-1b (a), Q-HE3D-3 (a) and Q-PR-1..10
+(a)), which republishes EFFECT_GATE's two programs from seccomp allowlists v4 (MET-ENFORCE-027, merged as `e7516160`:
+v3 plus one rule, EFFECT_GATE may call `readlinkat` only with a non-negative dirfd, `(arg0 & 0x80000000) == 0`), compiled
+by v4's pinned model and checked against v4's `filterDigests` and `programLengths`. Each program is MET-ENFORCE-025's v3
+program with exactly one 6-instruction block inserted (x86_64 at index 173 for call 267, aarch64 at index 34 for call
+78). Read at that packet's merge commit `d2ef7083d241a6bc1adb8ef923cc558d550fcd2b` (harness-onion PR #194, tree
+`611553eca1874d86eaff27d5ff9f11ae8b3117c0`, verified locally) with `git show d2ef7083:<path>`, mode 100644. Both are
+registered before use in that packet's edge registry record v3, `architecture/artifact-edges/operator-harness-engineering-v3.json`
+(status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, consumer packet HE-003A2, provider packet MET-ENFORCE-029, consumer
+paths exactly these). `crates/effect-gate/src/seal.rs` embeds both and installs the running architecture's.
+
+- `contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf` from `architecture/compiled-filter-programs-v2/programs/EFFECT_GATE.aarch64.bpf`, sha256 `8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044`, 1512 bytes (189 instructions)
+- `contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf` from `architecture/compiled-filter-programs-v2/programs/EFFECT_GATE.x86_64.bpf`, sha256 `4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3`, 1600 bytes (200 instructions)
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

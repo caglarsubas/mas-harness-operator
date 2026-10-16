@@ -16,8 +16,9 @@
 //! - Custody (§4.3), on every datagram before the model sees it: the control rules (`peer_wire`), the frame's
 //!   credentials pid (and uid and gid) equal the qualified ones, its SCM_SECURITY equals the accept-time SO_PEERSEC
 //!   bytes, the retained process directory still reads the same start time, the expected (I05) or recorded (I07)
-//!   cgroup and the expected label, and the pidfd has not fired. A failure after the first frame is `PeerChanged`
-//!   (fatal PEER_CHANGED, HELD); before it, as at accept; on the writer channel `WPeerChanged`.
+//!   cgroup and the expected label, on the writer channel the enrolled executable (HE-003A2), and the pidfd has not
+//!   fired. A failure after the first frame is `PeerChanged` (fatal PEER_CHANGED, HELD); before it, as at accept; on
+//!   the writer channel `WPeerChanged`.
 //! - The wake (§5.6), in this order: the expiry, then the ports' due deadlines (the port with the earlier deadline
 //!   first, all of its due events before the other's; see [`Port`]); the I05 connection (every datagram until it
 //!   would block); the I07 connection; the pidfds (a connection still held after its datagrams were read, whose
@@ -35,8 +36,12 @@
 //! - An event the model refuses (`EventError`) is a substrate defect: the connection concerned is closed and the loop
 //!   returns [`LoopExit`], as for a failed accept or poller call (§5.5); HE-003D exits the process.
 //!
-//! The executable of a peer is not read (§4.3): Q-HE2S-10 leaves the broker's artifact identity to HE-004's record,
-//! and the writer's executable check (owner decisions Q-HE3A-1 (c), Q-HE3A-1b (a)) lands in a later R10 packet.
+//! The broker's executable is not read (§4.3): Q-HE2S-10 leaves its artifact identity to HE-004's record. HE-003A2
+//! (DESIGN §4; owner decisions Q-HE3A-1 (c), Q-HE3A-1b (a), Q-A2-6 (a)) adds the writer's executable check through
+//! [`Os::writer_exe_ok`], for I07 connections only: at accept in `qualify` after the label and uid comparison and
+//! before the pidfd probe (a failure closes the connection unfed, R32), and on every I07 frame in `custody` after the
+//! process directory's reads and before the pidfd probe (a failure is a deviation, `WPeerChanged`, N12). The probe stays
+//! last, so the liveness argument (R36) covers the executable read. No new event, answer or fatal reason.
 //!
 //! HE-003B (DESIGN §4.2, Q-HE3B-13 (a), MODEL_DEFINED R56) adds the provided [`Port::failure`] and
 //! [`LoopExit::Port`]: the loop checks both ports' `failure()` after every event's output has been applied, wired and
@@ -187,6 +192,11 @@ pub trait Os: PortPoll {
     fn read_proc(&mut self, conn: ConnId) -> Option<ProcIdentity>;
     /// Whether the connection's pidfd reports an exit (an error counts as one).
     fn peer_exited(&mut self, conn: ConnId) -> bool;
+    /// HE-003A2 (DESIGN §4): whether the connection's peer runs the enrolled writer executable: its `exe` link, read
+    /// through the kept process directory into a buffer one byte longer than the enrolled path, equals that path
+    /// exactly (`peers::writer_exe_matches`). Any failure is false. The substrate asks it for I07 connections only; on
+    /// an I05 connection it would fail closed (the gate cannot read the broker's link).
+    fn writer_exe_ok(&mut self, conn: ConnId) -> bool;
     /// One receive with a control buffer of `control_capacity` bytes.
     fn recv(&mut self, conn: ConnId, control_capacity: usize) -> Received;
     /// One send of a whole datagram; false on any failure.
@@ -792,19 +802,16 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
 
     // ------------------------------------------------------------------------------------------ peers
 
-    /// §4.2: SO_PEERCRED, SO_PEERSEC and SO_PEERPIDFD, the process directory opened by the pid and read, the pidfd not
-    /// fired after the open (so the directory is the recorded process's), then the expected label (process and
-    /// socket), uid, and for a pinned gid and cgroup those too. The identity and the connection's control buffer size,
-    /// or `None`.
+    /// §4.2: SO_PEERCRED, SO_PEERSEC and SO_PEERPIDFD, the process directory opened by the pid and read, then the
+    /// expected label (process and socket), uid, and for a pinned gid and cgroup those too, then for the writer its
+    /// executable (HE-003A2, D1-8), and last the pidfd not fired after the open (so the directory, and every read
+    /// through it, was the recorded process's). The identity and the connection's control buffer size, or `None`.
     fn qualify(&mut self, conn: ConnId, side: Listen) -> Option<(QualifiedIdentity, usize)> {
         let peer = self.os.peer(conn)?;
         if peer.pid <= 0 || !self.os.open_proc(conn, peer.pid) {
             return None;
         }
         let process = self.os.read_proc(conn)?;
-        if self.os.peer_exited(conn) {
-            return None;
-        }
         let expected = self.expected(side);
         let matches = label_matches(&process.label, &expected.label)
             && label_matches(&peer.label, &expected.label)
@@ -812,6 +819,12 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
             && expected.gid.is_none_or(|gid| peer.gid == gid)
             && expected.cgroup.as_deref().is_none_or(|cgroup| same_lines(&process.cgroup, cgroup));
         if !matches {
+            return None;
+        }
+        if side == Listen::I07 && !self.os.writer_exe_ok(conn) {
+            return None;
+        }
+        if self.os.peer_exited(conn) {
             return None;
         }
         let capacity = control_capacity(peer.label.len())?;
@@ -828,7 +841,7 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
     }
 
     /// §4.3, in order: the control rules, the credentials, the socket label, the process directory's start time,
-    /// cgroup and label, and the pidfd.
+    /// cgroup and label, for the writer its executable (HE-003A2), and the pidfd.
     fn custody(&mut self, side: Listen, control: &[u8], control_truncated: bool) -> bool {
         let Some(held) = self.slot(side) else { return false };
         let conn = held.conn;
@@ -847,6 +860,9 @@ impl<O: Os, I: I04Port, U: UpstreamPort> Substrate<O, I, U> {
         let start_time = identity.start_time;
         let Some(process) = self.os.read_proc(conn) else { return false };
         if process.start_time != start_time || !same_lines(&process.cgroup, &cgroup) || !label_matches(&process.label, &label) {
+            return false;
+        }
+        if side == Listen::I07 && !self.os.writer_exe_ok(conn) {
             return false;
         }
         !self.os.peer_exited(conn)
@@ -1076,6 +1092,10 @@ mod tests {
 
         fn peer_exited(&mut self, _: ConnId) -> bool {
             true
+        }
+
+        fn writer_exe_ok(&mut self, _: ConnId) -> bool {
+            false
         }
 
         fn recv(&mut self, _: ConnId, _: usize) -> Received {

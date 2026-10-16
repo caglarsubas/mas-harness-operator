@@ -6,6 +6,13 @@
 //! HE-003A's ports have no Linux sources, so `LinuxOs::new` refuses every port request, which stops the loop (fail
 //! closed). HE-003B (DESIGN §4.1) adds `LinuxOs::with_net`: the port side of the poller looks the source up in the
 //! shared stream table (`linux_net`), refuses one another owner holds, and watches its `TcpListener` or `TcpConn`.
+//!
+//! HE-003A2 (DESIGN §4, owner decision Q-A2-6 (a)): both constructors take the enrolled writer executable (the signed
+//! configuration's `enrolledWriter.executable`) as a required argument, held privately, so no production `Os` exists
+//! without it. `writer_exe_ok` reads the peer's `exe` link through the connection's kept process directory
+//! (`ProcDir::exe`, gate-sys's `readlinkat` on that directory's descriptor) into a buffer one byte longer than the
+//! enrolled path and compares it exactly (`peers::writer_exe_buffer_len`, `peers::writer_exe_matches`); a connection
+//! without a kept directory, a refused read and any other bytes are false.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -17,7 +24,7 @@ use gate_sys::channel::{Conn, ListenError, Listener, PidFd, Poller, ProcDir, Rec
 use gate_sys::peer_wire::FRAME_BUFFER_BYTES;
 
 use crate::linux_net::SharedNet;
-use crate::peers::ListenerPlan;
+use crate::peers::{writer_exe_buffer_len, writer_exe_matches, ListenerPlan};
 use crate::seal::Sealed;
 use crate::substrate::{ConnId, Interest, Listen, Os, OsFailure, Owner, PeerCredentials, PortPoll, ProcIdentity,
                        Readiness, Received, SourceId, Watch};
@@ -45,6 +52,8 @@ pub struct LinuxOs {
     next: u64,
     /// The stream table the ports' sources live in (`with_net`); `None` refuses every port request.
     net: Option<SharedNet>,
+    /// The enrolled writer executable's path, compared exactly with an I07 peer's `exe` link (HE-003A2).
+    writer_executable: Vec<u8>,
 }
 
 /// Every watch of the substrate's own descriptors is for reading.
@@ -52,8 +61,9 @@ const READABLE: gate_sys::channel::Interest = gate_sys::channel::Interest { read
 
 impl LinuxOs {
     /// The poller and both listeners (each created inside its sockcreate context, then SO_PASSCRED, SO_PASSSEC, bind
-    /// and listen), after the seal.
-    pub fn new(_sealed: &Sealed, i05: &ListenerPlan, i07: &ListenerPlan) -> Result<LinuxOs, SetupError> {
+    /// and listen), after the seal, with the enrolled writer executable the I07 check compares (HE-003A2, required).
+    pub fn new(_sealed: &Sealed, i05: &ListenerPlan, i07: &ListenerPlan, writer_executable: Vec<u8>)
+               -> Result<LinuxOs, SetupError> {
         let poller = Poller::new().map_err(SetupError::Poller)?;
         let listen = |side: Listen, plan: &ListenerPlan| {
             gate_sys::channel::listen_seqpacket(&plan.path, &plan.context)
@@ -61,13 +71,14 @@ impl LinuxOs {
         };
         let i05 = listen(Listen::I05, i05)?;
         let i07 = listen(Listen::I07, i07)?;
-        Ok(LinuxOs { poller, i05, i07, slots: BTreeMap::new(), next: 1, net: None })
+        Ok(LinuxOs { poller, i05, i07, slots: BTreeMap::new(), next: 1, net: None, writer_executable })
     }
 
     /// As [`LinuxOs::new`], with the ports' sources resolved through the shared stream table `net` (HE-003B DESIGN
     /// §4.1, §4.4).
-    pub fn with_net(sealed: &Sealed, i05: &ListenerPlan, i07: &ListenerPlan, net: SharedNet) -> Result<LinuxOs, SetupError> {
-        let mut os = LinuxOs::new(sealed, i05, i07)?;
+    pub fn with_net(sealed: &Sealed, i05: &ListenerPlan, i07: &ListenerPlan, net: SharedNet, writer_executable: Vec<u8>)
+                    -> Result<LinuxOs, SetupError> {
+        let mut os = LinuxOs::new(sealed, i05, i07, writer_executable)?;
         os.net = Some(net);
         Ok(os)
     }
@@ -145,6 +156,16 @@ impl Os for LinuxOs {
     fn peer_exited(&mut self, conn: ConnId) -> bool {
         // No connection or no pidfd counts as exited (fail closed).
         self.slots.get(&conn.0).and_then(|slot| slot.pidfd.as_ref()).is_none_or(PidFd::exited)
+    }
+
+    fn writer_exe_ok(&mut self, conn: ConnId) -> bool {
+        // No connection or no kept process directory is a mismatch (fail closed).
+        let Some(directory) = self.slots.get(&conn.0).and_then(|slot| slot.proc_dir.as_ref()) else { return false };
+        let mut buffer = vec![0u8; writer_exe_buffer_len(&self.writer_executable)];
+        match directory.exe(&mut buffer) {
+            Ok(count) => buffer.get(..count).is_some_and(|link| writer_exe_matches(link, &self.writer_executable)),
+            Err(_) => false,
+        }
     }
 
     fn recv(&mut self, conn: ConnId, control_capacity: usize) -> Received {

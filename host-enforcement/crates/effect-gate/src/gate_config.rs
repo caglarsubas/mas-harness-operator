@@ -6,6 +6,13 @@
 //! unsigned document is never parsed. Order: the canonical subset (ASCII, strict JSON, depth at most 16, no float,
 //! integers 0..=2^53-1, byte-equal to the canonical encoding), then the schema (closed objects, unknown members
 //! refused), then the checks of DESIGN section 3.3. Every refusal is a value (the binary exits with status 13).
+//!
+//! HE-003A2 (DESIGN section 5, owner decision Q-A2-5 (a)): format v2 adds the top-level closed object
+//! `enrolledWriter: { "executable": "<absolute path>" }`, the enrolled policy writer's executable path that the gate
+//! compares exactly with the writer peer's `exe` link (an absolute normalised path of at most 255 bytes of printable
+//! ASCII, no control character, not ending in `" (deleted)"`, the kernel's rendering of an unlinked file). It is parsed
+//! here only; `gate`, R16 and `PolicyGate` are unchanged. The production value is data in the signed document, never a
+//! constant of the binary.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -17,8 +24,9 @@ use crate::net::{InetAddress, IpLiteral};
 use crate::policy_gate::{PolicyGate, PolicyGateError};
 use crate::substrate::Lifetimes;
 
-/// The configuration format; a binary accepts exactly this one, and gate-tls's domain prefix changes with it.
-pub const FORMAT: &str = "planeon.effect-gate-config/v1";
+/// The configuration format; a binary accepts exactly this one, and gate-tls's domain prefix changes with it (v2 since
+/// HE-003A2's `enrolledWriter`).
+pub const FORMAT: &str = "planeon.effect-gate-config/v2";
 
 /// The deepest nesting accepted (an empty object or array counts 1).
 pub const MAX_DEPTH: usize = 16;
@@ -39,7 +47,12 @@ pub const MIN_I04_PORT: u16 = 1024;
 /// A certificate chain holds 1 to 4 files, leaf first.
 pub const MAX_CHAIN_FILES: usize = 4;
 
-const MEMBERS: [&str; 5] = ["format", "gate", "lifetimes", "stores", "credentials"];
+const MEMBERS: [&str; 6] = ["format", "gate", "lifetimes", "stores", "credentials", "enrolledWriter"];
+const ENROLLED_WRITER_MEMBERS: [&str; 1] = ["executable"];
+
+/// The suffix the kernel appends to an executable link whose file was unlinked; an enrolled path ending in it could
+/// match a replaced binary's link, so it is refused (HE-003A2 DESIGN section 5).
+pub const DELETED_SUFFIX: &str = " (deleted)";
 const STORE_MEMBERS: [&str; 2] = ["journalDirectory", "markerDirectory"];
 const CREDENTIAL_MEMBERS: [&str; 5] = ["i04Server", "i04ClientCa", "apiserverServingCa", "effectIdentity", "writerIdentity"];
 
@@ -82,6 +95,8 @@ pub struct GateConfig {
     pub journal_directory: String,
     pub marker_directory: String,
     pub credentials: CredentialFiles,
+    /// `enrolledWriter.executable` (HE-003A2), as bytes for `LinuxOs`'s exact comparison with the writer's `exe` link.
+    pub writer_executable: Vec<u8>,
     /// `sha256:` and the hex digest of the document's bytes (the generation binding, DESIGN section 3.3).
     pub document_digest: String,
 }
@@ -294,6 +309,7 @@ impl GateConfig {
         if own.iter().filter_map(|files| files.chain.first()).any(|leaf| certificates.contains(leaf.sha256.as_str())) {
             return check("a serverCertificateDigest is the pin of one of the gate's own leaf certificates".to_string());
         }
+        let writer_executable = enrolled_writer(root.get("enrolledWriter"))?;
         Ok(GateConfig {
             gate: gate.clone(),
             kinds,
@@ -303,9 +319,31 @@ impl GateConfig {
             journal_directory: journal_directory.to_string(),
             marker_directory: marker_directory.to_string(),
             credentials,
+            writer_executable,
             document_digest: sha256::prefixed(document),
         })
     }
+}
+
+/// `enrolledWriter` (HE-003A2 DESIGN section 5): exactly `executable`, an absolute normalised path of at most 255 bytes
+/// of printable ASCII that does not end in `" (deleted)"`; its bytes. The canonical subset already refuses non-ASCII in
+/// any form (`json::canonical` writes non-ASCII raw, so an escaped character is not canonical), so the ASCII test on
+/// the decoded string is defence in depth. The canonical form escapes the control characters 0x01-0x1f and writes
+/// 0x7f raw, so in those spellings they reach this function and are refused here (PR review round 1, R1-5), as NUL is
+/// by `is_normal_path`; the other spellings (raw 0x01-0x1f, escaped 0x7f) are not canonical.
+fn enrolled_writer(value: Option<&Value>) -> Result<Vec<u8>, GateConfigError> {
+    let object = closed(value, "enrolledWriter", &ENROLLED_WRITER_MEMBERS)?;
+    let executable = text(object, "executable", "enrolledWriter")?;
+    if !is_normal_path(executable) || !executable.is_ascii() {
+        return check("enrolledWriter.executable is not an absolute normalised ASCII path of at most 255 bytes".into());
+    }
+    if executable.bytes().any(|byte| byte < 0x20 || byte == 0x7f) {
+        return check("enrolledWriter.executable holds a control character".to_string());
+    }
+    if executable.ends_with(DELETED_SUFFIX) {
+        return check("enrolledWriter.executable ends with \" (deleted)\"".to_string());
+    }
+    Ok(executable.as_bytes().to_vec())
 }
 
 /// `gate.manifests` or `gate.runs`: an object whose entries are objects (their members were checked by the I05

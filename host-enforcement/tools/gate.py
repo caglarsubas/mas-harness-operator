@@ -101,7 +101,9 @@ CC_PROBES = {"src/detect_compiler_family.c": "97ca4b021495611e828becea6187add374
 BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # harness-onion contract files R10 holds, byte-exact, registered in harness-onion's operator -> harness-engineering
 # buildArtifact edge record (owner decision Q-HE2-A; the two EFFECT_GATE programs in its record v2, MET-ENFORCE-025,
-# pinned at the published digests); provenance in contracts/PROVENANCE.md.
+# pinned at the published digests); provenance in contracts/PROVENANCE.md. HE-003A2 (DESIGN section 2, owner decision
+# Q-A2-1 (a)): the seccomp-v4 EFFECT_GATE programs of its record v3 (MET-ENFORCE-029) join them and are the ones the seal
+# embeds; the seccomp-v3 ones stay pinned, held but no longer embedded (17 files).
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -118,6 +120,8 @@ CONTRACTS = {
     "contracts/i07-v3/vectors.json": "c4c24c5ff15618aa2f0fe0f016011359bc4316220c6e40d5168f9ee24b6f736d",
     "contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf": "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a",
     "contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf": "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115",
+    "contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf": "8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044",
+    "contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf": "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3",
 }
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
@@ -204,6 +208,21 @@ TYPE_ITEM = re.compile(r"\btype\s+[A-Za-z_]\w*")
 PUB_PREFIX = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?$")
 STRUCT_ITEM = re.compile(r"\bstruct\s+[A-Za-z_]\w*")
 FN_POINTER = re.compile(r"\bfn\s*\(|\bextern\s*(?:\"\"\s*)?fn\b")
+# HE-003D PR review round 2 confirmation, N1 (HE-003A2 DESIGN section 6, owner decision Q-A2-9 (a), D1-3, D2-1): the
+# R2-1 rule also reads Fn-trait types, `dyn` or `impl` followed by Fn, FnMut or FnOnce (after other bounds, a lifetime
+# or a higher-ranked `for<..>`), next to fn pointers, in pub type aliases, the types of pub consts and statics, and pub
+# struct fields (braced and tuple); and it reads the variants of `pub` (or `pub(..)`) enums, tuple and named-field,
+# through their field types only (never a variant or field name), for gate-sys socket items (SOCKET_DATA_TYPES exempt),
+# fn pointers and Fn-trait types. A private enum (linux_net.rs's Stream) stays outside, like a private struct. N2 is
+# documentation: an associated type in a socket file is refused as a private alias (R72). PR review round 1, R1-1
+# (Q-A2-R1 (a)): the trait may be path-qualified (`std::ops::Fn`, `core::ops::FnMut`, `::core::ops::FnOnce`) and
+# parenthesised (`dyn (Fn())`), also higher-ranked and after nested generic bounds; any `Fn(`, `FnMut(` or `FnOnce(`
+# (or `<`) in the typed text refuses, whatever precedes it. Residual (code review's, R72): trait-impl associated consts
+# and items, pub fn bodies and return types, generic parameters (defaults, bounds, where-clauses) and subtraits of Fn.
+FN_TRAIT = re.compile(r"\b(?:dyn|impl)\s+(?:(?:for\s*<[^>]*>|'\w+|\??(?:::)?[A-Za-z_][\w:]*(?:\s*<[^<>]*>)?)\s*\+\s*)*"
+                      r"\(?\s*(?:for\s*<[^>]*>\s*)?(?:::)?(?:[A-Za-z_]\w*::)*(?:Fn|FnMut|FnOnce)\b"
+                      r"|\b(?:Fn|FnMut|FnOnce)\s*[(<]")
+PUB_ENUM = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?enum\s+[A-Za-z_]\w*")
 # R1-3: no macro in any linked crate's non-test sources or the binary (a macro could complete a gate-sys socket path
 # that neither the use-tree reading nor the text scan sees): macro_rules, a `macro` item, #[macro_export].
 MACROS = ((re.compile(r"\bmacro_rules\b"), "macro_rules"), (re.compile(r"(?<![\w$])macro\s+[A-Za-z_]"), "a macro item"),
@@ -237,9 +256,14 @@ SIGNER_KEY = "crates/gate-tls/config-signer.pub"
 # HE-003D DESIGN section 5 (O3, C8): planeon-gate's symbol inventory. MEMBARRIER must be absent (musl's membarrier.lo
 # defines both; its __membarrier_init is WEAK in pthread_create.lo and harmless). KILLED_WRAPPERS are the musl 1.2.5
 # wrappers whose system call the pinned EFFECT_GATE programs kill unconditionally on at least one target: each name's
-# primary system call number (x86_64, aarch64) run through a classic-BPF interpreter over contracts/seccomp-v3/ with
-# 147 argument vectors, every one SECCOMP_RET_KILL_PROCESS (argument-filtered calls such as socket, prctl, mremap and
-# fcntl are not listed; T04's steady-state trace stays the proof). A present one must be in WRAPPER_JUSTIFICATIONS, the
+# primary system call number (x86_64, aarch64) run through a classic-BPF interpreter over contracts/seccomp-v4/ with
+# every argument vector SECCOMP_RET_KILL_PROCESS (argument-filtered calls such as socket, prctl, mremap and fcntl are not
+# listed; T04's steady-state trace stays the proof). HE-003A2 (DESIGN section 2, D1-13) re-derived it over the v4
+# programs with the kept classifier tools/w03/he003a2/classify_wrappers.py (sha256
+# 97cb5f2b90aa68ae73dd87cab4c67f89055aebb4dc4c736b3fcc9927d4c71ca0; 90 argument vectors, sha256
+# 694dfd2daf4bc10083b71a242bb51c4ef0fa843f28a776f0f400b4fed2ed966c; HE-003D's was over contracts/seccomp-v3/ with 147):
+# readlinkat left (allowed under v4 with a non-negative dirfd on both targets); readlink stays (x86_64's call 89 is
+# killed unconditionally). A present one must be in WRAPPER_JUSTIFICATIONS, the
 # reviewed list built from phase 2's actual set (both targets of the shipped binary, which holds the composed gate
 # since Q-HE3D-B1 (a); the same twelve as a scratch build with a 32-byte stand-in key) and recorded in MODEL_DEFINED
 # (R77).
@@ -258,7 +282,7 @@ KILLED_WRAPPERS = ("__membarrier", "accept", "access", "capget", "capset", "chdi
                    "getresuid", "getuid", "inotify_init1", "ioctl", "isatty", "kill", "link", "lstat", "lstat64",
                    "membarrier", "memfd_create", "mkdir", "mkdirat", "mknod", "mlock", "mount", "msync", "open",
                    "open64", "pause", "personality", "pipe", "pipe2", "popen", "posix_spawn", "process_vm_readv",
-                   "ptrace", "readdir", "readlink", "readlinkat", "realpath", "rename", "renameat", "rmdir",
+                   "ptrace", "readdir", "readlink", "realpath", "rename", "renameat", "rmdir",
                    "sched_setaffinity", "seccomp", "sendfile", "setgid", "setpgid", "setpriority", "setrlimit",
                    "setsid", "settimeofday", "setuid", "shmget", "signalfd", "socketpair", "splice", "stat",
                    "stat64", "statx", "symlink", "sysinfo", "system", "tcgetattr", "tee", "timerfd_create",
@@ -313,8 +337,10 @@ STARTUP_EXCEPTIONS = {
 # PR review round 1, R1-1: the sources are read with comments removed and literal contents emptied (rust_code), every
 # `extern` must be a block, `extern crate` or a function's ABI, a block's body must hold only items the reader follows,
 # and the files allowed `unsafe` define no macro; anything else refuses. HE-003A DESIGN section 3: the channel module's
-# twelve symbols (accept4 only through syscall).
-FOREIGN_ITEMS = {OPENAT: {"openat"},
+# twelve symbols (accept4 only through syscall). HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-6): the openat module's
+# readlinkat (Dir::read_link, through musl's wrapper, which passes the dirfd unchanged and has no fallback), refused in
+# any other linked source.
+FOREIGN_ITEMS = {OPENAT: {"openat", "readlinkat"},
                  SEAL: {"prctl", "capset", "capget", "prlimit", "getresuid", "getresgid", "syscall"},
                  CHANNEL: {"socket", "bind", "listen", "setsockopt", "getsockopt", "recvmsg", "sendmsg", "epoll_create1",
                            "epoll_ctl", "epoll_pwait", "ppoll", "syscall"},
@@ -322,6 +348,18 @@ FOREIGN_ITEMS = {OPENAT: {"openat"},
                  # sections 5 and 6: the upstream client's connect and getsockopt (SO_ERROR), ten in all.
                  TCP: {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt", "recv", "send", "shutdown",
                        "syscall"}}
+# HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-9, D2-2): Dir::read_link is pub (gate-sys's host tests call it), so among
+# the linked crates' non-test sources, read without comments and with literals kept, the word read_link appears exactly
+# twice: its definition `fn read_link(` in openat.rs and the one call `read_link("exe",` in channel.rs (ProcDir::exe).
+# A second call, a call in another file or with another name, and a reference without a call (a fn item) refuse.
+READ_LINK = re.compile(r"\bread_link\b")
+READ_LINK_DEFINITION = re.compile(r"\bfn\s+read_link\s*\(")
+READ_LINK_CALL = re.compile(r'\bread_link\s*\(\s*"exe"\s*,')
+# PR review round 1, R1-3 (Q-A2-R1 (a)): the word readlinkat occurs exactly twice in openat.rs (read without comments,
+# literals kept and emptied alike), as its declaration inside the extern block and as the one call inside read_link's
+# body, and nowhere in another linked source, so no second wrapper under another name can read a link.
+READLINKAT = re.compile(r"\breadlinkat\b")
+READLINKAT_DECLARATION = re.compile(r"\bfn\s+readlinkat\s*\(")
 # HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
 # with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
 # struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
@@ -1686,11 +1724,84 @@ def struct_fields(code: str, start: int) -> list[str]:
     return [field for field in fields if field.strip()]
 
 
+def enum_variant_types(code: str, start: int) -> list[str]:
+    """HE-003A2 (N1, D2-1): the field types of each variant of the enum whose name ends at `start`: a tuple variant's
+    parenthesised types and a named-field variant's field types with the names removed (unit variants and
+    discriminants have none). Variant names are never returned. A body the reader cannot close or a variant it cannot
+    read refuses."""
+    opening = code.find("{", start)
+    require(opening >= 0 and ";" not in code[start:opening], "an enum the socket-module check cannot read")
+    depth, index = 0, opening
+    while index < len(code):
+        depth += {"{": 1, "}": -1}.get(code[index], 0)
+        if depth == 0:
+            break
+        index += 1
+    require(depth == 0, "an enum the socket-module check cannot read")
+    body = code[opening + 1:index].replace("->", "  ")
+    # PR review round 1, R1-2: variants are split at commas outside parentheses, brackets and braces only (a
+    # discriminant such as `1 << 2` holds angle brackets that are no generics), and each variant's field types must
+    # hold balanced angle brackets, or the reader refuses.
+    variants, depth, begin = [], 0, 0
+    for position, char in enumerate(body):
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            require(depth >= 0, "an enum the socket-module check cannot read")
+        elif char == "," and depth == 0:
+            variants.append(body[begin:position])
+            begin = position + 1
+    variants.append(body[begin:])
+    types = []
+    for variant in variants:
+        text = re.sub(r"#\s*\[[^\]]*\]", " ", variant).strip()
+        if not text:
+            continue
+        shape = re.match(r"[A-Za-z_]\w*\s*(.*)$", text, re.S)
+        require(shape, "an enum variant the socket-module check cannot read")
+        rest = shape.group(1).strip()
+        if rest[:1] in ("(", "{"):
+            # The fields up to their closing bracket; after it only an explicit discriminant (`= <expr>`) may follow.
+            level, close = 0, -1
+            for position, char in enumerate(rest):
+                level += {"(": 1, "[": 1, "{": 1, ")": -1, "]": -1, "}": -1}.get(char, 0)
+                if level == 0:
+                    close = position
+                    break
+            tail = rest[close + 1:].strip() if close > 0 else "?"
+            require(close > 0 and (tail == "" or tail.startswith("=")),
+                    "an enum variant the socket-module check cannot read")
+            inner = rest[1:close]
+            types.append(inner if rest[0] == "(" else FIELD_NAME.sub(" ", inner))
+        else:
+            require(rest == "" or rest.startswith("="), "an enum variant the socket-module check cannot read")
+            continue
+        angle = 0
+        for char in types[-1]:
+            angle += {"<": 1, ">": -1}.get(char, 0)
+            require(angle >= 0, "an enum variant the socket-module check cannot read (unbalanced angle brackets)")
+        require(angle == 0, "an enum variant the socket-module check cannot read (unbalanced angle brackets)")
+    return types
+
+
+def block_end(code: str, opening: int) -> int:
+    """The index after the `}` that closes the `{` at `opening` (comments removed, literal contents emptied)."""
+    depth = 0
+    for index in range(opening, len(code)):
+        depth += {"{": 1, "}": -1}.get(code[index], 0)
+        if depth == 0:
+            return index + 1
+    raise GateError("a block without its closing brace")
+
+
 def check_socket_items(rel: str, raw: str, code: str) -> None:
     """R1-3: in a SOCKET_FILES source (code read without comments, `::` spacing removed), no `pub` type alias, const,
     static or fn signature names a gate-sys channel or tcp item other than SOCKET_DATA_TYPES; no glob of those modules.
     R2-1: no private type alias, no pub const or static of a fn-pointer type, and no pub struct field whose type names
-    such an item or is a fn pointer. A text tripwire over names: a wrapper type or a pub fn's body stays code review's."""
+    such an item or is a fn pointer. HE-003A2 (N1): no pub type alias, pub const or static type or pub struct field of
+    a fn-pointer or Fn-trait type, and no variant of a pub enum whose field types name such an item or are a fn pointer
+    or an Fn-trait type. A text tripwire over names: a wrapper type or a pub fn's body stays code review's."""
     modules, items = set(), {}
     for path, rename in source_uses(rel, raw):
         if len(path) < 2 or path[0] != "gate_sys" or path[1] not in SOCKET_MODULES:
@@ -1711,9 +1822,12 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
         text = item_text(code, item.start(), item.group(1))
         found = hazards(text)
         require(not found, "%s has a pub item naming gate-sys's socket items %s (socket-module check)" % (rel, found))
-        if item.group(1) in ("const", "static"):
-            require(not FN_POINTER.search(text.split("=", 1)[0]),
+        if item.group(1) in ("const", "static", "type"):
+            typed = text if item.group(1) == "type" else text.split("=", 1)[0]
+            require(not FN_POINTER.search(typed),
                     "%s has a pub %s of a fn-pointer type (socket-module check)" % (rel, item.group(1)))
+            require(not FN_TRAIT.search(typed),
+                    "%s has a pub %s of an Fn-trait type (socket-module check)" % (rel, item.group(1)))
     for alias in TYPE_ITEM.finditer(code):
         require(PUB_PREFIX.search(code[:alias.start()]), "%s defines a private type alias (socket-module check)" % rel)
     for struct in STRUCT_ITEM.finditer(code):
@@ -1723,6 +1837,60 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
             found = hazards(field)
             require(not found, "%s has a pub field naming gate-sys's socket items %s (socket-module check)" % (rel, found))
             require(not FN_POINTER.search(field), "%s has a pub field of a fn-pointer type (socket-module check)" % rel)
+            require(not FN_TRAIT.search(field), "%s has a pub field of an Fn-trait type (socket-module check)" % rel)
+    for enum in PUB_ENUM.finditer(code):
+        for types in enum_variant_types(code, enum.end()):
+            found = hazards(types)
+            require(not found, "%s has a pub enum variant naming gate-sys's socket items %s (socket-module check)"
+                    % (rel, found))
+            require(not FN_POINTER.search(types), "%s has a pub enum variant of a fn-pointer type (socket-module check)"
+                    % rel)
+            require(not FN_TRAIT.search(types), "%s has a pub enum variant of an Fn-trait type (socket-module check)"
+                    % rel)
+
+
+def check_read_link(base: Path) -> int:
+    """HE-003A2 DESIGN section 3 (D2-2): over the linked crates' non-test sources (the binary included), read without
+    comments and with literals kept, the word read_link occurs exactly twice: once in openat.rs as its definition
+    (`fn read_link(`) and once in channel.rs as the call `read_link("exe", ..)`. The number of occurrences."""
+    found = {}
+    for rel, raw in linked_sources(base):
+        try:
+            code = rust_code(raw, literals=True)
+        except GateError as error:
+            raise GateError("%s: %s (read_link rule)" % (rel, error)) from None
+        if READ_LINK.search(code):
+            found[rel] = code
+    for rel in found:
+        require(rel in (OPENAT, CHANNEL), "%s names read_link; only openat.rs defines it and channel.rs calls it "
+                "(read_link rule)" % rel)
+    definition, call = found.get(OPENAT, ""), found.get(CHANNEL, "")
+    require(len(READ_LINK.findall(definition)) == 1 and READ_LINK_DEFINITION.search(definition),
+            "%s does not name read_link exactly once, as its definition (read_link rule)" % OPENAT)
+    require(len(READ_LINK.findall(call)) == 1 and READ_LINK_CALL.search(call),
+            "%s does not name read_link exactly once, as the call read_link(\"exe\", ..) (read_link rule)" % CHANNEL)
+    # R1-3: readlinkat, twice in openat.rs (the declaration in the extern block, the one call in read_link's body).
+    for rel, raw in linked_sources(base):
+        if rel != OPENAT:
+            require(not READLINKAT.search(rust_code(raw, literals=True)),
+                    "%s names readlinkat; only openat.rs declares it and calls it in read_link (read_link rule)" % rel)
+    raw = (base / OPENAT).read_text(encoding="utf-8")
+    code, kept = rust_code(raw), rust_code(raw, literals=True)
+    message = "%s does not name readlinkat exactly twice, as its declaration and one call in read_link (read_link rule)"
+    positions = [match.start() for match in READLINKAT.finditer(code)]
+    require(len(positions) == 2 and len(READLINKAT.findall(kept)) == 2, message % OPENAT)
+    declaration = READLINKAT_DECLARATION.search(code)
+    blocks = [(block.end() - 1, block_end(code, block.end() - 1)) for block in EXTERN_BLOCK.finditer(code)]
+    require(declaration and any(start < declaration.start() < end for start, end in blocks), message % OPENAT)
+    named = declaration.start() + declaration.group(0).index("readlinkat")
+    definition = READ_LINK_DEFINITION.search(code)
+    opening = code.find("{", definition.end()) if definition else -1
+    require(opening >= 0, message % OPENAT)
+    body = (opening, block_end(code, opening))
+    calls = [position for position in positions if position != named]
+    require(named in positions and len(calls) == 1 and body[0] < calls[0] < body[1]
+            and re.match(r"readlinkat\s*\(", code[calls[0]:]), message % OPENAT)
+    return sum(len(READ_LINK.findall(code)) for code in found.values())
 
 
 def check_macros(base: Path) -> int:
@@ -1915,12 +2083,16 @@ def main() -> int:
             "forbid and the two cfgs; no socket or thread name through that statement, nor in %s and %s (one use "
             "gate_sys::Dir; excepted in the latter)" % (GATE_MAIN, check_seal_order(HE), GATE_CONFIG, SIGNED_CONFIG))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
-            "nothing and name those modules' items in no pub type, const, static or fn signature except the data types "
-            "%s) and gate-sys, by use tree or qualified path; none names std::thread or thread::"
+            "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
+            "variant except the data types %s, and hold no fn-pointer or Fn-trait type in a pub alias, const, static, "
+            "field or enum variant) and gate-sys, by use tree or qualified path; none names std::thread or thread::"
             % (check_socket_modules(HE), " and ".join(SOCKET_FILES), ", ".join(SOCKET_DATA_TYPES)))
         say("store opening: %d sources of crates/gate call FileStores::open_bound exactly once, name ::open only as "
             "PolicyGate::open and rename or alias neither type; no linked source calls FileStores::open"
             % check_gate_stores(HE))
+        say("read_link: the word occurs %d times in the linked sources, as its definition in %s and the one call "
+            "read_link(\"exe\", ..) in %s; readlinkat occurs only in %s, as its declaration and the one call in "
+            "read_link (HE-003A2)" % (check_read_link(HE), OPENAT, CHANNEL, OPENAT))
         say("macros: %d linked sources define no macro_rules or macro item and carry no #[macro_export]"
             % check_macros(HE))
         say("code before main: %d linked sources name no link_section, #[used], init_array, no_mangle or export_name"
