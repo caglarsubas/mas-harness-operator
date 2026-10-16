@@ -59,11 +59,13 @@ const PR_CAP_AMBIENT_CLEAR_ALL: c_ulong = 4;
 /// The core limit the seal sets and reads back, `[soft, hard]`.
 const NO_CORE: [u64; 2] = [0, 0];
 
-/// The published EFFECT_GATE programs (harness-onion MET-ENFORCE-025, vendored byte-identically under
-/// `host-enforcement/contracts/seccomp-v3/` and pinned by `tools/gate.py`): the kernel's `struct sock_filter` arrays,
-/// 8 bytes per instruction. Both are compiled in on every target; [`RUNNING_ARCH`] selects the one installed.
-pub static PROGRAM_X86_64: &[u8] = include_bytes!("../../../contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf");
-pub static PROGRAM_AARCH64: &[u8] = include_bytes!("../../../contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf");
+/// The published EFFECT_GATE programs (harness-onion MET-ENFORCE-029, seccomp allowlists v4: v3 plus `readlinkat` with
+/// a non-negative dirfd; vendored byte-identically under `host-enforcement/contracts/seccomp-v4/` and pinned by
+/// `tools/gate.py`, HE-003A2; MET-ENFORCE-025's v3 programs stay pinned under `contracts/seccomp-v3/` but are no longer
+/// embedded): the kernel's `struct sock_filter` arrays, 8 bytes per instruction. Both are compiled in on every target;
+/// [`RUNNING_ARCH`] selects the one installed.
+pub static PROGRAM_X86_64: &[u8] = include_bytes!("../../../contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf");
+pub static PROGRAM_AARCH64: &[u8] = include_bytes!("../../../contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf");
 
 /// The two architectures the gate is built for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -894,8 +896,8 @@ mod tests {
 
     fn instructions(arch: Arch) -> u16 {
         match arch {
-            Arch::X86_64 => 194,
-            Arch::Aarch64 => 183,
+            Arch::X86_64 => 200,
+            Arch::Aarch64 => 189,
         }
     }
 
@@ -992,11 +994,11 @@ mod tests {
         assert_eq!(full.stage1_drops, (0..=40).filter(|capability| *capability != 8).collect::<Vec<u32>>());
         assert_eq!((full.stage1_bounding, full.stage1_capabilities), (SETPCAP, SETPCAP));
         assert_eq!(full.stage2_drops, [8]);
-        assert_eq!((full.arch, full.length), (Arch::X86_64, 194));
+        assert_eq!((full.arch, full.length), (Arch::X86_64, 200));
         let only = plan(start(SETPCAP, SETPCAP), Arch::Aarch64).expect("plan");
         assert_eq!((only.stage1_drops.len(), only.stage1_bounding, only.stage1_capabilities), (0, SETPCAP, SETPCAP));
         assert_eq!(only.stage2_drops, [8]);
-        assert_eq!((only.arch, only.length), (Arch::Aarch64, 183));
+        assert_eq!((only.arch, only.length), (Arch::Aarch64, 189));
         let empty = plan(start(0, 0), Arch::X86_64).expect("plan");
         assert_eq!((empty.stage1_drops.len(), empty.stage1_bounding, empty.stage1_capabilities), (0, 0, 0));
         assert!(empty.stage2_drops.is_empty());

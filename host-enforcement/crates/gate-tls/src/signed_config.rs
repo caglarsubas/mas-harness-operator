@@ -10,9 +10,9 @@
 //!   document is refused. A key of small order is refused by libsodium's method: the key with its sign bit cleared is
 //!   compared with the seven small-order y encodings (14 keys with both signs, the non-canonical ones ring's decoder
 //!   accepts included).
-//! - The payload is `UTF8("planeon.effect-gate-config/v1") || 0x00 || document`, verified with ring's
-//!   `UnparsedPublicKey::new(&ED25519, key).verify(payload, signature)`; the domain is effect-gate's `FORMAT`, so the
-//!   two change together. Verification comes first: an unsigned or invalid document is never parsed.
+//! - The payload is `UTF8("planeon.effect-gate-config/v2") || 0x00 || document` (v2 since HE-003A2), verified with
+//!   ring's `UnparsedPublicKey::new(&ED25519, key).verify(payload, signature)`; the domain is effect-gate's `FORMAT`,
+//!   so the two change together. Verification comes first: an unsigned or invalid document is never parsed.
 
 use std::io;
 use std::io::Read;

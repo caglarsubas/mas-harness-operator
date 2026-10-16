@@ -8,7 +8,8 @@
 //! 2. the signed configuration only: gate-tls's `signed_config::load` (11, 12) and `GateConfig::parse` (13);
 //! 3. seal stage 2 (60-79);
 //! 4. after the seal, in `serve` below: the credentials (20) and the TLS configurations (21); the fallible socket
-//!    setup, the I04 listener and the Linux `Os` (24), before anything durable is written; the file stores with the
+//!    setup, the I04 listener and the Linux `Os` with the enrolled writer executable (24, HE-003A2), before anything
+//!    durable is written; the file stores with the
 //!    generation binding (22) and the one PolicyGate on them, created on a fresh journal or reopened deny-first (23);
 //!    the socket-free composition; the substrate (25) and its loop (30-35).
 //!
@@ -82,7 +83,9 @@ fn serve(sealed: &Sealed, config: GateConfig) -> u8 {
     if NetTable::listen_i04(&net, sealed, &config.endpoint).is_err() {
         return status::SOCKETS;
     }
-    let Ok(os) = LinuxOs::with_net(sealed, &ListenerPlan::i05(), &ListenerPlan::i07(), net.clone()) else {
+    // HE-003A2 (DESIGN section 4, Q-A2-6 (a)): the Linux `Os` takes the enrolled writer executable, a required argument.
+    let (i05, i07) = (ListenerPlan::i05(), ListenerPlan::i07());
+    let Ok(os) = LinuxOs::with_net(sealed, &i05, &i07, net.clone(), config.writer_executable) else {
         return status::SOCKETS;
     };
 

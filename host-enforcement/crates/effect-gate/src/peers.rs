@@ -76,6 +76,20 @@ impl ExpectedPeers {
     }
 }
 
+/// The buffer size for reading the writer's executable link (HE-003A2 DESIGN §3, D1-2): one byte longer than the
+/// enrolled path, so a longer link (`" (deleted)"` appended, another file) fills the buffer, which the read refuses as
+/// possibly truncated.
+pub fn writer_exe_buffer_len(expected: &[u8]) -> usize {
+    expected.len().saturating_add(1)
+}
+
+/// Whether the writer's executable link, as read, is the enrolled path exactly: the same length and the same bytes.
+/// A `" (deleted)"` suffix, a prefix, a truncated or longer link and an empty one all fail (HE-003A2 DESIGN §3, HS43
+/// §4.3: "the link must equal that path exactly").
+pub fn writer_exe_matches(link: &[u8], expected: &[u8]) -> bool {
+    !link.is_empty() && link == expected
+}
+
 /// One listener's place and socket context.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListenerPlan {

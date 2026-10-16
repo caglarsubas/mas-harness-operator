@@ -729,8 +729,10 @@ TCP_DECLARATIONS = ("#[allow(clashing_extern_declarations)]\nunsafe extern \"C\"
                     "    fn syscall(number: c_long, ...) -> c_long;\n}\n")
 FOREIGN_TREE = {
     **LINKED_TREE,
-    "crates/gate-sys/src/openat.rs": "#![allow(unsafe_code)]\nunsafe extern \"C\" {\n    // the one call\n"
-                                     "    fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;\n}\n",
+    # HE-003A2: the openat module's two symbols, openat and readlinkat.
+    "crates/gate-sys/src/openat.rs": "#![allow(unsafe_code)]\nunsafe extern \"C\" {\n    // the two calls\n"
+                                     "    fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;\n"
+                                     "    fn readlinkat(dirfd: c_int, path: *const c_char, buffer: *mut c_char, size: usize) -> isize;\n}\n",
     "crates/gate-sys/src/seal.rs": "#![allow(unsafe_code)]\n" + SEAL_DECLARATIONS
                                    + "pub fn user_ids() -> [u32; 3] { [0; 3] }\n",
     # HE-003A: the channel module, the third file with its own allowlist (the linked tree's eighth source).
@@ -1064,14 +1066,19 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(gate.check_contracts(self.base), 1)
 
     # HE-002S DESIGN section 3: the two published EFFECT_GATE programs join the 13 contract files at their digests.
+    # HE-003A2 (DESIGN section 2, Q-A2-1 (a)): the two seccomp-v4 programs join them (17); the v3 ones stay pinned.
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 15)
+            self.assertEqual(len(gate.CONTRACTS), 17)
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf"],
                              "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf"],
                              "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf"],
+                             "8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf"],
+                             "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3")
         finally:
             self.patch.start()
 
@@ -1914,6 +1921,74 @@ class SocketItemTests(Tree):
                    "pub struct Pair(u8, Poller);\nfn private() -> fn() { f }\n")
         self.assertEqual(gate.check_socket_modules(self.base), 12)
 
+    def test_fn_traits_fn_pointers_and_pub_enum_variants_refuse(self):
+        # HE-003D PR review round 2 confirmation, N1 (HE-003A2 DESIGN section 6, Q-A2-9 (a), D1-3, D2-1).
+        os_rs, net_rs = "crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs"
+        lt = "fn lt(a: &InetAddress, p: u16) -> bool { gate_sys::tcp::listen_tcp(a, p).is_ok() }\n"
+        for rel, text, message in (
+                # The reviewer's Q25-Q30.
+                (net_rs, lt + "pub type Hook = fn(&InetAddress, u16) -> bool;\npub static LT: Hook = lt;", "pub type of a fn-pointer"),
+                (net_rs, lt + "pub static LT2: &(dyn Fn(&InetAddress, u16) -> bool + Sync) = &lt;", "pub static of an Fn-trait"),
+                (net_rs, lt + "pub struct Leak { pub hook: &'static (dyn Fn(&InetAddress, u16) -> bool + Sync) }", "pub field of an Fn-trait"),
+                (os_rs, "pub enum Leak { P(Poller) }", "pub enum variant naming gate-sys's socket items \\['Poller'\\]"),
+                (net_rs, lt + "pub enum H { F(fn(&InetAddress, u16) -> bool) }\npub const X: H = H::F(lt);", "pub enum variant of a fn-pointer"),
+                (net_rs, lt + "pub type Hook = fn(&InetAddress, u16) -> bool;\npub struct S { pub hook: Hook }", "pub type of a fn-pointer"),
+                # D2-1's three.
+                (os_rs, "pub enum H { F(fn() -> bool) }", "pub enum variant of a fn-pointer"),
+                (os_rs, "pub enum N { V { f: Box<dyn FnMut()> } }", "pub enum variant of an Fn-trait"),
+                # FnMut, FnOnce, higher-ranked and bounded forms; aliases, consts, statics, braced and tuple fields.
+                (os_rs, "pub type Cb = Box<dyn FnOnce(u8) + Send>;", "pub type of an Fn-trait"),
+                (os_rs, "pub static S: Mutex<Option<Box<dyn FnMut() + Send>>> = Mutex::new(None);", "pub static of an Fn-trait"),
+                (os_rs, "pub static H: &(dyn for<'a> Fn(&'a u8) + Sync) = &h;", "pub static of an Fn-trait"),
+                (os_rs, "pub const C: &dyn Fn() = &f;", "pub const of an Fn-trait"),
+                (os_rs, "pub(crate) const E: extern \"C\" fn() = f;", "pub const of a fn-pointer"),
+                (os_rs, "pub struct T(pub &'static (dyn Send + Fn()));", "pub field of an Fn-trait"),
+                (os_rs, "pub struct T(u8, pub(crate) Option<fn(u8)>);", "pub field of a fn-pointer"),
+                # A tuple field spelled `pub fn(..)` reads as a pub fn item, which the reader cannot close: refused too.
+                (os_rs, "pub struct T(u8, pub(crate) fn(u8));", "cannot read"),
+                (os_rs, "pub struct I { pub f: Box<dyn 'static + FnOnce()> }", "pub field of an Fn-trait"),
+                # Enum variants: tuple and named-field, socket items through every import form, visibility forms.
+                (os_rs, "pub enum W { P { poller: Poller } }", "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "pub(crate) enum W { A(u8), B(Option<Conn>) }", "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "pub(super) enum W { A(gate_sys::channel::PidFd) }", "pub enum variant naming gate-sys's socket items"),
+                (net_rs, "pub enum W { C(Box<TcpConn>) }", "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "pub enum W {\n    #[allow(dead_code)]\n    A { f: extern \"C\" fn() },\n}", "pub enum variant of a fn-pointer"),
+                (os_rs, "pub enum W { A(Box<dyn Send + FnOnce() -> u8>) }", "pub enum variant of an Fn-trait"),
+                # PR review round 1, R1-1: path-qualified, parenthesised, higher-ranked and nested-bound spellings.
+                (os_rs, "pub type Cb = Box<dyn std::ops::Fn(u8) + Send>;", "pub type of an Fn-trait"),
+                (os_rs, "pub struct Zq { pub f: Box<dyn core::ops::FnMut()> }", "pub field of an Fn-trait"),
+                (os_rs, "pub enum Qq { A(Box<dyn ::core::ops::FnOnce()>) }", "pub enum variant of an Fn-trait"),
+                (os_rs, "pub static PS: &(dyn (Fn()) + Sync) = &f;", "pub static of an Fn-trait"),
+                (os_rs, "pub static HR: &(dyn for<'a> std::ops::Fn(&'a u8) + Sync) = &h;", "pub static of an Fn-trait"),
+                (os_rs, "pub const HP: &dyn (for<'a> core::ops::FnMut(&'a u8)) = &h;", "pub const of an Fn-trait"),
+                (os_rs, "pub struct Ts(pub Box<dyn Foo<Vec<u8>> + Fn()>);", "pub field of an Fn-trait"),
+                (os_rs, "pub type Ip = Option<impl ::std::ops::FnOnce(u8)>;", "pub type of an Fn-trait"),
+                # PR review round 1, R1-2: angle brackets in a discriminant do not merge the next variant.
+                (os_rs, "#[repr(u8)]\npub enum Ev { A = 1 << 2, B(Poller) }", "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "#[repr(u8)]\npub enum Ev { A = 8 >> 1, B(Poller) }", "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "#[repr(u8)]\npub enum Ev { A = (2 >= 1) as u8, B { p: Poller } }",
+                 "pub enum variant naming gate-sys's socket items"),
+                (os_rs, "pub enum Ub { A(Vec<u8), B(u8) }", "unbalanced angle brackets"),
+                (os_rs, "pub enum Ub { A { f: u8> } }", "unbalanced angle brackets")):
+            self.refused(gate.check_socket_modules, rel, self.TREE[rel] + text + "\n", message)
+        # The unchanged files' shapes pass: a pub enum whose variant names equal socket types (SetupError's Poller and
+        # Listener) with data-type fields, a private enum holding socket items (linux_net.rs's Stream), unit variants and
+        # discriminants, and fn pointers or Fn traits in private items and in a private fn's parameters.
+        self.write(os_rs, self.TREE[os_rs].replace(
+            "pub enum SetupError { Listener { error: ListenError } }",
+            "pub enum SetupError { Poller(io::Error), Listener { side: Listen, error: ListenError } }")
+            + "pub enum Kind { Poller, Conn = 2, Plain(u8), Named { listener: u8 } }\n"
+            # R1-2: a balanced generic variant and a shift discriminant pass.
+            "#[repr(u8)]\npub enum Gen { A(HashMap<u8, Vec<u16>>) = 1 << 2, B { m: Option<Box<u8>> } = 8 >> 1 }\n"
+            "fn port_request(&self, request: impl FnOnce(&Poller, Watched<'_>) -> io::Result<()>) -> bool { r() }\n"
+            "struct Hidden { f: Box<dyn Fn()>, g: fn() }\n")
+        self.write(net_rs, self.TREE[net_rs] + "enum Stream {\n    Listener(TcpListener),\n    Conn(TcpConn),\n}\n")
+        self.assertEqual(gate.check_socket_modules(self.base), 12)
+        # Comments are not code; the reader refuses an enum it cannot read.
+        self.write(os_rs, self.TREE[os_rs] + "// pub enum Leak { P(Poller) }\n")
+        self.assertEqual(gate.check_socket_modules(self.base), 12)
+        self.refused(gate.check_socket_modules, os_rs, self.TREE[os_rs] + "pub enum Broken { A(u8)\n", "cannot read")
+
     def test_macros_refuse_in_every_linked_crate(self):
         p13 = ("macro_rules! wire { ($m:ident) => { gate_sys::$m::listen_tcp }; }\n"
                "#[allow(unused_imports)]\npub(crate) use wire;\n")
@@ -2032,6 +2107,16 @@ class GateSymbolTests(unittest.TestCase):
             with self.assertRaisesRegex(gate.GateError, "without a reviewed justification"):
                 gate.check_gate_symbols(present | {name})
 
+    def test_readlinkat_left_the_killed_wrappers(self):
+        # HE-003A2 (DESIGN section 2, D1-13): re-derived over contracts/seccomp-v4/, readlinkat is argument-filtered on
+        # both targets (allowed with a non-negative dirfd), so the gate may hold musl's wrapper; readlink stays (x86_64
+        # kills its call 89 unconditionally), and so does realpath, which calls it.
+        self.assertNotIn("readlinkat", gate.KILLED_WRAPPERS)
+        self.assertEqual(len(gate.KILLED_WRAPPERS), 98)
+        self.assertTrue({"readlink", "realpath", "getcwd"} <= set(gate.KILLED_WRAPPERS))
+        present = set(gate.WRAPPER_JUSTIFICATIONS) | {"readlinkat"} | CRATE_NAMES
+        self.assertEqual(gate.check_gate_symbols(present), sorted(gate.WRAPPER_JUSTIFICATIONS))
+
     def test_the_composed_gate_is_linked(self):
         # Each crate missing refuses; a crate whose name only starts like gate-tls's or rustls's does not count.
         for crate, missing in (("gate_tls", {"_RNvNtCskpwDPCNkCDi_8gate_tls13signed_config9read_file",
@@ -2104,6 +2189,102 @@ class StoreOpeningTests(Tree):
         # The tests may open unbound stores.
         self.write("crates/effect-gate/tests/stores.rs", "fn f() { let _ = FileStores::open(j); }\n")
         self.assertEqual(gate.check_gate_stores(self.base), 1)
+
+
+READ_LINK_OPENAT = ("#![allow(unsafe_code)]\n/// [`Dir::read_link`]: one link by name, the one readlinkat call.\n"
+                    "pub fn read_link(&self, name: &str, buffer: &mut [u8]) -> io::Result<usize> {\n"
+                    "    let count = unsafe { readlinkat(self.fd(), name.as_ptr(), buffer.as_mut_ptr().cast(), buffer.len()) };\n"
+                    "    x(count)\n}\n")
+READ_LINK_CHANNEL = ("#![allow(unsafe_code)]\n/// Through [`Dir::read_link`].\n"
+                     "pub fn exe(&self, buffer: &mut [u8]) -> io::Result<usize> {\n    self.dir.read_link(\"exe\", buffer)\n}\n")
+
+
+class OpenatReadLinkTests(Tree):
+    """HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-6, D1-9, D2-2): the openat module declares exactly openat and readlinkat
+    (readlinkat refused in any other linked source), and the word read_link occurs exactly twice in the linked sources:
+    its definition in openat.rs and the one call read_link("exe", ..) in channel.rs."""
+
+    TREE = {**FOREIGN_TREE, gate.OPENAT: FOREIGN_TREE[gate.OPENAT] + READ_LINK_OPENAT.split("\n", 1)[1],
+            gate.CHANNEL: FOREIGN_TREE[gate.CHANNEL] + READ_LINK_CHANNEL.split("\n", 1)[1]}
+
+    def test_the_openat_module_declares_exactly_its_two_symbols(self):
+        self.assertEqual(gate.FOREIGN_ITEMS[gate.OPENAT], {"openat", "readlinkat"})
+        self.assertEqual(gate.check_foreign_items(self.base), 11)
+        message = "openat.rs declares the foreign items .* not exactly"
+        openat = self.TREE[gate.OPENAT]
+        readlinkat = "    fn readlinkat(dirfd: c_int, path: *const c_char, buffer: *mut c_char, size: usize) -> isize;\n"
+        self.assertIn(readlinkat, openat)
+        for text in (openat.replace(readlinkat, ""), openat.replace("fn readlinkat(", "fn readlink("),
+                     openat + "unsafe extern \"C\" { fn syscall(number: c_long, ...) -> c_long; }\n",
+                     openat + "unsafe extern \"C\" { fn realpath(p: *const c_char, r: *mut c_char) -> *mut c_char; }\n"):
+            self.refused(gate.check_foreign_items, gate.OPENAT, text, message)
+        # readlinkat anywhere else refuses: another gate-sys module, effect-gate, gate-tls, the binary.
+        for rel in ("crates/gate-sys/src/peer_wire.rs", "crates/gate-sys/src/seal.rs", "crates/effect-gate/src/linux_os.rs",
+                    "crates/gate-tls/src/credentials.rs", gate.GATE_MAIN):
+            self.refused(gate.check_foreign_items, rel, self.TREE.get(rel, "") + "unsafe extern \"C\" {\n" + readlinkat + "}\n",
+                         "declares the foreign items .*readlinkat.* not exactly")
+
+    def test_read_link_is_defined_once_and_called_once_with_exe(self):
+        self.assertEqual(gate.check_read_link(self.base), 2)
+        channel, openat = self.TREE[gate.CHANNEL], self.TREE[gate.OPENAT]
+        for rel, text, message in (
+                # A second call, in channel.rs or anywhere else.
+                (gate.CHANNEL, channel + "pub fn cwd(&self, b: &mut [u8]) -> io::Result<usize> { self.dir.read_link(\"exe\", b) }\n",
+                 "channel.rs does not name read_link exactly once"),
+                ("crates/effect-gate/src/linux_os.rs", "fn f(d: &Dir, b: &mut [u8]) { let _ = d.read_link(\"exe\", b); }\n",
+                 "linux_os.rs names read_link"),
+                ("crates/gate-sys/src/peer_wire.rs", "fn f(d: &Dir, b: &mut [u8]) { let _ = d.read_link(\"cwd\", b); }\n",
+                 "peer_wire.rs names read_link"),
+                ("crates/gate-tls/src/signed_config.rs", "fn f(d: &Dir, b: &mut [u8]) { let _ = Dir::read_link(d, \"exe\", b); }\n",
+                 "signed_config.rs names read_link"),
+                (gate.GATE_MAIN, "#![forbid(unsafe_code)]\nfn main() { let _ = gate_sys::Dir::read_link; }\n", "main.rs names read_link"),
+                # Another link name, a non-literal name, a reference without a call (a fn item), a call by path.
+                (gate.CHANNEL, channel.replace("read_link(\"exe\", buffer)", "read_link(\"cwd\", buffer)"),
+                 "as the call read_link"),
+                (gate.CHANNEL, channel.replace("read_link(\"exe\", buffer)", "read_link(NAME, buffer)"), "as the call read_link"),
+                (gate.CHANNEL, channel.replace("self.dir.read_link(\"exe\", buffer)", "{ let f = Dir::read_link; f(&self.dir, \"exe\", buffer) }"),
+                 "as the call read_link"),
+                (gate.CHANNEL, channel.replace("self.dir.read_link(\"exe\", buffer)", "x(\"exe\", buffer)"), "as the call read_link"),
+                # The definition missing, renamed through a use, or defined twice.
+                (gate.OPENAT, openat.replace("pub fn read_link(", "pub fn link_of("), "as its definition"),
+                (gate.OPENAT, openat + "pub fn other() { let _ = Dir::read_link; }\n", "as its definition"),
+                ("crates/effect-gate/src/substrate.rs", "use gate_sys::Dir;\nfn f() { let _ = <Dir>::read_link; }\n",
+                 "substrate.rs names read_link"),
+                ("crates/effect-gate/src/file_store.rs", "fn f() { let _ = std::fs::read_link(p); }\n", "file_store.rs names read_link")):
+            self.refused(gate.check_read_link, rel, text, message)
+        # Comments are not code, and the tests may call it.
+        self.write("crates/effect-gate/src/linux_os.rs", "// read_link(\"exe\", b) through ProcDir::exe\n/* Dir::read_link */\n")
+        self.write("crates/gate-sys/tests/read_link.rs", "fn f(d: &Dir, b: &mut [u8]) { let _ = d.read_link(\"cwd\", b); }\n")
+        self.write("crates/effect-gate/tests/writer_exe.rs", "fn f(d: &Dir, b: &mut [u8]) { let _ = d.read_link(\"x\", b); }\n")
+        self.assertEqual(gate.check_read_link(self.base), 2)
+        # A literal holding the word counts (literals are kept), so it refuses outside the two places.
+        self.refused(gate.check_read_link, "crates/i05-protocol/src/json.rs", "const S: &str = \"read_link\";\n",
+                     "json.rs names read_link")
+
+    def test_readlinkat_occurs_twice_in_openat_as_declaration_and_one_call(self):
+        # PR review round 1, R1-3: no second wrapper of readlinkat under another name.
+        openat = self.TREE[gate.OPENAT]
+        call = "    let count = unsafe { readlinkat(self.fd(), name.as_ptr(), buffer.as_mut_ptr().cast(), buffer.len()) };\n"
+        self.assertIn(call, openat)
+        message = "openat.rs does not name readlinkat exactly twice"
+        for text in (
+                openat + "pub fn link_text(&self, name: &str, b: &mut [u8]) -> isize {\n"
+                         "    unsafe { readlinkat(self.fd(), name.as_ptr(), b.as_mut_ptr().cast(), b.len()) }\n}\n",
+                openat.replace(call, "    let count = x(name, buffer);\n")
+                + "pub fn sub(&self) -> isize { unsafe { readlinkat(0, p(), q(), 1) } }\n",
+                openat.replace(call, "    let count = x(name, buffer);\n"),
+                openat.replace("    fn readlinkat(", "    fn readlinkat_(") + "fn f() { let _ = readlinkat; }\n",
+                openat + "const NAME: &str = \"readlinkat\";\n",
+                openat.replace(call, "    let f = readlinkat;\n    let count = unsafe { f(1, p(), q(), 1) };\n"),
+                openat.replace(call, call + call)):
+            self.refused(gate.check_read_link, gate.OPENAT, text, message)
+        for rel in ("crates/gate-sys/src/peer_wire.rs", "crates/effect-gate/src/linux_os.rs", gate.GATE_MAIN):
+            self.refused(gate.check_read_link, rel, self.TREE.get(rel, "") + "fn f() { let _ = readlinkat; }\n",
+                         "names readlinkat; only openat.rs")
+        # Comments are not code.
+        self.write("crates/effect-gate/src/linux_os.rs", "// gate-sys's readlinkat on the kept directory\n")
+        self.write(gate.OPENAT, openat + "// readlinkat(AT_FDCWD, ..) is never called\n")
+        self.assertEqual(gate.check_read_link(self.base), 2)
 
 
 def fake_sha(name):

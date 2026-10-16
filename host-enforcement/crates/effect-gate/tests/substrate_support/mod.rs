@@ -57,6 +57,7 @@ pub struct FakePeer {
     pub open_proc: bool,
     pub identity: Option<ProcIdentity>,
     pub exited: bool,
+    pub exe_ok: bool,
 }
 
 pub fn broker_peer() -> FakePeer {
@@ -65,6 +66,7 @@ pub fn broker_peer() -> FakePeer {
         open_proc: true,
         identity: Some(ProcIdentity { start_time: BROKER_START, cgroup: BROKER_LEAF.to_vec(), label: broker_label() }),
         exited: false,
+        exe_ok: true,
     }
 }
 
@@ -74,6 +76,7 @@ pub fn writer_peer() -> FakePeer {
         open_proc: true,
         identity: Some(ProcIdentity { start_time: WRITER_START, cgroup: ADMIN_SCOPE.to_vec(), label: writer_label() }),
         exited: false,
+        exe_ok: true,
     }
 }
 
@@ -288,6 +291,12 @@ impl Os for FakeOs {
         let mut lab = self.0.borrow_mut();
         lab.trace.push(format!("exited #{}", conn.0));
         lab.conns.get(&conn.0).is_none_or(|fake| fake.peer.exited)
+    }
+
+    fn writer_exe_ok(&mut self, conn: ConnId) -> bool {
+        let mut lab = self.0.borrow_mut();
+        lab.trace.push(format!("exe #{}", conn.0));
+        lab.conns.get(&conn.0).is_some_and(|fake| fake.peer.exe_ok)
     }
 
     fn recv(&mut self, conn: ConnId, control_capacity: usize) -> Received {
