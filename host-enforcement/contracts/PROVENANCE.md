@@ -66,6 +66,22 @@ paths exactly these). `crates/effect-gate/src/seal.rs` embeds both and installs 
 - `contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf` from `architecture/compiled-filter-programs-v2/programs/EFFECT_GATE.aarch64.bpf`, sha256 `8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044`, 1512 bytes (189 instructions)
 - `contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf` from `architecture/compiled-filter-programs-v2/programs/EFFECT_GATE.x86_64.bpf`, sha256 `4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3`, 1600 bytes (200 instructions)
 
+## Compiled OBSERVER programs (HE-004A)
+
+Copied byte for byte from the harness-onion repository's `architecture/compiled-filter-programs/programs/`, packet
+MET-ENFORCE-025 (merge commit `5da126570973293e1075459efe7cf99038f378c9`), the same 14-program publication as the
+HE-002S section above; seccomp allowlists v4 left the OBSERVER row as v3 had it, so these are the current OBSERVER
+programs. Read at harness-onion `d2ef7083d241a6bc1adb8ef923cc558d550fcd2b` with `git show d2ef7083:<path>` (the bytes
+are equal at `5da1265`), mode 100644. Both are registered before use in edge registry records v2 and v3
+(`architecture/artifact-edges/operator-harness-engineering-v3.json`: status REGISTERED_BEFORE_USE, relation
+BYTE_IDENTICAL, provider packet MET-ENFORCE-025, consumer packet "HE-004", consumer paths exactly these). HE-004A
+consumes them as HE-004's first part (owner decisions Q-HE4-2 (a), the A/B/C/D split, and Q-HE4A-4 (a): the edge rule
+binds bytes, modes and versions, not the packet label). `crates/observer/src/seal.rs` embeds both and installs the
+running architecture's.
+
+- `contracts/seccomp-v3/OBSERVER.aarch64.bpf` from `architecture/compiled-filter-programs/programs/OBSERVER.aarch64.bpf`, sha256 `d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707`, 1816 bytes (227 instructions)
+- `contracts/seccomp-v3/OBSERVER.x86_64.bpf` from `architecture/compiled-filter-programs/programs/OBSERVER.x86_64.bpf`, sha256 `e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a`, 1904 bytes (238 instructions)
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

@@ -44,6 +44,16 @@ two Linux modules; no linked source names threads, code before main or printing;
 any mention and refuse every UpstreamResponse mention outside exchange.rs; the signer key file is 0 or 32 bytes; and
 planeon-gate's symbol table has no membarrier and only reviewed wrappers of killed calls.
 
+HE-004A (the observer substrate; DESIGN-A rev 2.1 sections 2, 3 and 6) pins the two OBSERVER programs among the contract
+files; planeon-observer's crates (crates/observer and gate-sys) must be exactly its closure, and its library and main.rs
+roots forbid unsafe_code; every linked-crate scan (linked sources, foreign items, Debug, socket modules, read_link,
+macros, code before main, prints) reads crates/observer too, and main.rs has the binary's one exit import; the seal-order
+grammar is parameterised by file and allowed calls, and the observer's main.rs holds stage 1 first, nothing between, the
+exact stage-2 statement and the pinned tail `ExitCode::from(status::NOT_YET_SERVING)`; crates/observer's sources name
+none of the gate's post-seal APIs nor the method calls the OBSERVER filter kills that the gate's allows; and each built
+planeon-observer has no membarrier symbol and holds its architecture's OBSERVER program bytes exactly once. Its wrapper
+inventory is not in HE-004A (owner decision Q-HE4A-B2 (a), open item OBSERVER-WRAPPER-INVENTORY in MODEL_DEFINED).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -103,7 +113,9 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # buildArtifact edge record (owner decision Q-HE2-A; the two EFFECT_GATE programs in its record v2, MET-ENFORCE-025,
 # pinned at the published digests); provenance in contracts/PROVENANCE.md. HE-003A2 (DESIGN section 2, owner decision
 # Q-A2-1 (a)): the seccomp-v4 EFFECT_GATE programs of its record v3 (MET-ENFORCE-029) join them and are the ones the seal
-# embeds; the seccomp-v3 ones stay pinned, held but no longer embedded (17 files).
+# embeds; the seccomp-v3 ones stay pinned, held but no longer embedded (17 files). HE-004A (DESIGN section 2, owner
+# decision Q-HE4A-4 (a)): the two OBSERVER programs its record v2 and v3 register for HE-004 (MET-ENFORCE-025), which
+# the observer's seal embeds (19 files).
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -122,6 +134,8 @@ CONTRACTS = {
     "contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf": "ee85e9d225ad687aec82f83cb7d7c1be95f16df5f68eec5b56ee913d6cd86115",
     "contracts/seccomp-v4/EFFECT_GATE.aarch64.bpf": "8de80a2b597b84d9f5ace818e76ef15d4b15a5b02013bb479ca4fdf73df3d044",
     "contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf": "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3",
+    "contracts/seccomp-v3/OBSERVER.aarch64.bpf": "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707",
+    "contracts/seccomp-v3/OBSERVER.x86_64.bpf": "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a",
 }
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
@@ -131,6 +145,13 @@ HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 # HE-002C DESIGN section 9: the crates EFFECT_GATE will link, checked over their non-test sources (src/). HE-003D
 # DESIGN section 5 (O4): the gate binary's own crate joins them.
 LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate")
+# HE-004A DESIGN-A section 6 (D2-4): planeon-observer links exactly its own crate and gate-sys (a closure check), and the
+# observer's crate joins every scan of the linked crates' sources (gate-sys is already among them).
+OBSERVER_CRATE = "crates/observer"
+OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys")
+SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE,)
+OBSERVER_MAIN = "crates/observer/src/main.rs"
+OBSERVER_LIB = "crates/observer/src/lib.rs"
 GATE_MAIN = "crates/gate/src/main.rs"
 GATE_CONFIG = "crates/effect-gate/src/gate_config.rs"
 SIGNED_CONFIG = "crates/gate-tls/src/signed_config.rs"
@@ -138,7 +159,9 @@ SIGNED_CONFIG = "crates/gate-tls/src/signed_config.rs"
 # only as this one use declaration of main.rs (whitespace around its tokens ignored), removed once before the
 # LINKED_FORBIDDEN scan; a second one, another std::process item or another file still refuses. No std::env (no argv).
 EXIT_USE = "use std::process::ExitCode;"
-LINKED_EXCEPTIONS = {GATE_MAIN: ((EXIT_USE, re.compile(r"\buse\s+std::process::ExitCode\s*;")),)}
+LINKED_EXCEPTIONS = {GATE_MAIN: ((EXIT_USE, re.compile(r"\buse\s+std::process::ExitCode\s*;")),),
+                     # HE-004A DESIGN-A section 6: the observer binary's exit, the same single allowance.
+                     OBSERVER_MAIN: ((EXIT_USE, re.compile(r"\buse\s+std::process::ExitCode\s*;")),)}
 # HE-003D DESIGN section 5 (O2; D1-3, D2-2): the seal-order grammar over main.rs read without comments. Exactly one
 # `#[cfg(target_os = "linux")] fn main() -> ExitCode` (and at most one non-Linux stub that only returns status::NOT_LINUX);
 # its body starts with `let <name> = match seal_stage1() {`; between that `seal_stage1(` and the single `seal_stage2(`
@@ -175,6 +198,24 @@ MAIN_USES = tuple(sorted(
 MAIN_FUNCTIONS = ["main", "main", "serve"]
 MAIN_ATTRIBUTES = ("#![forbid(unsafe_code)]", '#[cfg(target_os="linux")]', '#[cfg(not(target_os="linux"))]')
 MAIN_ITEMS = re.compile(r"(?<!')\b(mod|struct|enum|union|trait|type|impl|const|static|macro_rules|macro|extern)\b")
+# HE-004A DESIGN-A sections 5 and 6 (D2-3): the observer's main.rs is held to the same grammar with its own parameters
+# (check_seal_order's `site`): no configuration file, between the stages only the stage-1 statement's own arms
+# (SEAL_CALLS without the configuration's two calls), its own pinned imports, two `fn main` and no other function. Beyond
+# the gate's rules (`adjacent`): the stage-1 statement is exact, `let <n> = match seal_stage1() { Ok(<x>) => <x>, Err(<e>)
+# => return ExitCode::from(status::seal(&<e>)), };`, the stage-2 statement follows it with nothing between, and after it
+# comes exactly the tail OBSERVER_TAIL, which closes main: nothing but the not-yet-serving exit runs under the filter.
+STAGE1_STATEMENT = re.compile(
+    r"\s*let\s+([A-Za-z_]\w*)\s*=\s*match\s+seal_stage1\s*\(\s*\)\s*\{\s*Ok\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*"
+    r"([A-Za-z_]\w*)\s*,\s*Err\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*return\s+ExitCode\s*::\s*from\s*\(\s*status\s*::\s*seal\s*"
+    r"\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*\)\s*,?\s*\}\s*;")
+OBSERVER_TAIL = re.compile(r"\s*ExitCode\s*::\s*from\s*\(\s*status\s*::\s*NOT_YET_SERVING\s*\)\s*\}")
+OBSERVER_SEAL_CALLS = ("ExitCode::from", "status::seal", "Ok", "Err")
+OBSERVER_MAIN_USES = tuple(sorted([(("std", "process", "ExitCode"), None), (("planeon_observer", "status"), None)]
+                                  + [(("planeon_observer", name), None) for name in ("seal_stage1", "seal_stage2")]))
+GATE_SEAL_SITE = {"main": GATE_MAIN, "before": (GATE_CONFIG, SIGNED_CONFIG), "calls": SEAL_CALLS, "uses": MAIN_USES,
+                  "functions": MAIN_FUNCTIONS, "adjacent": False}
+OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": OBSERVER_MAIN_USES,
+                      "functions": ["main", "main"], "adjacent": True}
 SEAL_TOKEN = re.compile(r"\s*(::|=>|b\"\"|\"\"|''|[A-Za-z_]\w*|[0-9]\w*|[(){},;=&])")
 SEAL_KEYWORDS = {"let", "match", "return"}
 RUST_KEYWORDS = {"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "fn",
@@ -307,6 +348,10 @@ WRAPPER_JUSTIFICATIONS = {
     "sysinfo": "called only by musl's sysconf for _SC_PHYS_PAGES and _SC_AVPHYS_PAGES; std asks sysconf only for the page "
                "size (from the auxiliary vector, no system call)",
 }
+# HE-004A DESIGN-A section 6 (D1-10, D2-5): each target's planeon-observer must hold this contract file's bytes exactly
+# once.
+OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.x86_64.bpf",
+                     "aarch64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.aarch64.bpf"}
 OPENAT = "crates/gate-sys/src/openat.rs"
 SEAL = "crates/gate-sys/src/seal.rs"
 CHANNEL = "crates/gate-sys/src/channel.rs"
@@ -409,11 +454,32 @@ POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)
                        (r"\bio::\{[^}]*\bcopy\b", "io::copy in a grouped import"),
                        (r"\bis_terminal\b", "is_terminal (isatty: ioctl TIOCGWINSZ)"),
                        (r"\bIsTerminal\b", "IsTerminal (isatty: ioctl TIOCGWINSZ)"))
+# HE-004A DESIGN-A section 6 (D1-3, D2-2): crates/observer's sources (only them: gate-sys's own Dir::file and Dir::sync
+# definitions stay, and the observer reaches gate-sys only through this rule and the socket-module rule) name none of
+# POST_SEAL_FORBIDDEN and none of these names, which reach a system call the OBSERVER filter kills and the EFFECT_GATE
+# filter allows: gate-sys's O_RDWR opener (file, FileMode) and Dir::sync (fsync), std's sync_all and sync_data (fsync,
+# fdatasync), the lock family (flock; lock also refuses Mutex::lock in the single-threaded observer), and positioned
+# writes (pwrite64). PR review round 1, R1-1: they are matched as words in the code with comments and literal contents
+# removed and the whitespace around `::` removed, so a method call, a path call (`Dir::sync(d)`, `File::lock(f)`), a
+# function item (`let s = Dir::sync;`), a turbofish, a type path (`FileMode::Existing`) and an import are each refused;
+# only sync followed by `::` (other than a turbofish) is a module path segment and passes (`std::sync::atomic`). R1-4:
+# Drop joins them, so no destructor defined in crates/observer runs under the filter (gate-sys's own Drop impls are
+# role-neutral: SockCreate's, in the channel module, which the socket-module rule keeps from the observer).
+OBSERVER_POST_SEAL_FORBIDDEN = tuple(
+    (r"\b%s\b%s" % (word, r"(?!::(?!<))" if word == "sync" else ""), "%s (%s)" % (word, calls)) for word, calls in (
+    ("file", "gate-sys's O_RDWR opener"), ("FileMode", "gate-sys's O_RDWR or O_CREAT opener"),
+    ("sync", "gate-sys's Dir::sync: fsync"), ("sync_all", "fsync"), ("sync_data", "fdatasync"),
+    ("lock_shared", "flock"), ("try_lock", "flock"), ("try_lock_shared", "flock"), ("unlock", "flock"),
+    ("lock", "flock; also Mutex::lock"), ("write_at", "pwrite64"), ("write_all_at", "pwrite64"),
+    ("Drop", "a destructor run under the filter, R1-4")))
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]",
                "crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]",
-               GATE_MAIN: "#![forbid(unsafe_code)]"}
+               GATE_MAIN: "#![forbid(unsafe_code)]",
+               # HE-004A DESIGN-A section 3 (D2-4): the observer's library and binary roots.
+               OBSERVER_LIB: "#![forbid(unsafe_code)]",
+               OBSERVER_MAIN: "#![forbid(unsafe_code)]"}
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -1042,8 +1108,8 @@ def std_names(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
 
 
 def check_linked_sources(base: Path) -> int:
-    """A lexical tripwire over the non-test sources of the crates EFFECT_GATE will link, with the whitespace around `::`
-    removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside FD_FILES; std fs items
+    """A lexical tripwire over the non-test sources of the crates EFFECT_GATE will link and of planeon-observer's crate
+    (SCANNED_CRATES, HE-004A), with the whitespace around `::` removed first: none names a refused std path (LINKED_FORBIDDEN; the fd items outside FD_FILES; std fs items
     other than the allowed ones; std::os paths other than those), renames a std module or item, or uses a form that
     names std's modules without spelling their paths or the word asm (LINKED_FORMS); and their crate-root attributes.
     A rename is refused in a use of std and, read from the source with comments and literal contents removed, in any
@@ -1055,7 +1121,7 @@ def check_linked_sources(base: Path) -> int:
     for root, attribute in CRATE_ROOTS.items():
         require(attribute in (base / root).read_text(encoding="utf-8").splitlines(), "%s lacks %s" % (root, attribute))
     sources = [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
-               for crate in LINKED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
+               for crate in SCANNED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
     uses = {rel: source_uses(rel, raw) for rel, raw in sources}
     from_std = std_names([path for paths in uses.values() for path in paths])
     count = 0
@@ -1138,7 +1204,8 @@ def foreign_items(body: str) -> set[str]:
 
 
 def check_foreign_items(base: Path) -> int:
-    """A lexical tripwire over the non-test sources of the linked crates (HE-002S DESIGN section 6, D8): each file of
+    """A lexical tripwire over the non-test sources of the linked crates and the observer's (SCANNED_CRATES, HE-004A;
+    HE-002S DESIGN section 6, D8): each file of
     FOREIGN_ITEMS declares exactly its foreign symbols, no other linked source declares one, no extern item is public or
     declared `safe`, and no linked source names link_name. The sources are read with comments removed and literal
     contents emptied; every `extern` is an extern block, read strictly (foreign_items), `extern crate` or a function's
@@ -1146,7 +1213,7 @@ def check_foreign_items(base: Path) -> int:
     literals). Anything the check cannot read refuses, so it reads every extern block of these sources (HE-002S PR
     review round 1, R1-1)."""
     count = 0
-    for crate in LINKED_CRATES:
+    for crate in SCANNED_CRATES:
         for path in sorted((base / crate / "src").rglob("*.rs")):
             rel = path.relative_to(base).as_posix()
             text = path.read_text(encoding="utf-8")
@@ -1189,6 +1256,28 @@ def check_post_seal_sources(base: Path) -> int:
             for pattern, name in POST_SEAL_FORBIDDEN:
                 require(not re.search(pattern, text), "%s names %s (post-seal check)" % (rel, name))
             count += 1
+    return count
+
+
+def check_observer_post_seal(base: Path) -> int:
+    """HE-004A DESIGN-A section 6 (D1-3, D2-2): crates/observer's non-test sources (and only theirs), with the whitespace
+    around `::` removed, name none of POST_SEAL_FORBIDDEN (in the raw text, as for the gate's crates) and, in the code
+    with comments and literal contents removed, none of OBSERVER_POST_SEAL_FORBIDDEN's words in any form (method call,
+    path call, function item, turbofish, import; PR review round 1, R1-1) nor Drop (R1-4), each of which reaches a system
+    call the OBSERVER filter kills or would run code under it. In HE-004A only the not-yet-serving exit runs after the
+    seal; the rule settles the list before HE-004B..D add code. A list, not a proof: T04's steady-state trace stays the
+    proof. The number of sources."""
+    count = 0
+    for path in sorted((base / OBSERVER_CRATE / "src").rglob("*.rs")):
+        rel = path.relative_to(base).as_posix()
+        raw = path.read_text(encoding="utf-8")
+        text, code = PATH_SPACE.sub("::", raw), PATH_SPACE.sub("::", rust_code(raw))
+        for pattern, name in POST_SEAL_FORBIDDEN:
+            require(not re.search(pattern, text), "%s names %s (observer post-seal check)" % (rel, name))
+        for pattern, name in OBSERVER_POST_SEAL_FORBIDDEN:
+            require(not re.search(pattern, code), "%s names %s (observer post-seal check)" % (rel, name))
+        count += 1
+    require(count, "%s has no sources (observer post-seal check)" % OBSERVER_CRATE)
     return count
 
 
@@ -1263,13 +1352,14 @@ def field_types(kind: str, rest: str) -> str:
 
 
 def check_debug_derives(base: Path) -> int:
-    """A lexical tripwire over the sources of the crates EFFECT_GATE will link (HE-003A DESIGN section 8), read with
+    """A lexical tripwire over the sources of the crates EFFECT_GATE will link and the observer's (SCANNED_CRATES,
+    HE-004A; HE-003A DESIGN section 8), read with
     comments removed and literal contents emptied: an outer attribute that derives Debug (`derive(.. Debug ..)`, also
     inside `cfg_attr`) must be followed, after other attributes and a visibility, by a struct, enum or union whose field
     types mention none of DEBUG_HAZARDS (field and variant names are not types). An attribute or item the check cannot
     read refuses. Manual impls and direct formatting are code review's."""
     count = 0
-    for crate in LINKED_CRATES:
+    for crate in SCANNED_CRATES:
         for path in sorted((base / crate / "src").rglob("*.rs")):
             rel = path.relative_to(base).as_posix()
             try:
@@ -1307,7 +1397,8 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
     themselves) are exactly LINKED_CRATES;
     the workspace edition is 2024 and every member inherits it (the unsafe tripwire relies on edition 2024's `unsafe
     extern` and `#[unsafe(no_mangle)]`), and no target table of a member manifest ([lib], [[bin]], [[test]], [[bench]],
-    [[example]]) overrides the edition (HE-003A PR review round 1, R1-1). `workspace` is check_workspace's result."""
+    [[example]]) overrides the edition (HE-003A PR review round 1, R1-1); and, when planeon-observer is a member, it links
+    exactly OBSERVER_LINKED_CRATES (HE-004A). `workspace` is check_workspace's result."""
     require(not (base / "crates").is_symlink(), "crates is a symlink (workspace shape)")
     manifest = tomllib.loads((base / "Cargo.toml").read_text(encoding="utf-8"))
     members = manifest.get("workspace", {}).get("members", [])
@@ -1335,6 +1426,13 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
     closure = {names.get(name) for root in roots for name in linked(workspace, root)}
     require(closure == set(LINKED_CRATES), "the crates effect-gate, gate-tls and planeon-gate link are %s, not %s "
             "(workspace shape)" % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
+    # HE-004A DESIGN-A section 6 (D2-4): planeon-observer, a member, links exactly its own crate and gate-sys (its
+    # path dependencies, transitively; a dev-dependency is not linked and not in `workspace`).
+    if "planeon-observer" in names:
+        require("planeon-observer" in workspace, "no planeon-observer crate in the workspace (workspace shape)")
+        observer = {names.get(name) for name in linked(workspace, "planeon-observer")}
+        require(observer == set(OBSERVER_LINKED_CRATES), "planeon-observer links %s, not %s (workspace shape)"
+                % (sorted(str(path) for path in observer), sorted(OBSERVER_LINKED_CRATES)))
     return len(members)
 
 
@@ -1493,30 +1591,35 @@ def call_end(tokens: list[str], start: int) -> int:
     raise GateError("a call without its closing parenthesis (seal-order grammar)")
 
 
-def check_seal_order(base: Path) -> str:
+def check_seal_order(base: Path, site: dict = GATE_SEAL_SITE) -> str:
     """HE-003D DESIGN section 5 (O2; D1-3, D2-2): the seal-order grammar over the binary's main.rs read without
     comments (SEAL_CALLS and the patterns above), then the socket and thread names of BEFORE_SEAL_REFUSED in main.rs
     up to `seal_stage2(` and in all of gate_config.rs and signed_config.rs (one `use gate_sys::Dir;` excepted in the
     latter). What the functions called between the stages call in turn, and new public functions in linux_os.rs and
-    linux_net.rs, stay code review's (MODEL_DEFINED R72). Returns the calls found between the stages."""
-    for rel in (GATE_MAIN, GATE_CONFIG, SIGNED_CONFIG):
+    linux_net.rs, stay code review's (MODEL_DEFINED R72). HE-004A DESIGN-A section 6 (D2-3): parameterised by `site`,
+    the main.rs, the files read before the seal, the calls allowed between the stages, the pinned imports and functions
+    (GATE_SEAL_SITE by default, OBSERVER_SEAL_SITE for the observer); with `adjacent`, the stage-1 statement is exact,
+    the stage-2 statement follows it with nothing between, and OBSERVER_TAIL follows that and closes main. Returns the
+    calls found between the stages."""
+    main_rel = site["main"]
+    for rel in (main_rel,) + tuple(site["before"]):
         require((base / rel).is_file(), "%s is missing (seal-order grammar)" % rel)
-    raw = (base / GATE_MAIN).read_text(encoding="utf-8")
+    raw = (base / main_rel).read_text(encoding="utf-8")
     try:
         written, code = rust_code(raw, literals=True), rust_code(raw)
     except GateError as error:
-        raise GateError("%s: %s (seal-order grammar)" % (GATE_MAIN, error)) from None
+        raise GateError("%s: %s (seal-order grammar)" % (main_rel, error)) from None
     linux = list(LINUX_MAIN.finditer(written))
     others = list(OTHER_MAIN.finditer(written))
     require(len(linux) == 1 and len(LINUX_MAIN_CODE.findall(code)) == 1 and len(others) <= 1
             and len(FN_MAIN.findall(code)) == 1 + len(others),
             "%s must hold exactly one #[cfg(target_os = \"linux\")] fn main() -> ExitCode and at most a non-Linux stub "
-            "returning status::NOT_LINUX (seal-order grammar)" % GATE_MAIN)
+            "returning status::NOT_LINUX (seal-order grammar)" % main_rel)
     body = LINUX_MAIN_CODE.search(code).end()
     binding = STAGE1_BINDING.match(code, body)
     require(binding, "main does not start with `let <name> = match seal_stage1() {` (seal-order grammar)")
     require(len(re.findall(r"\bseal_stage1\s*\(", code)) == 1 and len(re.findall(r"\bseal_stage2\s*\(", code)) == 1,
-            "%s does not call seal_stage1 and seal_stage2 exactly once each (seal-order grammar)" % GATE_MAIN)
+            "%s does not call seal_stage1 and seal_stage2 exactly once each (seal-order grammar)" % main_rel)
     stage2 = re.search(r"\bseal_stage2\s*\(", code).start()
     require(stage2 > binding.end(), "seal_stage2 comes before seal_stage1 (seal-order grammar)")
     statements = [match for match in STAGE2_STATEMENT.finditer(code)]
@@ -1527,11 +1630,25 @@ def check_seal_order(base: Path) -> str:
     require(statement.group(2) == binding.group(1) and statement.group(3) == statement.group(4)
             and statement.group(5) == statement.group(6),
             "the second stage's argument or arms are not the stage-1 binding and the bound names (seal-order grammar)")
-    check_main_shape(raw, written, code, linux[0])
+    check_main_shape(raw, written, code, linux[0], site)
+    end = statement.end()
+    if site["adjacent"]:
+        first = STAGE1_STATEMENT.match(code, body)
+        require(first and first.group(2) == first.group(3) and first.group(4) == first.group(5),
+                "the first stage is not exactly `let <name> = match seal_stage1() { Ok(<x>) => <x>, Err(<e>) => return "
+                "ExitCode::from(status::seal(&<e>)), };` (seal-order grammar)")
+        require(not code[first.end():statement.start()].strip(),
+                "%s runs something between the seal's stages (seal-order grammar)" % main_rel)
+        tail = OBSERVER_TAIL.match(code, end)
+        require(tail, "after the second stage %s does not end main with exactly `ExitCode::from(status::NOT_YET_SERVING)` "
+                "(seal-order grammar)" % main_rel)
+        end = tail.end()
     depth = 1
-    for index in range(body, statement.end()):
+    for index in range(body, end):
         depth += {"{": 1, "}": -1}.get(code[index], 0)
-        require(depth > 0, "seal_stage2 is not called inside main (seal-order grammar)")
+        require(depth > 0 or index == end - 1 and site["adjacent"], "seal_stage2 is not called inside main (seal-order "
+                "grammar)")
+    require(not site["adjacent"] or depth == 0, "the pinned tail does not close main (seal-order grammar)")
     segment = code[re.search(r"\bseal_stage1\s*\(", code).end():statement.start()]
     tokens, index = [], 0
     while segment[index:].strip():
@@ -1555,19 +1672,19 @@ def check_seal_order(base: Path) -> str:
             cursor += 2
         name = "::".join(path)
         if cursor < len(tokens) and tokens[cursor] == "(":
-            end = call_end(tokens, cursor)
-            rest = end
+            end_call = call_end(tokens, cursor)
+            rest = end_call
             while rest < len(tokens) and tokens[rest] == ")":
                 rest += 1
             pattern = path[-1][:1].isupper() and rest < len(tokens) and tokens[rest] == "=>"
-            require(name in SEAL_CALLS or pattern,
+            require(name in site["calls"] or pattern,
                     "main calls %s( between the seal's stages (seal-order grammar)" % name)
             if name == "status::seal":
                 require(tokens[max(0, position - 4):position] == ["ExitCode", "::", "from", "("],
                         "status::seal( is not the argument of ExitCode::from( (seal-order grammar)")
-            (calls if name in SEAL_CALLS else patterns).add(name)
+            (calls if name in site["calls"] else patterns).add(name)
         position = cursor
-    for rel, text in ((GATE_MAIN, code[:statement.end()]), (GATE_CONFIG, None), (SIGNED_CONFIG, None)):
+    for rel, text in ((main_rel, code[:statement.end()]),) + tuple((rel, None) for rel in site["before"]):
         if text is None:
             try:
                 text = rust_code((base / rel).read_text(encoding="utf-8"))
@@ -1582,21 +1699,23 @@ def check_seal_order(base: Path) -> str:
     return "%s (and the tuple-variant patterns %s)" % (", ".join(sorted(calls)), ", ".join(sorted(patterns)) or "none")
 
 
-def check_main_shape(raw: str, written: str, code: str, linux: re.Match) -> None:
+def check_main_shape(raw: str, written: str, code: str, linux: re.Match, site: dict = GATE_SEAL_SITE) -> None:
     """PR review round 1, R1-2 (Q-HE3D-R1 (a)): main.rs (read without comments) imports exactly MAIN_USES (no rename,
     no glob, nothing else), defines no item but the two `fn main` and `fn serve` (no mod, struct, enum, union, trait,
     type, impl, const, static, macro or extern), carries only MAIN_ATTRIBUTES, and nothing but its cfg precedes the
-    Linux main. So no code defined in main.rs runs between the stages under an allowed name."""
-    uses = source_uses(GATE_MAIN, raw)
+    Linux main. So no code defined in main.rs runs between the stages under an allowed name. HE-004A (D2-3): the imports
+    and functions are the site's (the observer's: OBSERVER_MAIN_USES, two `fn main` and nothing else)."""
+    uses = source_uses(site["main"], raw)
     for path, rename in uses:
         require(rename is None, "main.rs renames an import (seal-order grammar)")
         require(path[-1] != "*", "main.rs imports a glob (seal-order grammar)")
-    require(tuple(sorted(uses)) == MAIN_USES, "main.rs's imports are not exactly the pinned set (seal-order grammar)")
+    require(tuple(sorted(uses)) == site["uses"], "main.rs's imports are not exactly the pinned set (seal-order grammar)")
     item = MAIN_ITEMS.search(code)
-    require(not item, "main.rs defines a %s item (the keyword); only fn main and fn serve are allowed (seal-order "
-            "grammar)" % (item.group(1) if item else ""))
-    require(sorted(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code)) == MAIN_FUNCTIONS,
-            "main.rs defines functions other than the two fn main and fn serve (seal-order grammar)")
+    require(not item, "main.rs defines a %s item (the keyword); only %s are allowed (seal-order grammar)"
+            % (item.group(1) if item else "", " and ".join("fn " + name for name in sorted(set(site["functions"])))))
+    require(sorted(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code)) == site["functions"],
+            "main.rs defines functions other than %s (seal-order grammar)"
+            % " and ".join("fn " + name for name in sorted(set(site["functions"]))))
     for attribute in OUTER_ATTRIBUTE.finditer(written):
         text = re.sub(r"\s+", "", written[attribute.start():bracket_end(written, attribute.start())])
         require(text in MAIN_ATTRIBUTES, "main.rs carries the attribute %s (seal-order grammar)" % text)
@@ -1608,9 +1727,11 @@ def check_main_shape(raw: str, written: str, code: str, linux: re.Match) -> None
 
 
 def linked_sources(base: Path) -> list[tuple[str, str]]:
-    """(relative path, text) of every non-test source of the linked crates (the binary included)."""
+    """(relative path, text) of every non-test source of the linked crates (the binary included) and, since HE-004A,
+    of planeon-observer's crate (SCANNED_CRATES), for the socket-module, store-opening, read_link, macro, code-before-main
+    and print rules."""
     return [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
-            for crate in LINKED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
+            for crate in SCANNED_CRATES for path in sorted((base / crate / "src").rglob("*.rs"))]
 
 
 def check_socket_modules(base: Path) -> int:
@@ -1958,6 +2079,21 @@ def check_gate_symbols(names: set[str]) -> list[str]:
     return present
 
 
+def check_observer_binary(names: set[str], raw: bytes, program: bytes) -> int:
+    """HE-004A DESIGN-A section 6 (D1-1; D1-10, D2-5): planeon-observer's .symtab (`names`) has no membarrier or
+    __membarrier (musl's membarrier.lo passes no zero third argument, which the OBSERVER row's exact-argument rule kills),
+    and the binary (`raw`) holds its architecture's OBSERVER program bytes exactly once (SEC-4 evidence beyond the source
+    pin; PR review round 1, R1-3: stage 1 also names the program, so a dropped stage 2 is the seal-order grammar's to
+    catch, not this check's). Its wrapper inventory is not checked here: owner decision Q-HE4A-B2 (a)
+    dropped it from HE-004A (MODEL_DEFINED, OBSERVER-WRAPPER-INVENTORY). The program's size."""
+    require(not names & set(MEMBARRIER), "planeon-observer links %s (membarrier check)" % sorted(names & set(MEMBARRIER)))
+    require(program, "an empty OBSERVER program (program-bytes check)")
+    count = raw.count(program)
+    require(count == 1, "planeon-observer holds its OBSERVER program %d times, not exactly once (program-bytes check)"
+            % count)
+    return len(program)
+
+
 def lock_closure(packages: list[dict], name: str) -> set:
     """The package names a lock package reaches through its `dependencies`, itself included."""
     by_name = {package["name"]: package for package in packages}
@@ -2043,8 +2179,9 @@ def main() -> int:
             % (len(workspace), ", ".join(sorted(REGISTRY_LINES["crates/gate-tls"])), len(PATCH_CRATES),
                len(vendor_rows) - len(PATCH_CRATES)))
         say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
-            "effect-gate, gate-tls and planeon-gate link exactly %s"
-            % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION, ", ".join(LINKED_CRATES)))
+            "effect-gate, gate-tls and planeon-gate link exactly %s; planeon-observer links exactly %s"
+            % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION, ", ".join(LINKED_CRATES),
+               ", ".join(OBSERVER_LINKED_CRATES)))
         say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
         rows = load_table(TABLE.read_bytes(), TABLE_SHA256)
         check_tree(rows, sysroot, targets)
@@ -2060,7 +2197,7 @@ def main() -> int:
         say("included code: %d workspace sources pass the lexical tripwire (no path attribute, include!, raw "
             "identifier or inline assembly; no manifest target path, build key or symlink), crates' src/ hold only .rs "
             "files" % check_included_code(HE))
-        linked_names = ", ".join(crate.split("/")[1] for crate in LINKED_CRATES)
+        linked_names = ", ".join(crate.split("/")[1] for crate in SCANNED_CRATES)
         say("linked sources: %d sources of %s name no refused std path, rename or glob no std module or item and do not "
             "name asm (lexical tripwire), crate roots forbid or deny unsafe_code" % (check_linked_sources(HE), linked_names))
         say("foreign items: %d sources of the linked crates, every extern read with comments and "
@@ -2082,6 +2219,12 @@ def main() -> int:
             "imports are the pinned set, its only items fn main (two) and fn serve, its only attributes the crate's "
             "forbid and the two cfgs; no socket or thread name through that statement, nor in %s and %s (one use "
             "gate_sys::Dir; excepted in the latter)" % (GATE_MAIN, check_seal_order(HE), GATE_CONFIG, SIGNED_CONFIG))
+        say("seal order (observer): %s holds one Linux main whose first statement is exactly `let <n> = match seal_stage1() "
+            "{ Ok(<x>) => <x>, Err(<e>) => return ExitCode::from(status::seal(&<e>)), };`, followed with nothing between by "
+            "the exact stage-2 statement and then exactly `ExitCode::from(status::NOT_YET_SERVING)`, which closes main; "
+            "calls between the stages only %s; its imports are the pinned set, its only items two fn main, its only "
+            "attributes the crate's forbid and the two cfgs; no socket or thread name through the stage-2 statement"
+            % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
             "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
             "variant except the data types %s, and hold no fn-pointer or Fn-trait type in a pub alias, const, static, "
@@ -2103,6 +2246,10 @@ def main() -> int:
         say("post-seal: %d sources of the linked crates name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
+        say("observer post-seal: %d sources of %s name none of those std APIs nor, in any form, %s, each of which reaches "
+            "a system call the OBSERVER filter kills or runs code under it (lexical tripwire, %s only)"
+            % (check_observer_post_seal(HE), OBSERVER_CRATE, ", ".join(name.split(" ")[0] for _, name
+                                                                       in OBSERVER_POST_SEAL_FORBIDDEN), OBSERVER_CRATE))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
@@ -2113,6 +2260,11 @@ def main() -> int:
             for binary in BINARIES:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
                 check_binary(raw, target, shape, markers, host_paths)
+                if binary == "planeon-observer":
+                    size = check_observer_binary(symbol_names(raw), raw, (HE / OBSERVER_PROGRAMS[target]).read_bytes())
+                    say("%s planeon-observer program and symbols: the %d bytes of %s occur exactly once; no membarrier "
+                        "or __membarrier (no wrapper inventory: owner decision Q-HE4A-B2 (a))"
+                        % (target, size, OBSERVER_PROGRAMS[target]))
                 if binary == "planeon-gate":
                     present = check_gate_symbols(symbol_names(raw))
                     say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "
