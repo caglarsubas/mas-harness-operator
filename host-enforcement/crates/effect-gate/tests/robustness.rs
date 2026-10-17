@@ -48,7 +48,9 @@ fn random_event_sequences_never_panic() {
     for round in 0..400 {
         let name = ["ACTIVE", "INSPECTING", "LATER"][round % 3];
         let config_value = field(configs, name);
-        let mut gate = Gate::new(Config::from_value(config_value).expect("config")).expect("gate");
+        let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(config_value).expect("v4's conversion");
+        let observer = Box::new(effect_gate::KernelObserver::new(kernel));
+        let mut gate = Gate::new(Config::from_value(&converted).expect("config")).expect("gate").with_observer(observer);
         for _ in 0..rng.below(80) {
             let conn = conns[rng.below(conns.len())].to_string();
             let event = match rng.below(16) {

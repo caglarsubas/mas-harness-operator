@@ -1,6 +1,11 @@
 //! The gate's resolved inputs for one generation (the vectors' `configs`): its generation and initial state, the
-//! peer-qualification digest, the signed endpoint, the signed profile's manifests, the runs, the observed probe
-//! workers and the bindings of earlier generations.
+//! peer-qualification digest, the signed endpoint, the signed profile's manifests, the runs and the bindings of
+//! earlier generations.
+//!
+//! HE-003A3 (I05 v4, DESIGN section 3, owner decision Q-A3-1 (a)): the configuration lists no worker; the gate
+//! observes the kernel at every BIND (`observation`). A configuration carrying v3's static `observedWorkers` list is
+//! refused with v4's text (vector C01), and that check runs first, before the unknown-field check, so C01 answers C01.
+//! v4's conversion of a v3 configuration is the test-only fake kernel's.
 //!
 //! The model's three input refusals come first, in its order and wording (a run manifest outside the signed profile; a
 //! manifest digest in two runs; a manifest identity resolving to more than one manifest), then the priorBindings shape
@@ -44,7 +49,6 @@ pub struct Config {
     pub manifests: BTreeMap<String, Manifest>,
     /// The runs, keyed by run nonce.
     pub runs: BTreeMap<String, Run>,
-    pub observed_workers: BTreeSet<(i64, i64)>,
     pub prior: PriorBindings,
 }
 
@@ -62,8 +66,12 @@ fn refuse<T>(message: &str) -> Result<T, ConfigError> {
     Err(ConfigError(message.to_string()))
 }
 
-const FIELDS: [&str; 9] = ["generation", "brokerChallenge", "state", "peerQualificationDigest", "endpoint", "manifests",
-                           "runs", "observedWorkers", "priorBindings"];
+const FIELDS: [&str; 8] = ["generation", "brokerChallenge", "state", "peerQualificationDigest", "endpoint", "manifests",
+                           "runs", "priorBindings"];
+
+/// I05 v4's refusal of a static worker list (vector C01, contract text).
+pub const STATIC_WORKERS_REFUSED: &str =
+    "v4 observes the kernel; a static observedWorkers list is refused (convert_v3_config)";
 
 fn text(object: &Object, key: &str) -> Result<String, ConfigError> {
     match object.get(key).and_then(Value::as_str) {
@@ -91,6 +99,9 @@ impl Config {
     /// Parses and validates a configuration document.
     pub fn from_value(document: &Value) -> Result<Config, ConfigError> {
         let root = object(Some(document), "configuration")?;
+        if root.get("observedWorkers").is_some() {
+            return refuse(STATIC_WORKERS_REFUSED);
+        }
         for (key, _) in root.iter() {
             if !key.as_str().is_some_and(|name| FIELDS.contains(&name)) {
                 return refuse("unknown configuration field");
@@ -128,22 +139,6 @@ impl Config {
                 manifests: text_list(entry.get("manifests"), "runs manifests")?,
             });
         }
-        let Some(workers) = root.get("observedWorkers").and_then(Value::as_array) else {
-            return refuse("configuration field observedWorkers is not a list");
-        };
-        let mut observed_workers = BTreeSet::new();
-        for worker in workers {
-            let pair = worker.as_array().unwrap_or_default();
-            match pair {
-                [pid, ticks] => match (pid.as_int().and_then(|v| v.to_i64()), ticks.as_int().and_then(|v| v.to_i64())) {
-                    (Some(pid), Some(ticks)) => {
-                        observed_workers.insert((pid, ticks));
-                    }
-                    _ => return refuse("an observed worker is not a [pid, startTicks] pair of integers"),
-                },
-                _ => return refuse("an observed worker is not a [pid, startTicks] pair of integers"),
-            }
-        }
         // The model's input refusals, in its order.
         let listed: Vec<&String> = runs.values().flat_map(|run| run.manifests.iter()).collect();
         if !listed.iter().all(|digest| manifests.contains_key(*digest)) {
@@ -176,6 +171,6 @@ impl Config {
             manifest_digests: set("manifestDigests")?,
             manifest_identities: set("manifestIdentities")?,
         };
-        Ok(Config { generation, state, peer_qualification_digest, endpoint, manifests, runs, observed_workers, prior })
+        Ok(Config { generation, state, peer_qualification_digest, endpoint, manifests, runs, prior })
     }
 }

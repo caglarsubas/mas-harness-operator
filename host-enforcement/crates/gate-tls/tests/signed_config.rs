@@ -65,7 +65,7 @@ fn small_order_keys() -> Vec<[u8; 32]> {
 fn a_good_signature_loads_the_document() {
     let dir = place("good", DOCUMENT, &signed(7, DOCUMENT));
     assert_eq!(load_from(&dir, &public(7)), Ok(DOCUMENT.to_vec()));
-    assert_eq!(payload(b"x"), b"planeon.effect-gate-config/v2\0x".to_vec());
+    assert_eq!(payload(b"x"), b"planeon.effect-gate-config/v3\0x".to_vec());
     let _ = std::fs::remove_dir_all(dir);
 }
 

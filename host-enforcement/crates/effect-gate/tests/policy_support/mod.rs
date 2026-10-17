@@ -56,8 +56,11 @@ pub fn upstream_outcome(upstream: &Value) -> UpstreamOutcome {
 
 /// Replays one event list on a fresh PolicyGate.
 pub fn replay_i07(config_value: &Value, kinds_value: &Value, events: &[Value], mode: Mode, context: &str) -> PolicyReplay {
+    let (converted, kernel) =
+        effect_gate::fake_kernel::convert_v3_config(config_value).unwrap_or_else(|error| panic!("{context}: not v3: {error}"));
     let mut gate =
-        PolicyGate::new(config_value, kinds_value).unwrap_or_else(|error| panic!("{context}: configuration refused: {error:?}"));
+        PolicyGate::new(&converted, kinds_value).unwrap_or_else(|error| panic!("{context}: configuration refused: {error:?}"));
+    gate = gate.with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
     let broker_schema = i05_protocol::i05_v3_schema().expect("I05 schema");
     let writer_schema = i05_protocol::i07_v3_schema().expect("I07 schema");
     let mut replay = Replay { outputs: Vec::new(), snapshot: Value::Null, frames: 0, value_fallbacks: 0 };

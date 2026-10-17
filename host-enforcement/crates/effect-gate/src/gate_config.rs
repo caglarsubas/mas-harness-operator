@@ -13,6 +13,13 @@
 //! ASCII, no control character, not ending in `" (deleted)"`, the kernel's rendering of an unlinked file). It is parsed
 //! here only; `gate`, R16 and `PolicyGate` are unchanged. The production value is data in the signed document, never a
 //! constant of the binary.
+//!
+//! HE-003A3 (DESIGN section 3, owner decision Q-A3-1 (a)): format v3. The `gate` member carries no `observedWorkers`:
+//! the gate observes the kernel at every BIND (I05 v4), so HE-003D's rule that the list be empty (Q-HE3D-2 (a)) is
+//! gone, and a `gate` member that still carries the list is refused by `PolicyGate::new`'s I05 `Config` with v4's text
+//! (vector C01), a `GateConfigError::Gate`. Every other member is unchanged; gate-tls's signing domain is `FORMAT`, so
+//! it follows (R83), and a v2 document is refused as another format. No signed document exists to migrate (the signer
+//! key stays empty until HE-008).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,8 +32,8 @@ use crate::policy_gate::{PolicyGate, PolicyGateError};
 use crate::substrate::Lifetimes;
 
 /// The configuration format; a binary accepts exactly this one, and gate-tls's domain prefix changes with it (v2 since
-/// HE-003A2's `enrolledWriter`).
-pub const FORMAT: &str = "planeon.effect-gate-config/v2";
+/// HE-003A2's `enrolledWriter`, v3 since HE-003A3's `gate` without `observedWorkers`).
+pub const FORMAT: &str = "planeon.effect-gate-config/v3";
 
 /// The deepest nesting accepted (an empty object or array counts 1).
 pub const MAX_DEPTH: usize = 16;
@@ -259,9 +266,6 @@ impl GateConfig {
             return check("gate.generation is not a valid store name (R19)".to_string());
         }
         let endpoint = endpoint(text(members, "endpoint", "gate")?)?;
-        if !members.get("observedWorkers").and_then(Value::as_array).is_some_and(<[Value]>::is_empty) {
-            return check("gate.observedWorkers must be empty (Q-HE3D-2 (a))".to_string());
-        }
         let manifests = closed_entries(members.get("manifests"), "gate.manifests")?;
         if manifests.len() > MAX_MANIFESTS {
             return check("gate.manifests holds more than 32 manifests (R48)".to_string());

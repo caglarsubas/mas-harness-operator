@@ -11,13 +11,18 @@
 //! `LinuxOs::with_net`). Std only and safe Rust (the root forbids `unsafe_code`), no panics on any input. The TLS
 //! ports live in the `gate-tls` crate; the binary's `main` (HE-003D) is not here. HE-003D adds what `main` needs
 //! portably: the signed configuration's canonical form, schema and checks (`gate_config`), the exit-status table
-//! (`status`) and the generation binding of the file stores (`FileStores::open_bound`).
+//! (`status`) and the generation binding of the file stores (`FileStores::open_bound`). HE-003A3 (I05 v4) adds the
+//! gate's observation of the BIND's worker (`observation`: the gate's seam, the portable five-step driver over four
+//! kernel calls, its parsers and the local diagnostic log; the Linux calls in `linux_os`) and the test-only fake
+//! kernel with v4's conversion of a v3 configuration (a public module that `tools/gate.py` keeps out of every other
+//! linked source); the configuration lists no worker.
 //!
 //! Behaviour taken from the pinned models or validator rather than the READMEs, and the R10-defined behaviour, is
 //! listed in `MODEL_DEFINED.md`.
 #![forbid(unsafe_code)]
 
 pub mod config;
+pub mod fake_kernel;
 pub mod file_store;
 pub mod frame;
 pub mod gate;
@@ -28,6 +33,7 @@ pub mod linux_net;
 #[cfg(target_os = "linux")]
 pub mod linux_os;
 pub mod net;
+pub mod observation;
 pub mod peers;
 pub mod policy;
 pub mod policy_gate;
@@ -45,6 +51,8 @@ pub use gate::{BoundRun, ChannelRefusal, ChannelState, ConnectionRefusal, Event,
                Output, OutputKind, Stamp, UpstreamResponse};
 pub use journal::{ChannelEnd, Entry, Record, TerminalDetails, WriteDetails};
 pub use net::{Accepted, StreamNet, Transfer};
+pub use observation::{Cause, KernelFail, KernelObserver, KernelReads, Logged, Observation, ObservationLog, PidState, Step,
+                      Unobserved, WorkerObserver};
 pub use peers::{ExpectedPeer, ExpectedPeers, ListenerPlan};
 pub use policy::{check_write, classify, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
                  Prior, RenderedWrite, ResourceRef, WritableKind, WriteOperation, WriteRefusal, WriteRequest};

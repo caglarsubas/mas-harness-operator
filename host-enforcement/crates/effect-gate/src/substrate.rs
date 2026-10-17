@@ -36,7 +36,8 @@
 //! - An event the model refuses (`EventError`) is a substrate defect: the connection concerned is closed and the loop
 //!   returns [`LoopExit`], as for a failed accept or poller call (§5.5); HE-003D exits the process.
 //!
-//! The broker's executable is not read (§4.3): Q-HE2S-10 leaves its artifact identity to HE-004's record. HE-003A2
+//! The broker's executable is not read (§4.3): HS43 §4.3 superseded Q-HE2S-10, so the broker's identity follows from
+//! its label and HE-004 provides none (Q-HE4-13 (a), HE-003A3). HE-003A2
 //! (DESIGN §4; owner decisions Q-HE3A-1 (c), Q-HE3A-1b (a), Q-A2-6 (a)) adds the writer's executable check through
 //! [`Os::writer_exe_ok`], for I07 connections only: at accept in `qualify` after the label and uid comparison and
 //! before the pidfd probe (a failure closes the connection unfed, R32), and on every I07 frame in `custody` after the
@@ -1166,9 +1167,11 @@ mod tests {
 
     fn substrate() -> Substrate<Quiet, Still, Still> {
         let vectors = json::parse(VECTORS).unwrap_or(json::Value::Null);
-        let config = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(json::Value::Null);
+        let v3 = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(json::Value::Null);
+        let Ok((config, kernel)) = crate::fake_kernel::convert_v3_config(&v3) else { panic!("ACTIVE converts") };
         let kinds = json::parse(KINDS).unwrap_or(json::Value::Null);
-        let gate = match PolicyGate::new(&config, &kinds) {
+        let observer = Box::new(crate::observation::KernelObserver::new(kernel));
+        let gate = match PolicyGate::new(&config, &kinds).map(|gate| gate.with_observer(observer)) {
             Ok(gate) => gate,
             Err(error) => panic!("the ACTIVE configuration builds a PolicyGate: {error:?}"),
         };

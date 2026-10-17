@@ -150,7 +150,7 @@ fn r20_payload_and_file_bounds_fail_clean() {
     assert_eq!(stores.entries(), [Entry::Torn]);
     assert_eq!(stores.append(Record::DrainStarted), Appended::Failed { torn: false });
     drop(stores);
-    let typed = Config::from_value(&config).expect("configuration");
+    let typed = typed(&config);
     let (gate, output) = Gate::open(typed, place.stores(&generation, None)).expect("Gate::open");
     assert_eq!(output.kind, OutputKind::RestartState(State::Held));
     assert_eq!(gate.journal(), [Entry::Torn]);
@@ -172,7 +172,7 @@ fn r21_a_payload_outside_the_record_tuples_is_torn() {
     let stores = place.stores(&generation, None);
     assert_eq!(stores.entries(), [Entry::Torn, Entry::Torn, Entry::Record(Record::DrainStarted)]);
     drop(stores);
-    let typed = Config::from_value(&config).expect("configuration");
+    let typed = typed(&config);
     let (_, output) = Gate::open(typed, place.stores(&generation, None)).expect("Gate::open");
     assert_eq!(output.kind, OutputKind::RestartState(State::Held));
     place.remove();
@@ -293,7 +293,7 @@ fn r30_a_live_earlier_generation_refuses_the_next() {
     drop(live);
     let stores = place.stores("g-2", None);
     assert!(stores.journal_created() && stores.indexed_now());
-    let config = Config::from_value(&with(&config, "generation", Value::str("g-2"))).expect("configuration");
+    let config = typed(&with(&config, "generation", Value::str("g-2")));
     assert!(Gate::create(config, stores).is_ok(), "the same generation is created afresh");
     assert_eq!(place.index(), ["g-1", "g-2"]);
     place.remove();
@@ -434,7 +434,7 @@ fn with(config: &Value, key: &str, member: Value) -> Value {
 }
 
 fn typed(config: &Value) -> Config {
-    Config::from_value(config).expect("configuration")
+    Config::from_value(&effect_gate::fake_kernel::convert_v3_config(config).expect("v4's conversion").0).expect("configuration")
 }
 
 fn event(kind: &str) -> Value {
@@ -569,8 +569,9 @@ fn stores_must_belong_to_the_configured_generation() {
     assert_eq!(Gate::open(typed(&config), place.stores("gen-x", None)).err(), Some(GateError::GenerationMismatch));
     let i07 = load(policy_support::I07_VECTORS);
     let kinds = load(policy_support::KINDS);
-    let writer_config = field(field(&i07, "configs"), "ACTIVE");
-    assert!(matches!(PolicyGate::create(writer_config, &kinds, place.stores("gen-x", None)),
+    let (writer_config, _) =
+        effect_gate::fake_kernel::convert_v3_config(field(field(&i07, "configs"), "ACTIVE")).expect("v4's conversion");
+    assert!(matches!(PolicyGate::create(&writer_config, &kinds, place.stores("gen-x", None)),
                      Err(PolicyGateError::Gate(GateError::GenerationMismatch))));
     place.remove();
 }

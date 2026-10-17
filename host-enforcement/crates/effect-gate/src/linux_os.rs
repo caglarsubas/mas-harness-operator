@@ -13,6 +13,18 @@
 //! (`ProcDir::exe`, gate-sys's `readlinkat` on that directory's descriptor) into a buffer one byte longer than the
 //! enrolled path and compares it exactly (`peers::writer_exe_buffer_len`, `peers::writer_exe_matches`); a connection
 //! without a kept directory, a refused read and any other bytes are false.
+//!
+//! HE-003A3 (DESIGN section 5, owner decisions Q-A3-5, Q-A3-6, Q-A3-9, Q-A3-14 and Q-A3-15 (a)) adds the observation's
+//! Linux calls. [`KernelRoots::open_after_seal`] takes `&Sealed` and opens the two root handles, the cgroup2 mount's
+//! and the proc filesystem's, each a gate-sys `KernelRoot` (`O_PATH`); `serve` calls it once, right after the socket
+//! setup and before the stores, and exits with `OBSERVER_ROOTS` when it fails. [`LinuxKernelReads`] holds exactly
+//! those two roots and implements the observation's four kernel calls: the probe-worker leaf's member file and a
+//! process's `stat` file, each opened afresh relative to its root (a gate-sys `FixedPath`) and read with the bounded
+//! plain-`read` helper; `pidfd_open` and the zero-timeout poll through gate-sys's `PidFd`. It caches nothing (this file
+//! holds no static or thread-local state) and maps every failure to its errno or marker; the steps and the mapping to
+//! causes are the portable driver's. Every descriptor is an owned handle, closed on every path. Its associated
+//! `Pidfd` is gate-sys's `PidFd` (the one type alias `tools/gate.py` exempts here, D3-1): it creates no socket, and a
+//! `LinuxKernelReads` exists only after `open_after_seal(&Sealed)`.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -21,9 +33,11 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use gate_sys::channel::{Conn, ListenError, Listener, PidFd, Poller, ProcDir, Recv, Watched};
+use gate_sys::openat::{read_bounded, FixedPath, KernelRoot};
 use gate_sys::peer_wire::FRAME_BUFFER_BYTES;
 
 use crate::linux_net::SharedNet;
+use crate::observation::{KernelFail, KernelReads, PidState, LEAF_PROCS_LIMIT, STAT_LIMIT};
 use crate::peers::{writer_exe_buffer_len, writer_exe_matches, ListenerPlan};
 use crate::seal::Sealed;
 use crate::substrate::{ConnId, Interest, Listen, Os, OsFailure, Owner, PeerCredentials, PortPoll, ProcIdentity,
@@ -239,5 +253,75 @@ impl Os for LinuxOs {
     fn realtime_ms(&self) -> Option<i64> {
         let since = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
         i64::try_from(since.as_millis()).ok()
+    }
+}
+
+// ------------------------------------------------------------------------------------------ the observation (HE-003A3)
+
+/// The observation's two root handles: the cgroup2 mount's and the proc filesystem's.
+pub struct KernelRoots {
+    cgroup: KernelRoot,
+    proc_root: KernelRoot,
+}
+
+impl KernelRoots {
+    /// Opens both roots, after the seal (I05 v4 rule 9: at start; HE-003A3 DESIGN section 5).
+    pub fn open_after_seal(_sealed: &Sealed) -> io::Result<KernelRoots> {
+        let cgroup = KernelRoot::open_kernel_root("/sys/fs/cgroup")?;
+        let proc_root = KernelRoot::open_kernel_root("/proc")?;
+        Ok(KernelRoots { cgroup, proc_root })
+    }
+}
+
+/// The observation's four kernel calls on Linux (see the module documentation); its only fields are the two roots.
+pub struct LinuxKernelReads {
+    cgroup: KernelRoot,
+    proc_root: KernelRoot,
+}
+
+impl LinuxKernelReads {
+    pub fn new(roots: KernelRoots) -> LinuxKernelReads {
+        LinuxKernelReads { cgroup: roots.cgroup, proc_root: roots.proc_root }
+    }
+}
+
+/// A failed call's errno, or the marker of a failure without one.
+fn kernel_fail(error: io::Error) -> KernelFail {
+    error.raw_os_error().map_or(KernelFail::NoErrno, KernelFail::Os)
+}
+
+/// One file opened afresh relative to `root` and read whole within `limit` bytes.
+fn read_fixed(root: &KernelRoot, path: io::Result<FixedPath>, limit: usize) -> Result<Vec<u8>, KernelFail> {
+    let path = path.map_err(kernel_fail)?;
+    let file = root.open_fixed(&path).map_err(kernel_fail)?;
+    match read_bounded(&file, limit) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(KernelFail::TooLong),
+        Err(error) => Err(kernel_fail(error)),
+    }
+}
+
+impl KernelReads for LinuxKernelReads {
+    type Pidfd = PidFd;
+
+    fn read_leaf_procs(&mut self) -> Result<Vec<u8>, KernelFail> {
+        let leaf = FixedPath::from_constant("planeon.slice/planeon-capacity-broker.service/probe-worker/cgroup.procs");
+        read_fixed(&self.cgroup, leaf, LEAF_PROCS_LIMIT)
+    }
+
+    fn pidfd_open(&mut self, pid: i32) -> Result<PidFd, KernelFail> {
+        PidFd::open(pid).map_err(kernel_fail)
+    }
+
+    fn read_stat(&mut self, pid: i32) -> Result<Vec<u8>, KernelFail> {
+        read_fixed(&self.proc_root, FixedPath::pid_stat(pid), STAT_LIMIT)
+    }
+
+    fn poll_zero(&mut self, pidfd: &PidFd) -> Result<PidState, KernelFail> {
+        match pidfd.poll_zero() {
+            Ok(false) => Ok(PidState::Alive),
+            Ok(true) => Ok(PidState::Exited),
+            Err(error) => Err(kernel_fail(error)),
+        }
     }
 }

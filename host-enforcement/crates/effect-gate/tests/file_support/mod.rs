@@ -7,7 +7,9 @@
 use std::io;
 
 use effect_gate::file_store::{index_generations, scan_journal};
-use effect_gate::{Config, Entry, Event, FaultHandle, FileStores, Gate, OpenError, PolicyEvent, PolicyGate, StoreDir};
+use effect_gate::fake_kernel::convert_v3_config;
+use effect_gate::{Config, Entry, Event, FaultHandle, FileStores, Gate, KernelObserver, OpenError, PolicyEvent, PolicyGate,
+                  StoreDir};
 use gate_sys::Dir;
 use i05_protocol::json::{self, JStr, Value};
 
@@ -103,11 +105,16 @@ impl Driven {
     pub fn memory(family: &Family, config: &Value) -> Driven {
         match family {
             Family::I05 => {
-                let typed = Config::from_value(config).expect("configuration");
-                Driven::I05 { gate: Gate::new(typed).expect("gate"), config: config.clone() }
+                let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                let typed = Config::from_value(&converted).expect("configuration");
+                let gate = Gate::new(typed).expect("gate").with_observer(Box::new(KernelObserver::new(kernel)));
+                Driven::I05 { gate, config: config.clone() }
             }
             Family::I07 { kinds } => Driven::I07 {
-                gate: PolicyGate::new(config, kinds).expect("PolicyGate"),
+                gate: {
+                    let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                    PolicyGate::new(&converted, kinds).expect("PolicyGate").with_observer(Box::new(KernelObserver::new(kernel)))
+                },
                 config: config.clone(),
                 kinds: kinds.clone(),
                 challenge: Value::Null,
@@ -119,11 +126,17 @@ impl Driven {
     pub fn create(family: &Family, config: &Value, stores: FileStores) -> Driven {
         match family {
             Family::I05 => {
-                let typed = Config::from_value(config).expect("configuration");
-                Driven::I05 { gate: Gate::create(typed, stores).expect("Gate::create"), config: config.clone() }
+                let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                let typed = Config::from_value(&converted).expect("configuration");
+                let gate = Gate::create(typed, stores).expect("Gate::create").with_observer(Box::new(KernelObserver::new(kernel)));
+                Driven::I05 { gate, config: config.clone() }
             }
             Family::I07 { kinds } => Driven::I07 {
-                gate: PolicyGate::create(config, kinds, stores).expect("PolicyGate::create"),
+                gate: {
+                    let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                    PolicyGate::create(&converted, kinds, stores).expect("PolicyGate::create")
+                        .with_observer(Box::new(KernelObserver::new(kernel)))
+                },
                 config: config.clone(),
                 kinds: kinds.clone(),
                 challenge: Value::Null,
@@ -136,12 +149,16 @@ impl Driven {
     pub fn open(family: &Family, config: &Value, stores: FileStores, challenge: Value) -> (Driven, Value) {
         match family {
             Family::I05 => {
-                let typed = Config::from_value(config).expect("configuration");
+                let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                let typed = Config::from_value(&converted).expect("configuration");
                 let (gate, output) = Gate::open(typed, stores).expect("Gate::open");
+                let gate = gate.with_observer(Box::new(KernelObserver::new(kernel)));
                 (Driven::I05 { gate, config: config.clone() }, output.to_doc().to_value())
             }
             Family::I07 { kinds } => {
-                let (gate, output) = PolicyGate::open(config, kinds, stores).expect("PolicyGate::open");
+                let (converted, kernel) = convert_v3_config(config).expect("v4's conversion");
+                let (gate, output) = PolicyGate::open(&converted, kinds, stores).expect("PolicyGate::open");
+                let gate = gate.with_observer(Box::new(KernelObserver::new(kernel)));
                 let driven = Driven::I07 { gate, config: config.clone(), kinds: kinds.clone(), challenge };
                 (driven, output.to_doc().to_value())
             }

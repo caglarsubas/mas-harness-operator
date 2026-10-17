@@ -82,6 +82,27 @@ running architecture's.
 - `contracts/seccomp-v3/OBSERVER.aarch64.bpf` from `architecture/compiled-filter-programs/programs/OBSERVER.aarch64.bpf`, sha256 `d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707`, 1816 bytes (227 instructions)
 - `contracts/seccomp-v3/OBSERVER.x86_64.bpf` from `architecture/compiled-filter-programs/programs/OBSERVER.x86_64.bpf`, sha256 `e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a`, 1904 bytes (238 instructions)
 
+## I05 gate channel v4, the gate's worker observation (HE-003A3)
+
+Copied byte for byte from the harness-onion repository's `architecture/i05-gate-channel-v4/`, packet MET-ENFORCE-030
+(the 242nd packet, I05-OBSERVED-WORKERS; owner decision Q-I5-4 (a); Q-I5-1 to Q-I5-3 (a) decided by the lane monitor
+under the owner's delegation),
+read at its merge commit `fd362f9eb64d6e9928f26fac5e339a50b8dee516` (tree `ffcf45231c9c65f75ad8cd5810e5ff685963b420`)
+with `git show fd362f9e:<path>`, mode 100644. v4 has no schema or outcome mapping of its own: its frames are v3's, and
+its vectors pin the four v3 files above by sha256, which R10 already holds byte-exact (no v3 file changes). Both files
+are registered before use in edge registry record v4, `architecture/artifact-edges/operator-harness-engineering-v4.json`
+(W03-PLAN-AMEND-2, MET-ENFORCE-032, merged as `c69e55f8`: status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL,
+provider packet MET-ENFORCE-030, consumer packet HE-003A3, consumer paths exactly these). HE-003A3 replays the vectors
+through effect-gate's observation driver and its fake kernel (owner decisions Q-A3-1..15 (a)).
+
+- `contracts/i05-v4/README.md` from `architecture/i05-gate-channel-v4/README.md`, sha256 `b0af1f8784c7e9bcdd3793a1002d1000e222a13e5a7613b50b04ce5a116ed04d`, 32574 bytes
+- `contracts/i05-v4/vectors.json` from `architecture/i05-gate-channel-v4/vectors.json`, sha256 `f314610f7ee3feb08533cb535f0a4c19fc991384b852b99a50a1646b0739b1e9`, 141491 bytes
+
+The v4 model is pinned by digest, not copied, and read as specification only where the README is silent (each such
+point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s HE-003A3 section), at the same commit:
+
+- `scripts/i05_gate_channel_v4.py`, sha256 `95c690cdb0744833f16fa6ac5372c2d8e3404fde9fb19a8fa4e9a0334246ae0d`, 77323 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

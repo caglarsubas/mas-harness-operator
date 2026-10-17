@@ -509,7 +509,9 @@ pub fn kinds() -> Value {
 }
 
 pub fn new_gate() -> PolicyGate {
-    PolicyGate::new(&config(), &kinds()).expect("the ACTIVE configuration builds a PolicyGate")
+    let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&config()).expect("v4's conversion");
+    let gate = PolicyGate::new(&converted, &kinds()).expect("the ACTIVE configuration builds a PolicyGate");
+    gate.with_observer(Box::new(effect_gate::KernelObserver::new(kernel)))
 }
 
 pub fn object(members: Vec<(&str, Value)>) -> Value {
