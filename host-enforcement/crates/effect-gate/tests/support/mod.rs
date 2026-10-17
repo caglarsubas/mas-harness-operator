@@ -3,7 +3,8 @@
 //! `mutate` operations, and records every output and the final snapshot as JSON values.
 #![allow(dead_code)]
 
-use effect_gate::{Config, Event, FrameInput, Gate, UpstreamResponse};
+use effect_gate::fake_kernel::convert_v3_config;
+use effect_gate::{Config, Event, FrameInput, Gate, KernelObserver, UpstreamResponse};
 use i05_protocol::json::{self, JStr, Object, Value};
 use i05_protocol::{frame, Datagram, FrameError, Schema, FRAME_VERSION};
 
@@ -179,8 +180,9 @@ pub fn base_event(event: &Value, context: &str) -> Event {
 
 /// Replays one event list on a fresh gate.
 pub fn replay(config_value: &Value, events: &[Value], mode: Mode, context: &str) -> Replay {
-    let config = Config::from_value(config_value).unwrap_or_else(|error| panic!("{context}: config refused: {error:?}"));
-    let mut gate = Gate::new(config).expect("gate");
+    let (converted, kernel) = convert_v3_config(config_value).unwrap_or_else(|error| panic!("{context}: not v3: {error}"));
+    let config = Config::from_value(&converted).unwrap_or_else(|error| panic!("{context}: config refused: {error:?}"));
+    let mut gate = Gate::new(config).expect("gate").with_observer(Box::new(KernelObserver::new(kernel)));
     let schema = i05_protocol::i05_v3_schema().expect("schema");
     let mut replay = Replay { outputs: Vec::new(), snapshot: Value::Null, frames: 0, value_fallbacks: 0 };
     for (index, event) in events.iter().enumerate() {

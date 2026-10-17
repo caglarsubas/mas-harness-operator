@@ -1071,10 +1071,15 @@ class ContractTests(unittest.TestCase):
     # HE-002S DESIGN section 3: the two published EFFECT_GATE programs join the 13 contract files at their digests.
     # HE-003A2 (DESIGN section 2, Q-A2-1 (a)): the two seccomp-v4 programs join them (17); the v3 ones stay pinned.
     # HE-004A (DESIGN section 2, Q-HE4A-4 (a)): the two OBSERVER programs join them (19).
+    # HE-003A3 (DESIGN section 2): the I05 v4 README and vectors join them (21).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 19)
+            self.assertEqual(len(gate.CONTRACTS), 21)
+            self.assertEqual(gate.CONTRACTS["contracts/i05-v4/README.md"],
+                             "b0af1f8784c7e9bcdd3793a1002d1000e222a13e5a7613b50b04ce5a116ed04d")
+            self.assertEqual(gate.CONTRACTS["contracts/i05-v4/vectors.json"],
+                             "f314610f7ee3feb08533cb535f0a4c19fc991384b852b99a50a1646b0739b1e9")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/OBSERVER.aarch64.bpf"],
                              "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/OBSERVER.x86_64.bpf"],
@@ -1217,6 +1222,36 @@ class StartUpExceptionTests(Tree):
         for rel in ("crates/gate-sys/src/peer_wire.rs", "crates/effect-gate/src/linux_os.rs",
                     "crates/effect-gate/tests/substrate.rs"):
             self.refused(gate.check_sources, rel, STARTUP_CHANNEL, "uses /proc .start-up lint")
+
+
+STARTUP_ROOTS = ('pub fn open_after_seal(_s: &Sealed) -> io::Result<KernelRoots> {\n'
+                 '    let cgroup = KernelRoot::open_kernel_root("/sys/fs/cgroup")?;\n'
+                 '    let proc_root = KernelRoot::open_kernel_root("/proc")?;\n    x(cgroup, proc_root)\n}\n')
+
+
+class StartUpRootTests(Tree):
+    """HE-003A3 (DESIGN sections 5 and 6, D2-5): linux_os.rs's two root opens are the start-up lint's exceptions there,
+    each excepted once; any other /proc or /sys there, or the same expressions elsewhere, still refuse."""
+
+    TREE = {"crates/effect-gate/src/linux_os.rs": STARTUP_ROOTS, "crates/gate-sys/src/peer_wire.rs": "pub fn parse() {}\n"}
+
+    def test_each_root_open_once_in_linux_os(self):
+        self.assertEqual(gate.check_sources(self.base), 2)
+        rel = "crates/effect-gate/src/linux_os.rs"
+        self.write(rel, STARTUP_ROOTS.replace('KernelRoot::open_kernel_root("/proc")',
+                                              'KernelRoot :: open_kernel_root ( "/proc" )'))
+        self.assertEqual(gate.check_sources(self.base), 2)
+        for text, token in ((STARTUP_ROOTS + 'fn again() { let _ = KernelRoot::open_kernel_root("/proc"); }\n', "/proc"),
+                            (STARTUP_ROOTS + 'fn again() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n', "/sys"),
+                            (STARTUP_ROOTS.replace('"/proc")', '"/proc/self")'), "/proc"),
+                            (STARTUP_ROOTS.replace('"/sys/fs/cgroup")', '"/sys/fs/cgroup/planeon.slice")'), "/sys"),
+                            (STARTUP_ROOTS.replace('KernelRoot::open_kernel_root("/proc")', 'KernelRoot::open_kernel_root(r"/proc")'), "/proc"),
+                            (STARTUP_ROOTS.replace('KernelRoot::open_kernel_root("/proc")', 'Dir::at("/proc")'), "/proc"),
+                            (STARTUP_ROOTS + "// the leaf under /sys/fs/cgroup\n", "/sys")):
+            self.refused(gate.check_sources, rel, text, "linux_os.rs uses %s .start-up lint" % token)
+        for other in ("crates/gate-sys/src/peer_wire.rs", "crates/effect-gate/src/observation.rs",
+                      "crates/effect-gate/tests/observation.rs", "crates/gate-sys/src/channel.rs"):
+            self.refused(gate.check_sources, other, STARTUP_ROOTS, "uses /(sys|proc) .start-up lint")
 
 
 DEBUG_TREE = {
@@ -1672,8 +1707,8 @@ fn main() -> ExitCode {
 fn serve(sealed: &Sealed, config: GateConfig) -> u8 {
     use effect_gate::file_store::fstat_device;
     use effect_gate::linux_net::{LinuxConnector, LinuxStreams, NetTable};
-    use effect_gate::linux_os::LinuxOs;
-    use effect_gate::{ExpectedPeers, FileStores, ListenerPlan, Owner, PolicyGate, Stores, Substrate};
+    use effect_gate::linux_os::{KernelRoots, LinuxKernelReads, LinuxOs};
+    use effect_gate::{ExpectedPeers, FileStores, KernelObserver, ListenerPlan, Owner, PolicyGate, Stores, Substrate};
     use gate_tls::{client_config, credentials, server_config, Exchange, I04Server, UpstreamClient};
     let net = NetTable::new();
     if NetTable::listen_i04(&net, sealed, &config.endpoint).is_err() {
@@ -1760,7 +1795,10 @@ class SealOrderTests(Tree):
                  "renames an import"),                                                                           # P3
                 (GOOD_MAIN.replace(use, "use gate_tls::signed_config::*;\n"), "imports a glob"),
                 (GOOD_MAIN + "use gate_tls::http1::frame;\n", "pinned set"),
-                (GOOD_MAIN.replace("    use effect_gate::linux_os::LinuxOs;\n", ""), "pinned set"),
+                (GOOD_MAIN.replace("    use effect_gate::linux_os::{KernelRoots, LinuxKernelReads, LinuxOs};\n", ""), "pinned set"),
+                # HE-003A3 (D2-2): the observation's three imports are pinned too.
+                (GOOD_MAIN.replace("{KernelRoots, LinuxKernelReads, LinuxOs}", "{LinuxKernelReads, LinuxOs}"), "pinned set"),
+                (GOOD_MAIN.replace("FileStores, KernelObserver, ListenerPlan", "FileStores, ListenerPlan"), "pinned set"),
                 (GOOD_MAIN + "fn early() {}\n", "functions other than"),
                 (GOOD_MAIN.replace("    let net = NetTable::new();", "    fn inner() {}\n    let net = NetTable::new();"),
                  "functions other than")):
@@ -1832,6 +1870,19 @@ class SealOrderTests(Tree):
                          "signed_config.rs names gate_sys")
         # Whitespace inside the excepted statement and a comment beside it are read through.
         self.write(gate.SIGNED_CONFIG, without + "use gate_sys :: Dir ; // the opener\n")
+        self.assertIn("signed_config::load", gate.check_seal_order(self.base))
+
+    def test_kernel_roots_are_refused_before_the_second_stage(self):
+        # HE-003A3 (DESIGN section 5, D2-2): KernelRoots joins BEFORE_SEAL_REFUSED; serve (after stage 2) may name it.
+        main = gate.GATE_MAIN
+        old = "    let config = match GateConfig::parse(&document) {"
+        self.refused(gate.check_seal_order, main, GOOD_MAIN.replace(
+            old, "    let _r = effect_gate::linux_os::KernelRoots::open_after_seal;\n" + old), "main.rs names KernelRoots before")
+        for rel, base_text in ((gate.GATE_CONFIG, GOOD_GATE_CONFIG), (gate.SIGNED_CONFIG, GOOD_SIGNED_CONFIG)):
+            self.refused(gate.check_seal_order, rel, base_text + "fn f() { let _ = KernelRoots :: open_after_seal; }\n",
+                         "names KernelRoots before the seal")
+        self.write(main, GOOD_MAIN.replace("    let _ = LinuxConnector::new(sealed, net);",
+                                           "    let _ = LinuxConnector::new(sealed, net);\n    let _k = KernelRoots::open_after_seal(sealed);"))
         self.assertIn("signed_config::load", gate.check_seal_order(self.base))
 
 
@@ -2025,6 +2076,343 @@ class SocketItemTests(Tree):
         self.write("crates/effect-gate/src/substrate.rs", "// no macro_rules here\nconst S: &str = \"macro_rules! m\";\n")
         self.write("crates/effect-gate/tests/m.rs", "macro_rules! m { () => {} }\n")
         self.assertEqual(gate.check_macros(self.base), 15)
+
+
+class StructAngleTests(Tree):
+    """HE-003A3 (STRUCT-ANGLE and the struct-body defect, owner decision Q-HE4A-5 (a); DESIGN section 6, D1-5, D2-3,
+    D3-3): struct_fields skips the generic list and any where-clause with the context-aware bracket scanner, nests
+    angles in type position (generic arguments, qualified paths, for<'a>; `>>` two closers, `->` no bracket) and treats
+    array lengths and `{ }` blocks as expressions, so no private first field can swallow a pub hazard field."""
+
+    TREE = {**SOCKET_TREE, "crates/effect-gate/src/linux_os.rs": "use gate_sys::channel::{Conn, ListenError, Poller};\n"}
+
+    def fields(self, text):
+        code = gate.rust_code(text)
+        match = gate.STRUCT_ITEM.search(code)
+        return [field.split(":")[0].split()[-1] if ":" in field else field.strip()
+                for field in gate.struct_fields(code, match.end())]
+
+    def test_each_form_reads_the_right_fields(self):
+        for text, names in (
+                ("pub struct S { a: HashMap<K, V>, pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: [u8; 1 << 2], pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: [u8; { 3 > 2 } as usize], pub p: Poller }", ["a", "p"]),
+                ("pub struct S<F: Fn(u8)> { pub p: Poller }", ["p"]),
+                ("pub struct S<F: Fn(u8) -> (u8, u8)> { pub p: Poller }", ["p"]),
+                ("pub struct S { a: <u8 as Tr<u8, u8>>::A, pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: for<'a> fn(&'a u8), pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: Box<dyn for<'a> Fn(&'a u8)>, pub p: Poller }", ["a", "p"]),
+                ("pub struct S<const N: usize = { 1 << 2 }> { pub p: Poller }", ["p"]),
+                ("pub struct S<const N: usize = { 3 > 2 }> { pub p: Poller }", ["p"]),
+                ("pub struct S<T> where T: Tr<{ 1 }> { pub p: Poller }", ["p"]),
+                ("pub struct S<T> where [u8; { 2 }]: Sized, T: Copy { pub p: Poller }", ["p"]),
+                ("pub struct S<T>(pub Poller, T) where T: Copy;", ["pub Poller", "T"]),
+                ("pub struct S<T> where T: Copy;", []),
+                ("pub struct S;", []),
+                ("pub struct S { a: Vec<Vec<u8>>, pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: [u8; N >> 1], pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: [u8; A[0] >> 1], pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: [u8; { size_of::<Vec<u8>>() }], pub p: Poller }", ["a", "p"]),
+                ("pub struct S<T = Vec<u8>> { a: T, pub p: Poller }", ["a", "p"]),
+                ("pub struct S<T = [u8; N >> 1]> { a: T, pub p: Poller }", ["a", "p"]),
+                ("pub struct S { a: fn(u8) -> u8, b: Box<dyn Iterator<Item = u8>>, pub p: Poller }", ["a", "b", "p"]),
+                ("pub struct S { #[allow(dead_code)] a: u8, pub(crate) p: Poller, }", ["a", "p"])):
+            self.assertEqual(self.fields(text), names, text)
+
+    def test_a_private_first_field_never_hides_a_pub_hazard(self):
+        os_rs = "crates/effect-gate/src/linux_os.rs"
+        base = self.TREE[os_rs]
+        for text in ("pub struct S { a: HashMap<K, V>, pub p: Poller }",
+                     "pub struct S { a: [u8; 1 << 2], pub p: Poller }",
+                     "pub struct S { a: [u8; { 3 > 2 } as usize], pub p: Poller }",
+                     "pub struct S<F: Fn(u8)> { pub p: Poller }",
+                     "pub struct S<F: Fn(u8) -> (u8, u8)> { pub p: Poller }",
+                     "pub struct S { a: <u8 as Tr<u8, u8>>::A, pub p: Poller }",
+                     "pub struct S { a: for<'a> fn(&'a u8), pub p: Poller }",
+                     "pub struct S { a: Box<dyn for<'a> Fn(&'a u8)>, pub p: Poller }",
+                     "pub struct S<const N: usize = { 1 << 2 }> { pub p: Poller }",
+                     "pub struct S<T> where T: Tr<{ 1 }> { pub p: Poller }",
+                     "pub struct S<T>(pub Poller, T) where T: Copy;",
+                     "pub struct S { a: Vec<Vec<u8>>, pub p: Poller }",
+                     "pub struct S { a: [u8; N >> 1], pub p: Poller }",
+                     "pub struct S { a: [u8; A[0] >> 1], pub p: Poller }",
+                     "pub struct S { a: [u8; { size_of::<Vec<u8>>() }], pub p: Poller }",
+                     "pub struct S<T = Vec<u8>> { a: T, pub p: Poller }",
+                     "pub struct S<T = [u8; N >> 1]> { a: T, pub p: Poller }"):
+            self.refused(gate.check_socket_modules, os_rs, base + text + "\n", "pub field naming gate-sys's socket items")
+        self.write(os_rs, base + "pub struct S<T> where T: Copy;\npub struct Q<T = [u8; N >> 1]> { a: T, p: Poller }\n")
+        self.assertEqual(gate.check_socket_modules(self.base), 14)
+
+    def test_an_unreadable_struct_or_a_field_default_refuses(self):
+        os_rs = "crates/effect-gate/src/linux_os.rs"
+        for text, message in (("pub struct S { a: bool = X < Y, pub p: Poller }", "a field default"),
+                              ("pub struct S { a: u8 = 1 }", "a field default"),
+                              ("pub struct S { a: u8>, pub p: Poller }", "cannot read"),
+                              ("pub struct S<T { a: T }", "cannot read"),
+                              ("pub struct S { a: (u8, pub p: Poller }", "cannot read"),
+                              ("pub struct S<T> = T;", "cannot read"),
+                              ("pub struct S<T>(T) x;", "cannot read")):
+            self.refused(gate.check_socket_modules, os_rs, self.TREE[os_rs] + text + "\n", message)
+
+
+OBSERVATION_TREE = {
+    **LINKED_TREE,
+    "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]\npub mod fake_kernel;\npub mod observation;\n"
+                                     "pub use observation::{KernelObserver, KernelReads, Unobserved, WorkerObserver};\n",
+    gate.OBSERVATION_RS: "pub trait WorkerObserver { fn observe(&mut self, pid: i64, start: i64) -> Observation; }\n"
+                         "pub trait KernelReads { type Pidfd; fn poll_zero(&mut self, p: &Self::Pidfd) -> u8; }\n"
+                         "pub struct Unobserved;\nimpl WorkerObserver for Unobserved { fn observe() {} }\n"
+                         "pub struct KernelObserver<K> { reads: K }\n"
+                         "impl<K: KernelReads> KernelObserver<K> { pub fn new(reads: K) -> KernelObserver<K> { x() } }\n"
+                         "impl<K: KernelReads> WorkerObserver for KernelObserver<K> { fn observe() {} }\n",
+    gate.FAKE_KERNEL: "use crate::observation::{KernelFail, KernelReads};\n"
+                      "/// A FakeKernel names KernelObserver only in a comment.\n"
+                      "#[derive(Clone, Debug, Default)]\npub struct FakeKernel { processes: Rc<RefCell<Vec<u8>>> }\n"
+                      "impl FakeKernel {\n    fn read(&self, render: impl FnOnce(&FakeKernel) -> Result<u8, u8>) -> u8 { x() }\n}\n"
+                      "impl KernelReads for FakeKernel {\n    type Pidfd = Rc<(i32, u64)>;\n    fn poll_zero() {}\n}\n"
+                      "pub fn convert_v3_config(config: &Value) -> Result<(Value, FakeKernel), String> { x() }\n",
+    gate.LINUX_OS: "use gate_sys::channel::PidFd;\nuse gate_sys::openat::{read_bounded, FixedPath, KernelRoot};\n"
+                   "pub struct KernelRoots { cgroup: KernelRoot, proc_root: KernelRoot }\n"
+                   "impl KernelRoots {\n    pub fn open_after_seal(_sealed: &Sealed) -> io::Result<KernelRoots> {\n"
+                   "        let cgroup = KernelRoot::open_kernel_root(\"/sys/fs/cgroup\")?;\n"
+                   "        let proc_root = KernelRoot::open_kernel_root(\"/proc\")?;\n"
+                   "        Ok(KernelRoots { cgroup, proc_root })\n    }\n}\n"
+                   "pub struct LinuxKernelReads {\n    cgroup: KernelRoot,\n    proc_root: KernelRoot,\n}\n"
+                   "fn read_fixed(root: &KernelRoot, path: io::Result<FixedPath>) -> u8 { root.open_fixed(&path?) }\n"
+                   "impl KernelReads for LinuxKernelReads {\n    type Pidfd = PidFd;\n"
+                   "    fn read_leaf_procs(&mut self) -> u8 {\n        read_fixed(&self.cgroup, FixedPath::from_constant("
+                   "\"planeon.slice/planeon-capacity-broker.service/probe-worker/cgroup.procs\"))\n    }\n"
+                   "    fn read_stat(&mut self, pid: i32) -> u8 { read_fixed(&self.proc_root, FixedPath::pid_stat(pid)) }\n}\n"
+                   "fn borrowed(x: &'static str) {}\n",
+    gate.OPENAT: LINKED_TREE["crates/gate-sys/src/openat.rs"]
+                 + "pub fn from_constant(path: &'static str) -> io::Result<FixedPath> { x() }\n"
+                   "pub fn pid_stat(pid: i32) -> io::Result<FixedPath> { x() }\n"
+                   "pub fn open_kernel_root(absolute: &str) -> io::Result<KernelRoot> { x() }\n"
+                   "pub fn open_fixed(&self, path: &FixedPath) -> io::Result<File> { x() }\n",
+    gate.GATE_MAIN: "#![forbid(unsafe_code)]\nfn main() {}\nfn serve(sealed: &Sealed) -> u8 {\n"
+                    "    let Ok(kernel) = KernelRoots::open_after_seal(sealed) else { return status::OBSERVER_ROOTS };\n    0\n}\n",
+    "crates/effect-gate/src/gate.rs": "pub struct Gate { observer: Box<dyn WorkerObserver> }\n"
+                                      "const C01: &str = \"a static list is refused (convert_v3_config)\";\n"
+                                      "// fake_kernel::FakeKernel in a comment\n"
+                                      "#[cfg(test)]\nmod tests {\n    use super::*;\n"
+                                      "    fn g() { let _ = crate::fake_kernel::convert_v3_config(&v); }\n}\n",
+}
+
+
+class ObservationRuleTests(Tree):
+    """HE-003A3 DESIGN sections 4-6 (D2-1, D2-5, D3-1, D3-2, D3-4): the observation's caller rules (exact call forms),
+    implementation pairs, the fake kernel's confinement and shape, the alias refusal, LinuxKernelReads's fields and
+    linux_os.rs's lack of static state."""
+
+    TREE = OBSERVATION_TREE
+
+    def test_the_tree_passes(self):
+        self.assertEqual(gate.check_observation(self.base), 14)
+
+    def test_the_callers_are_pinned_by_exact_call_forms(self):
+        os_rs, openat = self.TREE[gate.LINUX_OS], self.TREE[gate.OPENAT]
+        cgroup = 'KernelRoot::open_kernel_root("/sys/fs/cgroup")'
+        leaf = '"planeon.slice/planeon-capacity-broker.service/probe-worker/cgroup.procs"'
+        for rel, text, message in (
+                # open_kernel_root: a third call, a call elsewhere, a function item, a renamed path, outside the opener.
+                (gate.LINUX_OS, os_rs + 'fn f() { let _ = KernelRoot::open_kernel_root("/proc"); }\n', "pinned calls"),
+                ("crates/effect-gate/src/substrate.rs", 'fn f() { let _ = KernelRoot::open_kernel_root("/proc"); }\n',
+                 "substrate.rs names open_kernel_root"),
+                (gate.LINUX_OS, os_rs + "fn f() { let _ = KernelRoot::open_kernel_root; }\n", "pinned calls"),
+                (gate.LINUX_OS, os_rs.replace(cgroup, 'Root::open_kernel_root("/sys/fs/cgroup")'), "pinned calls"),
+                (gate.LINUX_OS, os_rs.replace(cgroup, "x()") + "fn f() { let _ = %s; }\n" % cgroup,
+                 "outside KernelRoots::open_after_seal"),
+                (gate.LINUX_OS, os_rs.replace('open_kernel_root("/proc")', 'open_kernel_root("/proc/1")'), "pinned calls"),
+                (gate.GATE_MAIN, self.TREE[gate.GATE_MAIN] + "fn f() { let _ = gate_sys::openat::KernelRoot::open_kernel_root(\"/proc\"); }\n",
+                 "main.rs names open_kernel_root"),
+                # open_after_seal: twice in main, elsewhere, another argument, no definition.
+                (gate.GATE_MAIN, self.TREE[gate.GATE_MAIN] + "fn g(sealed: &Sealed) { let _ = KernelRoots::open_after_seal(sealed); }\n",
+                 "main.rs does not name open_after_seal exactly"),
+                ("crates/effect-gate/src/substrate.rs", "fn f(s: &Sealed) { let _ = KernelRoots::open_after_seal(s); }\n",
+                 "substrate.rs names open_after_seal"),
+                (gate.GATE_MAIN, self.TREE[gate.GATE_MAIN].replace("open_after_seal(sealed)", "open_after_seal(&other)"),
+                 "main.rs does not name open_after_seal exactly"),
+                (gate.LINUX_OS, os_rs.replace("pub fn open_after_seal(", "pub fn open_roots("), "as its definition"),
+                # FixedPath's constructors: another literal, a second call, elsewhere; open_fixed by path or elsewhere.
+                (gate.LINUX_OS, os_rs.replace(leaf, '"planeon.slice/other/cgroup.procs"'), "from_constant exactly as its pinned"),
+                (gate.LINUX_OS, os_rs + "fn f() { let _ = FixedPath::from_constant(%s); }\n" % leaf, "from_constant exactly"),
+                ("crates/effect-gate/src/observation.rs", self.TREE[gate.OBSERVATION_RS] + "fn f() { FixedPath::pid_stat(1); }\n",
+                 "observation.rs names pid_stat"),
+                (gate.LINUX_OS, os_rs + "fn f() { let _ = FixedPath::pid_stat(2); }\n", "pid_stat exactly"),
+                (gate.LINUX_OS, os_rs.replace("root.open_fixed(&path?)", "KernelRoot::open_fixed(root, &path?)"),
+                 "names open_fixed other than as a method call"),
+                ("crates/gate-sys/src/channel.rs", "fn f(r: &KernelRoot, p: &FixedPath) { let _ = r.open_fixed(p); }\n",
+                 "channel.rs names open_fixed"),
+                (gate.OPENAT, openat + "pub fn from_constant2() { let _ = from_constant; }\n", "from_constant exactly once, as its definition"),
+                (gate.OPENAT, openat.replace("pub fn pid_stat(", "pub fn stat_of("), "pid_stat exactly once, as its definition")):
+            self.refused(gate.check_observation, rel, text, message)
+
+    def test_the_implementations_are_the_pinned_pairs(self):
+        message = "not one of the observation's pinned"
+        for rel, text in (
+                (gate.FAKE_KERNEL, self.TREE[gate.FAKE_KERNEL] + "impl KernelReads for () { type Pidfd = u8; }\n"),
+                (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS] + "impl<T> KernelReads for T { type Pidfd = u8; }\n"),
+                (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS] + "impl KernelReads for i32 {}\n"),
+                ("crates/effect-gate/src/substrate.rs", "struct Counter;\nimpl WorkerObserver for Counter {}\n"),
+                ("crates/effect-gate/src/substrate.rs", "impl crate::observation::WorkerObserver for X {}\n"),
+                ("crates/effect-gate/src/substrate.rs", "impl KernelReads for LinuxKernelReads {}\n"),
+                (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS] + "impl WorkerObserver for KernelObserver<u8> {}\n"),
+                (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS].replace(
+                    "impl<K: KernelReads> WorkerObserver for KernelObserver<K>",
+                    "impl<K> WorkerObserver for KernelObserver<K> where K: KernelReads")),
+                (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS] + "impl<T: WorkerObserver> WorkerObserver for Box<T> {}\n"),
+                ("crates/effect-gate/src/gate.rs", self.TREE["crates/effect-gate/src/gate.rs"].replace(
+                    "    use super::*;\n", "    use super::*;\n    struct Count;\n    impl WorkerObserver for Count {}\n")),
+                ("crates/effect-gate/src/substrate.rs", "fn f() { struct L; impl KernelReads for L {} }\n"),
+                ("crates/effect-gate/src/substrate.rs", "unsafe impl KernelReads for Z {}\n")):
+            self.refused(gate.check_observation, rel, text, message)
+        for rel, text in ((gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS].replace(
+                              "impl WorkerObserver for Unobserved { fn observe() {} }\n", "")),
+                          (gate.OBSERVATION_RS, self.TREE[gate.OBSERVATION_RS] + "impl WorkerObserver for Unobserved {}\n")):
+            self.refused(gate.check_observation, rel, text, "not each exactly once")
+        # Renamed traits are aliases; impl Trait in a parameter is a type, not an implementation.
+        self.refused(gate.check_observation, "crates/effect-gate/src/substrate.rs",
+                     "use crate::observation::WorkerObserver as W;\nimpl W for X {}\n", "renames or aliases")
+        self.write("crates/effect-gate/src/substrate.rs",
+                   "fn f(o: impl WorkerObserver, r: &dyn KernelReads<Pidfd = u8>) -> impl FnOnce() -> u8 { x() }\n")
+        self.assertEqual(gate.check_observation(self.base), 15)
+
+    def test_the_fake_kernel_is_confined(self):
+        message = "names the fake kernel outside a strict"
+        gate_rs = self.TREE["crates/effect-gate/src/gate.rs"]
+        for rel, text in (
+                ("crates/effect-gate/src/gate.rs", gate_rs + "use crate::fake_kernel::FakeKernel;\n"),
+                ("crates/effect-gate/src/policy_gate.rs", "fn f() { let _ = crate::fake_kernel::convert_v3_config; }\n"),
+                (gate.EFFECT_GATE_LIB, self.TREE[gate.EFFECT_GATE_LIB] + "pub use fake_kernel::FakeKernel;\n"),
+                (gate.EFFECT_GATE_LIB, self.TREE[gate.EFFECT_GATE_LIB] + "pub use crate::fake_kernel as k;\n"),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[cfg(any(test, unix))]\nmod tests {")),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[cfg(test)] mod tests {")),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[cfg(test)]\nmod other {")),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[allow(unused)]\n#[cfg(test)]\nmod tests {")),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[cfg(test)]\n#[allow(unused)]\nmod tests {")),
+                ("crates/effect-gate/src/gate.rs", gate_rs.replace("#[cfg(test)]\nmod tests {", "#[cfg(not(test))]\nmod tests {")),
+                (gate.GATE_MAIN, self.TREE[gate.GATE_MAIN] + "fn f() { let _ = effect_gate::fake_kernel::FakeKernel::default(); }\n"),
+                ("crates/gate-tls/src/upstream.rs", "fn f() -> effect_gate::fake_kernel::FakeKernel { x() }\n")):
+            self.refused(gate.check_observation, rel, text, message)
+        self.refused(gate.check_observation, gate.EFFECT_GATE_LIB, self.TREE[gate.EFFECT_GATE_LIB] + "pub mod fake_kernel;\n",
+                     "pub mod fake_kernel; exactly once")
+        fake = self.TREE[gate.FAKE_KERNEL]
+        for text, shape in ((fake + "pub use crate::observation::KernelReads;\n", "re-exports"),
+                            (fake + "struct Wrapper(FakeKernel);\n", "a struct other than FakeKernel"),
+                            (fake + "pub enum Kind { A }\n", "defines another type"),
+                            (fake + "pub trait Hook {}\n", "defines another type"),
+                            (fake + "impl Default for Unit {}\n", "an impl other than"),
+                            (fake + "impl FakeKernel { fn again() {} }\n", "an impl other than"),
+                            (fake + "fn f() { let _: Option<u8> = None; type Local = u8; }\n", "a type item other than"),
+                            (fake.replace("    type Pidfd = Rc<(i32, u64)>;\n", ""), "exactly one type Pidfd"),
+                            (fake.replace("    type Pidfd = Rc<(i32, u64)>;\n", "    type Pidfd = u8;\n    type Pidfd = u16;\n"),
+                             "exactly one type Pidfd"),
+                            (fake + "pub fn observer(k: FakeKernel) -> KernelObserver<FakeKernel> { x() }\n", "names an observer"),
+                            (fake + "pub fn boxed(k: FakeKernel) -> Box<dyn WorkerObserver> { x() }\n", "names an observer")):
+            self.refused(gate.check_observation, gate.FAKE_KERNEL, text, shape)
+        self.refused(gate.check_observation, gate.FAKE_KERNEL, fake + "pub type Fake = FakeKernel;\n", "renames or aliases")
+
+    def test_the_cgroup_root_open_is_the_linked_tripwire_s_one_fs_exception(self):
+        # HE-003A3 (R96): the exact `KernelRoot::open_kernel_root("/sys/fs/cgroup")` once in linux_os.rs; another
+        # `fs` word there, or the same expression in another file, still refuses.
+        self.assertEqual(gate.check_linked_sources(self.base), 14)
+        os_rs = self.TREE[gate.LINUX_OS]
+        message = "names a std fs item other than its allowed ones"
+        for rel, text in ((gate.LINUX_OS, os_rs + 'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n'),
+                          (gate.LINUX_OS, os_rs + "fn f() { let _ = std::fs::read(p); }\n"),
+                          (gate.LINUX_OS, os_rs + "// under /sys/fs\n"),
+                          ("crates/effect-gate/src/substrate.rs",
+                           'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n')):
+            self.refused(gate.check_linked_sources, rel, text, message)
+
+    def test_aliases_fields_and_state(self):
+        os_rs = self.TREE[gate.LINUX_OS]
+        for rel, text, message in (
+                (gate.LINUX_OS, os_rs.replace("use gate_sys::openat::{read_bounded, FixedPath, KernelRoot};",
+                                              "use gate_sys::openat::{read_bounded, FixedPath, KernelRoot as Root};"), "renames or aliases"),
+                ("crates/effect-gate/src/substrate.rs", "type Roots = crate::linux_os::KernelRoots;\n", "renames or aliases"),
+                ("crates/effect-gate/src/substrate.rs", "type FixedPath = u8;\n", "renames or aliases"),
+                ("crates/gate-tls/src/upstream.rs", "use effect_gate::KernelObserver as O;\n", "renames or aliases"),
+                (gate.LINUX_OS, os_rs.replace("    proc_root: KernelRoot,\n}", "    proc_root: KernelRoot,\n    cache: Vec<u8>,\n}"),
+                 "not exactly two private KernelRoots"),
+                (gate.LINUX_OS, os_rs.replace("    proc_root: KernelRoot,\n}", "}"), "not exactly two private KernelRoots"),
+                (gate.LINUX_OS, os_rs.replace("    cgroup: KernelRoot,\n    proc_root", "    pub cgroup: KernelRoot,\n    proc_root"),
+                 "not exactly two private KernelRoots"),
+                (gate.LINUX_OS, os_rs.replace("    proc_root: KernelRoot,\n}", "    proc_root: Option<KernelRoot>,\n}"),
+                 "not exactly two private KernelRoots"),
+                (gate.LINUX_OS, os_rs + "static LAST: u8 = 0;\n", "names static"),
+                (gate.LINUX_OS, os_rs + "thread_local! { static C: u8 = 0; }\n", "names (static|thread_local)"),
+                (gate.LINUX_OS, os_rs + "fn f() { let _ = std::sync::OnceLock::<u8>::new(); }\n", "a lazy or once cell"),
+                (gate.LINUX_OS, os_rs + "fn f() { let _ = std::cell::LazyCell::new(g); }\n", "a lazy or once cell")):
+            self.refused(gate.check_observation, rel, text, message)
+
+
+WIRING_MAIN = """#![forbid(unsafe_code)]
+fn main() {}
+fn serve(sealed: &Sealed, config: GateConfig) -> u8 {
+    use effect_gate::linux_os::{KernelRoots, LinuxKernelReads, LinuxOs};
+    use effect_gate::{KernelObserver, PolicyGate, Substrate};
+    let Ok(os) = LinuxOs::with_net(sealed, &i05, &i07, net.clone(), config.writer_executable) else {
+        return status::SOCKETS;
+    };
+    // the roots, before the stores
+    let Ok(kernel) = KernelRoots::open_after_seal(sealed) else { return status::OBSERVER_ROOTS };
+    let stores = match FileStores::open_bound(a, b, c, d, e, None) { Ok(stores) => stores, Err(_) => return status::STORES };
+    let gate = match PolicyGate::create(&config.gate, &config.kinds, stores) { Ok(gate) => gate, Err(_) => return status::GATE };
+    let gate = gate.with_observer(Box::new(KernelObserver::new(LinuxKernelReads::new(kernel))));
+    let mut substrate = match Substrate::new(gate, os, i04, upstream, ExpectedPeers::r10(), config.lifetimes) {
+        Ok(substrate) => substrate,
+        Err(_) => return status::SUBSTRATE,
+    };
+    status::loop_exit(&substrate.run())
+}
+"""
+
+
+class ObserverWiringTests(Tree):
+    """HE-003A3 DESIGN section 5 (D1-3, D2-2): serve's two pinned statements, each exactly once and in order: the
+    kernel roots after LinuxOs::with_net and before FileStores::open_bound, the Linux observer on the PolicyGate after
+    it and before Substrate::new, which takes that gate."""
+
+    TREE = {gate.GATE_MAIN: WIRING_MAIN}
+
+    def test_the_wiring_passes(self):
+        self.assertEqual(gate.check_observer_wiring(self.base), 2)
+        self.write(gate.GATE_MAIN, WIRING_MAIN.replace("let Ok(kernel) = KernelRoots::open_after_seal(sealed) else",
+                                                       "let Ok ( kernel ) = KernelRoots :: open_after_seal ( sealed )\n        else"))
+        self.assertEqual(gate.check_observer_wiring(self.base), 2)
+
+    def test_every_departure_refuses(self):
+        roots = "    let Ok(kernel) = KernelRoots::open_after_seal(sealed) else { return status::OBSERVER_ROOTS };\n"
+        observer = "    let gate = gate.with_observer(Box::new(KernelObserver::new(LinuxKernelReads::new(kernel))));\n"
+        stores = "    let stores = match FileStores::open_bound("
+        for text, message in (
+                (WIRING_MAIN.replace(roots, ""), "exactly one"),
+                (WIRING_MAIN.replace(observer, ""), "exactly one"),
+                (WIRING_MAIN.replace(roots, "").replace("    let gate = match", roots + "    let gate = match"), "out of order"),
+                (WIRING_MAIN.replace(observer, "").replace("    status::loop_exit", observer + "    status::loop_exit"),
+                 "out of order"),
+                (WIRING_MAIN.replace(roots, roots + roots), "exactly one"),
+                (WIRING_MAIN.replace(observer, observer.replace("KernelObserver::new(LinuxKernelReads::new(kernel))", "Unobserved")),
+                 "exactly one"),
+                (WIRING_MAIN.replace(roots, roots.replace("OBSERVER_ROOTS", "SOCKETS")), "exactly one"),
+                (WIRING_MAIN.replace(observer, observer + "    let gate = gate.with_observer(Box::new(Unobserved));\n"),
+                 "with_observer outside"),
+                (WIRING_MAIN.replace(observer, observer + "    let gate = wrap(gate);\n"), "rebinds gate"),
+                (WIRING_MAIN.replace("Substrate::new(gate,", "Substrate::new(other,"), "exactly one"),
+                (WIRING_MAIN + "fn extra() { let _ = KernelRoots::open_after_seal; }\n", "KernelRoots outside")):
+            self.refused(gate.check_observer_wiring, gate.GATE_MAIN, text, message)
+
+
+class DebugKernelRootTests(Tree):
+    """HE-003A3 (D2-7): KernelRoot joins the Debug hazards, so no struct holding it derives Debug."""
+
+    TREE = DEBUG_TREE
+
+    def test_a_struct_holding_a_kernel_root_derives_no_debug(self):
+        for text in ("#[derive(Debug)]\npub struct KernelRoots { cgroup: KernelRoot, proc_root: KernelRoot }\n",
+                     "#[derive(Debug)]\npub struct LinuxKernelReads { cgroup: Option<KernelRoot> }\n"):
+            self.refused(gate.check_debug_derives, "crates/effect-gate/src/linux_os.rs", text, "mention KernelRoot")
 
 
 class PreMainAndPrintTests(Tree):

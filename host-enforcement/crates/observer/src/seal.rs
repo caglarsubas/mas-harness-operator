@@ -1,6 +1,7 @@
 //! The OBSERVER process seal (HE-004A DESIGN section 4): two stages with nothing between them in HE-004A (the observer
-//! reads no configuration yet, owner decision Q-HE4A-1 (b)), in safe Rust over `gate_sys::seal`'s raw calls, which are
-//! role-neutral and used unchanged (its `prctl` wrapper cannot reach `PR_SET_DUMPABLE`).
+//! reads no configuration yet: owner decision Q-HE4A-1, DESIGN-A §10 option (b), which the monitor's "(a), as
+//! recommended" decided, confirmed 2026-10-16; HE-003A3, D1-1), in safe Rust over `gate_sys::seal`'s raw calls, which
+//! are role-neutral and used unchanged (its `prctl` wrapper cannot reach `PR_SET_DUMPABLE`).
 //!
 //! - Preconditions: the process is single-threaded (the `Threads:` line of its own status file) and root (real,
 //!   effective and saved uid and gid 0, read before the filter, which kills `getresuid`).

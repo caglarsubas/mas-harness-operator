@@ -5,6 +5,7 @@
 
 mod support;
 
+use effect_gate::fake_kernel::convert_v3_config;
 use effect_gate::Config;
 use i05_protocol::json::{Object, Value};
 use support::*;
@@ -58,11 +59,13 @@ fn configuration_refusals() {
         for (key, value) in field(row, "override").as_object().expect("override").iter() {
             merged.insert(key.clone(), value.clone());
         }
-        let refusal = Config::from_value(&Value::Object(merged)).err().map(|error| error.message().to_string());
+        let (converted, _) = convert_v3_config(&Value::Object(merged)).expect("v4's conversion");
+        let refusal = Config::from_value(&converted).err().map(|error| error.message().to_string());
         assert_eq!(refusal.as_deref(), Some(text(row, "expect")), "configuration refusal {id}");
     }
     for name in ["ACTIVE", "INSPECTING", "LATER"] {
-        assert!(Config::from_value(field(field(&vectors, "configs"), name)).is_ok(), "{name} is accepted");
+        let (converted, _) = convert_v3_config(field(field(&vectors, "configs"), name)).expect("v4's conversion");
+        assert!(Config::from_value(&converted).is_ok(), "{name} is accepted");
     }
 }
 

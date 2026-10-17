@@ -54,6 +54,17 @@ none of the gate's post-seal APIs nor the method calls the OBSERVER filter kills
 planeon-observer has no membarrier symbol and holds its architecture's OBSERVER program bytes exactly once. Its wrapper
 inventory is not in HE-004A (owner decision Q-HE4A-B2 (a), open item OBSERVER-WRAPPER-INVENTORY in MODEL_DEFINED).
 
+HE-003A3 (the I05 gate channel v4 adoption; DESIGN rev 2.2 sections 2, 5 and 6) pins the v4 README and vectors among
+the contract files; excepts the observation's two root opens in linux_os.rs from the start-up lint; pins the callers of
+the observation's openers by exact call forms (open_kernel_root, open_after_seal, FixedPath's two constructors and
+open_fixed), the implementations of the observation's traits by (trait, type) pairs, the fake kernel's names to its
+own module and strict #[cfg(test)] blocks, its module's shape, the two exempted `type Pidfd` bindings, LinuxKernelReads's
+two root fields and linux_os.rs's lack of static state; refuses renames and aliases of the observation's types; pins
+serve's two statements (the kernel roots before the stores, the Linux observer after the PolicyGate, before the
+substrate) with their imports and the stage-2 refusal of KernelRoots; adds KernelRoot to the Debug hazards; and reads
+struct bodies with the STRUCT-ANGLE rule (owner decision Q-HE4A-5 (a)): the generic list and any where-clause skipped
+with a context-aware bracket scanner, angles nesting in type position and ignored in expressions.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -115,7 +126,8 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # Q-A2-1 (a)): the seccomp-v4 EFFECT_GATE programs of its record v3 (MET-ENFORCE-029) join them and are the ones the seal
 # embeds; the seccomp-v3 ones stay pinned, held but no longer embedded (17 files). HE-004A (DESIGN section 2, owner
 # decision Q-HE4A-4 (a)): the two OBSERVER programs its record v2 and v3 register for HE-004 (MET-ENFORCE-025), which
-# the observer's seal embeds (19 files).
+# the observer's seal embeds (19 files). HE-003A3 (DESIGN section 2, owner decisions Q-A3-1..15 (a)): the I05 gate
+# channel v4 README and vectors its record v4 registers for HE-003A3 (MET-ENFORCE-030, merged as fd362f9e), 21 files.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -124,6 +136,8 @@ CONTRACTS = {
     "contracts/i05-v3/outcome-mapping.json": "4466f379f1cc669e047cffd8afa5fa88b2cc7648a51e2d38b17f0bd5e2252a3a",
     "contracts/i05-v3/vectors.json": "ab75d86fe54ade7ee2695ef84b200d0473e14e4112e64e7702032593658763ed",
     "contracts/i05-v3-supplement/vectors.json": "1c00bdb3ea112af6098a09158cce3e4a7a6098c9670f490ead4ca65d8bdbb5ac",
+    "contracts/i05-v4/README.md": "b0af1f8784c7e9bcdd3793a1002d1000e222a13e5a7613b50b04ce5a116ed04d",
+    "contracts/i05-v4/vectors.json": "f314610f7ee3feb08533cb535f0a4c19fc991384b852b99a50a1646b0739b1e9",
     "contracts/i07-v1/README.md": "9e5cb3d1023bc12b9e2643ae42dde5a87640cf04fc8ac1aa88350c65b12ba2dc",
     "contracts/i07-v2/README.md": "cde20d7fee8661cd9314350849870fe5b0838b7914a60237d0eeb1f5dca39d39",
     "contracts/i07-v3/README.md": "a8c51a725b99d84351aba7a326196e7078c239ba4e28d3eaec1cf09fb3dca43d",
@@ -190,6 +204,9 @@ MAIN_USES = tuple(sorted(
     + [(("effect_gate", name), None) for name in ("seal_stage1", "seal_stage2", "GateConfig", "Sealed")]
     + [(("gate_tls", "signed_config", "self"), None), (("gate_tls", "signed_config", "LoadError"), None)]
     + [(("effect_gate", "file_store", "fstat_device"), None), (("effect_gate", "linux_os", "LinuxOs"), None)]
+    # HE-003A3 (DESIGN section 5, D2-2): the observation's roots, its Linux reads and the driver.
+    + [(("effect_gate", "linux_os", "KernelRoots"), None), (("effect_gate", "linux_os", "LinuxKernelReads"), None),
+       (("effect_gate", "KernelObserver"), None)]
     + [(("effect_gate", "linux_net", name), None) for name in ("LinuxConnector", "LinuxStreams", "NetTable")]
     + [(("effect_gate", name), None) for name in ("ExpectedPeers", "FileStores", "ListenerPlan", "Owner", "PolicyGate",
                                                   "Stores", "Substrate")]
@@ -228,7 +245,9 @@ RUST_KEYWORDS = {"as", "async", "await", "break", "const", "continue", "crate", 
 # `use gate_sys::Dir;` at the start of a line is removed there first; a second one, `pub use`, a group, a rename,
 # another gate-sys path or a qualified `gate_sys::` expression still refuses.
 BEFORE_SEAL_REFUSED = (r"\bgate_sys\b", r"\bPoller\b", r"\blisten_", r"\bconnect_", r"\bNetTable\b", r"\bLinuxOs\b",
-                       r"\bLinuxConnector\b", r"\bstd::net\b", r"\bstd::thread\b", r"\bthread::")
+                       r"\bLinuxConnector\b", r"\bstd::net\b", r"\bstd::thread\b", r"\bthread::",
+                       # HE-003A3 (DESIGN section 5, D2-2): the observation's roots exist only after the seal.
+                       r"\bKernelRoots\b")
 SIGNED_CONFIG_DIR = re.compile(r"(?m)^[ \t]*use\s+gate_sys::Dir\s*;")
 # HE-003D DESIGN section 5 (D1-3, D2-6): gate-sys's socket modules are reached only from effect-gate's linux_os.rs and
 # linux_net.rs (whose public constructors take &Sealed), which re-export nothing (no `pub use`), and from gate-sys.
@@ -371,7 +390,15 @@ FD_FILES = (OPENAT, CHANNEL, TCP)
 STATUS_READ = 'Dir::at("/proc/self")?.file_ro("status")'
 SOCKCREATE_DIR = 'Dir::at("/proc/thread-self/attr")'
 PEER_DIR = 'Dir::at(&format!("/proc/{}", pid))'
+# HE-003A3 (DESIGN sections 5 and 6, D2-5): the observation's two root opens, each exactly once in linux_os.rs (the
+# observation rules pin both inside KernelRoots::open_after_seal).
+LINUX_OS = "crates/effect-gate/src/linux_os.rs"
+CGROUP_ROOT = 'KernelRoot::open_kernel_root("/sys/fs/cgroup")'
+PROC_ROOT = 'KernelRoot::open_kernel_root("/proc")'
+CGROUP_ROOT_CALL = re.compile(r'\bKernelRoot\s*::\s*open_kernel_root\s*\(\s*"/sys/fs/cgroup"\s*\)')
+PROC_ROOT_CALL = re.compile(r'\bKernelRoot\s*::\s*open_kernel_root\s*\(\s*"/proc"\s*\)')
 STARTUP_EXCEPTIONS = {
+    LINUX_OS: ((CGROUP_ROOT, CGROUP_ROOT_CALL), (PROC_ROOT, PROC_ROOT_CALL)),
     SEAL: ((STATUS_READ,
             re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')),),
     CHANNEL: ((SOCKCREATE_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/thread-self/attr"\s*\)')),
@@ -405,12 +432,70 @@ READ_LINK_CALL = re.compile(r'\bread_link\s*\(\s*"exe"\s*,')
 # body, and nowhere in another linked source, so no second wrapper under another name can read a link.
 READLINKAT = re.compile(r"\breadlinkat\b")
 READLINKAT_DECLARATION = re.compile(r"\bfn\s+readlinkat\s*\(")
+# HE-003A3 (DESIGN sections 4-6; D2-1, D2-5, D3-1, D3-2, D3-4): the observation's rules over the linked crates'
+# non-test sources. Callers: each distinctive opener or constructor word occurs only as its definition and its exact
+# calls (read without comments, literals kept). Implementations: every impl header naming WorkerObserver or KernelReads
+# is one of OBSERVATION_IMPLS, each exactly once in its file (no other, blanket, generic or primitive impl). The fake
+# kernel: its module name and its two names occur only in fake_kernel.rs, lib.rs's one `pub mod fake_kernel;` and
+# strict `#[cfg(test)] mod tests { .. }` blocks; fake_kernel.rs defines no other type, alias, re-export or wrapper.
+# Renames and aliases of OBSERVATION_TYPES refuse anywhere. LinuxKernelReads's only fields are two KernelRoots, and
+# linux_os.rs holds no static or thread-local state.
+OBSERVATION_RS = "crates/effect-gate/src/observation.rs"
+FAKE_KERNEL = "crates/effect-gate/src/fake_kernel.rs"
+EFFECT_GATE_LIB = "crates/effect-gate/src/lib.rs"
+PROBE_WORKER_LEAF = "planeon.slice/planeon-capacity-broker.service/probe-worker/cgroup.procs"
+OBSERVATION_CALLERS = (
+    # (word, the definition's file, the definition, the calling file, the exact call forms in it, exactly or at least)
+    ("open_kernel_root", OPENAT, r"\bfn\s+open_kernel_root\s*\(", LINUX_OS, (CGROUP_ROOT_CALL, PROC_ROOT_CALL), "exactly"),
+    ("open_after_seal", LINUX_OS, r"\bfn\s+open_after_seal\s*\(", GATE_MAIN,
+     (re.compile(r"\bKernelRoots\s*::\s*open_after_seal\s*\(\s*sealed\s*\)"),), "exactly"),
+    ("from_constant", OPENAT, r"\bfn\s+from_constant\s*\(", LINUX_OS,
+     (re.compile(r'\bFixedPath\s*::\s*from_constant\s*\(\s*"%s"\s*\)' % re.escape(PROBE_WORKER_LEAF)),), "exactly"),
+    ("pid_stat", OPENAT, r"\bfn\s+pid_stat\s*\(", LINUX_OS, (re.compile(r"\bFixedPath\s*::\s*pid_stat\s*\("),), "exactly"),
+    ("open_fixed", OPENAT, r"\bfn\s+open_fixed\s*\(", LINUX_OS, (re.compile(r"\.\s*open_fixed\s*\("),), "at least"),
+)
+OBSERVATION_IMPLS = {
+    "impl WorkerObserver for Unobserved": OBSERVATION_RS,
+    "impl < K : KernelReads > WorkerObserver for KernelObserver < K >": OBSERVATION_RS,
+    "impl < K : KernelReads > KernelObserver < K >": OBSERVATION_RS,
+    "impl KernelReads for LinuxKernelReads": LINUX_OS,
+    "impl KernelReads for FakeKernel": FAKE_KERNEL,
+}
+OBSERVATION_TRAITS = re.compile(r"\b(?:WorkerObserver|KernelReads)\b")
+IMPL_WORD = re.compile(r"\bimpl\b")
+HEADER_TOKEN = re.compile(r"[A-Za-z_]\w*|'\w+|\S")
+FAKE_NAMES = re.compile(r"\b(?:fake_kernel|FakeKernel|convert_v3_config)\b")
+FAKE_MOD = re.compile(r"\bpub\s+mod\s+fake_kernel\s*;")
+CFG_TEST_LINE = re.compile(r"(?m)^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\][ \t]*\n[ \t]*mod[ \t]+tests[ \t]*\{")
+OBSERVATION_TYPES = ("WorkerObserver", "KernelReads", "KernelObserver", "FakeKernel", "KernelRoot", "KernelRoots",
+                     "FixedPath", "LinuxKernelReads")
+OBSERVATION_ALIASES = (re.compile(r"\b(?:%s)\s+as\b" % "|".join(OBSERVATION_TYPES)),
+                       re.compile(r"\bas\s+(?:%s)\b" % "|".join(OBSERVATION_TYPES)),
+                       re.compile(r"\btype\s+\w+\s*(?:<[^>]*>)?\s*=\s*[\w:<> ]*\b(?:%s)\b" % "|".join(OBSERVATION_TYPES)),
+                       re.compile(r"\btype\s+(?:%s)\b" % "|".join(OBSERVATION_TYPES)))
+PIDFD_TYPE = {LINUX_OS: (re.compile(r"\bimpl\s+KernelReads\s+for\s+LinuxKernelReads\s*\{"),
+                         re.compile(r"\btype\s+Pidfd\s*=\s*PidFd\s*;")),
+              FAKE_KERNEL: (re.compile(r"\bimpl\s+KernelReads\s+for\s+FakeKernel\s*\{"),
+                            re.compile(r"\btype\s+Pidfd\s*=[^;]*;"))}
+LINUX_OS_STATE = ((re.compile(r"(?<!')\bstatic\b"), "static"), (re.compile(r"\bthread_local\b"), "thread_local!"),
+                  (re.compile(r"\b(?:OnceLock|OnceCell|LazyLock|LazyCell)\b"), "a lazy or once cell"))
+ROOT_FIELD = re.compile(r"\s*[a-z_]\w*\s*:\s*KernelRoot\s*")
+# DESIGN section 5 (D1-3, D2-2): serve's two statements, each exactly once and in this order: LinuxOs::with_net, the
+# roots, FileStores::open_bound, the PolicyGate's observer, Substrate::new (which takes that `gate`).
+ROOTS_STATEMENT = re.compile(r"\blet\s+Ok\s*\(\s*kernel\s*\)\s*=\s*KernelRoots\s*::\s*open_after_seal\s*\(\s*sealed\s*\)\s*else"
+                             r"\s*\{\s*return\s+status\s*::\s*OBSERVER_ROOTS\s*;?\s*\}\s*;")
+OBSERVER_STATEMENT = re.compile(r"\blet\s+gate\s*=\s*gate\s*\.\s*with_observer\s*\(\s*Box\s*::\s*new\s*\(\s*KernelObserver\s*::"
+                                r"\s*new\s*\(\s*LinuxKernelReads\s*::\s*new\s*\(\s*kernel\s*\)\s*\)\s*\)\s*\)\s*;")
+WIRING_ORDER = (re.compile(r"\bLinuxOs\s*::\s*with_net\s*\("), ROOTS_STATEMENT, re.compile(r"\bFileStores\s*::\s*open_bound\s*\("),
+                OBSERVER_STATEMENT, re.compile(r"\bSubstrate\s*::\s*new\s*\(\s*gate\s*,"))
 # HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
 # with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
 # struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
 # impls and direct formatting are code review's.
 DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir", "TcpListener", "TcpConn",
-                 "NetTable", "LinuxConnector")
+                 "NetTable", "LinuxConnector",
+                 # HE-003A3 (DESIGN section 5, D2-7): the observation's O_PATH root handle.
+                 "KernelRoot")
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
@@ -1134,7 +1219,9 @@ def check_linked_sources(base: Path) -> int:
             require(not re.search(pattern, scanned), "%s names %s (linked-source tripwire)" % (rel, pattern.replace("\\b", "")))
         require(rel in FD_FILES or not FD_ITEMS.search(text),
                 "%s names a std::os::fd item outside %s" % (rel, " and ".join(FD_FILES)))
-        rest = text
+        # HE-003A3 (R96): the cgroup2 root's one exact open in linux_os.rs holds the path segment `fs`, excepted once
+        # there, as in the start-up lint; any other `fs` word still refuses.
+        rest = CGROUP_ROOT_CALL.sub(" ", text, count=1) if rel == LINUX_OS else text
         for item, allowed in FS_ITEMS:
             if allowed(rel):
                 rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
@@ -1816,32 +1903,86 @@ def item_text(code: str, start: int, kind: str) -> str:
     raise GateError("an item the socket-module check cannot read")
 
 
-def struct_fields(code: str, start: int) -> list[str]:
-    """The field texts of the struct whose name ends at `start`: its braced or tuple body, split at the commas outside
-    brackets (`->` read as no bracket); a unit struct has none. A body the reader cannot close refuses."""
-    opening = re.compile(r"[{(;]").search(code, start)
-    require(opening, "a struct the socket-module check cannot read")
-    if opening.group(0) == ";":
-        return []
-    close = {"{": "}", "(": ")"}[opening.group(0)]
-    depth, index = 0, opening.start()
+def bracket_scan(code: str, index: int, stops: str, what: str, body: bool = False) -> tuple[int, list[int], list[int]]:
+    """HE-003A3 (STRUCT-ANGLE, owner decision Q-HE4A-5 (a), DESIGN section 6, D1-5, D2-3, D3-3): walks `code` from
+    `index` in type position with an empty bracket stack until one of `stops` at depth 0 (the stack empty); returns
+    that index and the positions of the commas and of the `=` at depth 0. In type position every `(`, `[` and `<` opens
+    and every `)`, `]` and `>` closes its own kind (`>>` is two closers, `->` is no bracket), so a generic argument list,
+    a qualified path `<u8 as Tr<u8, u8>>::A` and a higher-ranked `for<'a>` all nest; an array length after its `;` up
+    to the matching `]` and every `{ .. }` block are expression contexts, where `<` and `>` (and `<<`, `>>`, `<=`, `>=`)
+    are operators and everything nested is an expression too. In a struct `body`, a `=` at depth 0 (a field default)
+    makes the rest of that field an expression context too, up to the next comma at depth 0 (D3-3), so the caller sees
+    the `=` and refuses it; generic defaults are types and keep the type rule. A closer of the wrong kind, a `>` with
+    no open angle or the end of the code refuses (`what` names the reader)."""
+    stack: list[list[str]] = []
+    commas, equals = [], []
+    default = False
     while index < len(code):
-        depth += {opening.group(0): 1, close: -1}.get(code[index], 0)
-        if depth == 0:
-            break
+        char = code[index]
+        if code.startswith("->", index):
+            index += 2
+            continue
+        if not stack and char in stops:
+            return index, commas, equals
+        mode = stack[-1][1] if stack else ("expr" if default else "type")
+        if char in "([{":
+            stack.append([char, "expr" if mode == "expr" or char == "{" else "type"])
+        elif char == "<" and mode == "type":
+            stack.append(["<", "type"])
+        elif char == ">" and mode == "type":
+            require(stack and stack[-1][0] == "<", "%s cannot read" % what)
+            stack.pop()
+        elif char in ")]}":
+            require(stack and stack[-1][0] == {")": "(", "]": "[", "}": "{"}[char], "%s cannot read" % what)
+            stack.pop()
+        elif char == ";" and stack and stack[-1] == ["[", "type"]:
+            stack[-1][1] = "expr"
+        elif char == "," and not stack:
+            commas.append(index)
+            default = False
+        elif char == "=" and not stack:
+            equals.append(index)
+            default = body
         index += 1
-    require(depth == 0, "a struct the socket-module check cannot read")
-    inner = code[opening.start() + 1:index].replace("->", "  ")
-    fields, depth, begin = [], 0, 0
-    for position, char in enumerate(inner):
-        if char in "([{<":
-            depth += 1
-        elif char in ")]}>":
-            depth -= 1
-        elif char == "," and depth == 0:
-            fields.append(inner[begin:position])
-            begin = position + 1
-    fields.append(inner[begin:])
+    raise GateError("%s cannot read" % what)
+
+
+def struct_fields(code: str, start: int) -> list[str]:
+    """The field texts of the struct whose name ends at `start` (HE-003A3, the STRUCT-ANGLE rule and the struct-body
+    defect, Q-HE4A-5 (a)): the generic parameter list is skipped with `bracket_scan`'s angle rule (so `S<F: Fn(u8) ->
+    (u8, u8)>` or a default `{ 1 << 2 }` never ends it early); then a `(` opens a tuple body, after which only an
+    optional where-clause and `;` may follow; otherwise an optional where-clause is skipped up to the `{` at depth 0 of
+    all four bracket kinds (braces inside a where-clause or a generic default are nested, never the body), or a unit
+    struct ends at its `;` at depth 0 after any where-clause. The body is split at its commas at depth 0 of `(`, `[`,
+    `{` and `<` under the same rule. A `=` at the body's depth 0 (a field default) refuses, so no default expression
+    can hide a field; so does anything the reader cannot delimit."""
+    what = "a struct the socket-module check"
+    index = start
+    while index < len(code) and code[index].isspace():
+        index += 1
+    if code.startswith("<", index):
+        index = bracket_scan(code, index + 1, ">", what)[0] + 1
+    rest = re.compile(r"\s*").match(code, index).end()
+    if code.startswith("(", rest):
+        close, commas, equals = bracket_scan(code, rest + 1, ")", what, body=True)
+        tail = re.compile(r"\s*").match(code, close + 1).end()
+        if re.match(r"where\b", code[tail:]):
+            tail = bracket_scan(code, tail, ";{", what)[0]
+        require(code.startswith(";", tail), "%s cannot read" % what)
+        body, opening = code[rest + 1:close], rest + 1
+    else:
+        require(code.startswith(("{", ";"), rest) or re.match(r"where\b", code[rest:]), "%s cannot read" % what)
+        stop = bracket_scan(code, rest, "{;", what)[0]
+        if code[stop] == ";":
+            return []
+        close, commas, equals = bracket_scan(code, stop + 1, "}", what, body=True)
+        body, opening = code[stop + 1:close], stop + 1
+    require(not equals, "%s cannot read (a field default)" % what)
+    fields, begin = [], 0
+    for comma in commas:
+        fields.append(body[begin:comma - opening])
+        begin = comma - opening + 1
+    fields.append(body[begin:])
     return [field for field in fields if field.strip()]
 
 
@@ -1949,7 +2090,10 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
                     "%s has a pub %s of a fn-pointer type (socket-module check)" % (rel, item.group(1)))
             require(not FN_TRAIT.search(typed),
                     "%s has a pub %s of an Fn-trait type (socket-module check)" % (rel, item.group(1)))
+    exempt = pidfd_binding(rel, code, "socket-module check", required=False)
     for alias in TYPE_ITEM.finditer(code):
+        if alias.start() == exempt:
+            continue
         require(PUB_PREFIX.search(code[:alias.start()]), "%s defines a private type alias (socket-module check)" % rel)
     for struct in STRUCT_ITEM.finditer(code):
         for field in struct_fields(code, struct.end()):
@@ -2012,6 +2156,180 @@ def check_read_link(base: Path) -> int:
     require(named in positions and len(calls) == 1 and body[0] < calls[0] < body[1]
             and re.match(r"readlinkat\s*\(", code[calls[0]:]), message % OPENAT)
     return sum(len(READ_LINK.findall(code)) for code in found.values())
+
+
+def pidfd_binding(rel: str, code: str, rule: str, required: bool = True) -> int:
+    """HE-003A3 (DESIGN section 5, D3-1): the position of the one associated `type Pidfd = ..;` binding a file may
+    hold, inside its `impl KernelReads for <its type>` block (`type Pidfd = PidFd;` in linux_os.rs, any one type in
+    fake_kernel.rs); -1 for any other file, and (unless `required`) for a file without that block. More than one such
+    block, or a block without exactly one such binding, refuses. The binding in linux_os.rs exposes gate-sys's PidFd,
+    which creates no socket, from a LinuxKernelReads that exists only after open_after_seal(&Sealed)."""
+    if rel not in PIDFD_TYPE:
+        return -1
+    header, binding = PIDFD_TYPE[rel]
+    blocks = list(header.finditer(code))
+    if not blocks and not required:
+        return -1
+    require(len(blocks) == 1, "%s does not hold exactly one KernelReads impl block (%s)" % (rel, rule))
+    opening = blocks[0].end() - 1
+    inside = [match for match in binding.finditer(code) if opening < match.start() < block_end(code, opening)]
+    require(len(inside) == 1, "%s does not bind exactly one type Pidfd in its KernelReads impl (%s)" % (rel, rule))
+    return inside[0].start()
+
+
+def impl_headers(rel: str, code: str) -> list[tuple[int, str]]:
+    """Each item-level impl header of a source (read without comments, literal contents emptied) as (position, its
+    tokens joined by single spaces), from `impl` to the `{` or `;` at depth 0 of the STRUCT-ANGLE scanner. An item-level
+    `impl` starts the file or follows `{`, `}`, `;`, an attribute's `]` or `unsafe`; `impl Trait` in a parameter or
+    return type (after `:`, `(`, `,`, `<`, `&` or `->`) is a type, not an implementation."""
+    headers = []
+    for word in IMPL_WORD.finditer(code):
+        before = code[:word.start()].rstrip()
+        if before and before[-1] not in "{};]" and not re.search(r"\bunsafe$", before):
+            continue
+        end = bracket_scan(code, word.end(), "{;", "%s: an impl header the observation rules" % rel)[0]
+        headers.append((word.start(), " ".join(HEADER_TOKEN.findall(code[word.start():end]))))
+    return headers
+
+
+def cfg_test_blocks(code: str) -> list[tuple[int, int]]:
+    """The strict in-source test modules of a source read without comments (D3-2): `#[cfg(test)]` alone on its line,
+    directly above `mod tests {`, with no other attribute on the line above it; each as (start, end) of the block."""
+    blocks = []
+    for match in CFG_TEST_LINE.finditer(code):
+        before = code[:match.start()].rstrip()
+        if before.endswith("]"):
+            continue
+        blocks.append((match.start(), block_end(code, match.end() - 1)))
+    return blocks
+
+
+def check_observation(base: Path) -> int:
+    """HE-003A3 DESIGN sections 4-6 (D2-1, D2-5, D3-1, D3-2, D3-4) over the linked crates' non-test sources:
+    - callers: each OBSERVATION_CALLERS word occurs (read without comments, literals kept) only as its one definition
+      in its file and its exact calls in the calling file (exactly those, or at least one for open_fixed); the two
+      root opens lie inside KernelRoots::open_after_seal's body;
+    - implementations: every impl header naming WorkerObserver or KernelReads is one of OBSERVATION_IMPLS, in its file,
+      each exactly once (no other, blanket, generic, primitive or path-qualified impl);
+    - the fake kernel: fake_kernel, FakeKernel and convert_v3_config occur (read without comments, literal contents
+      emptied) only in fake_kernel.rs, as lib.rs's one `pub mod fake_kernel;` and inside strict #[cfg(test)] mod tests
+      blocks; fake_kernel.rs re-exports nothing, defines no struct but FakeKernel, no enum, union or trait, no impl but
+      `impl FakeKernel` and `impl KernelReads for FakeKernel`, no type item but its one `type Pidfd`, and names neither
+      KernelObserver nor WorkerObserver (no wrapper);
+    - no linked source renames or aliases OBSERVATION_TYPES;
+    - linux_os.rs: LinuxKernelReads's only fields are two KernelRoots, and the file names no static, thread_local! or
+      once or lazy cell.
+    The number of sources."""
+    sources = linked_sources(base)
+    rule = "observation rules"
+    for rel in (OBSERVATION_RS, FAKE_KERNEL, EFFECT_GATE_LIB, LINUX_OS, OPENAT, GATE_MAIN):
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    kept, codes = {}, {}
+    for rel, raw in sources:
+        try:
+            kept[rel], codes[rel] = rust_code(raw, literals=True), rust_code(raw)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    for word, home, definition, caller, calls, how in OBSERVATION_CALLERS:
+        pattern = re.compile(r"\b%s\b" % word)
+        for rel, code in kept.items():
+            if rel not in (home, caller):
+                require(not pattern.search(code), "%s names %s; only %s defines it and %s calls it (%s)"
+                        % (rel, word, home, caller, rule))
+        own = kept[home]
+        require(len(pattern.findall(own)) == 1 and re.search(definition, own),
+                "%s does not name %s exactly once, as its definition (%s)" % (home, word, rule))
+        found = kept[caller]
+        exact = [match for call in calls for match in call.finditer(found)]
+        if how == "exactly":
+            require(len(pattern.findall(found)) == len(calls) and len(exact) == len(calls)
+                    and all(len(call.findall(found)) == 1 for call in calls),
+                    "%s does not name %s exactly as its pinned calls (%s)" % (caller, word, rule))
+        else:
+            require(exact and len(pattern.findall(found)) == len(exact),
+                    "%s names %s other than as a method call (%s)" % (caller, word, rule))
+    definition = re.search(r"\bfn\s+open_after_seal\s*\(", kept[LINUX_OS])
+    opening = kept[LINUX_OS].find("{", definition.end())
+    body = (opening, block_end(kept[LINUX_OS], opening))
+    for call in (CGROUP_ROOT_CALL, PROC_ROOT_CALL):
+        position = call.search(kept[LINUX_OS]).start()
+        require(body[0] < position < body[1], "%s opens a kernel root outside KernelRoots::open_after_seal (%s)"
+                % (LINUX_OS, rule))
+    seen = {header: 0 for header in OBSERVATION_IMPLS}
+    for rel, code in codes.items():
+        for _, header in impl_headers(rel, code):
+            if not OBSERVATION_TRAITS.search(header):
+                continue
+            require(OBSERVATION_IMPLS.get(header) == rel, "%s holds the impl `%s`, not one of the observation's pinned "
+                    "(trait, type) pairs (%s)" % (rel, header, rule))
+            seen[header] += 1
+    require(all(count == 1 for count in seen.values()), "the observation's impls are not each exactly once: %s (%s)"
+            % (sorted(header for header, count in seen.items() if count != 1), rule))
+    for rel, code in codes.items():
+        for pattern in OBSERVATION_ALIASES:
+            require(not pattern.search(PATH_SPACE.sub("::", code)), "%s renames or aliases an observation type (%s)"
+                    % (rel, rule))
+        if rel == FAKE_KERNEL:
+            continue
+        rest = code
+        if rel == EFFECT_GATE_LIB:
+            require(len(FAKE_MOD.findall(rest)) == 1, "%s does not declare pub mod fake_kernel; exactly once (%s)"
+                    % (rel, rule))
+            rest = FAKE_MOD.sub(" ", rest, count=1)
+        for start, end in reversed(cfg_test_blocks(rest)):
+            rest = rest[:start] + " " + rest[end:]
+        require(not FAKE_NAMES.search(rest), "%s names the fake kernel outside a strict #[cfg(test)] mod tests block "
+                "(%s)" % (rel, rule))
+    fake = codes[FAKE_KERNEL]
+    require(not PUB_USE.search(fake) and not re.search(r"\buse\s+(?:self|super|crate)::fake_kernel\b", fake),
+            "%s re-exports (%s)" % (FAKE_KERNEL, rule))
+    require([match.group(0).split()[-1] for match in STRUCT_ITEM.finditer(fake)] == ["FakeKernel"],
+            "%s defines a struct other than FakeKernel (%s)" % (FAKE_KERNEL, rule))
+    require(not re.search(r"\b(?:enum|union|trait)\s+[A-Za-z_]", fake), "%s defines another type (%s)" % (FAKE_KERNEL, rule))
+    require(sorted(header for _, header in impl_headers(FAKE_KERNEL, fake))
+            == ["impl FakeKernel", "impl KernelReads for FakeKernel"],
+            "%s holds an impl other than FakeKernel's two (%s)" % (FAKE_KERNEL, rule))
+    exempt = pidfd_binding(FAKE_KERNEL, fake, rule)
+    require([match.start() for match in TYPE_ITEM.finditer(fake)] == [exempt],
+            "%s defines a type item other than its one type Pidfd (%s)" % (FAKE_KERNEL, rule))
+    require(not re.search(r"\b(?:KernelObserver|WorkerObserver)\b", fake),
+            "%s names an observer (a wrapper) (%s)" % (FAKE_KERNEL, rule))
+    linux = codes[LINUX_OS]
+    structs = [match for match in STRUCT_ITEM.finditer(linux) if match.group(0).split()[-1] == "LinuxKernelReads"]
+    require(len(structs) == 1, "%s does not define LinuxKernelReads exactly once (%s)" % (LINUX_OS, rule))
+    fields = struct_fields(linux, structs[0].end())
+    require(len(fields) == 2 and all(ROOT_FIELD.fullmatch(field) for field in fields),
+            "LinuxKernelReads's fields are not exactly two private KernelRoots (%s)" % rule)
+    for pattern, name in LINUX_OS_STATE:
+        require(not pattern.search(linux), "%s names %s (no cache for the observation's reads) (%s)" % (LINUX_OS, name, rule))
+    return len(sources)
+
+
+def check_observer_wiring(base: Path) -> int:
+    """HE-003A3 DESIGN section 5 (D1-3, D2-2): the binary's main.rs (read without comments) holds serve's two pinned
+    statements, ROOTS_STATEMENT and OBSERVER_STATEMENT, each exactly once and in WIRING_ORDER (after LinuxOs::with_net
+    the roots, before FileStores::open_bound; after it the observer, before Substrate::new, which takes that gate);
+    with_observer, KernelRoots, LinuxKernelReads and KernelObserver occur nowhere else but in its imports; and exactly
+    two `let gate` bindings, the second the observer's. So a production gate always carries the Linux observer. The
+    number of statements."""
+    try:
+        code = rust_code((base / GATE_MAIN).read_text(encoding="utf-8"))
+    except GateError as error:
+        raise GateError("%s: %s (observer wiring)" % (GATE_MAIN, error)) from None
+    positions = []
+    for pattern in WIRING_ORDER:
+        found = list(pattern.finditer(code))
+        require(len(found) == 1, "%s does not hold exactly one %s (observer wiring)" % (GATE_MAIN, pattern.pattern[:48]))
+        positions.append(found[0].start())
+    require(positions == sorted(positions), "%s holds serve's statements out of order (observer wiring)" % GATE_MAIN)
+    uses = re.sub(r"\buse\b[^;]*;", " ", code)
+    for word, count in (("with_observer", 1), ("KernelRoots", 1), ("LinuxKernelReads", 1), ("KernelObserver", 1)):
+        require(len(re.findall(r"\b%s\b" % word, uses)) == count,
+                "%s names %s outside its imports and pinned statement (observer wiring)" % (GATE_MAIN, word))
+    bindings = [match.start() for match in re.finditer(r"\blet\s+gate\b", code)]
+    require(len(bindings) == 2 and bindings[1] == positions[3],
+            "%s rebinds gate other than as the PolicyGate and its observer (observer wiring)" % GATE_MAIN)
+    return 2
 
 
 def check_macros(base: Path) -> int:
@@ -2236,6 +2554,16 @@ def main() -> int:
         say("read_link: the word occurs %d times in the linked sources, as its definition in %s and the one call "
             "read_link(\"exe\", ..) in %s; readlinkat occurs only in %s, as its declaration and the one call in "
             "read_link (HE-003A2)" % (check_read_link(HE), OPENAT, CHANNEL, OPENAT))
+        say("observation: %d linked sources call open_kernel_root, open_after_seal, FixedPath::from_constant, "
+            "FixedPath::pid_stat and open_fixed only by their pinned forms (the two root opens inside "
+            "KernelRoots::open_after_seal, the probe-worker leaf literal exact); implement WorkerObserver and KernelReads "
+            "only by the pairs %s; name the fake kernel only in %s, lib.rs's pub mod and strict #[cfg(test)] mod tests "
+            "blocks (it defines nothing else); rename or alias none of %s; LinuxKernelReads holds two KernelRoots and "
+            "linux_os.rs no static state (HE-003A3)"
+            % (check_observation(HE), "; ".join(OBSERVATION_IMPLS), FAKE_KERNEL, ", ".join(OBSERVATION_TYPES)))
+        say("observer wiring: %d statements of serve, the kernel roots after LinuxOs::with_net and before the stores "
+            "(status OBSERVER_ROOTS) and the Linux observer on the PolicyGate before Substrate::new, each exactly once "
+            "(HE-003A3)" % check_observer_wiring(HE))
         say("macros: %d linked sources define no macro_rules or macro item and carry no #[macro_export]"
             % check_macros(HE))
         say("code before main: %d linked sources name no link_section, #[used], init_array, no_mangle or export_name"

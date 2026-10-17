@@ -3,8 +3,9 @@
 //! raw calls, then the published OBSERVER seccomp program; SEC-4 and HI-7 for OBSERVER) and the exit-status table
 //! (`status`). Std only and safe Rust (the root forbids `unsafe_code`); the generic seal engine is crate-private and the
 //! Linux stages are the only makers of the `Stage1` and `Sealed` tokens. No configuration is read in HE-004A (owner
-//! decision Q-HE4A-1 (b)); HE-004B and HE-004C add the I06/ADM-4 logic and the apiserver client. The R10-defined
-//! behaviour is listed in `crates/effect-gate/MODEL_DEFINED.md` (the HE-004A section).
+//! decision Q-HE4A-1: DESIGN-A §10 option (b), which the monitor's "(a), as recommended" decided, confirmed 2026-10-16;
+//! HE-003A3, D1-1); HE-004B and HE-004C add the I06/ADM-4 logic and the apiserver client. The R10-defined behaviour is
+//! listed in `crates/effect-gate/MODEL_DEFINED.md` (the HE-004A section).
 #![forbid(unsafe_code)]
 
 pub mod seal;

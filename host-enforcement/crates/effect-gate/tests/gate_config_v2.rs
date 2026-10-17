@@ -33,7 +33,7 @@ fn active_gate() -> Value {
     let vectors = json::parse(I07_VECTORS).expect("the I07 vectors parse");
     let mut gate = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().expect("ACTIVE");
     let Value::Object(members) = &mut gate else { panic!("ACTIVE is an object") };
-    members.insert(JStr::new("observedWorkers"), Value::Array(Vec::new()));
+    members.remove(&JStr::new("observedWorkers")).expect("the I07 v3 configuration lists observed workers");
     gate
 }
 
@@ -81,7 +81,7 @@ fn refused_check(executable: &str, what: &str) {
 
 #[test]
 fn the_format_is_v2_and_the_enrolled_path_is_typed() {
-    assert_eq!(FORMAT, "planeon.effect-gate-config/v2");
+    assert_eq!(FORMAT, "planeon.effect-gate-config/v3");
     assert_eq!(DELETED_SUFFIX, " (deleted)");
     let config = parse(&document()).expect("the valid v2 document passes");
     assert_eq!(config.writer_executable, ENROLLED.as_bytes());
@@ -180,7 +180,7 @@ fn a_v1_document_is_refused() {
     // A complete v1 document (no enrolledWriter, the v1 format) is refused too.
     members(&mut v1).remove(&JStr::new("enrolledWriter")).expect("the member exists");
     assert!(matches!(parse(&v1), Err(GateConfigError::Schema(_))), "a v1 document");
-    let mut v3 = document();
-    members(&mut v3).insert(JStr::new("format"), Value::str("planeon.effect-gate-config/v3"));
-    assert!(matches!(parse(&v3), Err(GateConfigError::Schema(_))), "another version");
+    let mut v2 = document();
+    members(&mut v2).insert(JStr::new("format"), Value::str("planeon.effect-gate-config/v2"));
+    assert!(matches!(parse(&v2), Err(GateConfigError::Schema(_))), "another version");
 }

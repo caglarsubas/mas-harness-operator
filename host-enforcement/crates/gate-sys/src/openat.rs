@@ -22,16 +22,29 @@
 //!   with the same name check, through musl's `readlinkat` wrapper on the directory's own descriptor (never `AT_FDCWD`,
 //!   and the name is never absolute, so the descriptor is never ignored): the gate's read of its writer peer's `exe`
 //!   link through the retained process directory. A full buffer, an empty result and any error are refused.
+//! - [`KernelRoot`] (HE-003A3 DESIGN section 5, owner decisions Q-A3-5 and Q-A3-15 (a); Linux only) is the observation's
+//!   root handle, a type of its own: [`KernelRoot::open_kernel_root`] opens a directory by absolute path with
+//!   `O_PATH|O_DIRECTORY|O_CLOEXEC` (no `open` or `read` of the directory itself, which SELinux matrix v5 does not grant
+//!   the gate), and its only method, [`KernelRoot::open_fixed`], opens one [`FixedPath`] relative to it, read-only,
+//!   never following a final symbolic link (`O_RDONLY|O_CLOEXEC|O_NOFOLLOW`). A `FixedPath` is 1 to 4 components of
+//!   `[A-Za-z0-9._-]+`, none `.` or `..`, built from a constant ([`FixedPath::from_constant`]) or as `<pid>/stat` for a
+//!   process number of at least 1 ([`FixedPath::pid_stat`]); `tools/gate.py` pins the callers to effect-gate's
+//!   `linux_os.rs` by exact call forms. [`read_bounded`] reads an opened file with plain `read` calls until one returns
+//!   0, into a buffer one byte longer than its bound, so a longer file is refused without sizing anything from metadata
+//!   (I05 v4 rule 5); `file_ro` is unchanged.
 //!
-//! `Dir`'s `Debug` prints `Dir` and no descriptor: std's `Debug` of a `File` reads the descriptor's link in the proc
-//! filesystem, a call the EFFECT_GATE program kills (HE-003A DESIGN §8).
+//! `Dir`'s and `KernelRoot`'s `Debug` print their type names and no descriptor: std's `Debug` of a `File` reads the
+//! descriptor's link in the proc filesystem, a call the EFFECT_GATE program kills (HE-003A DESIGN §8).
 //!
 //! The flag values are pinned per target. The two Linux columns were checked against the pinned musl `libc.a` and
 //! the macOS column (host tests only) against the 13.3 SDK's `fcntl.h` (design review round 1; `O_NONBLOCK`, HE-002S:
 //! musl's `pipe2` sets 0o4000 with `F_SETFL` on both Linux targets, and the SDK's `sys/fcntl.h` defines 0x4;
 //! `O_NOCTTY`, HE-003A: musl's `openpty.lo` opens the multiplexer with `O_RDWR|O_NOCTTY` = 0x102 on both Linux
-//! targets, so 0o400, and the SDK's `sys/fcntl.h` defines 0x20000); any other target does not compile. Errors are the
-//! OS's (`io::Error::last_os_error()`), except the name and type checks of this module, which are `InvalidInput`.
+//! targets, so 0o400, and the SDK's `sys/fcntl.h` defines 0x20000); any other target does not compile. `O_PATH`
+//! (HE-003A3, Linux only, D2-7): 0o10000000 on both Linux targets, the value of the vendored libc 0.2.190's musl
+//! module (`src/unix/linux_like/linux/musl/mod.rs:522`, no architecture override), asserted at compile time; gate-sys
+//! gains no dependency. Errors are the OS's (`io::Error::last_os_error()`), except the name and type checks of this
+//! module, which are `InvalidInput`.
 #![allow(unsafe_code)]
 
 use std::ffi::CString;
@@ -41,6 +54,7 @@ use std::ffi::c_uint;
 use std::fmt;
 use std::fs::File;
 use std::io;
+use std::io::Read;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::os::unix::fs::MetadataExt;
@@ -59,6 +73,7 @@ mod flags {
     pub const O_CLOEXEC: c_int = 0o2000000;
     pub const O_NONBLOCK: c_int = 0o4000;
     pub const O_NOCTTY: c_int = 0o400;
+    pub const O_PATH: c_int = 0o10000000;
 }
 
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
@@ -75,6 +90,7 @@ mod flags {
     pub const O_CLOEXEC: c_int = 0o2000000;
     pub const O_NONBLOCK: c_int = 0o4000;
     pub const O_NOCTTY: c_int = 0o400;
+    pub const O_PATH: c_int = 0o10000000;
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -98,6 +114,10 @@ mod flags {
 #[cfg(target_os = "linux")]
 const _: () = assert!(flags::O_RDWR | flags::O_NOCTTY == 0x102);
 
+// HE-003A3 (D2-7): the vendored libc 0.2.190's musl `O_PATH`, the same on both Linux targets.
+#[cfg(target_os = "linux")]
+const _: () = assert!(flags::O_PATH == 0o10000000);
+
 #[cfg(not(any(
     all(target_os = "linux", target_arch = "x86_64"),
     all(target_os = "linux", target_arch = "aarch64"),
@@ -111,6 +131,9 @@ const STORE_FILE_MODE: c_uint = 0o600;
 
 /// The longest store file name (`NAME_MAX`).
 const MAX_NAME_BYTES: usize = 255;
+
+/// The most components a [`FixedPath`] holds (HE-003A3).
+pub const MAX_FIXED_COMPONENTS: usize = 4;
 
 unsafe extern "C" {
     fn openat(dirfd: c_int, path: *const c_char, flags: c_int, ...) -> c_int;
@@ -272,5 +295,107 @@ impl Dir {
             Ok(count) if count < buffer.len() => Ok(count),
             _ => Err(refusal("a symbolic link filled its buffer and may be longer")),
         }
+    }
+}
+
+// ------------------------------------------------------------------------------------------ the observation's reads
+
+/// One component of a [`FixedPath`]: `[A-Za-z0-9._-]+`, not `.` or `..`.
+fn fixed_component(part: &str) -> bool {
+    !part.is_empty()
+        && part != "."
+        && part != ".."
+        && part.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'_' || byte == b'-')
+}
+
+/// A relative path a [`KernelRoot`] opens (HE-003A3 DESIGN section 5): 1 to 4 components of `[A-Za-z0-9._-]+`, none
+/// empty, `.` or `..`, so it never leaves the root, never names a parent and is never absolute.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedPath {
+    path: CString,
+}
+
+impl FixedPath {
+    /// A fixed path from a constant (the probe-worker leaf's member file); refused (`InvalidInput`) unless it is 1 to
+    /// 4 components of the grammar.
+    pub fn from_constant(path: &'static str) -> io::Result<FixedPath> {
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.len() > MAX_FIXED_COMPONENTS || !parts.iter().all(|part| fixed_component(part)) {
+            return Err(refusal("a fixed path is 1 to 4 components of [A-Za-z0-9._-], none '.' or '..'"));
+        }
+        CString::new(path).map(|path| FixedPath { path }).map_err(|_| refusal("a fixed path must not contain NUL"))
+    }
+
+    /// `<pid>/stat` for a process number of at least 1; refused (`InvalidInput`) otherwise.
+    pub fn pid_stat(pid: i32) -> io::Result<FixedPath> {
+        if pid < 1 {
+            return Err(refusal("a process number must be at least 1"));
+        }
+        CString::new(format!("{pid}/stat")).map(|path| FixedPath { path }).map_err(|_| refusal("a fixed path"))
+    }
+
+    /// The path's bytes (without the NUL).
+    pub fn as_bytes(&self) -> &[u8] {
+        self.path.as_bytes()
+    }
+}
+
+/// Reads `file` with plain `read` calls until one returns 0 (EINTR retries), into a buffer of `limit + 1` bytes: the
+/// bytes read, or `None` when the file holds more than `limit` bytes (HE-003A3, I05 v4 rule 5). Nothing is sized from
+/// metadata; any other error is returned.
+pub fn read_bounded(file: &File, limit: usize) -> io::Result<Option<Vec<u8>>> {
+    let mut buffer = vec![0u8; limit.saturating_add(1)];
+    let mut filled = 0usize;
+    let mut reader = file;
+    loop {
+        let Some(rest) = buffer.get_mut(filled..).filter(|rest| !rest.is_empty()) else { return Ok(None) };
+        match reader.read(rest) {
+            Ok(0) => break,
+            Ok(count) => filled = filled.saturating_add(count),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+    }
+    buffer.truncate(filled);
+    Ok(Some(buffer))
+}
+
+/// The observation's root handle (HE-003A3 DESIGN section 5, Linux only): an `O_PATH` directory descriptor whose only
+/// method is [`KernelRoot::open_fixed`]. The descriptor closes when the handle is dropped.
+#[cfg(target_os = "linux")]
+pub struct KernelRoot {
+    handle: File,
+}
+
+/// The type name only: no descriptor, and never std's `Debug` of the `File`.
+#[cfg(target_os = "linux")]
+impl fmt::Debug for KernelRoot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("KernelRoot")
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl KernelRoot {
+    /// [`KernelRoot::open_kernel_root`]'s flags: `O_PATH|O_DIRECTORY|O_CLOEXEC`.
+    pub const ROOT_FLAGS: c_int = flags::O_PATH | flags::O_DIRECTORY | flags::O_CLOEXEC;
+
+    /// [`KernelRoot::open_fixed`]'s flags: `O_RDONLY|O_CLOEXEC|O_NOFOLLOW`.
+    pub const FIXED_FLAGS: c_int = flags::O_RDONLY | flags::O_CLOEXEC | flags::O_NOFOLLOW;
+
+    /// Opens the directory at `absolute` as a root handle (`openat(AT_FDCWD, absolute, O_PATH|O_DIRECTORY|O_CLOEXEC)`).
+    pub fn open_kernel_root(absolute: &str) -> io::Result<KernelRoot> {
+        if !absolute.starts_with('/') {
+            return Err(refusal("a kernel root must be named by an absolute path"));
+        }
+        let path = CString::new(absolute).map_err(|_| refusal("a kernel root path must not contain NUL"))?;
+        let handle = call(flags::AT_FDCWD, &path, KernelRoot::ROOT_FLAGS, false)?;
+        Ok(KernelRoot { handle })
+    }
+
+    /// Opens `path` relative to this root, read-only (`openat(root, path, O_RDONLY|O_CLOEXEC|O_NOFOLLOW)`); the
+    /// descriptor is non-negative by construction and the path is never absolute, so the root is never ignored.
+    pub fn open_fixed(&self, path: &FixedPath) -> io::Result<File> {
+        call(self.handle.as_raw_fd(), &path.path, KernelRoot::FIXED_FLAGS, false)
     }
 }

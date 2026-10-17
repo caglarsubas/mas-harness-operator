@@ -180,8 +180,10 @@ fn an_ambiguous_write_restarts_held_across_processes() {
     ];
     for (case, events, expected) in cases {
         let (place, config, generation) = written(case, &events);
+        let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&config).expect("v4's conversion");
         let (policy, output) =
-            PolicyGate::open(&config, &kinds, place.stores(&generation, None)).expect("PolicyGate::open");
+            PolicyGate::open(&converted, &kinds, place.stores(&generation, None)).expect("PolicyGate::open");
+        let policy = policy.with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
         assert_eq!(show(&output.to_doc().to_value()),
                    format!(r#"{{"maintenance":"ENDED","restartState":"{}"}}"#, expected.as_str()), "{case}");
         assert_eq!(policy.gate().journal().last(), Some(&Entry::Record(Record::Restarted { state: expected })), "{case}");
@@ -190,8 +192,10 @@ fn an_ambiguous_write_restarts_held_across_processes() {
         let writes = show(field(&policy.snapshot().to_value(), "writes"));
         assert_eq!(writes.contains("IO_AMBIGUOUS"), ambiguous, "{case}: {writes}");
         drop(policy);
-        let config = Config::from_value(&without_writer(&config)).expect("configuration");
+        let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&without_writer(&config)).expect("v4's conversion");
+        let config = Config::from_value(&converted).expect("configuration");
         let (gate, output) = Gate::open(config, place.stores(&generation, None)).expect("Gate::open");
+        let gate = gate.with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
         assert_eq!(output.kind, OutputKind::RestartState(expected), "{case}: the I05 gate alone");
         assert_eq!(gate.state(), expected);
         drop(gate);

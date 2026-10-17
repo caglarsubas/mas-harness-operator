@@ -91,13 +91,15 @@ fn one_channel_per_generation() {
 #[test]
 fn after_a_process_restart_a_passed_expiry_is_fed_first_and_no_connection_is_accepted() {
     let (journal, marker) = place("substrate-restart");
+    let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&config()).expect("v4's conversion");
     {
-        let gate = PolicyGate::create(&config(), &kinds(), stores(&journal, &marker)).expect("a new generation");
+        let gate = PolicyGate::create(&converted, &kinds(), stores(&journal, &marker)).expect("a new generation")
+            .with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
         let mut bench = Bench::new(gate, lifetimes(NOW + 3600));
         let conn = bench.open_broker();
         bench.broker_says(conn, "BIND_EXECUTION", t01("BIND_EXECUTION")).expect("a wake");
     }
-    let (gate, _) = PolicyGate::open(&config(), &kinds(), stores(&journal, &marker)).expect("the restart");
+    let (gate, _) = PolicyGate::open(&converted, &kinds(), stores(&journal, &marker)).expect("the restart");
     assert_eq!(gate.channel_state(), ChannelState::Closed);
     // The run's lifetime ended while the gate was down: EXPIRE at the first wake, which does not wait.
     let mut bench = Bench::new(gate, lifetimes(NOW - 1));

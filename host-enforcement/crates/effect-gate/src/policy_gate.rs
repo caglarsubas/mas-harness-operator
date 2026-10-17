@@ -23,6 +23,10 @@
 //! HE-003C (DESIGN §2.1, §6) keeps the rendered request with the outstanding write (`forwarded_write`, read by the
 //! upstream port's `sync`), and R16 parses `apiserverAuthority` once as a loopback IP literal with port
 //! (`apiserver_address`, the one address both channels connect to). No answer, record or vector changes.
+//!
+//! HE-003A3 (I05 v4, DESIGN section 4, Q-A3-4 (a), R10-defined): the base gate observes the BIND's worker; the
+//! PolicyGate's BINDs reach the same `Gate::bind`, so they are observed identically. `with_observer` attaches the
+//! base gate's observer (the binary attaches the Linux one right after `create` or `open`).
 
 use std::collections::BTreeMap;
 
@@ -34,6 +38,7 @@ use crate::config::{Config, ConfigError};
 use crate::file_store::FileStores;
 use crate::gate::{BoundRun, ChannelState, Event, EventError, FrameInput, Gate, GateError, Output, UpstreamResponse};
 use crate::journal::{Entry, Record, WriteDetails};
+use crate::observation::WorkerObserver;
 use crate::policy::{check_write, render_write, request_digest, write_outcome_is_final, KindsError, PolicyKinds,
                     RenderedWrite, WriteOperation, WriteRequest};
 use crate::types::{AbortReason, Classification, DrainAnswer, FatalReason, Invalidation, Maintenance, MaintenanceEnd,
@@ -453,6 +458,12 @@ impl PolicyGate {
         let output = policy.restart();
         policy.settle_maintenance();
         Ok((policy, output))
+    }
+
+    /// The PolicyGate with `observer` as its base gate's worker observation (HE-003A3 DESIGN section 4).
+    pub fn with_observer(mut self, observer: Box<dyn WorkerObserver>) -> PolicyGate {
+        self.gate = self.gate.with_observer(observer);
+        self
     }
 
     /// The base gate (read only).
@@ -1079,6 +1090,7 @@ fn rebuild_writes(journal: &[Entry]) -> (BTreeMap<u16, WriteEntry>, MaintenanceR
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::observation::KernelObserver;
     use i05_protocol::json::{self, Object};
 
     const VECTORS: &str = include_str!("../../../contracts/i07-v3/vectors.json");
@@ -1091,7 +1103,8 @@ mod tests {
     }
 
     fn active_config() -> Value {
-        parse(VECTORS).get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null)
+        let v3 = parse(VECTORS).get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null);
+        crate::fake_kernel::convert_v3_config(&v3).map_or(Value::Null, |(config, _)| config)
     }
 
     fn with_member(config: &Value, key: &str, member: Option<Value>) -> Value {
@@ -1106,7 +1119,9 @@ mod tests {
     }
 
     fn gate() -> PolicyGate {
-        match PolicyGate::new(&active_config(), &parse(KINDS)) {
+        let v3 = parse(VECTORS).get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null);
+        let Ok((config, kernel)) = crate::fake_kernel::convert_v3_config(&v3) else { panic!("ACTIVE converts") };
+        match PolicyGate::new(&config, &parse(KINDS)).map(|gate| gate.with_observer(Box::new(KernelObserver::new(kernel)))) {
             Ok(gate) => gate,
             Err(error) => panic!("the ACTIVE configuration builds a PolicyGate: {error:?}"),
         }

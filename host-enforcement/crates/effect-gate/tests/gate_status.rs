@@ -66,7 +66,7 @@ fn all_statuses_are_distinct_and_non_zero() {
     sorted.dedup();
     assert_eq!(sorted.len(), all.len(), "a status is shared: {all:?}");
     assert!(!all.contains(&0), "the loop has no normal end, so no status is 0");
-    assert_eq!(STAGES, [2, 11, 12, 13, 20, 21, 22, 23, 24, 25]);
+    assert_eq!(STAGES, [2, 11, 12, 13, 20, 21, 22, 23, 24, 25, 26]);
     assert_eq!((status::NOT_LINUX, status::CONFIG_READ, status::CONFIG_SIGNATURE, status::CONFIG_CHECK), (2, 11, 12, 13));
     assert_eq!((status::CREDENTIALS, status::TLS_SETUP, status::STORES, status::GATE, status::SOCKETS, status::SUBSTRATE),
                (20, 21, 22, 23, 24, 25));

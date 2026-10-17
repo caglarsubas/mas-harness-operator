@@ -35,7 +35,7 @@ fn identity(base: &str, leaf: char, key: char) -> Value {
 fn active_gate() -> Value {
     let vectors = json::parse(I07_VECTORS).expect("the I07 vectors parse");
     let mut gate = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().expect("ACTIVE");
-    set(&mut gate, &["observedWorkers"], Value::Array(Vec::new()));
+    remove(&mut gate, &["observedWorkers"]);
     gate
 }
 
@@ -157,9 +157,15 @@ fn the_i04_endpoint() {
 }
 
 #[test]
-fn observed_workers_must_be_empty() {
+fn observed_workers_are_refused_with_v4s_text() {
     let pair = Value::Array(vec![Value::int(4100), Value::int(900001)]);
-    refused_check(|value| set(value, &["gate", "observedWorkers"], Value::Array(vec![pair])), "observedWorkers");
+    for workers in [Value::Array(vec![pair]), Value::Array(Vec::new())] {
+        match mutated(|value| set(value, &["gate", "observedWorkers"], workers)) {
+            Err(GateConfigError::Gate(error)) => assert!(format!("{error:?}").contains(
+                "v4 observes the kernel; a static observedWorkers list is refused (convert_v3_config)"), "{error:?}"),
+            other => panic!("observedWorkers: expected the C01 refusal, got {other:?}"),
+        }
+    }
 }
 
 #[test]

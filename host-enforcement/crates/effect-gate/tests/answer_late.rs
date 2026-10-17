@@ -137,11 +137,13 @@ fn file_stores_debug_prints_the_generation_only() {
 #[test]
 fn after_a_restart_the_channel_is_closed_and_the_bound_run_comes_from_the_journal() {
     let (journal, marker) = place("restart");
-    let mut gate = PolicyGate::create(&config(), &kinds(), stores(&journal, &marker)).expect("a new generation");
+    let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&config()).expect("v4's conversion");
+    let mut gate = PolicyGate::create(&converted, &kinds(), stores(&journal, &marker)).expect("a new generation")
+        .with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
     broker(&mut gate, "GENERATION_STATUS", empty());
     broker(&mut gate, "BIND_EXECUTION", t01("BIND_EXECUTION"));
     drop(gate);
-    let (gate, _) = PolicyGate::open(&config(), &kinds(), stores(&journal, &marker)).expect("the restart");
+    let (gate, _) = PolicyGate::open(&converted, &kinds(), stores(&journal, &marker)).expect("the restart");
     assert_eq!(gate.channel_state(), ChannelState::Closed);
     assert_eq!(gate.bound_run(), Some(BoundRun { execution_id: "1".repeat(64), run_nonce: "run-one".to_string(),
                                                  expired: false }));
@@ -153,13 +155,15 @@ fn a_restart_after_answer_late_is_held() {
     // The journal file's decoder knows ANSWER_LATE (R42), so the reopened journal holds the record as written, its
     // digest is the one before the restart, and the restart is HELD, the state it names.
     let (journal, marker) = place("answer-late");
-    let mut gate = PolicyGate::create(&config(), &kinds(), stores(&journal, &marker)).expect("a new generation");
+    let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&config()).expect("v4's conversion");
+    let mut gate = PolicyGate::create(&converted, &kinds(), stores(&journal, &marker)).expect("a new generation")
+        .with_observer(Box::new(effect_gate::KernelObserver::new(kernel)));
     broker(&mut gate, "GENERATION_STATUS", empty());
     handle(&mut gate, PolicyEvent::Base(Event::AnswerLate));
     let invalidated = records(&gate).len() - 1;
     let digest = gate.gate().journal_digest();
     drop(gate);
-    let (gate, output) = PolicyGate::open(&config(), &kinds(), stores(&journal, &marker)).expect("the restart");
+    let (gate, output) = PolicyGate::open(&converted, &kinds(), stores(&journal, &marker)).expect("the restart");
     assert!(String::from_utf8_lossy(&output.to_doc().canonical()).contains(r#""restartState":"HELD""#));
     assert_eq!(records(&gate)[invalidated], r#"["INVALIDATED","ANSWER_LATE","HELD"]"#);
     // HE-003A PR review round 1, R1-3 (f): the reopened journal, up to the restart's own RESTARTED record, has the

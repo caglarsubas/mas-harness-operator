@@ -70,7 +70,9 @@ fn random_policy_event_sequences_never_panic() {
     let (mut refused, mut framed) = (0usize, 0usize);
     for round in 0..300 {
         let config = field(configs, ["ACTIVE", "INSPECTING"][round % 2]);
-        let mut gate = PolicyGate::new(config, &kinds).expect("PolicyGate");
+        let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(config).expect("v4's conversion");
+        let observer = Box::new(effect_gate::KernelObserver::new(kernel));
+        let mut gate = PolicyGate::new(&converted, &kinds).expect("PolicyGate").with_observer(observer);
         let mut challenge = Value::str(&challenges[0]);
         for _ in 0..rng.below(60) {
             let event = match rng.below(16) {

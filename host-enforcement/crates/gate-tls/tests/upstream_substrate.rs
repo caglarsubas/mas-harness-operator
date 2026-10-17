@@ -55,7 +55,9 @@ fn object(members: Vec<(&str, Value)>) -> Value {
 fn policy_gate(pki: &Pki) -> PolicyGate {
     let config = parse(I07_VECTORS).get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().expect("ACTIVE");
     let ours = text(&config).replace(VECTOR_CERTIFICATE, &sha256::prefixed(&pki.client));
-    PolicyGate::new(&parse(&ours), &parse(KINDS)).expect("the configuration builds a PolicyGate")
+    let (converted, kernel) = effect_gate::fake_kernel::convert_v3_config(&parse(&ours)).expect("v4's conversion");
+    let gate = PolicyGate::new(&converted, &parse(KINDS)).expect("the configuration builds a PolicyGate");
+    gate.with_observer(Box::new(effect_gate::KernelObserver::new(kernel)))
 }
 
 fn t01(operation: &str, nth: usize) -> Value {

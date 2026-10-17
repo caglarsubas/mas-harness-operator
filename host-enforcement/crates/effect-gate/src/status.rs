@@ -1,7 +1,8 @@
 //! The gate binary's exit statuses (HE-003D DESIGN sections 3.5 and 4, obligation O7): one distinct, non-zero status
 //! per failure point: each seal step (stage 1 in 40-59, stage 2 in 60-79), each configuration stage (11-13), each
-//! setup stage (20-25) and each loop exit (30-35); 2 is the non-Linux build's stub. Portable and host-tested; the
-//! loop has no normal end, so no status is 0. MODEL_DEFINED.md lists the table (R71).
+//! setup stage (20-26) and each loop exit (30-35); 2 is the non-Linux build's stub. Portable and host-tested; the
+//! loop has no normal end, so no status is 0. MODEL_DEFINED.md lists the table (R71). HE-003A3 (DESIGN section 5,
+//! Q-A3-6 (a)) adds 26, the observation's two kernel roots, opened after the socket setup and before the stores.
 
 use crate::seal::{SealError, SealStep, Stage};
 use crate::substrate::LoopExit;
@@ -27,6 +28,8 @@ pub const GATE: u8 = 23;
 pub const SOCKETS: u8 = 24;
 /// `Substrate::new`.
 pub const SUBSTRATE: u8 = 25;
+/// `KernelRoots::open_after_seal`: the cgroup2 mount's or the proc filesystem's root handle (HE-003A3).
+pub const OBSERVER_ROOTS: u8 = 26;
 /// The loop's exits, one per `LoopExit` variant.
 pub const LOOP_MODEL_PRECONDITION: u8 = 30;
 pub const LOOP_UNEXPECTED_OUTPUT: u8 = 31;
@@ -86,7 +89,7 @@ pub fn loop_exit(exit: &LoopExit) -> u8 {
     }
 }
 
-/// The configuration and setup statuses, in table order (`main` reaches the socket setup, 24, before the stores, 22,
-/// and the gate, 23).
-pub const STAGES: [u8; 10] = [NOT_LINUX, CONFIG_READ, CONFIG_SIGNATURE, CONFIG_CHECK, CREDENTIALS, TLS_SETUP, STORES, GATE,
-                              SOCKETS, SUBSTRATE];
+/// The configuration and setup statuses, in table order (`main` reaches the socket setup, 24, and the observation's
+/// roots, 26, before the stores, 22, and the gate, 23).
+pub const STAGES: [u8; 11] = [NOT_LINUX, CONFIG_READ, CONFIG_SIGNATURE, CONFIG_CHECK, CREDENTIALS, TLS_SETUP, STORES, GATE,
+                              SOCKETS, SUBSTRATE, OBSERVER_ROOTS];

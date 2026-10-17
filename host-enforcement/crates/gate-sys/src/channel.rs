@@ -15,7 +15,9 @@
 //! - [`ProcDir`]: the peer's directory in the proc filesystem, opened by number and kept, and its three identity reads
 //!   (`stat`, `cgroup`, `attr/current`), parsed by `peer_wire`; HE-003A2 (DESIGN §3) adds [`ProcDir::exe`], the `exe`
 //!   link read through the kept directory with `openat.rs`'s `Dir::read_link` (no new `unsafe` here).
-//! - [`PidFd::exited`]: a zero-timeout `ppoll` on the pidfd.
+//! - [`PidFd::exited`]: a zero-timeout `ppoll` on the pidfd. HE-003A3 (DESIGN section 5, I05 v4) adds
+//!   [`PidFd::open`], `pidfd_open(pid, 0)` issued through `syscall` (no new foreign symbol), with the OS's errno kept
+//!   (ESRCH among them), and [`PidFd::poll_zero`], the same zero-timeout `ppoll` that tells a poll error from an event.
 //! - [`recv`] and [`send`]: one `recvmsg` or `sendmsg`, never waiting.
 //! - [`Poller`]: `epoll_create1`, `epoll_ctl` and `epoll_pwait` (aarch64 has no `epoll_wait` system call).
 //!
@@ -25,8 +27,10 @@
 //!
 //! Constants (per target, with their evidence; the pinned musl 1.2.5 `libc.a`, sha256 `e699c64b…` for x86_64 and
 //! `b03473b6…` for aarch64, where its code shows the value, otherwise the kernel UAPI header named, for T04):
-//! `accept4` is 288 / 242 (`accept4.lo` passes it to `__syscall_cp`); `AF_UNIX` 1 (`syslog.lo` calls `socket(1,
-//! 0x80002, 0)`); `SOCK_CLOEXEC` 0x80000 and `SOCK_NONBLOCK` 0x800 (`socket.lo` and `accept4.lo` test exactly these
+//! `accept4` is 288 / 242 (`accept4.lo` passes it to `__syscall_cp`); `pidfd_open` is 434 on both (HE-003A3: musl
+//! 1.2.5 has no wrapper; the kernel's unified number, in its generic `unistd.h` and x86_64's `syscall_64.tbl`, as the
+//! vendored libc 0.2.190's musl modules give it: `b64/x86_64/mod.rs:513`, `b64/aarch64/mod.rs:589`); `AF_UNIX` 1
+//! (`syslog.lo` calls `socket(1, 0x80002, 0)`); `SOCK_CLOEXEC` 0x80000 and `SOCK_NONBLOCK` 0x800 (`socket.lo` and `accept4.lo` test exactly these
 //! bits before their `fcntl` fallbacks); `MSG_NOSIGNAL` 0x4000 (`res_msend.lo` passes it to `sendto` and `sendmsg`);
 //! `MSG_DONTWAIT` 0x40 (`netlink.lo` passes it to `recv`); `POLLNVAL` 0x20 (`__libc_start_main.lo` tests bit 5 of
 //! `revents`, at offset 6 of `struct pollfd`). From the kernel UAPI: `SOCK_SEQPACKET` 5 (`linux/net.h`); `SOL_SOCKET`
@@ -72,6 +76,7 @@ mod consts {
     use std::ffi::c_short;
 
     pub const SYS_ACCEPT4: c_long = 288;
+    pub const SYS_PIDFD_OPEN: c_long = 434;
     pub const AF_UNIX: c_int = 1;
     pub const SOCK_SEQPACKET: c_int = 5;
     pub const SOCK_NONBLOCK: c_int = 0o4000;
@@ -110,6 +115,7 @@ mod consts {
     use std::ffi::c_short;
 
     pub const SYS_ACCEPT4: c_long = 242;
+    pub const SYS_PIDFD_OPEN: c_long = 434;
     pub const AF_UNIX: c_int = 1;
     pub const SOCK_SEQPACKET: c_int = 5;
     pub const SOCK_NONBLOCK: c_int = 0o4000;
@@ -301,7 +307,8 @@ pub struct Conn {
     fd: OwnedFd,
 }
 
-/// A pidfd for the process a connection's peer was at `connect`.
+/// A pidfd: for the process a connection's peer was at `connect` (SO_PEERPIDFD), or for a process by number
+/// (`pidfd_open`, HE-003A3).
 pub struct PidFd {
     fd: OwnedFd,
 }
@@ -606,6 +613,45 @@ impl ProcDir {
 }
 
 impl PidFd {
+    /// `pidfd_open(pid, 0)` through `syscall` (HE-003A3 DESIGN section 5): a pidfd for the thread-group leader `pid` (a
+    /// number of at least 1, else `InvalidInput` before any call). A failure is the OS's error with its errno kept
+    /// (ESRCH: no such process); the caller maps it.
+    pub fn open(pid: i32) -> io::Result<PidFd> {
+        if pid < 1 {
+            return Err(refusal("a process number must be at least 1"));
+        }
+        let zero: c_long = 0;
+        // SAFETY: pidfd_open takes a number and a flags word and reads or writes no memory; musl's syscall reads six
+        // further `long` arguments, which are all passed.
+        let value = unsafe { syscall(SYS_PIDFD_OPEN, c_long::from(pid), zero, zero, zero, zero, zero) };
+        if value < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let descriptor = c_int::try_from(value).map_err(|_| invalid("pidfd_open returned a descriptor past int"))?;
+        Ok(PidFd { fd: adopt(descriptor) })
+    }
+
+    /// One zero-timeout `ppoll` for POLLIN (HE-003A3, I05 v4 step 5): `Ok(false)` when it reports no event (the
+    /// process has not exited), `Ok(true)` when it reports any event (POLLIN, POLLHUP, POLLERR or POLLNVAL), and the
+    /// OS's error when the poll fails. EINTR retries.
+    pub fn poll_zero(&self) -> io::Result<bool> {
+        let zero = Timespec { seconds: 0, nanoseconds: 0 };
+        loop {
+            let mut entry = PollFd { fd: self.fd.as_raw_fd(), events: POLLIN, revents: 0 };
+            // SAFETY: `entry` is one live `struct pollfd` (the count passed is 1), `zero` a live timespec that ppoll
+            // reads, and the signal mask is null; ppoll writes only `entry.revents`.
+            let value = unsafe { ppoll(&mut entry, 1, &zero, std::ptr::null()) };
+            if value < 0 {
+                let error = io::Error::last_os_error();
+                if error.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(error);
+            }
+            return Ok(value > 0);
+        }
+    }
+
     /// Whether the process has exited (zombie or reaped): a zero-timeout `ppoll` for POLLIN. EINTR retries; any other
     /// error, and POLLERR, POLLNVAL or any other returned event, counts as exited.
     pub fn exited(&self) -> bool {

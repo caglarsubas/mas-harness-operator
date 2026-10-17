@@ -17,6 +17,14 @@
 //!
 //! HE-003B adds the R10-defined `Event::Disconnect` (HE-003B DESIGN §4.3, MODEL_DEFINED R44): an I04 connection the
 //! port ended on its own before any request leaves the model; no existing event's answer changes.
+//!
+//! HE-003A3 (I05 v4, DESIGN section 4, owner decisions Q-A3-3 and Q-A3-4 (a)): the BIND's worker is observed, not
+//! looked up. `Gate::bind` asks the gate's [`WorkerObserver`] once, at the place of HE-003D's static list check (after
+//! every check through MANIFEST_REUSED, before the BIND record), and only for a BIND that passed them all; a
+//! `NotObserved` answer is the existing non-fatal, retryable `WORKER_NOT_OBSERVED`, with nothing durable written. Each
+//! observation goes to the gate's in-memory diagnostic log. Every gate starts with `Unobserved` (every BIND refused);
+//! `with_observer` attaches another (the binary attaches the Linux kernel observer; tests the fake kernel). The
+//! PolicyGate's BINDs go through this same `bind` (R10-defined; v4 is silent on I07).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,6 +37,7 @@ use i05_protocol::{
 use crate::config::{Config, PriorBindings};
 use crate::file_store::FileStores;
 use crate::journal::{journal_doc, ChannelEnd, Entry, Record, TerminalDetails};
+use crate::observation::{Logged, Observation, ObservationLog, Unobserved, WorkerObserver};
 use crate::store::{Appended, MemoryStores, Stores};
 use crate::types::{Classification, CloseReason, DrainAnswer, FatalReason, Invalidation, State};
 
@@ -533,6 +542,10 @@ pub struct Gate {
     counters: Counters,
     stores: Box<dyn Stores>,
     failing: bool,
+    /// The BIND's worker observation (HE-003A3); `Unobserved` until `with_observer`.
+    observer: Box<dyn WorkerObserver>,
+    /// The local diagnostic log of the observations (not durable, not in the snapshot, not on the wire).
+    observations: ObservationLog,
 }
 
 impl Gate {
@@ -599,7 +612,20 @@ impl Gate {
             counters: Counters::default(),
             stores,
             failing: false,
+            observer: Box::new(Unobserved),
+            observations: ObservationLog::default(),
         })
+    }
+
+    /// The gate with `observer` as its worker observation (HE-003A3 DESIGN section 4), replacing the one it had.
+    pub fn with_observer(mut self, observer: Box<dyn WorkerObserver>) -> Gate {
+        self.observer = observer;
+        self
+    }
+
+    /// The local diagnostic log: the last 64 observations and the count of the ones dropped (read only).
+    pub fn observation_log(&self) -> &ObservationLog {
+        &self.observations
     }
 
     pub fn state(&self) -> State {
@@ -1407,7 +1433,10 @@ impl Gate {
             // again (even under a different digest).
             return refused("MANIFEST_REUSED");
         }
-        if !self.config.observed_workers.contains(&(p.worker_pid, p.worker_start_ticks)) {
+        // HE-003A3 (I05 v4): a fresh observation of the named worker, here and nowhere earlier (IR5-1).
+        let observation = self.observer.observe(p.worker_pid, p.worker_start_ticks);
+        self.observations.record(Logged { pid: p.worker_pid, start_ticks: p.worker_start_ticks, observation });
+        if observation != Observation::Observed {
             return refused("WORKER_NOT_OBSERVED");
         }
         let set_digest = sha256::prefixed(&Doc::Array(digests.iter().map(|digest| Doc::str(digest)).collect()).canonical());
@@ -1616,8 +1645,10 @@ mod tests {
 
     fn active_gate() -> Gate {
         let vectors = json::parse(VECTORS).unwrap_or(Value::Null);
-        let config = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null);
-        match Config::from_value(&config).map(Gate::new) {
+        let v3 = vectors.get("configs").and_then(|configs| configs.get("ACTIVE")).cloned().unwrap_or(Value::Null);
+        let Ok((config, kernel)) = crate::fake_kernel::convert_v3_config(&v3) else { panic!("ACTIVE converts") };
+        let observer = Box::new(crate::observation::KernelObserver::new(kernel));
+        match Config::from_value(&config).map(|config| Gate::new(config).map(|gate| gate.with_observer(observer))) {
             Ok(Ok(gate)) => gate,
             _ => panic!("the ACTIVE configuration builds a gate"),
         }
