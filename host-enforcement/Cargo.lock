@@ -99,7 +99,12 @@ name = "planeon-observer"
 version = "0.1.0"
 dependencies = [
  "gate-sys",
+ "gate-tls",
+ "getrandom",
  "i05-protocol",
+ "ring",
+ "rustls",
+ "zeroize",
 ]
 
 [[package]]

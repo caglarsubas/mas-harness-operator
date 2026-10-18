@@ -78,6 +78,19 @@ registered contract file, only in contracts.rs (and seal.rs's two OBSERVER progr
 only in gate.apiserver_address() and Substrate::new(gate, ..); observation.rs defines no module outside its strict test
 module and Unobserved and KernelObserver exactly once each at its top level.
 
+HE-004C (the observer's apiserver read client and live wiring; DESIGN-C rev 4 section 15, owner decisions Q-HE4-5,
+Q-HE4-6 and Q-HE4C-1..14, all (a)) gives crates/observer its own registry lines, each equal to gate-tls's (G1), and keeps
+planeon-observer's closure (G2; the gate-tls dev-dependency is outside it); check_tls reads two groups, gate-tls with the
+binary unchanged and crates/observer with the whole deny-list, a server-side list, its three client settings exactly
+once and the client authentication and webpki verifier once each in its tls.rs (G3); the observer's linux_net.rs joins
+the socket modules (G4); the observer's main.rs ends with exactly `ExitCode::from(serve(&<the stage-2 binding>))`, holds
+fn serve with its pinned imports, and serve calls the configuration's load, parse and lifetime, the credentials, the TLS
+configuration, the wire, the embedded closure and the epoch each exactly once in that order (G5); the observer's signed
+configuration includes its own signer key, and both key files are 0 or 32 bytes (G6); contracts.rs holds only pinned
+constant items (G7, R1-3); the no-panic tripwire covers every new observer module, main.rs and status.rs (G8); each built
+planeon-observer holds a rustls client-connection symbol and an observer client, http, watch or observe symbol (G9); the
+observer's secret types and its wire join the Debug rules (G10). No wrapper inventory (owner rule Q-HE4A-B2).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -113,12 +126,17 @@ REGISTRY = "registry+https://github.com/rust-lang/crates.io-index"
 # HE-003B DESIGN sections 2.4 and 20: the only registry dependency lines of the workspace, all in gate-tls's
 # [dependencies] (the ring dev-dependency fallback of section 9 was not needed, B6). HE-003D DESIGN section 3.1
 # (Q-HE3D-6 (a)): ring's Ed25519 for the signed configuration, `ring = "=0.17.14"` exactly in that form.
-REGISTRY_LINES = {"crates/gate-tls": {
+GATE_TLS_REGISTRY_LINES = {
     "rustls": {"version": "=0.23.46", "default-features": False, "features": ["ring", "std"]},
     "getrandom": {"version": "=0.2.17", "default-features": False, "features": ["linux_disable_fallback"]},
     "zeroize": {"version": "=1.9.1", "default-features": False, "features": ["alloc"]},
     "ring": "=0.17.14",
-}}
+}
+# HE-004C DESIGN-C sections 3 and 15 (G1; owner decision Q-HE4-5 (a)): the observer's apiserver client links the same
+# vendored crates through its own entry, each of its four lines equal to gate-tls's (no package is added; Cargo.lock
+# gains only planeon-observer's edges). Its gate-tls dev-dependency is a path edge, outside REGISTRY_LINES and outside
+# the closure, which reads [dependencies] only.
+REGISTRY_LINES = {"crates/gate-tls": GATE_TLS_REGISTRY_LINES, "crates/observer": dict(GATE_TLS_REGISTRY_LINES)}
 # HE-003D DESIGN sections 2 and 5 (phase 1): the workspace manifest's only [patch] table maps exactly these 11 LINKED
 # vendored crates to their vendor/ directories (path packages inside the workspace root, so rustc receives
 # workspace-relative paths and planeon-gate carries no build-host path); in Cargo.lock they are path packages (no
@@ -255,14 +273,31 @@ STAGE1_STATEMENT = re.compile(
     r"\s*let\s+([A-Za-z_]\w*)\s*=\s*match\s+seal_stage1\s*\(\s*\)\s*\{\s*Ok\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*"
     r"([A-Za-z_]\w*)\s*,\s*Err\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*return\s+ExitCode\s*::\s*from\s*\(\s*status\s*::\s*seal\s*"
     r"\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*\)\s*,?\s*\}\s*;")
-OBSERVER_TAIL = re.compile(r"\s*ExitCode\s*::\s*from\s*\(\s*status\s*::\s*NOT_YET_SERVING\s*\)\s*\}")
+# HE-004C DESIGN-C sections 14 and 15 (G5, D1-1): the tail becomes exactly `ExitCode::from(serve(&<the stage-2
+# binding>))`, which closes main (the binding is the stage-2 statement's own name, filled in at check time); main.rs's
+# functions are the two main and serve, and its pinned imports gain Sealed (serve's signature) and serve's in-body ones.
+OBSERVER_TAIL = r"\s*ExitCode\s*::\s*from\s*\(\s*serve\s*\(\s*&\s*%s\s*\)\s*\)\s*\}"
 OBSERVER_SEAL_CALLS = ("ExitCode::from", "status::seal", "Ok", "Err")
-OBSERVER_MAIN_USES = tuple(sorted([(("std", "process", "ExitCode"), None), (("planeon_observer", "status"), None)]
-                                  + [(("planeon_observer", name), None) for name in ("seal_stage1", "seal_stage2")]))
+OBSERVER_MAIN_USES = tuple(sorted(
+    [(("std", "process", "ExitCode"), None), (("planeon_observer", "status"), None)]
+    + [(("planeon_observer", name), None) for name in ("seal_stage1", "seal_stage2", "Sealed")]
+    + [(("planeon_observer", "config", "self"), None), (("planeon_observer", "config", "ObserverConfig"), None)]
+    + [(("planeon_observer", name), None) for name in ("credentials", "observe", "signed_config", "utc")]
+    + [(("planeon_observer", "linux_net", "LinuxWire"), None), (("planeon_observer", "snapshot", "Closure"), None)]
+    + [(("planeon_observer", "tls", name), None) for name in ("client_config", "time_provider")]))
 GATE_SEAL_SITE = {"main": GATE_MAIN, "before": (GATE_CONFIG, SIGNED_CONFIG), "calls": SEAL_CALLS, "uses": MAIN_USES,
                   "functions": MAIN_FUNCTIONS, "adjacent": False}
 OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": OBSERVER_MAIN_USES,
-                      "functions": ["main", "main"], "adjacent": True}
+                      "functions": ["main", "main", "serve"], "adjacent": True}
+# G5's wiring rule (D1-1): in serve, read without comments and use declarations, the whitespace around `::` removed, each
+# of these calls appears exactly once, in this order.
+OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bsigned_config::load\s*\(", "signed_config::load("), (r"\bObserverConfig::parse\s*\(", "ObserverConfig::parse("),
+    (r"(?<![\w:])config::check_lifetime\s*\(", "config::check_lifetime("),
+    (r"\bcredentials::observer_inputs\s*\(", "credentials::observer_inputs("),
+    (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bLinuxWire::new\s*\(", "LinuxWire::new("),
+    (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
+FN_SERVE = re.compile(r"\bfn\s+serve\s*\(")
 SEAL_TOKEN = re.compile(r"\s*(::|=>|b\"\"|\"\"|''|[A-Za-z_]\w*|[0-9]\w*|[(){},;=&])")
 SEAL_KEYWORDS = {"let", "match", "return"}
 RUST_KEYWORDS = {"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "fn",
@@ -281,7 +316,11 @@ BEFORE_SEAL_REFUSED = (r"\bgate_sys\b", r"\bPoller\b", r"\blisten_", r"\bconnect
 SIGNED_CONFIG_DIR = re.compile(r"(?m)^[ \t]*use\s+gate_sys::Dir\s*;")
 # HE-003D DESIGN section 5 (D1-3, D2-6): gate-sys's socket modules are reached only from effect-gate's linux_os.rs and
 # linux_net.rs (whose public constructors take &Sealed), which re-export nothing (no `pub use`), and from gate-sys.
-SOCKET_FILES = ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs")
+# HE-004C DESIGN-C section 15 (G4, D1-14 (a) and (d)): the observer's one socket module, whose only constructor takes the
+# observer's &Sealed (code review's, as for the gate); every other crates/observer source still refuses gate-sys's socket
+# modules, which is why client.rs's Wire has its own portable types.
+OBSERVER_LINUX_NET = "crates/observer/src/linux_net.rs"
+SOCKET_FILES = ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs", OBSERVER_LINUX_NET)
 SOCKET_MODULES = ("channel", "tcp")
 SOCKET_TEXT = re.compile(r"\bgate_sys::(?:channel|tcp)\b")
 PUB_USE = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b")
@@ -343,6 +382,10 @@ PRINTS = ((re.compile(r"\bprint\s*!"), "print!"), (re.compile(r"\bprintln\s*!"),
           (re.compile(r"\bdbg\s*!"), "dbg!"), (re.compile(r"(?i)\bstd(?:out|err)\b"), "stdout or stderr"))
 # DESIGN section 3.1 (Q-HE3D-7 (d)): the compiled-in signer key file holds exactly 0 (not yet set) or 32 bytes.
 SIGNER_KEY = "crates/gate-tls/config-signer.pub"
+# HE-004C DESIGN-C sections 11 and 15 (G6, Q-HE4C-3 (i)): the observer's own compiled-in key, empty until HE-008, under
+# the same rule; the gate run reads both.
+OBSERVER_SIGNER_KEY = "crates/observer/config-signer.pub"
+SIGNER_KEYS = (SIGNER_KEY, OBSERVER_SIGNER_KEY)
 # HE-003D DESIGN section 5 (O3, C8): planeon-gate's symbol inventory. MEMBARRIER must be absent (musl's membarrier.lo
 # defines both; its __membarrier_init is WEAK in pthread_create.lo and harmless). KILLED_WRAPPERS are the musl 1.2.5
 # wrappers whose system call the pinned EFFECT_GATE programs kill unconditionally on at least one target: each name's
@@ -401,6 +444,21 @@ WRAPPER_JUSTIFICATIONS = {
 # once.
 OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.x86_64.bpf",
                      "aarch64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.aarch64.bpf"}
+# HE-004C DESIGN-C section 15 (G9, D1-6, D2-8; owner decision Q-HE4C-12 (a)): symbols only the path after the
+# configuration keeps, so the shipped planeon-observer holds the composed client while its key is empty (the compiled
+# key passes core::hint::black_box). A symbol counts by its own path: the mangled name (legacy `_ZN` or v0 `_R`) is read
+# down its first path component to its first crate root (symbol_path), so a generic instantiation of another crate's
+# item (core's drop glue of a rustls type, alloc's B-tree over an observer type) or the instantiating-crate suffix never
+# counts. The client symbol: a rustls symbol naming ClientConnection (the length-prefixed identifier); LTO inlines every
+# one in both shipped builds, so the recorded substitute applies: a rustls symbol of the client handshake modules
+# (rustls::client::hs or rustls::client::tls13: emit_client_hello_for_retry, handle_server_hello, the Expect* states),
+# which only a client connection drives. The module symbol: a planeon_observer symbol of its client, http, watch or
+# observe module. Verified on both musl builds and recorded in MODEL_DEFINED R118. No wrapper inventory (owner rule
+# Q-HE4A-B2).
+OBSERVER_CLIENT_CONNECTION = re.compile(r"(?<!\d)16ClientConnection(?![a-z])")
+OBSERVER_CLIENT_MODULES = (("rustls", "client", "hs"), ("rustls", "client", "tls13"))
+OBSERVER_MODULES = ("client", "http", "watch", "observe")
+SYMBOL_IDENT = re.compile(r"(\d+)_?")
 OPENAT = "crates/gate-sys/src/openat.rs"
 SEAL = "crates/gate-sys/src/seal.rs"
 CHANNEL = "crates/gate-sys/src/channel.rs"
@@ -533,13 +591,17 @@ OBSERVATION_HOME_TYPES = ("Unobserved", "KernelObserver")
 DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "PidFd", "ProcDir", "TcpListener", "TcpConn",
                  "NetTable", "LinuxConnector",
                  # HE-003A3 (DESIGN section 5, D2-7): the observation's O_PATH root handle.
-                 "KernelRoot")
+                 "KernelRoot",
+                 # HE-004C DESIGN-C section 15 (G10): the observer's wire holds the poller and its TCP connections.
+                 "LinuxWire")
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
                 "ServerConnection", "ClientConfig", "ClientConnection", "TlsClientIdentity",
                 # HE-003D DESIGN section 3.4 (D1-7): the credential read's helper and key holder.
-                "CredentialFile", "KeyBytes")
+                "CredentialFile", "KeyBytes",
+                # HE-004C DESIGN-C section 15 (G10): the observer's identity, key holder and credential helper.
+                "ObserverIdentity", "ObserverKeyBytes", "ObserverCredential")
 DEBUG_HAZARD = re.compile(r"\b(?:%s)\b" % "|".join(DEBUG_HAZARDS + SECRET_TYPES))
 OUTER_ATTRIBUTE = re.compile(r"#\s*\[")
 ITEM_AFTER_ATTRIBUTES = re.compile(r"\s*(?:#\s*\[|(?:pub\s*(?:\([^)]*\)\s*)?)?(struct|enum|union)\s+([A-Za-z_]\w*))")
@@ -636,6 +698,23 @@ PANICS = tuple((re.compile(pattern), name) for pattern, name in (
 # plain string literal (no escape, no raw string, no concat!) naming, relative to its file, a registered CONTRACTS file;
 # only contracts.rs and seal.rs hold one, and seal.rs only its two OBSERVER programs.
 OBSERVER_INCLUDE = re.compile(r"\binclude_(?:bytes|str)\s*!")
+# HE-004C DESIGN-C section 15 (G6): exactly one more include, the observer's signer key in its signed_config.rs.
+OBSERVER_SIGNED_CONFIG = "crates/observer/src/signed_config.rs"
+OBSERVER_KEY_INCLUDE = "../config-signer.pub"
+# HE-004C DESIGN-C section 15 (G7; HE-004B1 PR review R1-3): contracts.rs, read without comments and with literals kept,
+# holds only these two item forms (doc comments are comments): the bytes of a registered contract file, and a registered
+# CONTRACTS pin as 64 lowercase hex. A fn, a use (pub or not), a static, another type, an unpinned value, an attribute or a
+# mod refuses.
+CONTRACT_BYTES_ITEM = re.compile(r'\bpub\s+const\s+[A-Z][A-Z0-9_]*\s*:\s*&\s*\[\s*u8\s*\]\s*=\s*include_bytes\s*!\s*\(\s*'
+                                 r'"([^"\\]*)"\s*\)\s*;')
+CONTRACT_PIN_ITEM = re.compile(r'\bpub\s+const\s+[A-Z][A-Z0-9_]*\s*:\s*&\s*str\s*=\s*"([^"\\]*)"\s*;')
+# HE-004C DESIGN-C section 15 (G8, D1-14 (c)): the no-panic tripwire also covers every HE-004C module and the changed
+# main.rs and status.rs (seal.rs and the logic modules keep their own rules).
+OBSERVER_C_NAMES = ("signed_config", "config", "credentials", "tls", "http", "exposition", "watch", "requests", "quota",
+                    "utc", "client", "linux_net", "observe")
+OBSERVER_C_MODULES = tuple("crates/observer/src/%s.rs" % name for name in OBSERVER_C_NAMES)
+OBSERVER_STATUS = "crates/observer/src/status.rs"
+OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS)
 OBSERVER_INCLUDE_FORM = re.compile(r'\binclude_(?:bytes|str)\s*!\s*\(\s*"([^"\\]*)"\s*\)')
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
@@ -693,6 +772,18 @@ UPSTREAM_RESPONSE_HOME = "crates/gate-tls/src/exchange.rs"
 MACRO_RULES = re.compile(r"\bmacro_rules\b")
 # The crates check_tls reads: gate-tls (which must have sources) and the binary (HE-003D DESIGN section 5, C7).
 TLS_CRATES = (GATE_TLS, "crates/gate")
+# HE-004C DESIGN-C section 15 (G3; D1-14 (b)): check_tls's group O, crates/observer, a client only. Its non-test sources
+# hold none of TLS_FORBIDDEN nor of this server-side list in their raw text (comments included); read with comments
+# removed and literal contents emptied they set resumption, enable_early_data and enable_sni exactly once each, as the
+# closed setting, name with_client_auth_cert and with_webpki_verifier exactly once each, in crates/observer/src/tls.rs,
+# and define no macro_rules macro. The counts are per group, so planeon-gate's sources and counts stay as they are.
+OBSERVER_TLS = "crates/observer/src/tls.rs"
+OBSERVER_TLS_FORBIDDEN = tuple((re.compile(name), name) for name in (
+    "ServerConfig", "ServerConnection", "WebPkiClientVerifier", "with_cert_resolver", "with_single_cert",
+    "max_early_data_size", "send_tls13_tickets", "send_half_rtt_data", "session_storage", "NoServerSessionStorage",
+    "SingleCertAndKey", "ResolvesServerCert"))
+OBSERVER_TLS_SETTINGS = tuple(setting for setting in TLS_SETTINGS if setting[0] in ("resumption", "enable_early_data",
+                                                                                     "enable_sni"))
 # The linked-source patterns below are matched against the source with the whitespace around every `::` removed
 # (PATH_SPACE), so `std :: process` is `std::process` to them.
 PATH_SPACE = re.compile(r"\s*::\s*")
@@ -1516,6 +1607,12 @@ def check_observer_includes(base: Path) -> int:
                 % rel)
         if not forms:
             continue
+        # HE-004C (G6): the signed configuration's one include is the observer's own signer key, and nothing else there.
+        if rel == OBSERVER_SIGNED_CONFIG:
+            require(forms == [OBSERVER_KEY_INCLUDE] and re.search(r"\binclude_bytes\s*!", code),
+                    "%s embeds something other than exactly include_bytes!(\"%s\") (observer contracts rule)"
+                    % (rel, OBSERVER_KEY_INCLUDE))
+            continue
         require(rel in (OBSERVER_CONTRACTS, OBSERVER_SEAL_RS), "%s embeds a file; only %s embeds contract bytes "
                 "(observer contracts rule)" % (rel, OBSERVER_CONTRACTS))
         for literal in forms:
@@ -1526,6 +1623,79 @@ def check_observer_includes(base: Path) -> int:
                     "%s embeds %s, not an OBSERVER program (observer contracts rule)" % (rel, literal))
         count += len(forms)
     return count
+
+
+def check_observer_serve(base: Path) -> int:
+    """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
+    body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
+    call appears exactly once, in that order: load, parse, lifetime, credentials, TLS configuration, wire, embedded closure,
+    epoch. What each called function calls in turn stays code review's. The number of calls."""
+    rel = OBSERVER_MAIN
+    require((base / rel).is_file(), "%s is missing (observer wiring order)" % rel)
+    try:
+        code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
+    except GateError as error:
+        raise GateError("%s: %s (observer wiring order)" % (rel, error)) from None
+    found = list(FN_SERVE.finditer(code))
+    require(len(found) == 1, "%s does not hold exactly one fn serve (observer wiring order)" % rel)
+    opening = code.find("{", found[0].end())
+    require(opening >= 0, "%s's fn serve has no body (observer wiring order)" % rel)
+    body = USE_DECLARATION.sub(" ", code[opening:block_end(code, opening)])
+    positions = []
+    for pattern, name in OBSERVER_WIRING:
+        calls = list(pattern.finditer(body))
+        require(len(calls) == 1, "serve does not call %s exactly once (observer wiring order)" % name)
+        positions.append(calls[0].start())
+    require(positions == sorted(positions), "serve does not call %s in this order (observer wiring order)"
+            % ", ".join(name for _, name in OBSERVER_WIRING))
+    return len(OBSERVER_WIRING)
+
+
+def check_observer_contracts_module(base: Path) -> int:
+    """HE-004C DESIGN-C section 15 (G7; HE-004B1 PR review R1-3): crates/observer/src/contracts.rs, read without comments
+    and with literals kept, holds only CONTRACT_BYTES_ITEM items naming a registered contract file (relative to it) and
+    CONTRACT_PIN_ITEM items whose text is one of the CONTRACTS pins; nothing else (no fn, use, static, other type,
+    attribute, mod or unpinned value). The number of items."""
+    rel = OBSERVER_CONTRACTS
+    require((base / rel).is_file(), "%s is missing (contracts pin)" % rel)
+    try:
+        code = rust_code((base / rel).read_text(encoding="utf-8"), literals=True)
+    except GateError as error:
+        raise GateError("%s: %s (contracts pin)" % (rel, error)) from None
+    items = 0
+    for item in CONTRACT_BYTES_ITEM.finditer(code):
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(rel), item.group(1)))
+        require(target in CONTRACTS, "%s embeds %s, which is not a registered contract file (contracts pin)"
+                % (rel, item.group(1)))
+        items += 1
+    pins = set(CONTRACTS.values())
+    for item in CONTRACT_PIN_ITEM.finditer(code):
+        require(re.fullmatch(r"[0-9a-f]{64}", item.group(1)) and item.group(1) in pins,
+                "%s holds the text %r, which is not a registered contract pin (contracts pin)" % (rel, item.group(1)[:16]))
+        items += 1
+    rest = CONTRACT_PIN_ITEM.sub(" ", CONTRACT_BYTES_ITEM.sub(" ", code)).strip()
+    require(not rest, "%s holds %r, not only pinned constant items (contracts pin)" % (rel, rest[:40]))
+    require(items, "%s holds no item (contracts pin)" % rel)
+    return items
+
+
+def check_observer_no_panic(base: Path) -> int:
+    """HE-004C DESIGN-C section 15 (G8, D1-14 (c)): each of OBSERVER_NO_PANIC (the HE-004C modules, main.rs and
+    status.rs) exists and, read with comments removed, literal contents emptied and the whitespace around `::` removed,
+    names no panicking macro or call (PANICS) outside strict #[cfg(test)] mod tests blocks. The number of sources."""
+    for rel in OBSERVER_NO_PANIC:
+        require((base / rel).is_file(), "%s is missing (observer no-panic tripwire)" % rel)
+    for rel in OBSERVER_NO_PANIC:
+        try:
+            code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
+        except GateError as error:
+            raise GateError("%s: %s (observer no-panic tripwire)" % (rel, error)) from None
+        for start, end in reversed(cfg_test_blocks(code)):
+            code = code[:start] + " " + code[end:]
+        for pattern, name in PANICS:
+            require(not pattern.search(code), "%s names %s outside a strict #[cfg(test)] mod tests block (observer "
+                    "no-panic tripwire)" % (rel, name))
+    return len(OBSERVER_NO_PANIC)
 
 
 def check_unsafe(base: Path) -> int:
@@ -1826,6 +1996,37 @@ def check_tls(base: Path) -> int:
     for pattern, name in TLS_CLIENT_AUTH:
         require(len(re.findall(pattern, code)) == 1 and len(re.findall(pattern, client_code)) == 1,
                 "gate-tls and the binary do not mention %s exactly once, in tls_client.rs (TLS deny-list)" % name)
+    return len(sources) + check_observer_tls(base)
+
+
+def check_observer_tls(base: Path) -> int:
+    """HE-004C DESIGN-C section 15 (G3; D1-14 (b)): check_tls's group O, crates/observer's non-test sources (which must
+    exist), a client only: none of TLS_FORBIDDEN or OBSERVER_TLS_FORBIDDEN in their raw text (comments included); read
+    with comments removed and literal contents emptied, OBSERVER_TLS_SETTINGS each set exactly once as the closed setting,
+    TLS_CLIENT_AUTH each mentioned exactly once, in crates/observer/src/tls.rs, and no macro_rules. The group's own counts,
+    so group G's stay as they are. The number of its sources."""
+    sources = [(source.relative_to(base).as_posix(), source.read_text(encoding="utf-8"))
+               for source in sorted((base / OBSERVER_CRATE / "src").rglob("*.rs"))]
+    require(sources, "crates/observer has no sources (TLS deny-list, group O)")
+    code = ""
+    for rel, text in sources:
+        for pattern, name in TLS_FORBIDDEN + OBSERVER_TLS_FORBIDDEN:
+            require(not pattern.search(text), "%s names %s (TLS deny-list, group O)" % (rel, name))
+        try:
+            source_code = rust_code(text)
+        except GateError as error:
+            raise GateError("%s: %s (TLS deny-list, group O)" % (rel, error)) from None
+        require(not MACRO_RULES.search(source_code), "%s defines a macro with macro_rules (TLS deny-list, group O)" % rel)
+        code += source_code + "\n"
+    for name, assignment in OBSERVER_TLS_SETTINGS:
+        require(len(re.findall(r"\b%s\b" % name, code)) == 1 and len(re.findall(assignment, code)) == 1,
+                "crates/observer does not set %s exactly once, as the closed setting (TLS deny-list, group O)" % name)
+    tls = base / OBSERVER_TLS
+    require(tls.is_file(), "crates/observer has no tls.rs (TLS deny-list, group O)")
+    tls_code = rust_code(tls.read_text(encoding="utf-8"))
+    for pattern, name in TLS_CLIENT_AUTH:
+        require(len(re.findall(pattern, code)) == 1 and len(re.findall(pattern, tls_code)) == 1,
+                "crates/observer does not mention %s exactly once, in tls.rs (TLS deny-list, group O)" % name)
     return len(sources)
 
 
@@ -1887,9 +2088,9 @@ def check_seal_order(base: Path, site: dict = GATE_SEAL_SITE) -> str:
                 "ExitCode::from(status::seal(&<e>)), };` (seal-order grammar)")
         require(not code[first.end():statement.start()].strip(),
                 "%s runs something between the seal's stages (seal-order grammar)" % main_rel)
-        tail = OBSERVER_TAIL.match(code, end)
-        require(tail, "after the second stage %s does not end main with exactly `ExitCode::from(status::NOT_YET_SERVING)` "
-                "(seal-order grammar)" % main_rel)
+        tail = re.compile(OBSERVER_TAIL % re.escape(statement.group(1))).match(code, end)
+        require(tail, "after the second stage %s does not end main with exactly `ExitCode::from(serve(&<the stage-2 "
+                "binding>))` (seal-order grammar)" % main_rel)
         end = tail.end()
     depth = 1
     for index in range(body, end):
@@ -2588,13 +2789,14 @@ def check_prints(base: Path) -> int:
     return len(sources)
 
 
-def check_signer_key(base: Path) -> int:
+def check_signer_key(base: Path, rel: str = SIGNER_KEY) -> int:
     """HE-003D DESIGN section 3.1 (Q-HE3D-7 (d)): the compiled-in signer key file is a regular file of exactly 0 (not
-    yet set: every document is refused) or 32 bytes. Its size."""
-    path = base / SIGNER_KEY
-    require(path.is_file() and not path.is_symlink(), "%s is missing (signer key)" % SIGNER_KEY)
+    yet set: every document is refused) or 32 bytes. Its size. HE-004C (G6): the gate run reads each of SIGNER_KEYS, the
+    gate's and the observer's."""
+    path = base / rel
+    require(path.is_file() and not path.is_symlink(), "%s is missing (signer key)" % rel)
     size = len(path.read_bytes())
-    require(size in (0, 32), "%s holds %d bytes, not 0 or 32 (signer key)" % (SIGNER_KEY, size))
+    require(size in (0, 32), "%s holds %d bytes, not 0 or 32 (signer key)" % (rel, size))
     return size
 
 
@@ -2629,6 +2831,74 @@ def check_observer_binary(names: set[str], raw: bytes, program: bytes) -> int:
     require(count == 1, "planeon-observer holds its OBSERVER program %d times, not exactly once (program-bytes check)"
             % count)
     return len(program)
+
+
+def symbol_path(name: str) -> tuple[tuple[str, ...], str]:
+    """A mangled symbol's own path: the identifiers from its first crate root on (as far as they run consecutively)
+    and the rest of the name after that crate root. Legacy names (`_ZN`) start at their first identifier; v0 names
+    (`_R`) are followed down the first component of their path: `N` and its namespace, `M` and `X` (with an optional
+    `s<base62>_` disambiguator), `Y` and `I`, to the crate root `C` (and its disambiguator). Anything else gives no
+    path."""
+    if name.startswith("_ZN"):
+        at = 3
+    elif name.startswith("_R"):
+        at = 2
+        while True:
+            tag = name[at:at + 1]
+            if tag == "N" and len(name) > at + 1:
+                at += 2
+            elif tag in ("M", "X"):
+                at += 1
+                if name[at:at + 1] == "s":
+                    end = name.find("_", at)
+                    if end < 0:
+                        return (), ""
+                    at = end + 1
+            elif tag in ("Y", "I"):
+                at += 1
+            elif tag == "C":
+                at += 1
+                if name[at:at + 1] == "s":
+                    end = name.find("_", at)
+                    if end < 0:
+                        return (), ""
+                    at = end + 1
+                break
+            else:
+                return (), ""
+    else:
+        return (), ""
+    rest, parts = name[at:], []
+    while True:
+        match = SYMBOL_IDENT.match(name, at)
+        if not match:
+            break
+        length = int(match.group(1))
+        if length == 0 or match.end() + length > len(name):
+            break
+        parts.append(name[match.end():match.end() + length])
+        at = match.end() + length
+    return tuple(parts), rest
+
+
+def check_observer_symbols(names: set[str]) -> tuple[str, str]:
+    """HE-004C DESIGN-C section 15 (G9, D1-6, D2-8): beside check_observer_binary's no-membarrier and program rules,
+    planeon-observer's .symtab (`names`), each symbol read by its own path (symbol_path), holds a rustls symbol naming
+    ClientConnection or, if LTO inlined them all, the recorded substitute (a rustls::client::hs or rustls::client::tls13
+    symbol, OBSERVER_CLIENT_MODULES), and a planeon_observer symbol of its client, http, watch or observe module
+    (OBSERVER_MODULES). What was found: the client symbol's kind ("ClientConnection" or "substitute") and the first module
+    symbol in name order."""
+    paths = {name: symbol_path(name) for name in names}
+    client = sorted(name for name, (path, rest) in paths.items()
+                    if path[:1] == ("rustls",) and OBSERVER_CLIENT_CONNECTION.search(rest))
+    substitute = sorted(name for name, (path, _) in paths.items() if path[:3] in OBSERVER_CLIENT_MODULES)
+    require(client or substitute, "planeon-observer's symbol table holds no rustls ClientConnection symbol and no recorded "
+            "substitute: the composed client is not linked (observer symbols)")
+    modules = sorted(name for name, (path, _) in paths.items()
+                     if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in OBSERVER_MODULES)
+    require(modules, "planeon-observer's symbol table holds no planeon_observer client, http, watch or observe symbol: the "
+            "composed client is not linked (observer symbols)")
+    return ("ClientConnection" if client else "substitute", modules[0])
 
 
 def lock_closure(packages: list[dict], name: str) -> set:
@@ -2709,11 +2979,12 @@ def main() -> int:
                                                    roles["LOCK_ONLY"], vendor_files, VENDOR_TABLE_SHA256,
                                                    ", ".join(sorted(BUILD_SCRIPTS))))
         workspace = check_workspace(HE, vendor_rows)
-        say("workspace: %d crates, no build script or proc-macro; the only registry dependencies are %s of gate-tls; "
-            "the only [patch] maps the %d LINKED vendored crates to their vendor/ paths, and Cargo.lock lists them as "
-            "path packages with their vendor rows' versions and edges; its %d registry packages are exactly the other "
-            "vendor rows, with their checksums and dependency lists"
-            % (len(workspace), ", ".join(sorted(REGISTRY_LINES["crates/gate-tls"])), len(PATCH_CRATES),
+        say("workspace: %d crates, no build script or proc-macro; the only registry dependencies are %s, each of %s "
+            "with the same pinned line (HE-004C); the only [patch] maps the %d LINKED vendored crates to their vendor/ "
+            "paths, and Cargo.lock lists them as path packages with their vendor rows' versions and edges; its %d "
+            "registry packages are exactly the other vendor rows, with their checksums and dependency lists"
+            % (len(workspace), ", ".join(sorted(GATE_TLS_REGISTRY_LINES)),
+               " and ".join(crate.split("/")[1] for crate in sorted(REGISTRY_LINES)), len(PATCH_CRATES),
                len(vendor_rows) - len(PATCH_CRATES)))
         say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
             "effect-gate, gate-tls and planeon-gate link exactly %s; planeon-observer links exactly %s"
@@ -2745,11 +3016,15 @@ def main() -> int:
         say("Debug: %d sources of the linked crates derive Debug on no struct or enum named %s or whose field types "
             "mention %s (lexical tripwire)" % (check_debug_derives(HE), ", ".join(SECRET_TYPES),
                                                ", ".join(DEBUG_HAZARDS + SECRET_TYPES)))
-        say("TLS deny-list: %d gate-tls and binary sources name none of its %d refused tokens; %s are each set "
-            "exactly once as the closed setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( once "
-            "each; with_client_auth_cert and with_webpki_verifier are mentioned once each, in tls_client.rs; outside "
-            "exchange.rs none names UpstreamResponse, and none defines a macro_rules macro"
-            % (check_tls(HE), len(TLS_FORBIDDEN), ", ".join(name for name, _ in TLS_SETTINGS)))
+        observer_tls = check_observer_tls(HE)
+        say("TLS deny-list, two groups: %d sources. Group G, gate-tls and the binary: none of its %d refused tokens; %s "
+            "are each set exactly once as the closed setting; tls.rs names with_cert_resolver( and SingleCertAndKey::from( "
+            "once each; with_client_auth_cert and with_webpki_verifier are mentioned once each, in tls_client.rs; outside "
+            "exchange.rs none names UpstreamResponse, and none defines a macro_rules macro. Group O, crates/observer (%d "
+            "sources, HE-004C): none of those tokens nor of its %d server-side tokens; %s each set exactly once; "
+            "with_client_auth_cert and with_webpki_verifier mentioned once each, in %s; no macro_rules"
+            % (check_tls(HE), len(TLS_FORBIDDEN), ", ".join(name for name, _ in TLS_SETTINGS), observer_tls,
+               len(OBSERVER_TLS_FORBIDDEN), ", ".join(name for name, _ in OBSERVER_TLS_SETTINGS), OBSERVER_TLS))
         say("seal order: %s holds one Linux main that starts with seal stage 1, calls between the stages only %s "
             "(status::seal inside ExitCode::from) and runs stage 2 as the exact statement `let <n> = match "
             "seal_stage2(<stage 1>) { Ok(<x>) => <x>, Err(<e>) => return ExitCode::from(status::seal(&<e>)), };`; its "
@@ -2758,10 +3033,12 @@ def main() -> int:
             "gate_sys::Dir; excepted in the latter)" % (GATE_MAIN, check_seal_order(HE), GATE_CONFIG, SIGNED_CONFIG))
         say("seal order (observer): %s holds one Linux main whose first statement is exactly `let <n> = match seal_stage1() "
             "{ Ok(<x>) => <x>, Err(<e>) => return ExitCode::from(status::seal(&<e>)), };`, followed with nothing between by "
-            "the exact stage-2 statement and then exactly `ExitCode::from(status::NOT_YET_SERVING)`, which closes main; "
-            "calls between the stages only %s; its imports are the pinned set, its only items two fn main, its only "
-            "attributes the crate's forbid and the two cfgs; no socket or thread name through the stage-2 statement"
-            % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
+            "the exact stage-2 statement and then exactly `ExitCode::from(serve(&<the stage-2 binding>))`, which closes "
+            "main (HE-004C); calls between the stages only %s; its imports are the pinned set (serve's included), its only "
+            "items two fn main and fn serve, its only attributes the crate's forbid and the two cfgs; no socket or thread "
+            "name through the stage-2 statement" % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
+        say("observer wiring order: serve calls %d steps each exactly once, in this order: %s (HE-004C, G5)"
+            % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
             "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
             "variant except the data types %s, and hold no fn-pointer or Fn-trait type in a pub alias, const, static, "
@@ -2789,7 +3066,8 @@ def main() -> int:
             % check_pre_main(HE))
         say("print rule: %d linked sources name no print!, println!, eprint!, eprintln!, dbg!, stdout or stderr"
             % check_prints(HE))
-        say("signer key: %s holds %d bytes (0: not yet set, every document refused)" % (SIGNER_KEY, check_signer_key(HE)))
+        say("signer keys: %s (0: not yet set, every document refused)"
+            % "; ".join("%s holds %d bytes" % (rel, check_signer_key(HE, rel)) for rel in SIGNER_KEYS))
         say("post-seal: %d sources of the linked crates name none of HE-002S DESIGN section 5's "
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
@@ -2805,7 +3083,13 @@ def main() -> int:
             % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES),
                ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
         say("observer contracts: %d embedded files, each one plain literal naming a registered contract file, only in %s "
-            "and (the OBSERVER programs) %s (HE-004B1)" % (check_observer_includes(HE), OBSERVER_CONTRACTS, OBSERVER_SEAL_RS))
+            "and (the OBSERVER programs) %s (HE-004B1); besides them only %s's include_bytes!(\"%s\") (HE-004C)"
+            % (check_observer_includes(HE), OBSERVER_CONTRACTS, OBSERVER_SEAL_RS, OBSERVER_SIGNED_CONFIG,
+               OBSERVER_KEY_INCLUDE))
+        say("contracts pin: %s holds %d items, each a pub const of a registered contract file's bytes or of a registered "
+            "pin, and nothing else (HE-004C, R1-3)" % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE)))
+        say("observer no-panic: %d sources (the HE-004C modules, main.rs and status.rs) name no panicking macro or call "
+            "outside strict #[cfg(test)] blocks (HE-004C, G8)" % check_observer_no_panic(HE))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
@@ -2817,10 +3101,12 @@ def main() -> int:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
                 check_binary(raw, target, shape, markers, host_paths)
                 if binary == "planeon-observer":
-                    size = check_observer_binary(symbol_names(raw), raw, (HE / OBSERVER_PROGRAMS[target]).read_bytes())
+                    names = symbol_names(raw)
+                    size = check_observer_binary(names, raw, (HE / OBSERVER_PROGRAMS[target]).read_bytes())
+                    client, module = check_observer_symbols(names)
                     say("%s planeon-observer program and symbols: the %d bytes of %s occur exactly once; no membarrier "
-                        "or __membarrier (no wrapper inventory: owner decision Q-HE4A-B2 (a))"
-                        % (target, size, OBSERVER_PROGRAMS[target]))
+                        "or __membarrier; the composed client is linked: a rustls %s symbol and %s (no wrapper "
+                        "inventory: owner decision Q-HE4A-B2 (a))" % (target, size, OBSERVER_PROGRAMS[target], client, module))
                 if binary == "planeon-gate":
                     present = check_gate_symbols(symbol_names(raw))
                     say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "

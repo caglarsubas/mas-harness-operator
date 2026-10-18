@@ -9,7 +9,17 @@ publish.workspace = true
 # and the binary (src/main.rs); the seal's raw calls are gate-sys's, by path, and no registry crate. HE-004B1 DESIGN-B
 # section 3 (owner decision Q-HE4B-6 (a)): the observer links i05-protocol for its strict JSON parser, canonical encoder,
 # py_eq and SHA-256 (the RBAC snapshot and ADM-4 logic); Cargo.lock already lists this edge (it does not separate dev
-# edges), so it is unchanged.
+# edges), so it is unchanged. HE-004C DESIGN-C section 3 (owner decision Q-HE4-5 (a)): the apiserver read client links
+# the vendored rustls and ring through the observer's own registry lines, each byte-equal to gate-tls's four lines
+# (tools/gate.py's REGISTRY_LINES); no package is added, and Cargo.lock gains only the observer's edges. gate-tls is a
+# test-only path edge for the parity tests (the answer reader and the ClientHello, D1-15); it is not linked.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
 i05-protocol = { path = "../i05-protocol" }
+rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std"] }
+getrandom = { version = "=0.2.17", default-features = false, features = ["linux_disable_fallback"] }
+zeroize = { version = "=1.9.1", default-features = false, features = ["alloc"] }
+ring = "=0.17.14"
+
+[dev-dependencies]
+gate-tls = { path = "../gate-tls" }
