@@ -1,0 +1,10 @@
+[package]
+name = "observer-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# HE-004D1 DESIGN-D1 sections 3 and 4 (owner decisions Q-HE4D1-4 and -5 (a)): the policy observer's kernel reads, std
+# only, with no dependency, build script or feature; a path dependency of crates/observer alone, so planeon-gate's
+# closure and gate-sys stay byte-identical.

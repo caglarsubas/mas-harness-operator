@@ -17,13 +17,20 @@
 #![forbid(unsafe_code)]
 
 pub mod admission;
+pub mod capture;
+pub mod capture_check;
+pub mod capture_schema;
 pub mod client;
 pub mod config;
 pub mod contracts;
 pub mod credentials;
+pub mod enrolled;
 pub mod exposition;
 pub mod http;
 pub mod inputs;
+pub mod kernel_text;
+#[cfg(target_os = "linux")]
+pub mod linux_capture;
 #[cfg(target_os = "linux")]
 pub mod linux_net;
 pub mod observe;

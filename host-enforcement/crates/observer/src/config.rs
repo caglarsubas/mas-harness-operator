@@ -16,16 +16,28 @@
 //! The lifetime (D1-1) is checked right after the parse, because its bounds come from the parsed document:
 //! `notBefore <= now < notAfter` on the wall clock (status 14), and a wall clock before the epoch or past the year 9999
 //! is status 97. While the observer runs, reaching `notAfter` exits 94 (`observe`).
+//!
+//! HE-004D1 (DESIGN-D1 section 5.1; owner decision Q-HE4D1-2 (a); MODEL_DEFINED R121) adds
+//! `planeon.observer-config/v2`: v1's eight members with that format, plus `qualificationRecord: {path, sha256}`, parsed
+//! by [`ObserverConfig::parse_with_record`] with v1's helpers and checks. The record's path must name one entry of the
+//! configuration's own directory (`/etc/planeon/policy-observer`, typed `planeon_etc_t`), other than `config.json` and
+//! `config.json.sig` (D1-3); anything else is status 13. [`ObserverConfig::parse`] and [`FORMAT`] are unchanged, so a v2
+//! document is refused there, and `serve` calls only the v2 parse, so the binary refuses every v1 document. The
+//! signature's domain stays `planeon.observer-config/v1` (`signed_config::payload`): each document's own `format` member
+//! is signed under it, so a signed v1 document never parses as v2.
 
 use std::fmt;
 
 use gate_sys::inet::{parse_authority, InetAddress, IpLiteral};
 use i05_protocol::json::{self, Object, Value};
 
+use crate::signed_config::{DOCUMENT_NAME, PRODUCTION_DIR, SIGNATURE_NAME};
 use crate::snapshot::SYSTEM_NAMESPACES;
 
 /// The document's format, and the signature's domain.
 pub const FORMAT: &str = "planeon.observer-config/v1";
+/// The format of a document that names the qualification record (HE-004D1); its signature's domain stays [`FORMAT`].
+pub const FORMAT_V2: &str = "planeon.observer-config/v2";
 /// The deepest nesting of the canonical subset.
 pub const MAX_DEPTH: usize = 16;
 /// The largest integer of the canonical subset, 2^53 - 1.
@@ -42,6 +54,9 @@ const INDEX_NAME: &str = "generations";
 /// The root's members, exactly.
 const MEMBERS: [&str; 8] = ["format", "generation", "validity", "apiserverAuthority", "qualificationNamespace", "credentials",
                             "admission", "enrollment"];
+/// The v2 root's members, exactly: v1's and the qualification record.
+const MEMBERS_V2: [&str; 9] = ["format", "generation", "validity", "apiserverAuthority", "qualificationNamespace",
+                               "credentials", "admission", "enrollment", "qualificationRecord"];
 
 /// A file the configuration names: an absolute normalised path and its pin.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -262,6 +277,19 @@ fn credentials(value: Option<&Value>) -> Result<CredentialFiles, ConfigError> {
     Ok(CredentialFiles { serving_ca, chain, key })
 }
 
+/// A qualification record's path (D1-3): the configuration's own directory, then one name of `[A-Za-z0-9._-]`, neither
+/// `.`, `..`, the configuration document nor its signature.
+pub fn is_record_path(path: &str) -> bool {
+    path.strip_prefix(PRODUCTION_DIR).and_then(|rest| rest.strip_prefix('/')).is_some_and(|name| {
+        !name.is_empty()
+            && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+            && name != "."
+            && name != ".."
+            && name != DOCUMENT_NAME
+            && name != SIGNATURE_NAME
+    })
+}
+
 impl ObserverConfig {
     /// Checks a verified document (see the module documentation) and returns the typed configuration.
     pub fn parse(document: &[u8]) -> Result<ObserverConfig, ConfigError> {
@@ -270,6 +298,28 @@ impl ObserverConfig {
         if text(root, "format", "the document")? != FORMAT {
             return schema(format!("the document's format is not {FORMAT}"));
         }
+        ObserverConfig::members(root)
+    }
+
+    /// Checks a verified `planeon.observer-config/v2` document (HE-004D1, D1-3): v1's checks on its eight members,
+    /// then the qualification record's reference, which must name an entry of the configuration's own directory. The
+    /// typed configuration and the record's path and pin. Every refusal is status 13.
+    pub fn parse_with_record(document: &[u8]) -> Result<(ObserverConfig, FileRef), ConfigError> {
+        let value = canonical_value(document)?;
+        let root = closed(Some(&value), "the document", &MEMBERS_V2)?;
+        if text(root, "format", "the document")? != FORMAT_V2 {
+            return schema(format!("the document's format is not {FORMAT_V2}"));
+        }
+        let config = ObserverConfig::members(root)?;
+        let record = file_ref(root.get("qualificationRecord"), "qualificationRecord")?;
+        if !is_record_path(&record.path) {
+            return check("qualificationRecord.path is not an entry of the configuration's directory".to_string());
+        }
+        Ok((config, record))
+    }
+
+    /// The checks of the members v1 and v2 share, in v1's order.
+    fn members(root: &Object) -> Result<ObserverConfig, ConfigError> {
         let generation = text(root, "generation", "the document")?;
         if !is_generation(generation) {
             return check("generation is not a valid store name (R19)".to_string());

@@ -12,9 +12,12 @@ publish.workspace = true
 # edges), so it is unchanged. HE-004C DESIGN-C section 3 (owner decision Q-HE4-5 (a)): the apiserver read client links
 # the vendored rustls and ring through the observer's own registry lines, each byte-equal to gate-tls's four lines
 # (tools/gate.py's REGISTRY_LINES); no package is added, and Cargo.lock gains only the observer's edges. gate-tls is a
-# test-only path edge for the parity tests (the answer reader and the ClientHello, D1-15); it is not linked.
+# test-only path edge for the parity tests (the answer reader and the ClientHello, D1-15); it is not linked. HE-004D1
+# DESIGN-D1 section 3 (owner decision Q-HE4D1-4 (a)): the kernel captures' raw reads are observer-sys's, a std-only path
+# crate only this one links; Cargo.lock gains that path package and the edge, and no registry or vendored package.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
+observer-sys = { path = "../observer-sys" }
 i05-protocol = { path = "../i05-protocol" }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std"] }
 getrandom = { version = "=0.2.17", default-features = false, features = ["linux_disable_fallback"] }

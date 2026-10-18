@@ -69,6 +69,10 @@ name = "libc"
 version = "0.2.190"
 
 [[package]]
+name = "observer-sys"
+version = "0.1.0"
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 
@@ -102,6 +106,7 @@ dependencies = [
  "gate-tls",
  "getrandom",
  "i05-protocol",
+ "observer-sys",
  "ring",
  "rustls",
  "zeroize",
