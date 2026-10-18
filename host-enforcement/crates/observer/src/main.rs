@@ -10,8 +10,14 @@
 //! the TLS client configuration (21), the Linux wire, whose constructor takes `&Sealed` (24), the embedded closure
 //! once (22), then the observation epoch, which has no normal end (80-99). `tools/gate.py` holds this file to the
 //! seal-order grammar with the observer's parameters (stage 1 first, nothing between, the exact stage-2 statement, the
-//! exact tail `ExitCode::from(serve(&<the stage-2 binding>))`), its pinned imports, `serve`'s eight calls in this order
-//! and the observer's linked-crate rules. On other targets a stub exits with status 2 (command 8's darwin build).
+//! exact tail `ExitCode::from(serve(&<the stage-2 binding>))`), its pinned imports, `serve`'s calls in their order and
+//! the observer's linked-crate rules. On other targets a stub exits with status 2 (command 8's darwin build).
+//!
+//! HE-004D1 (DESIGN-D1 section 17.3, G-D1-8) gives `serve` twelve calls in this order: the signed configuration's load
+//! (11, 12), its v2 parse with the qualification record's reference (13), the lifetime (14; 97), the credentials (20),
+//! the TLS configuration (21), the embedded capture schema (25), the record's read (26, 27), the enrolled record (27,
+//! 28, 29), the Linux wire (24), the capture roots, whose constructor `LinuxCapture::new` takes `&Sealed` (30), the
+//! embedded closure (22) and the epoch with the capture engine (80-99).
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;
@@ -38,12 +44,16 @@ fn main() -> ExitCode {
     ExitCode::from(status::NOT_LINUX)
 }
 
-/// Everything after the seal (DESIGN-C section 14); the exit status. The only constructor that creates a socket or the
-/// poller, `LinuxWire::new`, takes `&Sealed`.
+/// Everything after the seal (DESIGN-C section 14, DESIGN-D1 section 17.3); the exit status. The only constructors
+/// that create a socket or the poller (`LinuxWire::new`) or open the capture roots (`LinuxCapture::new`) take `&Sealed`.
 #[cfg(target_os = "linux")]
 fn serve(sealed: &Sealed) -> u8 {
+    use planeon_observer::capture::CaptureEngine;
+    use planeon_observer::capture_schema::CaptureSchema;
     use planeon_observer::config::{self, ObserverConfig};
     use planeon_observer::credentials;
+    use planeon_observer::enrolled::{self, Enrolled};
+    use planeon_observer::linux_capture::LinuxCapture;
     use planeon_observer::linux_net::LinuxWire;
     use planeon_observer::observe;
     use planeon_observer::signed_config;
@@ -55,7 +65,7 @@ fn serve(sealed: &Sealed) -> u8 {
         Ok(document) => document,
         Err(error) => return status::config_load(&error),
     };
-    let Ok(config) = ObserverConfig::parse(&document) else { return status::CONFIG_CHECK };
+    let Ok((config, record_ref)) = ObserverConfig::parse_with_record(&document) else { return status::CONFIG_CHECK };
     drop(document);
     if let Err(error) = config::check_lifetime(&config, utc::wall_seconds()) {
         return status::lifetime(&error);
@@ -64,7 +74,22 @@ fn serve(sealed: &Sealed) -> u8 {
         return status::CREDENTIALS;
     };
     let Ok(tls) = client_config(identity, serving_ca, time_provider()) else { return status::TLS_SETUP };
+    let Ok((schema, record_schema)) = CaptureSchema::embedded() else { return status::CAPTURE_SCHEMA };
+    let record = match enrolled::load_record(&record_ref) {
+        Ok(record) => record,
+        Err(error) => return status::capture_setup(&error),
+    };
+    let enrolled = match Enrolled::new(record, &record_schema, utc::wall_seconds()) {
+        Ok(enrolled) => enrolled,
+        Err(error) => return status::capture_setup(&error),
+    };
+    drop(record_schema);
     let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };
+    let capture = match LinuxCapture::new(sealed) {
+        Ok(capture) => capture,
+        Err(error) => return status::capture_setup(&error),
+    };
     let Ok(closure) = Closure::embedded() else { return status::CLOSURE };
-    status::observation(&observe::run(wire, config, tls, closure))
+    let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));
+    status::observation(&observe::run(wire, config, tls, closure, captures))
 }

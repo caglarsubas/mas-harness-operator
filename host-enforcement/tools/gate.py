@@ -91,6 +91,22 @@ constant items (G7, R1-3); the no-panic tripwire covers every new observer modul
 planeon-observer holds a rustls client-connection symbol and an observer client, http, watch or observe symbol (G9); the
 observer's secret types and its wire join the Debug rules (G10). No wrapper inventory (owner rule Q-HE4A-B2).
 
+HE-004D1 (the observer's kernel captures and NP-3; DESIGN-D1 rev 4 section 19, owner decisions Q-HE4D1-1..12 (a),
+Q-HE4D1-D1 (c), -D2 (a) and -D3 (a)) adds observer-sys, a std-only crate without dependencies, to planeon-observer's
+closure and every linked-crate scan (G-D1-1); its kernel.rs is the one file of it allowed `unsafe`, std::os::fd items and
+MetadataExt, and declares exactly the foreign item syscall (G-D1-2), whose calls are pinned: six numbers, seven
+arguments, named constants in the checked positions, one ioctl request and three bpf commands, and no other route to the
+item (G-D1-3); the open flags are four named sets of read-only flags each with its compile-time assert, the cgroup file
+names are exactly seven, no observer source names freeze and observer-sys names no write (G-D1-4, NP-3); five exact
+private root constants are excepted once each from the start-up lint and from the linked-source `fs` scan (G-D1-5,
+R3-1, R4-1); observer_sys is named only in linux_capture.rs, which re-exports nothing and whose public items name no
+observer-sys type, and its constructor is called once, as LinuxCapture::new(sealed) in serve (G-D1-6); link_text and
+own_pid are pinned to their reads and called only in linux_capture.rs (G-D1-7); serve's wiring has twelve calls
+(G-D1-8); the four native-profile contract files are pinned and the embedded schema has one use site (G-D1-9); three new
+logic modules take B1's logic rule (G-D1-10); the no-panic, post-seal and Debug rules cover the new sources and handles
+(G-D1-11..13); planeon-observer's symbol table holds the two not-inlined constructors (G-D1-14); and its host-path scan
+exempts exactly one span, the pinned v4 schema's bytes, which must occur once (G-D1-16; HOST_PATHS unchanged).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -161,7 +177,9 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # the observer's seal embeds (19 files). HE-003A3 (DESIGN section 2, owner decisions Q-A3-1..15 (a)): the I05 gate
 # channel v4 README and vectors its record v4 registers for HE-003A3 (MET-ENFORCE-030, merged as fd362f9e), 21 files.
 # HE-004B1 (DESIGN-B section 2, owner decision Q-HE4B-7 (a)): the ten I06 v2, I06 v1 and admission v3 files record v4
-# registers for HE-004 (rows 34-43), 31 files.
+# registers for HE-004 (rows 34-43), 31 files. HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's three HE-004D1
+# rows (native-profile v4's schema, vectors and README) and its native-profile v3 schema row, held under the byte rule
+# for the cross-version cases X12-X14 (owner decision Q-HE4D1-11 (a)), 35 files.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -196,6 +214,12 @@ CONTRACTS = {
     "contracts/admission-v3/README.md": "c3106482b4ff79649cbef7c65797c6fcd6b64f8419e871ae7d89eecad3ff98ab",
     "contracts/admission-v3/admission-manifests/planeon-a2.json":
         "1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741",
+    "contracts/native-profile-v4/qualification.schema.json":
+        "c3e91c087ebc6a13e8a96a066f80710ac968c8def434d1d1b97415811715ed10",
+    "contracts/native-profile-v4/vectors.json": "dede64ab3202a9e28094f062b5dad868c13ca02423e2380af8666ecf2e7a86e6",
+    "contracts/native-profile-v4/README.md": "a4205a5388dc83827bb39670bcc9477b030f29829128abf19f7578321c170174",
+    "contracts/native-profile-v3/qualification.schema.json":
+        "ae5cbb6aa39f4edfa2d9919f25e55bad9ab214a99ca927c5afe7e2d943946ac5",
 }
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
@@ -210,8 +234,13 @@ LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol",
 # sections 3 and 6 (owner decision Q-HE4B-6 (a)): it links i05-protocol too, which every linked-crate scan already
 # reads (LINKED_CRATES); the closure check and the SBOM's workspace set follow.
 OBSERVER_CRATE = "crates/observer"
-OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol")
-SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE,)
+# HE-004D1 DESIGN-D1 sections 3 and 19 (G-D1-1; owner decision Q-HE4D1-4 (a)): observer-sys, the observer's std-only
+# kernel-read crate, joins planeon-observer's closure and every linked-crate scan; its manifest has no dependency.
+OBSERVER_SYS = "crates/observer-sys"
+OBSERVER_SYS_LIB = "crates/observer-sys/src/lib.rs"
+OBSERVER_SYS_KERNEL = "crates/observer-sys/src/kernel.rs"
+OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol", OBSERVER_SYS)
+SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
 GATE_MAIN = "crates/gate/src/main.rs"
@@ -284,19 +313,30 @@ OBSERVER_MAIN_USES = tuple(sorted(
     + [(("planeon_observer", "config", "self"), None), (("planeon_observer", "config", "ObserverConfig"), None)]
     + [(("planeon_observer", name), None) for name in ("credentials", "observe", "signed_config", "utc")]
     + [(("planeon_observer", "linux_net", "LinuxWire"), None), (("planeon_observer", "snapshot", "Closure"), None)]
-    + [(("planeon_observer", "tls", name), None) for name in ("client_config", "time_provider")]))
+    + [(("planeon_observer", "tls", name), None) for name in ("client_config", "time_provider")]
+    # HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): serve's in-body imports of the capture setup.
+    + [(("planeon_observer", "capture", "CaptureEngine"), None), (("planeon_observer", "capture_schema", "CaptureSchema"), None),
+       (("planeon_observer", "enrolled", "self"), None), (("planeon_observer", "enrolled", "Enrolled"), None),
+       (("planeon_observer", "linux_capture", "LinuxCapture"), None)]))
 GATE_SEAL_SITE = {"main": GATE_MAIN, "before": (GATE_CONFIG, SIGNED_CONFIG), "calls": SEAL_CALLS, "uses": MAIN_USES,
                   "functions": MAIN_FUNCTIONS, "adjacent": False}
 OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": OBSERVER_MAIN_USES,
                       "functions": ["main", "main", "serve"], "adjacent": True}
 # G5's wiring rule (D1-1): in serve, read without comments and use declarations, the whitespace around `::` removed, each
-# of these calls appears exactly once, in this order.
+# of these calls appears exactly once, in this order. HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): twelve calls, the v2
+# parse with the record's reference in place of the v1 parse, the capture schema, the record's read, the enrolled record
+# and the capture roots joining them.
 OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
-    (r"\bsigned_config::load\s*\(", "signed_config::load("), (r"\bObserverConfig::parse\s*\(", "ObserverConfig::parse("),
+    (r"\bsigned_config::load\s*\(", "signed_config::load("),
+    (r"\bObserverConfig::parse_with_record\s*\(", "ObserverConfig::parse_with_record("),
     (r"(?<![\w:])config::check_lifetime\s*\(", "config::check_lifetime("),
     (r"\bcredentials::observer_inputs\s*\(", "credentials::observer_inputs("),
-    (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bLinuxWire::new\s*\(", "LinuxWire::new("),
+    (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bCaptureSchema::embedded\s*\(", "CaptureSchema::embedded("),
+    (r"(?<![\w:])enrolled::load_record\s*\(", "enrolled::load_record("), (r"\bEnrolled::new\s*\(", "Enrolled::new("),
+    (r"\bLinuxWire::new\s*\(", "LinuxWire::new("), (r"\bLinuxCapture::new\s*\(", "LinuxCapture::new("),
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
+# The v1 parse no longer appears in serve (G-D1-8).
+OBSERVER_V1_PARSE = re.compile(r"\bObserverConfig::parse\s*\(")
 FN_SERVE = re.compile(r"\bfn\s+serve\s*\(")
 SEAL_TOKEN = re.compile(r"\s*(::|=>|b\"\"|\"\"|''|[A-Za-z_]\w*|[0-9]\w*|[(){},;=&])")
 SEAL_KEYWORDS = {"let", "match", "return"}
@@ -312,7 +352,9 @@ RUST_KEYWORDS = {"as", "async", "await", "break", "const", "continue", "crate", 
 BEFORE_SEAL_REFUSED = (r"\bgate_sys\b", r"\bPoller\b", r"\blisten_", r"\bconnect_", r"\bNetTable\b", r"\bLinuxOs\b",
                        r"\bLinuxConnector\b", r"\bstd::net\b", r"\bstd::thread\b", r"\bthread::",
                        # HE-003A3 (DESIGN section 5, D2-2): the observation's roots exist only after the seal.
-                       r"\bKernelRoots\b")
+                       r"\bKernelRoots\b",
+                       # HE-004D1 DESIGN-D1 section 17.3 (G-D1-6): the capture roots too.
+                       r"\bobserver_sys\b", r"\bLinuxCapture\b")
 SIGNED_CONFIG_DIR = re.compile(r"(?m)^[ \t]*use\s+gate_sys::Dir\s*;")
 # HE-003D DESIGN section 5 (D1-3, D2-6): gate-sys's socket modules are reached only from effect-gate's linux_os.rs and
 # linux_net.rs (whose public constructors take &Sealed), which re-export nothing (no `pub use`), and from gate-sys.
@@ -465,11 +507,11 @@ CHANNEL = "crates/gate-sys/src/channel.rs"
 TCP = "crates/gate-sys/src/tcp.rs"
 GATE_TLS = "crates/gate-tls"
 # The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6, HE-003A
-# DESIGN section 8, HE-003B DESIGN section 3).
-UNSAFE_FILES = (OPENAT, SEAL, CHANNEL, TCP)
+# DESIGN section 8, HE-003B DESIGN section 3; HE-004D1 DESIGN-D1 section 4.4, G-D1-2: observer-sys's kernel.rs).
+UNSAFE_FILES = (OPENAT, SEAL, CHANNEL, TCP, OBSERVER_SYS_KERNEL)
 # The linked sources that may name std::os::fd items (HE-003A DESIGN section 8): effect-gate holds gate-sys's opaque
-# types and names no descriptor.
-FD_FILES = (OPENAT, CHANNEL, TCP)
+# types and names no descriptor. HE-004D1 (G-D1-2): observer-sys's kernel.rs.
+FD_FILES = (OPENAT, CHANNEL, TCP, OBSERVER_SYS_KERNEL)
 # HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5) and HE-003A DESIGN section 8:
 # the start-up lint's exceptions, a per-file list of exact expressions (whitespace between their tokens ignored), each
 # removed once before the scan: in gate-sys's seal module the expression that opens the process's own status file, in
@@ -485,13 +527,37 @@ CGROUP_ROOT = 'KernelRoot::open_kernel_root("/sys/fs/cgroup")'
 PROC_ROOT = 'KernelRoot::open_kernel_root("/proc")'
 CGROUP_ROOT_CALL = re.compile(r'\bKernelRoot\s*::\s*open_kernel_root\s*\(\s*"/sys/fs/cgroup"\s*\)')
 PROC_ROOT_CALL = re.compile(r'\bKernelRoot\s*::\s*open_kernel_root\s*\(\s*"/proc"\s*\)')
+# HE-004D1 DESIGN-D1 section 19 (G-D1-5; B1's pattern for a record module, Q-HE4B-5 (a)): five exact private root
+# constants, each removed once in its own file. A pattern ignores whitespace between the tokens and is anchored to a line
+# start with only spaces or tabs before `const`, so a `pub`, `pub(crate)` or same-line attribute form is not removed and
+# still refuses; a raw string, concat!, a comment between the tokens or a changed string is not the expression either.
+OBSERVER_ENROLLED = "crates/observer/src/enrolled.rs"
+OBSERVER_CAPTURE_CHECK = "crates/observer/src/capture_check.rs"
+
+
+def root_constant(name: str, value: str) -> tuple[str, re.Pattern]:
+    """The exact item `const <name>: &str = "<value>";` and its anchored, whitespace-tolerant pattern (G-D1-5)."""
+    return ('const %s: &str = "%s";' % (name, value),
+            re.compile(r'(?m)^[ \t]*const\s+%s\s*:\s*&\s*str\s*=\s*"%s"\s*;' % (name, re.escape(value))))
+
+
+D1_ROOT_CONSTANTS = {
+    OBSERVER_SYS_KERNEL: (root_constant("PROC_ROOT", "/proc"), root_constant("CGROUP_ROOT", "/sys/fs/cgroup")),
+    OBSERVER_ENROLLED: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"), root_constant("PIN_ROOT", "/sys/fs/bpf/planeon")),
+    OBSERVER_CAPTURE_CHECK: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"),),
+}
 STARTUP_EXCEPTIONS = {
     LINUX_OS: ((CGROUP_ROOT, CGROUP_ROOT_CALL), (PROC_ROOT, PROC_ROOT_CALL)),
     SEAL: ((STATUS_READ,
             re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')),),
     CHANNEL: ((SOCKCREATE_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/thread-self/attr"\s*\)')),
               (PEER_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*&\s*format\s*!\s*\(\s*"/proc/\{\}"\s*,\s*pid\s*\)\s*\)'))),
+    **D1_ROOT_CONSTANTS,
 }
+# HE-004D1 DESIGN-D1 section 19 (G-D1-5, R3-1): the linked-source scan refuses the word fs in the raw text of every
+# non-test source, so the same five expressions are removed once each, in their own files, before that scan (as R96's
+# one cgroup2-root open in linux_os.rs); the PROC_ROOT one holds no fs. Any other fs word still refuses.
+FS_SCAN_EXCEPTIONS = D1_ROOT_CONSTANTS
 # HE-002S DESIGN section 6 (D8): the foreign symbols each linked source declares, exactly; no other linked source
 # declares a foreign item. Extern items are private, none is declared `safe`, and no linked source names link_name.
 # PR review round 1, R1-1: the sources are read with comments removed and literal contents emptied (rust_code), every
@@ -507,7 +573,84 @@ FOREIGN_ITEMS = {OPENAT: {"openat", "readlinkat"},
                  # HE-003B DESIGN section 3.1: the I04 listener's eight (accept4 only through syscall); HE-003C DESIGN
                  # sections 5 and 6: the upstream client's connect and getsockopt (SO_ERROR), ten in all.
                  TCP: {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt", "recv", "send", "shutdown",
-                       "syscall"}}
+                       "syscall"},
+                 # HE-004D1 DESIGN-D1 section 4.1 (G-D1-2; owner decision Q-HE4D1-5 (a)): observer-sys's one item.
+                 OBSERVER_SYS_KERNEL: {"syscall"}}
+# HE-004D1 DESIGN-D1 sections 4.1 and 19 (G-D1-3, D1-6): kernel.rs's calls of its one foreign item. Read without comments
+# and with literals kept: the word syscall is its extern declaration `fn syscall(` once and otherwise only a plain call
+# `syscall(` (not after `::` or `.`); every call has exactly seven arguments, the first one of the six SYS_ constants;
+# each SYS_ constant is defined once per target module with its pinned value, there is no other, and the names occur
+# only there and as a call's first argument; the checked positions (openat's flags, the fourth argument; ioctl's
+# request, the third; bpf's command, the second) are single named constants, the request FS_IOC_MEASURE_VERITY and
+# the command one of the three BPF commands, each defined once with its pinned value. In observer's and observer-sys's
+# other sources neither syscall nor a SYS_ name occurs (R4-2).
+SYS_NUMBERS = {"x86_64": {"SYS_OPENAT": 257, "SYS_GETDENTS64": 217, "SYS_READLINKAT": 267, "SYS_FSTATFS": 138,
+                          "SYS_IOCTL": 16, "SYS_BPF": 321},
+               "aarch64": {"SYS_OPENAT": 56, "SYS_GETDENTS64": 61, "SYS_READLINKAT": 78, "SYS_FSTATFS": 44,
+                           "SYS_IOCTL": 29, "SYS_BPF": 280}}
+SYS_CHECKED = {"SYS_OPENAT": 3, "SYS_IOCTL": 2, "SYS_BPF": 1}
+IOCTL_REQUESTS = {"FS_IOC_MEASURE_VERITY": 0xC0046686}
+BPF_COMMANDS = {"BPF_OBJ_GET": 7, "BPF_OBJ_GET_INFO_BY_FD": 15, "BPF_PROG_QUERY": 16}
+SYS_NAME = re.compile(r"\bSYS_[A-Za-z0-9_]+\b")
+SYSCALL_WORD = re.compile(r"\bsyscall\b")
+NUMBERS_MODULE = re.compile(r'#\s*\[\s*cfg\s*\(\s*target_arch\s*=\s*"(x86_64|aarch64)"\s*\)\s*\]\s*mod\s+numbers\s*\{')
+# G-D1-4 (NP-3): every openat call's flags are one of these sets, each built only from the read-only flags and each
+# asserted against the OBSERVER row's write-and-create mask; the cgroup file names are exactly these seven, each once;
+# no observer or observer-sys source names freeze (code) or holds "cgroup.freeze" (literals), and observer-sys's code
+# names no write, Write or write_all.
+OPEN_FLAG_SETS = ("ROOT_PATH_FLAGS", "DIR_FLAGS", "READ_FLAGS", "TARGET_FLAGS")
+READ_ONLY_FLAGS = ("O_RDONLY", "O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_CLOEXEC", "O_NONBLOCK")
+WRITE_MASK = "0x400643"
+CGROUP_FILE_NAMES = ("cgroup.procs", "cgroup.events", "cgroup.stat", "memory.max", "pids.max", "pids.current", "cpu.max")
+DOTTED_NAME = re.compile(r'"([0-9A-Za-z_]+(?:\.[0-9A-Za-z_]+)+)"')
+FREEZE_WORD = re.compile(r"\bfreeze\b")
+WRITE_WORDS = re.compile(r"\b(?:write|Write|write_all)\b")
+# G-D1-7: link_text is defined once in kernel.rs and reads only ProcLink's five names; Roots::own_pid reads the proc
+# root's `self` link, the one other link name; link_at, their one helper, is called exactly in those two places; and
+# link_text and own_pid are called (among the observer's and observer-sys's sources) only in linux_capture.rs.
+OBSERVER_LINUX_CAPTURE = "crates/observer/src/linux_capture.rs"
+PROC_LINK_NAMES = ("exe", "ns/user", "ns/mnt", "ns/pid", "ns/net")
+LINK_TEXT_CALL = re.compile(r"\blink_at\s*\(\s*&\s*self\s*\.\s*handle\s*,\s*&\s*name\s*\(\s*which\s*\.\s*name\s*\(\s*\)\s*\)")
+OWN_PID_CALL = re.compile(r'\blink_at\s*\(\s*&\s*self\s*\.\s*proc_root\s*,\s*&\s*name\s*\(\s*"self"\s*\)')
+# PR review round 1, R1-2: the names kernel.rs's pins read are bound once. No item inside a function body (the `const`
+# of a `*const` pointer type and of `&raw const` is not an item), and on the link-read path each function names the free
+# fn `name` exactly so: (free calls, method calls, other words); `link_at`'s one other word is its parameter's use.
+BODY_ITEM = re.compile(r"\b(?:fn|static|use|impl|mod|struct|enum|union|trait|type|extern|macro_rules|macro)\b"
+                       r"|(?<!\*)(?<!raw\s)\bconst\b")
+LINK_PATH_NAMES = {"link_text": (1, 1, 0), "own_pid": (1, 0, 0), "link_at": (0, 0, 1)}
+# PR review round 2, R2-1 (G-D1-7): the link-read path's three functions, pinned exactly. Each is read from kernel.rs
+# without comments and with literals kept, from its visibility to its closing brace, as tokens (a whole string literal,
+# an identifier, a number or one other character) joined by single spaces, so whitespace and comments do not count and
+# any other text refuses: neither a rebound or retyped `which`, an added or retyped parameter, a generic parameter, a
+# changed visibility nor a changed body can move a link read off ProcLink's five names and the proc root's `self`.
+LINK_TOKEN = re.compile(r'''"(?:[^"\\]|\\.)*"|[A-Za-z_]\w*|\d\w*|'\w+|\S''')
+LINK_PATH_PINS = {
+    'link_text': (
+        'pub fn link_text ( & self , which : ProcLink , buffer : & mut [ u8 ] ) - > io : : Result < usize > { let '
+        'limit = buffer . len ( ) . min ( LINK_BUFFER ) ; let buffer = buffer . get_mut ( . . limit ) . '
+        'ok_or_else ( | | refusal ( "a link buffer" ) ) ? ; link_at ( & self . handle , & name ( which . name ( ) '
+        ') ? , buffer ) }'),
+    'own_pid': (
+        'pub fn own_pid ( & self ) - > io : : Result < i32 > { let mut buffer = [ 0u8 ; 32 ] ; let count = '
+        'link_at ( & self . proc_root , & name ( "self" ) ? , & mut buffer ) ? ; let text = std : : str : : '
+        'from_utf8 ( buffer . get ( . . count ) . unwrap_or_default ( ) ) . map_err ( | _ | refusal ( "the self '
+        'link" ) ) ? ; number ( text ) . ok_or_else ( | | refusal ( "the self link is not a process number" ) ) }'),
+    'link_at': (
+        'fn link_at ( dir : & File , name : & CStr , buffer : & mut [ u8 ] ) - > io : : Result < usize > { if '
+        'buffer . is_empty ( ) { return Err ( refusal ( "a link buffer must hold at least one byte" ) ) ; } let '
+        'size = c_long : : try_from ( buffer . len ( ) ) . map_err ( | _ | refusal ( "a link buffer\'s length" ) ) '
+        '? ; let value = unsafe { syscall ( SYS_READLINKAT , raw ( dir ) , name . as_ptr ( ) , buffer . '
+        'as_mut_ptr ( ) , size , ZERO , ZERO ) } ; match counted ( value ) ? { 0 = > Err ( refusal ( "a link read '
+        'back empty" ) ) , count if count < buffer . len ( ) = > Ok ( count ) , _ = > Err ( refusal ( "a link '
+        'filled its buffer and may be longer" ) ) , } }'),
+}
+# PR review round 3, R3-1 (monitor decision (a)): observer-sys's kernel.rs pinned whole by sha256, checked like CONTRACTS,
+# alongside the lexical rules above, which stay for intent and clear refusals. The pinned link-read functions' callees
+# (the free fn `name`, and ProcLink's name() in any impl, through an alias or a trait impl) cannot change without a new
+# pin; any change to the file refuses.
+OBSERVER_SYS_PINS = {
+    "crates/observer-sys/src/kernel.rs": "0b3d0151c9eaf1f44dd56436795aefd8cb7140ce9f4d16fe5f4eaf7130e61d43",
+}
 # HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-9, D2-2): Dir::read_link is pub (gate-sys's host tests call it), so among
 # the linked crates' non-test sources, read without comments and with literals kept, the word read_link appears exactly
 # twice: its definition `fn read_link(` in openat.rs and the one call `read_link("exe",` in channel.rs (ProcDir::exe).
@@ -593,7 +736,10 @@ DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "Pid
                  # HE-003A3 (DESIGN section 5, D2-7): the observation's O_PATH root handle.
                  "KernelRoot",
                  # HE-004C DESIGN-C section 15 (G10): the observer's wire holds the poller and its TCP connections.
-                 "LinuxWire")
+                 "LinuxWire",
+                 # HE-004D1 DESIGN-D1 section 19 (G-D1-13): observer-sys's handles (its ProcDir shares gate-sys's name,
+                 # already listed) and the observer's capture view over them.
+                 "Roots", "CgroupDir", "Opened", "ProgFd", "LinuxCapture")
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
@@ -662,7 +808,8 @@ OBSERVER_POST_SEAL_FORBIDDEN = tuple(
 # `impl Drop for Value` in json.rs (a parsed value freed iteratively: munmap and brk, both in the OBSERVER row; a recorded
 # residual), is removed once from that file's code before the word scan; a second one, another type's Drop, or the impl
 # in another file still refuses.
-OBSERVER_POST_SEAL_CRATES = (OBSERVER_CRATE, "crates/i05-protocol")
+# HE-004D1 DESIGN-D1 section 19 (G-D1-12): observer-sys's code runs after the seal too.
+OBSERVER_POST_SEAL_CRATES = (OBSERVER_CRATE, "crates/i05-protocol", OBSERVER_SYS)
 I05_JSON = "crates/i05-protocol/src/json.rs"
 OBSERVER_DROP_EXCEPTIONS = {I05_JSON: re.compile(r"\bimpl\s+Drop\s+for\s+Value\b")}
 # HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2): the observer's five logic modules. Read with comments removed, literal
@@ -679,13 +826,22 @@ OBSERVER_LOGIC_NAMES = ("inputs", "rbac", "snapshot", "operational", "admission"
 OBSERVER_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in OBSERVER_LOGIC_NAMES)
 OBSERVER_CONTRACTS = "crates/observer/src/contracts.rs"
 OBSERVER_SEAL_RS = "crates/observer/src/seal.rs"
-CRATE_PATH_ROOTS = ("std", "core", "alloc", "crate", "self", "super", "i05_protocol", "gate_sys", "planeon_observer")
+# HE-004D1 (G-D1-10): observer_sys is a crate root too, so a logic module naming it names a rooted path and refuses.
+CRATE_PATH_ROOTS = ("std", "core", "alloc", "crate", "self", "super", "i05_protocol", "gate_sys", "planeon_observer",
+                    "observer_sys")
 OBSERVER_LOGIC_PATHS = (tuple(("crate", name) for name in OBSERVER_LOGIC_NAMES + ("contracts",))
                         + tuple(("self", name) for name in OBSERVER_LOGIC_NAMES)
                         + (("i05_protocol", "json"), ("i05_protocol", "sha256"), ("i05_protocol", "contracts"))
                         + tuple(("std", "collections", name) for name in ("BTreeMap", "BTreeSet", "VecDeque"))
                         + tuple(("std", name) for name in ("cmp", "fmt", "string", "vec", "iter", "ops", "str", "borrow",
                                                            "convert", "option", "result")))
+# HE-004D1 DESIGN-D1 section 19 (G-D1-10): the capture checks' three logic modules take B1's rule with the whitelist
+# extended by i05-protocol's schema module and the three modules themselves (B1's five keep theirs).
+D1_LOGIC_NAMES = ("capture_schema", "capture_check", "kernel_text")
+D1_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in D1_LOGIC_NAMES)
+D1_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + (("i05_protocol", "schema"),)
+                  + tuple(("crate", name) for name in D1_LOGIC_NAMES) + tuple(("self", name) for name in D1_LOGIC_NAMES))
+LOGIC_MODULES = tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
 CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
 OBSERVER_LOGIC_WORDS = ((re.compile(r"\b(?:HashMap|HashSet|RandomState)\b"), "HashMap, HashSet or RandomState (getrandom)"),
                         (re.compile(r"\binclude_(?:bytes|str)\s*!"), "include_bytes! or include_str! (only contracts.rs embeds)"))
@@ -714,7 +870,15 @@ OBSERVER_C_NAMES = ("signed_config", "config", "credentials", "tls", "http", "ex
                     "utc", "client", "linux_net", "observe")
 OBSERVER_C_MODULES = tuple("crates/observer/src/%s.rs" % name for name in OBSERVER_C_NAMES)
 OBSERVER_STATUS = "crates/observer/src/status.rs"
-OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS)
+# HE-004D1 DESIGN-D1 section 19 (G-D1-11): the capture engine, the enrolled record and the Linux capture view join it;
+# observer-sys's three sources have their own list, where only an item-level compile-time assert, `const _: () =
+# assert!(..);` at brace depth 0 (evaluated by the compiler, which fails the build instead of panicking), is removed
+# before the scan, and only when its argument holds no `{` or `}` (PR review round 1, R1-1: a block argument can hold an
+# item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
+OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
+    "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture"))
+OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
+CONST_ASSERT = re.compile(r"\bconst\s+_\s*:\s*\(\s*\)\s*=\s*assert\s*!\s*\(")
 OBSERVER_INCLUDE_FORM = re.compile(r'\binclude_(?:bytes|str)\s*!\s*\(\s*"([^"\\]*)"\s*\)')
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
@@ -723,7 +887,9 @@ CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                GATE_MAIN: "#![forbid(unsafe_code)]",
                # HE-004A DESIGN-A section 3 (D2-4): the observer's library and binary roots.
                OBSERVER_LIB: "#![forbid(unsafe_code)]",
-               OBSERVER_MAIN: "#![forbid(unsafe_code)]"}
+               OBSERVER_MAIN: "#![forbid(unsafe_code)]",
+               # HE-004D1 DESIGN-D1 section 4 (G-D1-1): observer-sys's root denies unsafe_code; kernel.rs allows it.
+               OBSERVER_SYS_LIB: "#![deny(unsafe_code)]"}
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -811,7 +977,8 @@ OPENAT_FD_PATH = re.compile(r"std::os::fd::\w+")
 FD_ITEMS = re.compile(r"std::os::fd|\b(?:FromRawFd|AsRawFd|IntoRawFd|RawFd|OwnedFd|BorrowedFd|AsFd)\b")
 # The only std fs items a linked source may name, each where it may (longest first): any other occurrence of the word
 # fs (another item, a module import, a grouped import of these) refuses.
-FS_ITEMS = (("std::os::unix::fs::MetadataExt", lambda rel: rel.startswith("crates/gate-sys/")),
+# HE-004D1 (G-D1-2): MetadataExt also in observer-sys (kernel.rs reads its own descriptors' device, inode and mode).
+FS_ITEMS = (("std::os::unix::fs::MetadataExt", lambda rel: rel.startswith(("crates/gate-sys/", "crates/observer-sys/"))),
             ("std::os::unix::fs::FileExt",
              lambda rel: rel.startswith("crates/gate-sys/") or rel == "crates/effect-gate/src/file_store.rs"),
             ("std::fs::File", lambda rel: True))
@@ -930,7 +1097,11 @@ def comment_markers(pin: dict) -> tuple[bytes, bytes]:
 
 
 def check_binary(raw: bytes, target: str, shape: str, markers: tuple[bytes, bytes],
-                 host_paths: tuple[bytes, ...] = HOST_PATHS) -> None:
+                 host_paths: tuple[bytes, ...] = HOST_PATHS, exempt: bytes = b"") -> int:
+    """The shape, the .comment markers and no build-host path. HE-004D1 (G-D1-16; owner decision Q-HE4D1-D3 (a)): with
+    `exempt` (planeon-observer's embedded native-profile v4 schema), those bytes must occur exactly once, and the host-path
+    scan reads a copy with that one span blanked (zero bytes of the same length); every needle outside it still fails.
+    The span's offset, or -1 without `exempt`."""
     header = elf_header(raw)
     require(header["machine"] == MACHINE[target], "wrong e_machine")
     phdrs = program_headers(raw, header)
@@ -968,8 +1139,30 @@ def check_binary(raw: bytes, target: str, shape: str, markers: tuple[bytes, byte
     lines = section_bytes(raw, comments[0]).split(b"\0")
     for marker in markers:
         require(any(line.startswith(marker) for line in lines), ".comment does not name %s" % marker.decode().strip())
+    offset, scanned = -1, raw
+    if exempt:
+        count = raw.count(exempt)
+        require(count == 1, "the exempt span (the embedded schema) occurs %d times, not exactly once (G-D1-16)" % count)
+        offset = raw.find(exempt)
+        scanned = raw[:offset] + bytes(len(exempt)) + raw[offset + len(exempt):]
     for needle in host_paths:
-        require(needle not in raw, "a build-host path is in the binary")
+        require(needle not in scanned, "a build-host path is in the binary")
+    return offset
+
+
+# HE-004D1 DESIGN-D1 section 19 (G-D1-16): the one binary with an exempt span, and the contract file whose bytes it is.
+EXEMPT_SPANS = {"planeon-observer": "contracts/native-profile-v4/qualification.schema.json"}
+
+
+def binary_exempt(binary: str, base: Path) -> bytes:
+    """The bytes check_binary exempts for `binary` (G-D1-16): planeon-observer's embedded schema, read from `base` and
+    checked against its CONTRACTS pin first; nothing for every other binary."""
+    rel = EXEMPT_SPANS.get(binary)
+    if rel is None:
+        return b""
+    data = (base / rel).read_bytes()
+    require(sha256(data) == CONTRACTS[rel], "%s differs from its registered bytes (G-D1-16)" % rel)
+    return data
 
 
 def check_crt_symbols(name: str, names: set[str]) -> None:
@@ -1393,6 +1586,9 @@ def check_linked_sources(base: Path) -> int:
         # HE-003A3 (R96): the cgroup2 root's one exact open in linux_os.rs holds the path segment `fs`, excepted once
         # there, as in the start-up lint; any other `fs` word still refuses.
         rest = CGROUP_ROOT_CALL.sub(" ", text, count=1) if rel == LINUX_OS else text
+        # HE-004D1 (G-D1-5, R3-1): the file's own root constants, each removed once.
+        for _, expression in FS_SCAN_EXCEPTIONS.get(rel, ()):
+            rest = expression.sub(" ", rest, count=1)
         for item, allowed in FS_ITEMS:
             if allowed(rel):
                 rest = re.sub(re.escape(item) + r"(?!\w)", "", rest)
@@ -1545,22 +1741,24 @@ def check_observer_post_seal(base: Path) -> int:
     return count
 
 
-def allowed_logic_path(path: tuple[str, ...], rooted: bool) -> bool:
+def allowed_logic_path(path: tuple[str, ...], rooted: bool, prefixes: tuple = OBSERVER_LOGIC_PATHS) -> bool:
     """Whether a path of an observer logic module passes the whitelist: a path not rooted at a crate (its first segment
-    a local name, or an imported module or type) passes; a rooted one must start with an OBSERVER_LOGIC_PATHS entry."""
+    a local name, or an imported module or type) passes; a rooted one must start with an entry of `prefixes`
+    (OBSERVER_LOGIC_PATHS for B1's modules, D1_LOGIC_PATHS for D1's)."""
     if not rooted and path[0] not in CRATE_PATH_ROOTS:
         return True
-    return any(path[:len(prefix)] == prefix for prefix in OBSERVER_LOGIC_PATHS)
+    return any(path[:len(prefix)] == prefix for prefix in prefixes)
 
 
 def check_observer_logic(base: Path) -> int:
     """HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2) over the observer's logic modules (OBSERVER_LOGIC, each required),
     read with comments removed, literal contents emptied and the whitespace around `::` removed: every use path (no
     rename, no glob) and every crate-rooted code path starts with an OBSERVER_LOGIC_PATHS entry; none of
-    OBSERVER_LOGIC_WORDS; and, outside strict #[cfg(test)] mod tests blocks, none of PANICS. The number of modules."""
-    for rel in OBSERVER_LOGIC:
+    OBSERVER_LOGIC_WORDS; and, outside strict #[cfg(test)] mod tests blocks, none of PANICS. HE-004D1 (G-D1-10): D1's
+    three logic modules too, each path starting with a D1_LOGIC_PATHS entry (LOGIC_MODULES). The number of modules."""
+    for rel, _ in LOGIC_MODULES:
         require((base / rel).is_file(), "%s is missing (observer logic rules)" % rel)
-    for rel in OBSERVER_LOGIC:
+    for rel, prefixes in LOGIC_MODULES:
         raw = (base / rel).read_text(encoding="utf-8")
         try:
             code = PATH_SPACE.sub("::", rust_code(raw))
@@ -1569,12 +1767,12 @@ def check_observer_logic(base: Path) -> int:
         for path, rename in source_uses(rel, raw):
             require(rename is None, "%s renames an import (observer logic rules)" % rel)
             require(path[-1] != "*", "%s imports a glob (observer logic rules)" % rel)
-            require(allowed_logic_path(path, False), "%s imports %s, outside the observer logic whitelist (observer logic "
+            require(allowed_logic_path(path, False, prefixes), "%s imports %s, outside the observer logic whitelist (observer logic "
                     "rules)" % (rel, "::".join(path)))
         for match in CODE_PATH.finditer(USE_DECLARATION.sub(" ", code)):
             leading, root, tail = match.groups()
             path = (root,) + tuple(tail.split("::")[1:])
-            require(allowed_logic_path(path, bool(leading)), "%s names %s%s, outside the observer logic whitelist "
+            require(allowed_logic_path(path, bool(leading), prefixes), "%s names %s%s, outside the observer logic whitelist "
                     "(observer logic rules)" % (rel, leading or "", "::".join(path)))
         for pattern, name in OBSERVER_LOGIC_WORDS:
             require(not pattern.search(code), "%s names %s (observer logic rules)" % (rel, name))
@@ -1584,7 +1782,7 @@ def check_observer_logic(base: Path) -> int:
         for pattern, name in PANICS:
             require(not pattern.search(scanned), "%s names %s outside a strict #[cfg(test)] mod tests block (observer "
                     "no-panic tripwire)" % (rel, name))
-    return len(OBSERVER_LOGIC)
+    return len(LOGIC_MODULES)
 
 
 def check_observer_includes(base: Path) -> int:
@@ -1629,7 +1827,8 @@ def check_observer_serve(base: Path) -> int:
     """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
     body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
     call appears exactly once, in that order: load, parse, lifetime, credentials, TLS configuration, wire, embedded closure,
-    epoch. What each called function calls in turn stays code review's. The number of calls."""
+    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse. What each called function calls
+    in turn stays code review's. The number of calls."""
     rel = OBSERVER_MAIN
     require((base / rel).is_file(), "%s is missing (observer wiring order)" % rel)
     try:
@@ -1641,6 +1840,7 @@ def check_observer_serve(base: Path) -> int:
     opening = code.find("{", found[0].end())
     require(opening >= 0, "%s's fn serve has no body (observer wiring order)" % rel)
     body = USE_DECLARATION.sub(" ", code[opening:block_end(code, opening)])
+    require(not OBSERVER_V1_PARSE.search(body), "serve calls the v1 ObserverConfig::parse( (observer wiring order, G-D1-8)")
     positions = []
     for pattern, name in OBSERVER_WIRING:
         calls = list(pattern.finditer(body))
@@ -1679,15 +1879,41 @@ def check_observer_contracts_module(base: Path) -> int:
     return items
 
 
+def const_asserts(code: str) -> list[tuple[int, int]]:
+    """The item-level compile-time asserts of a source read without comments and with literal contents emptied: each
+    `const _: () = assert!(..);` at brace depth 0 whose argument holds no `{` or `}`, as (start, end) through its `;`
+    (G-D1-11; PR review round 1, R1-1). A form whose argument holds a brace is not returned, so it is scanned whole and
+    its `assert!` refuses."""
+    spans = []
+    for match in CONST_ASSERT.finditer(code):
+        if brace_depth(code, match.start()) != 0:
+            continue
+        depth, index = 1, match.end()
+        while depth and index < len(code):
+            depth += {"(": 1, ")": -1}.get(code[index], 0)
+            index += 1
+        rest = re.match(r"\s*;", code[index:])
+        require(depth == 0 and rest, "a compile-time assert the no-panic tripwire cannot read")
+        if "{" in code[match.end():index] or "}" in code[match.end():index]:
+            continue
+        spans.append((match.start(), index + rest.end()))
+    return spans
+
+
 def check_observer_no_panic(base: Path) -> int:
     """HE-004C DESIGN-C section 15 (G8, D1-14 (c)): each of OBSERVER_NO_PANIC (the HE-004C modules, main.rs and
-    status.rs) exists and, read with comments removed, literal contents emptied and the whitespace around `::` removed,
-    names no panicking macro or call (PANICS) outside strict #[cfg(test)] mod tests blocks. The number of sources."""
-    for rel in OBSERVER_NO_PANIC:
+    status.rs; HE-004D1, G-D1-11: enrolled.rs, capture.rs and linux_capture.rs) exists and, read with comments removed,
+    literal contents emptied and the whitespace around `::` removed, names no panicking macro or call (PANICS) outside
+    strict #[cfg(test)] mod tests blocks. HE-004D1: observer-sys's three sources (OBSERVER_SYS_NO_PANIC) too, after
+    their item-level compile-time asserts are removed (const_asserts). The number of sources."""
+    for rel in OBSERVER_NO_PANIC + OBSERVER_SYS_NO_PANIC:
         require((base / rel).is_file(), "%s is missing (observer no-panic tripwire)" % rel)
-    for rel in OBSERVER_NO_PANIC:
+    for rel in OBSERVER_NO_PANIC + OBSERVER_SYS_NO_PANIC:
         try:
             code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
+            if rel in OBSERVER_SYS_NO_PANIC:
+                for start, end in reversed(const_asserts(code)):
+                    code = code[:start] + " " + code[end:]
         except GateError as error:
             raise GateError("%s: %s (observer no-panic tripwire)" % (rel, error)) from None
         for start, end in reversed(cfg_test_blocks(code)):
@@ -1695,7 +1921,7 @@ def check_observer_no_panic(base: Path) -> int:
         for pattern, name in PANICS:
             require(not pattern.search(code), "%s names %s outside a strict #[cfg(test)] mod tests block (observer "
                     "no-panic tripwire)" % (rel, name))
-    return len(OBSERVER_NO_PANIC)
+    return len(OBSERVER_NO_PANIC) + len(OBSERVER_SYS_NO_PANIC)
 
 
 def check_unsafe(base: Path) -> int:
@@ -1851,6 +2077,11 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
         observer = {names.get(name) for name in linked(workspace, "planeon-observer")}
         require(observer == set(OBSERVER_LINKED_CRATES), "planeon-observer links %s, not %s (workspace shape)"
                 % (sorted(str(path) for path in observer), sorted(OBSERVER_LINKED_CRATES)))
+    # HE-004D1 DESIGN-D1 section 3 (G-D1-1): observer-sys is std-only, its manifest names no dependency of any kind.
+    if OBSERVER_SYS in members:
+        table = tomllib.loads((base / OBSERVER_SYS / "Cargo.toml").read_text(encoding="utf-8"))
+        require(not any(key in table for key in ("dependencies", "dev-dependencies", "build-dependencies", "target")),
+                "observer-sys has a dependency; it is std-only (workspace shape, G-D1-1)")
     return len(members)
 
 
@@ -2687,6 +2918,469 @@ def check_observation(base: Path) -> int:
     return len(sources)
 
 
+# --- HE-004D1: observer-sys's calls and NP-3, the capture wiring (DESIGN-D1 section 19) ---------------------------------
+
+def observer_sources(base: Path, crates: tuple[str, ...] = (OBSERVER_CRATE, OBSERVER_SYS)) -> list[tuple[str, str]]:
+    """(relative path, text) of every non-test source of crates/observer and observer-sys (or of `crates`)."""
+    return [(path.relative_to(base).as_posix(), path.read_text(encoding="utf-8"))
+            for crate in crates for path in sorted((base / crate / "src").rglob("*.rs"))]
+
+
+def call_arguments(code: str, opening: int) -> list[str]:
+    """The top-level arguments of the call whose `(` is at `opening` in a source read with literal contents emptied,
+    each stripped (a trailing comma adds none)."""
+    depth, start, arguments = 0, opening + 1, []
+    for index in range(opening, len(code)):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth == 0:
+                arguments.append(code[start:index].strip())
+                return arguments[:-1] if arguments[-1] == "" else arguments
+        elif char == "," and depth == 1:
+            arguments.append(code[start:index].strip())
+            start = index + 1
+    raise GateError("a call without its closing parenthesis")
+
+
+def body_of(code: str, definition: re.Pattern, what: str) -> tuple[int, int]:
+    """(start, end) of the body of the one function `definition` finds in `code`; none or several refuse, naming
+    `what`."""
+    found = list(definition.finditer(code))
+    require(len(found) == 1, "%s: not exactly one such function" % what)
+    opening = code.find("{", found[0].end())
+    require(opening >= 0, "%s: the function has no body" % what)
+    return opening, block_end(code, opening)
+
+
+def kernel_code(base: Path, rule: str) -> tuple[str, str, str]:
+    """observer-sys's kernel.rs as (raw, code with literal contents emptied, code with literals kept), comments removed
+    and the whitespace around `::` removed."""
+    rel = OBSERVER_SYS_KERNEL
+    require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    raw = (base / rel).read_text(encoding="utf-8")
+    try:
+        return raw, PATH_SPACE.sub("::", rust_code(raw)), PATH_SPACE.sub("::", rust_code(raw, literals=True))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+
+
+def syscall_calls(code: str, rule: str) -> list[list[str]]:
+    """The arguments of every call of the foreign item syscall in kernel.rs's code (literal contents emptied), after
+    checking that the word occurs exactly once as its extern declaration and otherwise only as plain calls (G-D1-3)."""
+    rel = OBSERVER_SYS_KERNEL
+    blocks = [(block.end() - 1, block_end(code, block.end() - 1)) for block in EXTERN_BLOCK.finditer(code)]
+    declarations, calls = 0, []
+    for word in SYSCALL_WORD.finditer(code):
+        before, after = code[:word.start()], code[word.end():]
+        if re.match(r"\s*\(", after) and re.search(r"\bfn\s+$", before):
+            require(any(start < word.start() < end for start, end in blocks),
+                    "%s defines fn syscall( outside its extern block (%s)" % (rel, rule))
+            declarations += 1
+            continue
+        require(re.match(r"\s*\(", after) and not re.search(r"(?:::|\.|\bas|\buse)\s*$", before),
+                "%s names syscall other than as its extern declaration and plain calls (a reference, path, import or "
+                "rename) (%s)" % (rel, rule))
+        calls.append(call_arguments(code, code.index("(", word.end())))
+    require(declarations == 1, "%s does not declare fn syscall( exactly once (%s)" % (rel, rule))
+    return calls
+
+
+def defined_once(code: str, name: str, value: int | None = None) -> bool:
+    """Whether `name` is bound exactly once (a const, static or let) and, with `value`, as `const <name>: c_long =
+    <value>;` (decimal, octal or hexadecimal, underscores allowed)."""
+    bindings = re.findall(r"\b(?:const|static|let)\s+(?:mut\s+)?%s\b" % name, code)
+    if len(bindings) != 1:
+        return False
+    if value is None:
+        return True
+    found = re.search(r"\bconst\s+%s\s*:\s*c_long\s*=\s*(0[xX][0-9A-Fa-f_]+|0[oO][0-7_]+|[0-9_]+)\s*;" % name, code)
+    return bool(found) and int(found.group(1).replace("_", ""), 0) == value
+
+
+def check_observer_sys_calls(base: Path) -> int:
+    """HE-004D1 DESIGN-D1 sections 4.1 and 19 (G-D1-3, D1-6): kernel.rs's calls of syscall. The word syscall is its
+    extern declaration once and otherwise only plain calls; every call has exactly seven arguments, the first one of the
+    six SYS_ constants; each SYS_ constant is defined once in each target's numbers module with its pinned value, no
+    other exists, and the names occur only there and as calls' first arguments (a shadowing let or const refuses);
+    openat's flags (the fourth argument), ioctl's request (the third) and bpf's command (the second) are single named
+    constants, the request FS_IOC_MEASURE_VERITY and the command one of the three BPF commands, each defined once with
+    its pinned value. No other observer or observer-sys source names syscall or a SYS_ constant (R4-2). The number of
+    calls."""
+    rule = "observer-sys calls, G-D1-3"
+    rel = OBSERVER_SYS_KERNEL
+    raw, code, kept = kernel_code(base, rule)
+    calls = syscall_calls(code, rule)
+    names = set(SYS_NUMBERS["x86_64"])
+    found = {}
+    for module in NUMBERS_MODULE.finditer(kept):
+        arch = module.group(1)
+        require(arch not in found, "%s holds two numbers modules for %s (%s)" % (rel, arch, rule))
+        body = kept[module.end():block_end(kept, module.end() - 1) - 1]
+        numbers = {}
+        for item in re.finditer(r"\bconst\s+(SYS_[A-Za-z0-9_]+)\s*:\s*c_long\s*=\s*([0-9_]+)\s*;", body):
+            require(item.group(1) not in numbers, "%s defines %s twice for %s (%s)" % (rel, item.group(1), arch, rule))
+            numbers[item.group(1)] = int(item.group(2).replace("_", ""))
+        require(numbers == SYS_NUMBERS[arch], "%s's %s call numbers are %s, not the pinned %s (%s)"
+                % (rel, arch, sorted(numbers.items()), sorted(SYS_NUMBERS[arch].items()), rule))
+        found[arch] = numbers
+    require(set(found) == set(SYS_NUMBERS), "%s does not define the call numbers in one numbers module per target (%s)"
+            % (rel, rule))
+    words = [match.group(0) for match in SYS_NAME.finditer(code)]
+    require(set(words) <= names, "%s names %s, not one of the six calls' numbers (%s)"
+            % (rel, sorted(set(words) - names), rule))
+    require(len(re.findall(r"\bconst\s+SYS_", code)) == 2 * len(names) and not re.search(r"\b(?:let|static)\s+(?:mut\s+)?SYS_",
+                                                                                          code),
+            "%s binds a SYS_ name outside its numbers modules (a shadow) (%s)" % (rel, rule))
+    require(len(words) == 2 * len(names) + len(calls),
+            "%s names a SYS_ constant other than in its definitions and as a call's first argument (%s)" % (rel, rule))
+    for arguments in calls:
+        require(len(arguments) == 7, "%s calls syscall with %d arguments, not seven (%s)" % (rel, len(arguments), rule))
+        number = arguments[0]
+        require(number in names, "%s calls syscall with the number %r, not one of the six SYS_ constants (%s)"
+                % (rel, number[:40], rule))
+        if number in SYS_CHECKED:
+            value = arguments[SYS_CHECKED[number]]
+            require(re.fullmatch(r"[A-Za-z_]\w*", value), "%s's %s call passes %r in its checked position, not a named "
+                    "constant (%s)" % (rel, number, value[:40], rule))
+            allowed = {"SYS_OPENAT": OPEN_FLAG_SETS, "SYS_IOCTL": tuple(IOCTL_REQUESTS), "SYS_BPF": tuple(BPF_COMMANDS)}
+            require(value in allowed[number], "%s's %s call passes %s, not one of %s (%s)"
+                    % (rel, number, value, ", ".join(allowed[number]), rule))
+    for name, value in list(IOCTL_REQUESTS.items()) + list(BPF_COMMANDS.items()):
+        require(defined_once(code, name, value), "%s does not define %s once as %#x (%s)" % (rel, name, value, rule))
+    for other, text in observer_sources(base):
+        if other == rel:
+            continue
+        try:
+            other_code = rust_code(text)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (other, error, rule)) from None
+        require(not SYSCALL_WORD.search(other_code) and not SYS_NAME.search(other_code),
+                "%s names syscall or a SYS_ constant; only %s calls the foreign item (%s)" % (other, rel, rule))
+    return len(calls)
+
+
+def check_observer_read_only(base: Path) -> int:
+    """HE-004D1 DESIGN-D1 sections 4.5, 9.4 and 19 (G-D1-4, NP-3): in kernel.rs every openat call's flags are one of the
+    four named sets, each defined once from the read-only flags only and carrying its compile-time assert against the
+    OBSERVER row's write-and-create mask 0x400643; kernel.rs's cgroup file names (its dotted string literals) are
+    exactly the seven of section 4.5, each once; no observer or observer-sys source names freeze (raw text, so
+    "cgroup.freeze" too); and observer-sys's code names no write, Write or write_all. The number of openat calls."""
+    rule = "observer read-only rule, G-D1-4 (NP-3)"
+    rel = OBSERVER_SYS_KERNEL
+    raw, code, kept = kernel_code(base, rule)
+    for other, text in observer_sources(base):
+        require(not FREEZE_WORD.search(text), "%s names freeze (%s)" % (other, rule))
+    for name in OPEN_FLAG_SETS:
+        definitions = list(re.finditer(r"\bconst\s+%s\s*:\s*c_long\s*=\s*([^;]*);" % name, code))
+        require(len(definitions) == 1 and defined_once(code, name), "%s does not define %s exactly once (%s)"
+                % (rel, name, rule))
+        terms = [term.strip() for term in definitions[0].group(1).split("|")]
+        require(all(term in READ_ONLY_FLAGS for term in terms), "%s's %s is built from %s, not only the read-only flags "
+                "%s (%s)" % (rel, name, " | ".join(terms), ", ".join(READ_ONLY_FLAGS), rule))
+        squeezed = "".join(code.split())
+        asserts = squeezed.count("const_:()=assert!(%s&%s==0);" % (name, WRITE_MASK))
+        require(asserts == 1, "%s lacks %s's compile-time assert against %s (%s)" % (rel, name, WRITE_MASK, rule))
+    opens = [arguments for arguments in syscall_calls(code, rule) if arguments[:1] == ["SYS_OPENAT"]]
+    for arguments in opens:
+        require(len(arguments) > 3 and arguments[3] in OPEN_FLAG_SETS, "%s opens with %r, not one of the named sets %s "
+                "(%s)" % (rel, arguments[3][:40] if len(arguments) > 3 else "", ", ".join(OPEN_FLAG_SETS), rule))
+    names = DOTTED_NAME.findall(kept)
+    require(sorted(names) == sorted(CGROUP_FILE_NAMES), "%s's cgroup file names are %s, not exactly the seven %s, each once "
+            "(%s)" % (rel, sorted(names), ", ".join(CGROUP_FILE_NAMES), rule))
+    for other, text in observer_sources(base):
+        if other.startswith(OBSERVER_SYS + "/"):
+            try:
+                other_code = rust_code(text)
+            except GateError as error:
+                raise GateError("%s: %s (%s)" % (other, error, rule)) from None
+            require(not WRITE_WORDS.search(other_code), "%s names write, Write or write_all (%s)" % (other, rule))
+    return len(opens)
+
+
+def check_observer_capture_callers(base: Path) -> int:
+    """HE-004D1 DESIGN-D1 sections 17.3 and 19 (G-D1-6, D1-12, R2-1): among crates/observer's sources only
+    linux_capture.rs names observer_sys (raw text); linux_capture.rs re-exports nothing and no pub fn, type, const or
+    static, pub struct field or pub enum variant of it names an observer-sys type (the R1-3 socket-item shape); read
+    without comments and with the whitespace around `::` removed, LinuxCapture::new occurs only as the one call
+    `LinuxCapture::new(sealed)` inside main.rs's serve, `impl LinuxCapture` (with its `fn new(`) and `struct
+    LinuxCapture` only in linux_capture.rs, and LinuxCapture is renamed or aliased nowhere. The number of sources."""
+    rule = "capture callers, G-D1-6"
+    sources = observer_sources(base, (OBSERVER_CRATE,))
+    for rel in (OBSERVER_LINUX_CAPTURE, OBSERVER_MAIN):
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    for rel, raw in sources:
+        require(rel == OBSERVER_LINUX_CAPTURE or not re.search(r"\bobserver_sys\b", raw),
+                "%s names observer_sys; only %s does (%s)" % (rel, OBSERVER_LINUX_CAPTURE, rule))
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        require(not re.search(r"\bLinuxCapture\s+as\b|\bas\s+LinuxCapture\b|\btype\s+\w+\s*(?:<[^>]*>)?\s*=\s*[\w:<> ]*"
+                              r"\bLinuxCapture\b|\btype\s+LinuxCapture\b", code),
+                "%s renames or aliases LinuxCapture (%s)" % (rel, rule))
+        calls = list(re.finditer(r"\bLinuxCapture::new\b", code))
+        impls = list(re.finditer(r"\bimpl\s+LinuxCapture\s*\{", code))
+        structs = list(re.finditer(r"\bstruct\s+LinuxCapture\b", code))
+        if rel == OBSERVER_MAIN:
+            serve = body_of(code, FN_SERVE, "%s's fn serve (%s)" % (rel, rule))
+            exact = list(re.finditer(r"\bLinuxCapture::new\(\s*sealed\s*\)", code))
+            require(len(calls) == 1 and len(exact) == 1 and exact[0].start() == calls[0].start()
+                    and serve[0] < calls[0].start() < serve[1],
+                    "%s does not call LinuxCapture::new exactly once, as LinuxCapture::new(sealed) in serve (%s)"
+                    % (rel, rule))
+        else:
+            require(not calls, "%s names LinuxCapture::new; only main.rs's serve calls it (%s)" % (rel, rule))
+        if rel == OBSERVER_LINUX_CAPTURE:
+            require(len(impls) == 1 and len(structs) == 1, "%s does not define LinuxCapture and its impl exactly once (%s)"
+                    % (rel, rule))
+            opening = impls[0].end() - 1
+            require(re.search(r"\bfn\s+new\s*\(", code[opening:block_end(code, opening)]),
+                    "%s's impl LinuxCapture has no fn new (%s)" % (rel, rule))
+            require(not PUB_USE.search(code), "%s re-exports with pub use (%s)" % (rel, rule))
+            check_observer_sys_items(rel, raw, code, rule)
+        else:
+            require(not impls and not structs, "%s defines LinuxCapture or its inherent impl; only %s does (%s)"
+                    % (rel, OBSERVER_LINUX_CAPTURE, rule))
+    return len(sources)
+
+
+def check_observer_sys_items(rel: str, raw: str, code: str, rule: str) -> None:
+    """The R1-3 shape for linux_capture.rs (G-D1-6): no pub fn signature, type, const or static, pub struct field or pub
+    enum variant names an observer-sys item (by a qualified path, an imported module or an imported name)."""
+    modules, items = {"observer_sys"}, {}
+    for path, rename in source_uses(rel, raw):
+        if path[0] != "observer_sys":
+            continue
+        require(path[-1] != "*", "%s imports a glob of observer-sys (%s)" % (rel, rule))
+        if path[-1] == "self":
+            modules.add(rename or path[-2])
+        else:
+            items[rename or path[-1]] = path[-1]
+
+    def hazards(text: str) -> list[str]:
+        named = set()
+        for module in modules:
+            named |= set(re.findall(r"(?<!::)\b%s::(\w+)" % re.escape(module), text))
+        named |= {original for binding, original in items.items() if re.search(r"(?<!::)\b%s\b" % re.escape(binding), text)}
+        return sorted(named)
+
+    for item in PUB_ITEM.finditer(code):
+        found = hazards(item_text(code, item.start(), item.group(1)))
+        require(not found, "%s has a pub item naming observer-sys's items %s (%s)" % (rel, found, rule))
+    for struct in STRUCT_ITEM.finditer(code):
+        for field in struct_fields(code, struct.end()):
+            if re.match(r"\s*(?:#\s*\[[^\]]*\]\s*)*pub\b", field):
+                found = hazards(field)
+                require(not found, "%s has a pub field naming observer-sys's items %s (%s)" % (rel, found, rule))
+    for enum in PUB_ENUM.finditer(code):
+        for types in enum_variant_types(code, enum.end()):
+            found = hazards(types)
+            require(not found, "%s has a pub enum variant naming observer-sys's items %s (%s)" % (rel, found, rule))
+
+
+def check_observer_links(base: Path) -> int:
+    """HE-004D1 DESIGN-D1 sections 4.5, 9.1 and 19 (G-D1-7, R2-6): in kernel.rs (read without comments, literals kept)
+    link_text is named once, as its definition; ProcLink has five variants and its name table exactly the five names
+    exe, ns/user, ns/mnt, ns/pid and ns/net; own_pid is named once, as its definition; their one helper link_at is
+    named three times, its definition, the call on ProcLink's name inside link_text and the call on the proc root's
+    `self` link inside own_pid. Among the observer's and observer-sys's other sources only linux_capture.rs names
+    link_text and own_pid, as method calls. gate-sys's read_link and readlinkat rules stay as they are. The number of
+    link reads."""
+    rule = "link reads, G-D1-7"
+    rel = OBSERVER_SYS_KERNEL
+    raw, code, kept = kernel_code(base, rule)
+    for word in ("link_text", "own_pid"):
+        require(len(re.findall(r"\b%s\b" % word, kept)) == 1 and re.search(r"\bfn\s+%s\s*\(" % word, kept),
+                "%s does not name %s exactly once, as its definition (%s)" % (rel, word, rule))
+    enum = re.search(r"\benum\s+ProcLink\s*\{", code)
+    require(enum, "%s defines no enum ProcLink (%s)" % (rel, rule))
+    variants = re.findall(r"[A-Za-z_]\w*", code[enum.end():block_end(code, enum.end() - 1) - 1])
+    require(len(variants) == len(PROC_LINK_NAMES), "%s's ProcLink has %d variants, not %d (%s)"
+            % (rel, len(variants), len(PROC_LINK_NAMES), rule))
+    table = list(re.finditer(r"\bimpl\s+ProcLink\s*\{", kept))
+    require(len(table) == 1, "%s does not hold exactly one impl ProcLink (%s)" % (rel, rule))
+    opening = table[0].end() - 1
+    literals = re.findall(r'"([^"\\]*)"', kept[opening:block_end(kept, opening)])
+    require(sorted(literals) == sorted(PROC_LINK_NAMES), "%s's ProcLink names are %s, not exactly %s (%s)"
+            % (rel, sorted(literals), ", ".join(PROC_LINK_NAMES), rule))
+    require(len(re.findall(r"\blink_at\b", kept)) == 3 and re.search(r"\bfn\s+link_at\s*\(", kept),
+            "%s does not name link_at exactly as its definition and its two calls (%s)" % (rel, rule))
+    for function, call in (("link_text", LINK_TEXT_CALL), ("own_pid", OWN_PID_CALL)):
+        start, end = body_of(kept, re.compile(r"\bfn\s+%s\s*\(" % function), "%s's fn %s (%s)" % (rel, function, rule))
+        found = list(call.finditer(kept))
+        require(len(found) == 1 and start < found[0].start() < end, "%s's %s does not read exactly its one pinned link "
+                "(%s)" % (rel, function, rule))
+    calls = 0
+    for other, text in observer_sources(base):
+        if other == rel:
+            continue
+        try:
+            other_kept = rust_code(text, literals=True)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (other, error, rule)) from None
+        for word in ("link_text", "own_pid"):
+            named = len(re.findall(r"\b%s\b" % word, other_kept))
+            if other == OBSERVER_LINUX_CAPTURE:
+                method_calls = len(re.findall(r"\.\s*%s\s*\(" % word, other_kept))
+                require(named and named == method_calls, "%s names %s other than as a method call (%s)"
+                        % (other, word, rule))
+                calls += method_calls
+            else:
+                require(not named, "%s names %s; only %s calls it (%s)" % (other, word, OBSERVER_LINUX_CAPTURE, rule))
+    return calls
+
+
+def function_bodies(code: str) -> list[tuple[str, int, int, int]]:
+    """Each function with a body in a source read without comments and with literal contents emptied: (its name, the
+    start of `fn`, its body's opening brace, the index after its closing brace). Extern declarations end with `;`."""
+    found = []
+    for match in re.finditer(r"\bfn\s+([A-Za-z_]\w*)", code):
+        depth, index = 0, match.end()
+        while index < len(code):
+            char = code[index]
+            if char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif depth == 0 and char in "{;":
+                break
+            index += 1
+        if index < len(code) and code[index] == "{":
+            found.append((match.group(1), match.start(), index, block_end(code, index)))
+    return found
+
+
+def check_observer_sys_names(base: Path) -> int:
+    """HE-004D1 PR review round 1, R1-2 (G-D1-3, G-D1-4, G-D1-7): the names the observer-sys pins read cannot be rebound
+    in kernel.rs (read without comments, literal contents emptied, the whitespace around `::` removed). No use declaration
+    renames (`use .. as`); no function body holds an item (BODY_ITEM: fn, const, static, use, impl, mod, struct, enum,
+    union, trait, type, extern, macro_rules or macro); each of the four flag sets occurs exactly in its definition, its
+    assert and the openat calls passing it, and the verity request and each BPF command exactly in its definition and
+    the calls passing it (counted as G-D1-3 counts the SYS_ names); and on the link-read path (LINK_PATH_NAMES) the
+    free function `name` and `link_at` are named exactly as pinned in `link_text`, `own_pid` and `link_at`, whose `let`
+    patterns and closure parameters bind no name kernel.rs defines at its top level. PR review round 2, R2-2: the
+    no-rename rule covers every observer-sys source (lib.rs's re-exports included). The number of function bodies."""
+    rule = "observer-sys pinned names, R1-2"
+    rel = OBSERVER_SYS_KERNEL
+    raw, code, kept = kernel_code(base, rule)
+    # PR review round 2, R2-2: no renaming use (a `pub use .. as` re-export included) in any observer-sys source.
+    for source, text in observer_sources(base, (OBSERVER_SYS,)):
+        for path, rename in source_uses(source, text):
+            require(rename is None, "%s renames %s as %s in a use declaration (%s)" % (source, "::".join(path), rename, rule))
+    bodies = function_bodies(code)
+    for function, _, opening, end in bodies:
+        item = BODY_ITEM.search(code, opening + 1, end - 1)
+        require(not item, "%s holds an item (%s) inside fn %s's body (%s)" % (rel, item.group(0) if item else "", function,
+                                                                          rule))
+    calls = syscall_calls(code, rule)
+    counted = [(name, 2, "SYS_OPENAT", 3) for name in OPEN_FLAG_SETS]
+    counted += [(name, 1, "SYS_IOCTL", 2) for name in IOCTL_REQUESTS]
+    counted += [(name, 1, "SYS_BPF", 1) for name in BPF_COMMANDS]
+    for name, fixed, number, position in counted:
+        passed = sum(1 for arguments in calls if arguments[:1] == [number] and len(arguments) > position
+                     and arguments[position] == name)
+        found = len(re.findall(r"\b%s\b" % name, code))
+        require(found == fixed + passed, "%s names %s %d times, not exactly %d (its definition%s and the %d calls passing "
+                "it) (%s)" % (rel, name, found, fixed + passed, " and assert" if fixed == 2 else "", passed, rule))
+    require(len(re.findall(r"\blink_at\b", code)) == 3, "%s does not name link_at exactly as its definition and its two "
+            "calls (%s)" % (rel, rule))
+    top = {name for name in re.findall(r"\b(?:const|static)\s+(?:mut\s+)?([A-Za-z_]\w*)\s*:", code) if name != "_"}
+    top |= {match.group(1) for match in re.finditer(r"\bfn\s+([A-Za-z_]\w*)", code) if brace_depth(code, match.start()) == 0}
+    top |= {"syscall"}
+    free = [match.start() for match in re.finditer(r"\bfn\s+name\s*\(", code) if brace_depth(code, match.start()) == 0]
+    require(len(free) == 1, "%s does not define the free fn name exactly once at its top level (%s)" % (rel, rule))
+    for function, (free_calls, method_calls, plain) in LINK_PATH_NAMES.items():
+        spans = [(start, opening, end) for name, start, opening, end in bodies if name == function]
+        require(len(spans) == 1, "%s does not define fn %s exactly once (%s)" % (rel, function, rule))
+        start, opening, end = spans[0]
+        body = code[opening + 1:end - 1]
+        words = [match for match in re.finditer(r"\bname\b", body)]
+        found = (sum(1 for match in words if re.match(r"\s*\(", body[match.end():])
+                     and not re.search(r"\.\s*$", body[:match.start()])),
+                 sum(1 for match in words if re.match(r"\s*\(", body[match.end():]) and re.search(r"\.\s*$", body[:match.start()])),
+                 sum(1 for match in words if not re.match(r"\s*\(", body[match.end():])))
+        require(found == (free_calls, method_calls, plain), "%s's %s names `name` as %d calls, %d method calls and %d other "
+                "words, not %d, %d and %d (%s)" % (rel, function, *found, free_calls, method_calls, plain, rule))
+        signature = code[start:opening]
+        require(len(re.findall(r"\bname\b", signature)) == (1 if plain else 0),
+                "%s's %s binds `name` in its signature other than as pinned (%s)" % (rel, function, rule))
+        bound = []
+        for word in re.finditer(r"\blet\b", body):
+            bound += re.findall(r"[A-Za-z_]\w*", let_pattern(body, word.end()))
+        for closure in re.finditer(r"(?:(?<=[(,=])|(?<=\bmove))\s*\|([^|]*)\|", body):
+            bound += re.findall(r"[A-Za-z_]\w*", closure.group(1))
+        shadowed = sorted(set(bound) & top)
+        require(not shadowed, "%s's %s binds %s, which kernel.rs defines at its top level (%s)"
+                % (rel, function, ", ".join(shadowed), rule))
+    return len(bodies)
+
+
+def pinned_text(kept: str, function: str, rule: str) -> str:
+    """The one function `function` of a source read without comments and with literals kept, from its visibility (the
+    text after the previous item's `}`, `;` or the enclosing `{`) to its closing brace, as LINK_TOKEN tokens joined by
+    single spaces."""
+    spans = [span for span in function_bodies(kept) if span[0] == function]
+    require(len(spans) == 1, "%s: not exactly one fn %s (%s)" % (OBSERVER_SYS_KERNEL, function, rule))
+    _, start, _, end = spans[0]
+    prefix = max(kept.rfind("}", 0, start), kept.rfind(";", 0, start), kept.rfind("{", 0, start)) + 1
+    return " ".join(LINK_TOKEN.findall(kept[prefix:end]))
+
+
+def check_observer_link_pins(base: Path) -> int:
+    """HE-004D1 PR review round 2, R2-1 (G-D1-7): kernel.rs's `link_text`, `own_pid` and `link_at`, signatures and bodies,
+    equal their pinned token texts (LINK_PATH_PINS) after whitespace normalisation; any edit refuses. The number of
+    pinned functions."""
+    rule = "link-read path pinned, R2-1"
+    rel = OBSERVER_SYS_KERNEL
+    _, _, kept = kernel_code(base, rule)
+    for function, pinned in LINK_PATH_PINS.items():
+        require(pinned_text(kept, function, rule) == pinned,
+                "%s's fn %s differs from its pinned signature and body (%s)" % (rel, function, rule))
+    return len(LINK_PATH_PINS)
+
+
+def check_observer_sys_pins(base: Path) -> int:
+    """HE-004D1 PR review round 3, R3-1: every OBSERVER_SYS_PINS file is present, not a symlink, and byte-exact (its
+    sha256 equals its pin). The number of pinned files."""
+    for rel, expected in OBSERVER_SYS_PINS.items():
+        path = base / rel
+        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (observer-sys pin, R3-1)" % rel)
+        require(sha256(path.read_bytes()) == expected, "%s differs from its pinned bytes (observer-sys pin, R3-1)" % rel)
+    return len(OBSERVER_SYS_PINS)
+
+
+def check_native_profile_use(base: Path) -> int:
+    """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5): read without comments, NATIVE_PROFILE_V4_SCHEMA occurs in
+    crates/observer's sources only as its definition in contracts.rs and once in capture_schema.rs, inside
+    CaptureSchema::embedded, so the schema's bytes have one use site (G-D1-16 checks the binary). The number of
+    occurrences."""
+    rule = "native-profile schema use, G-D1-9"
+    word = re.compile(r"\bNATIVE_PROFILE_V4_SCHEMA\b")
+    schema_rs = "crates/observer/src/capture_schema.rs"
+    total = 0
+    for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        found = list(word.finditer(code))
+        if rel == OBSERVER_CONTRACTS:
+            require(len(found) == 1 and re.search(r"\bpub\s+const\s+NATIVE_PROFILE_V4_SCHEMA\s*:", code),
+                    "%s does not define NATIVE_PROFILE_V4_SCHEMA exactly once (%s)" % (rel, rule))
+        elif rel == schema_rs:
+            start, end = body_of(code, re.compile(r"\bfn\s+embedded\s*\("), "%s's fn embedded (%s)" % (rel, rule))
+            require(len(found) == 1 and start < found[0].start() < end,
+                    "%s does not use NATIVE_PROFILE_V4_SCHEMA exactly once, in CaptureSchema::embedded (%s)" % (rel, rule))
+        else:
+            require(not found, "%s names NATIVE_PROFILE_V4_SCHEMA; only %s uses it (%s)" % (rel, schema_rs, rule))
+        total += len(found)
+    require(total == 2, "NATIVE_PROFILE_V4_SCHEMA is not defined and used once each (%s)" % rule)
+    return total
+
+
 def check_observer_wiring(base: Path) -> int:
     """HE-003A3 DESIGN section 5 (D1-3, D2-2): the binary's main.rs (read without comments) holds serve's two pinned
     statements, ROOTS_STATEMENT and OBSERVER_STATEMENT, each exactly once and in WIRING_ORDER (after LinuxOs::with_net
@@ -2901,6 +3595,92 @@ def check_observer_symbols(names: set[str]) -> tuple[str, str]:
     return ("ClientConnection" if client else "substitute", modules[0])
 
 
+# HE-004D1 DESIGN-D1 section 19 (G-D1-14, D1-7): the two constructors marked #[inline(never)], run once after the seal,
+# whose symbols planeon-observer's .symtab must hold (G9's LTO fallback named in advance); recorded in MODEL_DEFINED R134.
+CAPTURE_SYMBOLS = (("observer_sys", "kernel", "Roots", "open"),
+                   ("planeon_observer", "linux_capture", "LinuxCapture", "new"))
+BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def v0_path(name: str) -> tuple[str, ...]:
+    """The item path of a v0-mangled (`_R`) symbol: crate roots (`C`), nested names (`N`), inherent impls (`M`, read as
+    their self type's path) and backrefs (`B`), so `<observer_sys::kernel::Roots>::open` reads as observer_sys, kernel,
+    Roots, open. Generic arguments, trait impls and every other form give no path (an empty tuple)."""
+    if not name.startswith("_R"):
+        return ()
+    text = name[2:]
+
+    def number(at: int) -> tuple[int, int]:
+        end = text.index("_", at)
+        value = 0
+        for char in text[at:end]:
+            value = value * 62 + BASE62.index(char)
+        return (value + 1 if end > at else 0), end + 1
+
+    def identifier(at: int) -> tuple[str, int]:
+        if text[at] == "s":
+            _, at = number(at + 1)
+        match = re.match(r"(0|[1-9][0-9]*)_?", text[at:])
+        if text[at] == "u" or not match:
+            raise ValueError("an identifier v0_path does not read")
+        start = at + match.end()
+        length = int(match.group(1))
+        if start + length > len(text):
+            raise ValueError("a truncated identifier")
+        return text[start:start + length], start + length
+
+    def path(at: int, depth: int) -> tuple[list[str], int]:
+        if depth > 32:
+            raise ValueError("too deep")
+        tag = text[at]
+        if tag == "C":
+            crate, at = identifier(at + 1)
+            return [crate], at
+        if tag == "N":
+            parent, at = path(at + 2, depth + 1)
+            ident, at = identifier(at)
+            return parent + [ident], at
+        if tag == "M":
+            at += 1
+            if text[at] == "s":
+                _, at = number(at + 1)
+            _, at = path(at, depth + 1)
+            return path(at, depth + 1)
+        if tag == "B":
+            target, end = number(at + 1)
+            if target >= at:
+                raise ValueError("a backref that does not point back")
+            return path(target, depth + 1)[0], end
+        raise ValueError("a path form v0_path does not read")
+
+    try:
+        return tuple(path(0, 0)[0])
+    except (ValueError, IndexError):
+        return ()
+
+
+def item_path(name: str) -> tuple[str, ...]:
+    """A symbol's whole item path: a legacy name's identifiers without the trailing hash, or v0_path's."""
+    if name.startswith("_ZN"):
+        parts = symbol_path(name)[0]
+        return parts[:-1] if parts and re.fullmatch(r"h[0-9a-f]{16}", parts[-1]) else parts
+    return v0_path(name)
+
+
+def check_capture_symbols(names: set[str]) -> list[str]:
+    """HE-004D1 DESIGN-D1 section 19 (G-D1-14): planeon-observer's .symtab holds, each by its whole item path, a symbol of
+    observer_sys::kernel::Roots::open and one of planeon_observer::linux_capture::LinuxCapture::new (CAPTURE_SYMBOLS);
+    another function's symbol, a closure inside them or a name that only mentions them does not count. The symbols
+    found, one per path."""
+    found = []
+    for wanted in CAPTURE_SYMBOLS:
+        matches = sorted(name for name in names if item_path(name) == wanted)
+        require(matches, "planeon-observer's symbol table holds no %s symbol: the capture roots are not linked as built "
+                "(observer symbols, G-D1-14)" % "::".join(wanted))
+        found.append(matches[0])
+    return found
+
+
 def lock_closure(packages: list[dict], name: str) -> set:
     """The package names a lock package reaches through its `dependencies`, itself included."""
     by_name = {package["name"]: package for package in packages}
@@ -3037,8 +3817,8 @@ def main() -> int:
             "main (HE-004C); calls between the stages only %s; its imports are the pinned set (serve's included), its only "
             "items two fn main and fn serve, its only attributes the crate's forbid and the two cfgs; no socket or thread "
             "name through the stage-2 statement" % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
-        say("observer wiring order: serve calls %d steps each exactly once, in this order: %s (HE-004C, G5)"
-            % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
+        say("observer wiring order: serve calls %d steps each exactly once, in this order: %s, and not the v1 parse "
+            "(HE-004C, G5; HE-004D1, G-D1-8)" % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
             "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
             "variant except the data types %s, and hold no fn-pointer or Fn-trait type in a pub alias, const, static, "
@@ -3077,10 +3857,11 @@ def main() -> int:
             % (check_observer_post_seal(HE), " and ".join(OBSERVER_POST_SEAL_CRATES),
                ", ".join(name.split(" ")[0] for _, name in OBSERVER_POST_SEAL_FORBIDDEN), " and ".join(OBSERVER_POST_SEAL_CRATES),
                I05_JSON))
-        say("observer logic: %d modules of %s (%s) name only the whitelisted path roots %s, no super:: or foreign self::"
-            " path, glob, renaming import, HashMap, HashSet, RandomState or include macro, and no panicking macro or call "
-            "outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
-            % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES),
+        say("observer logic: %d modules of %s (%s; HE-004D1, G-D1-10: %s, whose whitelist adds i05_protocol::schema and "
+            "the three modules) name only the whitelisted path roots %s, no super:: or foreign self:: path, glob, renaming "
+            "import, HashMap, HashSet, RandomState or include macro, and no panicking macro or call outside strict "
+            "#[cfg(test)] blocks (lexical tripwire, HE-004B1)"
+            % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES), ", ".join(D1_LOGIC_NAMES),
                ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
         say("observer contracts: %d embedded files, each one plain literal naming a registered contract file, only in %s "
             "and (the OBSERVER programs) %s (HE-004B1); besides them only %s's include_bytes!(\"%s\") (HE-004C)"
@@ -3088,8 +3869,39 @@ def main() -> int:
                OBSERVER_KEY_INCLUDE))
         say("contracts pin: %s holds %d items, each a pub const of a registered contract file's bytes or of a registered "
             "pin, and nothing else (HE-004C, R1-3)" % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE)))
-        say("observer no-panic: %d sources (the HE-004C modules, main.rs and status.rs) name no panicking macro or call "
-            "outside strict #[cfg(test)] blocks (HE-004C, G8)" % check_observer_no_panic(HE))
+        say("observer no-panic: %d sources (the HE-004C modules, main.rs, status.rs, enrolled.rs, capture.rs and "
+            "linux_capture.rs, and observer-sys's three after their item-level compile-time asserts) name no panicking "
+            "macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; HE-004D1, G-D1-11)" % check_observer_no_panic(HE))
+        say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
+            "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
+            "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "
+            "(HE-004D1, G-D1-3)" % (OBSERVER_SYS_KERNEL, check_observer_sys_calls(HE), ", ".join(SYS_NUMBERS["x86_64"]),
+                                    ", ".join(IOCTL_REQUESTS), ", ".join(BPF_COMMANDS)))
+        say("observer read-only (NP-3): %d openat calls, each with one of the four named flag sets %s built only from %s "
+            "and asserted against %s; kernel.rs's cgroup file names exactly %s; no observer source names freeze; "
+            "observer-sys names no write (HE-004D1, G-D1-4)"
+            % (check_observer_read_only(HE), ", ".join(OPEN_FLAG_SETS), ", ".join(READ_ONLY_FLAGS), WRITE_MASK,
+               ", ".join(CGROUP_FILE_NAMES)))
+        say("capture callers: %d sources of %s; only %s names observer_sys, re-exports nothing and names no observer-sys "
+            "item in a pub item, field or variant; LinuxCapture::new is called once, as LinuxCapture::new(sealed) in serve; "
+            "LinuxCapture is defined, implemented and renamed nowhere else (HE-004D1, G-D1-6)"
+            % (check_observer_capture_callers(HE), OBSERVER_CRATE, OBSERVER_LINUX_CAPTURE))
+        say("link reads: link_text reads only ProcLink's five names %s and own_pid only the proc root's self link, both "
+            "defined once in %s and called (%d calls) only in %s (HE-004D1, G-D1-7)"
+            % (", ".join(PROC_LINK_NAMES), OBSERVER_SYS_KERNEL, check_observer_links(HE), OBSERVER_LINUX_CAPTURE))
+        say("observer-sys pinned names: %d function bodies of %s hold no item, no use declaration renames, each flag set, "
+            "the verity request and each BPF command occur exactly in their definition, assert and the calls passing them, "
+            "and link_text, own_pid and link_at name `name` and link_at only as pinned and bind no top-level name "
+            "(HE-004D1 PR review round 1, R1-2; every observer-sys source without a renaming use, R2-2)"
+            % (check_observer_sys_names(HE), OBSERVER_SYS_KERNEL))
+        say("link-read path: %d functions of %s (%s) equal their pinned signatures and bodies, whitespace and comments "
+            "aside (HE-004D1 PR review round 2, R2-1)" % (check_observer_link_pins(HE), OBSERVER_SYS_KERNEL,
+                                                          ", ".join(LINK_PATH_PINS)))
+        say("observer-sys pin: %d file matches its pinned sha256 (%s) (HE-004D1 PR review round 3, R3-1)"
+            % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
+        say("native-profile schema: NATIVE_PROFILE_V4_SCHEMA occurs %d times in %s, its definition in %s and its one use "
+            "in CaptureSchema::embedded (HE-004D1, G-D1-9)" % (check_native_profile_use(HE), OBSERVER_CRATE,
+                                                               OBSERVER_CONTRACTS))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
@@ -3099,7 +3911,8 @@ def main() -> int:
             shape = pin["targets"][target]["shape"]
             for binary in BINARIES:
                 raw = (HE / "target" / target / "release" / binary).read_bytes()
-                check_binary(raw, target, shape, markers, host_paths)
+                exempt = binary_exempt(binary, HE)
+                offset = check_binary(raw, target, shape, markers, host_paths, exempt)
                 if binary == "planeon-observer":
                     names = symbol_names(raw)
                     size = check_observer_binary(names, raw, (HE / OBSERVER_PROGRAMS[target]).read_bytes())
@@ -3107,6 +3920,12 @@ def main() -> int:
                     say("%s planeon-observer program and symbols: the %d bytes of %s occur exactly once; no membarrier "
                         "or __membarrier; the composed client is linked: a rustls %s symbol and %s (no wrapper "
                         "inventory: owner decision Q-HE4A-B2 (a))" % (target, size, OBSERVER_PROGRAMS[target], client, module))
+                    say("%s planeon-observer capture symbols (G-D1-14): %s" % (target, ", ".join(check_capture_symbols(names))))
+                    say("%s planeon-observer exempt span (G-D1-16): the %d bytes of %s occur exactly once, at offset %d "
+                        "(length %d); the host-path scan (%s, the build root and the home directory) reads the binary "
+                        "with that one span blanked and finds none; HOST_PATHS is unchanged, and every other binary is "
+                        "scanned whole" % (target, len(exempt), EXEMPT_SPANS[binary], offset, len(exempt),
+                                           ", ".join(needle.decode() for needle in HOST_PATHS)))
                 if binary == "planeon-gate":
                     present = check_gate_symbols(symbol_names(raw))
                     say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "

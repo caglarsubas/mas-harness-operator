@@ -7,8 +7,14 @@
 //! `serve`'s setup (11-14, 20-24) and the epoch's exits (80-99, `observation`, one exhaustive match). `STAGES` keeps
 //! `NOT_YET_SERVING`, which `main` no longer reaches. Every status stays distinct, non-zero, below 200 and outside
 //! 40-79, 2 and 10. There is no normal end and no status 0.
+//!
+//! HE-004D1 (DESIGN-D1 section 17.2, owner decision Q-HE4D1-7 (a); MODEL_DEFINED R132) adds the capture setup's
+//! statuses in a third table, `CAPTURE_SETUP` (25-30): the embedded schema (25), the record's read (26), form (27),
+//! read-path preconditions (28) and window (29), and the capture roots (30), mapped by `capture_setup`, one exhaustive
+//! match. 31-39 stay free. A capture's own failure is never a status: it is a slot of the view.
 
 use crate::config::LifetimeError;
+use crate::enrolled::SetupError;
 use crate::observe::ObserverExit;
 use crate::seal::{SealError, SealStep, Stage};
 use crate::signed_config::LoadError;
@@ -120,6 +126,36 @@ pub const SERVING: [u8; 28] = [
     APISERVER_RESTART, READ_REFUSED, UNREACHABLE, ANSWER, CONSISTENCY, INPUTS, RBAC, OPERATIONAL, QUOTA, ADM4_MISMATCH,
     ADM4_UNAVAILABLE, WATCH_GAP, DEADLINE, CONFIG_EXPIRED, POLL, ADM4_INPUT, CLOCK, STALE, EXPANSION,
 ];
+
+/// `CaptureSchema::embedded`: the canonical pin, a conditional outside the closed form, or a variant's load.
+pub const CAPTURE_SCHEMA: u8 = 25;
+/// `enrolled::load_record`: the record's open, size, read or pin.
+pub const RECORD_READ: u8 = 26;
+/// The record's form: the canonical subset, the node cap, not a v4 record, the data bound or the `record` variant.
+pub const RECORD_FORM: u8 = 27;
+/// R10's read-path preconditions of the record.
+pub const RECORD_TARGETS: u8 = 28;
+/// The record's window: not canonical, not ordered, or already over at start.
+pub const RECORD_WINDOW: u8 = 29;
+/// `LinuxCapture::new`: a capture root's open or its filesystem magic.
+pub const CAPTURE_ROOTS: u8 = 30;
+
+/// The capture setup's statuses, in table order (HE-004D1).
+pub const CAPTURE_SETUP: [u8; 6] = [CAPTURE_SCHEMA, RECORD_READ, RECORD_FORM, RECORD_TARGETS, RECORD_WINDOW, CAPTURE_ROOTS];
+
+/// The status of a capture setup refusal: one exhaustive match (an unusable wall clock stays 97, as for the
+/// configuration's lifetime).
+pub fn capture_setup(error: &SetupError) -> u8 {
+    match error {
+        SetupError::Schema(_) => CAPTURE_SCHEMA,
+        SetupError::RecordRead(_) => RECORD_READ,
+        SetupError::RecordForm(_) => RECORD_FORM,
+        SetupError::RecordTargets(_) => RECORD_TARGETS,
+        SetupError::RecordWindow(_) => RECORD_WINDOW,
+        SetupError::Roots(_) => CAPTURE_ROOTS,
+        SetupError::Clock => lifetime(&LifetimeError::Clock),
+    }
+}
 
 /// The status of `signed_config::load`'s refusal: 11 for the read, 12 for the key or the signature.
 pub fn config_load(error: &LoadError) -> u8 {

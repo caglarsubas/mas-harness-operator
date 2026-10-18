@@ -137,6 +137,37 @@ as at `3cba1171`, the design's read pin):
 - `scripts/i06_backend_profile_v2.py`, sha256 `58ceb7a6817aab512a56f9f2a614868ce27660d174be353c5629cc8de335e426`, 6349 bytes
 - `scripts/admission_semantics_v3.py`, sha256 `3db8f51ab55f49dc33cf6f028306bfb6d7aa1c5d7d96f264cfe709dae925ad22`, 38172 bytes
 
+## Native profile v4 (HE-004D1)
+
+Copied byte for byte from the harness-onion repository at `887cbe7` with `git show 887cbe7:<providerPath>`, mode
+100644, each sha256 and length checked before use. All four are registered before use in edge registry record v5,
+`architecture/artifact-edges/operator-harness-engineering-v5.json` (sha256
+`89b47ef8f865b31911eb8da2b08a5a3c22b2d92a62599cb6fdfccbfe7f79e3c0`, 27595 bytes), status REGISTERED_BEFORE_USE, relation
+BYTE_IDENTICAL, consumer paths exactly these. The three native-profile v4 rows name consumer packet HE-004D1 and provider
+packet MET-ENFORCE-033 (their `providerCommit` is null in the record). `crates/observer/src/contracts.rs`
+embeds the v4 schema for the observer's capture checks; the vectors and the README are read by the tests and as contract
+text only.
+
+- `contracts/native-profile-v4/qualification.schema.json` from `architecture/native-profile-v4/qualification.schema.json`, sha256 `c3e91c087ebc6a13e8a96a066f80710ac968c8def434d1d1b97415811715ed10`, 93041 bytes
+- `contracts/native-profile-v4/vectors.json` from `architecture/native-profile-v4/vectors.json`, sha256 `dede64ab3202a9e28094f062b5dad868c13ca02423e2380af8666ecf2e7a86e6`, 802048 bytes
+- `contracts/native-profile-v4/README.md` from `architecture/native-profile-v4/README.md`, sha256 `a4205a5388dc83827bb39670bcc9477b030f29829128abf19f7578321c170174`, 62643 bytes
+
+The native-profile v3 schema's row in the same record names provider commit `a29c93c7` (MET-ENFORCE-010) and consumer
+packet HE-004D2. The edge rule binds bytes, modes and versions, not the packet label, and owner decision Q-HE4D1-11 (a)
+replays the cross-version cases X12-X14 under the v3 schema's registered bytes, so HE-004D1 is the row's first consumer
+under that byte rule (as HE-004B1 consumed rows labelled HE-004); the file at `887cbe7` equals the row (the same sha256 and
+length), and HE-004D2 relies on the same bytes. The tests read it only.
+
+- `contracts/native-profile-v3/qualification.schema.json` from `architecture/native-profile-v3/qualification.schema.json`, sha256 `ae5cbb6aa39f4edfa2d9919f25e55bad9ab214a99ca927c5afe7e2d943946ac5`, 78375 bytes
+
+The four rows are unchanged in edge registry record v6 (`operator-harness-engineering-v6.json` at harness-onion
+`a3b9e6e7`). The v4 model is pinned by digest, not copied, and read as specification only where the README is silent
+(each such point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s HE-004D1 section), at the same commit `887cbe7`; it
+pins the schema by the sha256 of its canonical encoding, `3bf244b21f91e30062ad56a7a21f3f0b4554daa71a0c3b624bcac058fee58d80`,
+which the observer checks at load:
+
+- `scripts/native_qualification_v4.py`, sha256 `f7c718072d1ffbb9b8bbc310e6141d476ea5f25296f70ff8c1bc9ada3db02387`, 67218 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

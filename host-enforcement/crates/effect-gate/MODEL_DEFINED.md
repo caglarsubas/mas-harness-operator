@@ -1818,3 +1818,215 @@ contract file is added or changed. Its rules are R106-R119.
 The subject was DESIGN-C revision 2 (sha256 `df6b0e19…`); design review rounds 2-4 changed no recommendation, and round 4
 gave PASS_FOR_BUILD on revision 4. The complete messages are recorded in the operator's
 `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-004D1: the observer's kernel captures and NP-3 (crate `observer-sys`; `capture_schema`, `capture_check`, `kernel_text`, `enrolled`, `capture`, `linux_capture`; `contracts/native-profile-v4/`, `contracts/native-profile-v3/qualification.schema.json`)
+
+The packet (DESIGN-D1 revision 4, sha256 `f8189354…`; dossier questions Q-HE4D1-1..12 all (a), and Q-HE4D1-D1 (c),
+Q-HE4D1-D2 (a) and Q-HE4D1-D3 (a), quoted at the end) gives the sealed policy observer its kernel captures: once per
+observation cycle, right after the cycle's scrape, it takes the five P1 role captures (WORKER first, inside the broker's
+frozen bracket), the P5 lifecycle capture and one ENTRY_BOUND capture per backend component, checks each with R10's port
+of native-profile v4's capture checks against the enrolled qualification record, and keeps the latest set in memory.
+The kernel reads go through a new std-only crate, observer-sys, whose one foreign item is `syscall` with six calls
+(`openat`, `getdents64`, `readlinkat`, `fstatfs`, the verity ioctl and three `bpf` commands); every open is read-only
+(NP-3). A capture failure is a slot state and never ends the epoch. The four contract files are copied byte for byte
+(edge record v5; provenance in `contracts/PROVENANCE.md`); the model `scripts/native_qualification_v4.py` (sha256
+`f7c71807…`, harness-onion `887cbe7`) is pinned by digest, read as specification only where the README is silent, and
+never copied. planeon-gate, planeon-broker, planeon-containment and planeon-writer are byte-identical; gate-sys,
+effect-gate's sources, gate-tls, i05-protocol, `crates/gate`, B1's five logic modules, `seal.rs` and HE-004C's modules
+other than `lib.rs`, `main.rs`, `status.rs`, `config.rs`, `contracts.rs` and `observe.rs` are unchanged. Its rules are
+R120-R135.
+
+### Points taken from the pinned model (the README is silent; lines of `native_qualification_v4.py` at `887cbe7`)
+
+| # | Point | Model |
+|---|---|---|
+| P1 | The P1 check's order: version, the record's and capture's shapes, the role, the host, the even SELinux sequence with before equal to after, the booleans, the policy digest, hardening and boot entry, the binding, the window `a <= b < d`, `b - a <= 2000`, `d - a <= 900000`; the class's route fields; the custody fields; the cgroup without its hidden keys; uniform threads; the capability sets; the members; the task count; seccomp and the frozen bracket; no descendants; the broker's delegated children; the files; the image and maps; the hook programs; the empty census | `:510-628` |
+| P2 | `capture_class`: OBSERVER is DECLARED_T04; BROKER, WORKER and a role holding CAP_NET_BIND_SERVICE are LABEL_BOUND; the others OBSERVED | `:482-489` |
+| P3 | The member sets: each member keyed by (pid, start ticks) with its threads keyed by (tid, start ticks), no repeat; the set read first equal to the set read last (refusal: "member or thread set changed during the inspection"); the reported members exactly that set | `:491-508` |
+| P4 | The hidden cgroup keys: `selinuxLabel` always, and `path` too in the observer's own capture | `:544-546` |
+| P5 | The WORKER's capability sets (owner decision D5): a bounding set of distinct names, all among those the broker enrolled; its other four sets empty | `:548-556` |
+| P6 | The task count: `pids.current` equals the members' thread total (the declared bound alone for the observer's own leaf) and is at most `pidsMax` | `:580-584` |
+| P7 | The hooks and the census: the seven hooks in `HOOKS` order with their pinned programs (`pinLabel` declared), and the 22 `CENSUS_ATTACH_TYPES` in the model's order, each effective list empty | `:56-57`, `:98-104`, `:621-628` |
+| P8 | The files (each enrolled path once, its entry and measurement, the set complete), the OBSERVED image (`exe` path, device and inode of the measured file) and the executable maps (equal, as sorted lists, to the enrolled executable segments) | `:603-620` |
+| P9 | The lifecycle capture: the marker without its label, `runFsType`, the containment cgroup ABSENT or EMPTY, the booleans, no slice member, the census well formed and complete (every parent, every enrolled cgroup and the broker service), the containment subject not resident, no unenrolled populated cgroup, `nr_descendants` equal to the census less one | `:655-688` |
+| P10 | The backend binding: the component recorded, its process label and cgroup path, the executable's path, content digest and verity digest equal to the record's | `:691-706` |
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R120 | Scope and the capture view (Q-HE4D1-6, -7, -10 (a)). One set per observation cycle, in memory only (`CaptureView`: a sequence, the record's digest, the five role slots in the model's order, the lifecycle slot, the backend slots in component order, the set's start in Unix milliseconds), replaced wholesale by each set. A slot is `Taken` (the canonical capture, its digest and its `observedAt`), `NotFrozen`, `Unavailable(reason)`, `Pending` (before `validFrom`) or `Expired` (from `expiresAt - 3 s`). No capture failure ends the epoch; no `ObserverExit` variant is added. **The declared host fields (Q-HE4D1-1 (a), owner-accepted vacuous equalities):** `host`, `selinuxBefore`, `selinuxAfter`, `kernelPolicyDigest`, `booleansObserved`, `hardeningObserved` and `bootEntryObserved` are copied from the record, never read; the view carries `DECLARED_HOST_FIELDS` and `HOST_FIELDS_OBSERVED = false`, so the model's equalities on them hold by construction until HE-008 and T04 supply real reads or a follow-up contract drops them. The capturer (§13.5): R10 states only that the observer builds each capture from its own reads and the record's declared host fields (D1-12); capturer authentication is HE-004-I01's | DESIGN-D1 §13; Q-HE4D1-1, -6, -7, -10 (a); D1-12 |
+| R121 | Configuration v2 and the record's source (Q-HE4D1-2 (a)). `planeon.observer-config/v2` is v1's closed schema plus a ninth member, `qualificationRecord {path, sha256}`; the path must be in `/etc/planeon/policy-observer` (the configuration's own directory, `planeon_etc_t`), not the configuration or its signature, otherwise 13 (D1-3). The signature domain stays `planeon.observer-config/v1` (unchanged); v1 documents still parse as a library call and `serve` uses `parse_with_record`, which refuses them (13). `enrolled::load_record` opens the record read-only in that directory, sizes it by `fstat` (at most 262,144 bytes, `MAX_BYTES`), reads size + 1, checks the sha256 pin (26) and requires the canonical form, so the pin equals `qualificationDigest` (27) | DESIGN-D1 §5; Q-HE4D1-2 (a); D1-3 |
+| R122 | The schema load and rewrite (Q-HE4D1-3 (a)). `CaptureSchema::embedded` takes the one embedded copy of the v4 schema (`NATIVE_PROFILE_V4_SCHEMA`, G-D1-9), checks the sha256 of its canonical encoding against the model's pin `3bf244b2…`, rewrites its closed set of `if`/`then`/`else` conditionals (exactly `$defs/capture/allOf/0` and `/3`) as `allOf` + `[{if, then}, {anyOf: [if, else]}]` (i05-protocol refuses `else`), and loads four validators (capture, lifecycle, backend and the record, the last dropped after enrollment); any refusal is 25. Evidence: the replay (R130) localises all 125 schema refusals with no prefix fallback | DESIGN-D1 §6; Q-HE4D1-3 (a) |
+| R123 | The enrolled record (§7). `Enrolled::new`: the v4 identity, the data bound and the `record` variant (27); R10's read-path preconditions (28): every enrolled path in the read grammar (absolute and normalised), each `files` row at most 64 MiB and each `backendFiles` row at most 1 GiB (S1), at most 512 MiB of Planeon code and 4 GiB of backend code; the five role cgroups under the planeon slice with `pidsMax` at most 4,096, each `filePaths` entry a `files` row, the hook pins under the pin root; the containment cgroup and each backend component's cgroup under the cgroup2 root, each executable a `backendFiles` row; the seal marker's path; the window (29): `validFrom < expiresAt`, both canonical UTC, `expiresAt > now`; an unusable clock is 97. `CheckedRecord` holds the record value and its digest once, discharging the model's per-call record shape check | DESIGN-D1 §7; S1 |
+| R124 | observer-sys (Q-HE4D1-4, -5 (a)). A std-only workspace crate without dependencies; its root denies `unsafe_code`; only `kernel.rs` (Linux) allows it, with one `// SAFETY:` block per call. The one foreign item `syscall`, six calls by number with six further `long` arguments: x86_64 `openat` 257, `getdents64` 217, `readlinkat` 267, `fstatfs` 138, `ioctl` 16, `bpf` 321; aarch64 56, 61, 78, 44, 29, 280 (the vendored libc 0.2.190's musl modules). Four named flag sets of `O_RDONLY`, `O_PATH`, `O_DIRECTORY`, `O_NOFOLLOW`, `O_CLOEXEC` and `O_NONBLOCK`, each asserted at compile time against the OBSERVER row's mask 0x400643; `struct statfs` (120 bytes), the verity reply (`FS_IOC_MEASURE_VERITY` 0xC0046686, capacity 32, algorithm 1), procfs, cgroup2 and tmpfs magic. **Under owner Q-HE4D1-D1 (c), cited by name from v6.12 `linux/bpf.h` and `linux/capability.h`, no fetch or vendoring:** `BPF_OBJ_GET` 7, `BPF_OBJ_GET_INFO_BY_FD` 15, `BPF_PROG_QUERY` 16, `BPF_F_RDONLY`, `BPF_F_ALLOW_OVERRIDE`, `BPF_F_ALLOW_MULTI`, `BPF_F_QUERY_EFFECTIVE`, the three attribute layouts (24, 16 and 64 bytes), `struct bpf_prog_info` (232 bytes and seven offsets), the 29 attach-type numbers and the 41 capability bits; compile-time asserts check what can be checked without the headers (29 distinct attach types, 41 distinct names over 0..=40, single-bit and distinct flags). Any query error makes the slot unavailable, never an empty list; every cited constant is a T04 check item; **the residual:** a value that is wrong but distinct and accepted by the kernel stays undetected until T04. No bpffs magic: the pin mount is not checked (D1-3). Bounds refuse and never truncate: listings (65,536 processes, 64 children, a 32 KiB buffer, each listing a fresh descriptor so no seek), reads past their limit, a translated program over 64 KiB, more than 16 map ids or 64 query ids | DESIGN-D1 §4; Q-HE4D1-4, -5 (a), -D1 (c); D1-4, D1-6 |
+| R125 | The P1 capture (§8, §9). The window: the wall clock `a` and the monotonic start, the role cgroup held, the members before (`cgroup.procs`, each pid's directory held, `stat`, the task listing, each task's `stat`), the process reads through the held directories (`status`, `attr/current`, `cgroup`, each thread's `status` and `attr/current`; OBSERVED roles `maps`, `exe` and the four namespace links), the descriptor checks (each enrolled file's open, facts, verity and memo digest; the cgroup's inode, limits, `pids.current`, children and `cgroup.stat`; the broker's service directory; the seven hook programs with local and effective queries and the 22-type census), the OBSERVED role's second `maps`, the members after, and `b = a + elapsed`; over 2,000 ms is "inspection window exceeded". "Observe faithfully, let the port decide": the engine refuses early only for read failures, R10's bounds, the window, the bracket's start and the record's window. Each member's `cgroup` must name the role's cgroup (D1-12). The OBSERVER's own capture holds cgroup facts only, and its one member must be its own pid, read from the proc root's `self` link (R2-6; not `std::process::id()`, which the linked-source rule refuses); the link read is held by HE-002S-D2 and AMEND-3 OBS-HOSTPOL-1, and SAFETY item 3's six link names (R3-4). The mode is `%04o` of `st_mode & 0o7777` (D1-5); the call count counts `0x85` calls with source register 0 or 2 (D1-10). NP-3 is discharged structurally: no open can write (R124, G-D1-4) and no source names `cgroup.freeze`; the plan text is unchanged | DESIGN-D1 §8-§9; D1-5, D1-10, D1-12; R2-6, R3-4 |
+| R126 | The WORKER frozen bracket (Q-HE4D1-9 (a), Q-HE4D1-D2 (a)). **WORKER-FIRST, D1's own obligation (C4-3):** the WORKER attempt is the set's first action, right after the scrape, before any hashing read or other capture (tested: the set's first access is the leaf's `cgroup.events`). It runs only when every WORKER file's digest is in the memo (else "content digest pending", with no read of the leaf) and only within 5 s of its cycle's scheduled start ("cycle late" past it). `cgroup.events` must read `frozen 1` at the start (else `NotFrozen`, nothing else read) and again after. **R10's NP-9 number: 70 s = 60 s cycle + 5 s scrape-to-set bound + 2 s window + 3 s margin, each term worst-case (C4-2).** The guarantee holds only within a running epoch, from the first set after the fill has covered the WORKER's files (the first set's attempt is never usable, R2-3; a restart costs availability, not safety); flipping `PER_SPEC_PROGRESS` re-checks the 5 s bound at T04 (R2-6); a shorter hold gives about `(H - 2)/60` attempts per freeze; how often is HE-005's | DESIGN-D1 §10; Q-HE4D1-9 (a), -D2 (a); C4-2, C4-3; R2-3, R2-6 |
+| R127 | The lifecycle capture (§11). The seal marker read through its absolute path (mode `& 0o7777`, the run filesystem's type from `fstatfs`: `tmpfs` only); the containment cgroup's state (ABSENT, EMPTY or populated); the census walk under `planeon.slice` (breadth first, at most 1,024 cgroups and depth 8, emitted in path order); the domain scan: each set a fresh listing of the proc root, at most 65,536 entries and a 5 s deadline, each refusing and never truncating, with the lifecycle and every backend slot then unavailable ("process scan bound"); a process counts toward a Planeon domain by its `attr/current` type (P-a completeness), and the observer counts its own domain too. A `dontaudit` for the denials the scan meets is HE-008's recommendation, not a grant (D1-3, D1-4) | DESIGN-D1 §11; D1-3, D1-4 |
+| R128 | Backend captures (§12). The candidates for a component are the scanned processes whose label is its `processLabel` and whose `cgroup` is its `cgroupPath`; over 4,096 refuses; the earliest by start ticks is captured (its executable path, content digest and verity from the memo and a fresh open), ENTRY_BOUND | DESIGN-D1 §12 |
+| R129 | File measurement (Q-HE4D1-12 (a)). A per-epoch memo by path and (device, inode, size, ctime) holds the SHA-256 of exactly `size` bytes read through one no-follow read-only descriptor and then EOF, streamed in 64 KiB reads (i05-protocol's `Sha256`); every window opens the path afresh, checks its facts against the memo's key (another key drops the entry: "content digest stale") and measures verity, and the record's verity digest binds the content the memo hashed, which keeps the memo sound across inode reuse. Before any byte is read, the fresh open's size must equal the record row's: a file of another size is marked as differing and never read, and its capture refuses it ("file differs from its record row"), so the 512 MiB and 4 GiB totals bound the hashing (PR review round 1, R1-3). The budgeted fill runs after WORKER-FIRST: the WORKER's files first, then the other roles' and the backends' executables; a file the budget cuts keeps its one held descriptor and its partial hash, bound to its key, and resumes next set on that descriptor (no seek anywhere), restarting from byte 0 through a fresh open if the key changed (R2-3, R3-3). The page-cache charge and its stalls are T04 items (D1-9) | DESIGN-D1 §14; Q-HE4D1-12 (a); D1-9; R2-3, R3-3 |
+| R130 | The port and the replay (Q-HE4D1-11 (a)). `capture_check.rs` ports `check_capture`, `check_lifecycle_capture` and `check_backend_capture` in the model's order with its refusal kinds; the 37 texts the vectors pin are compared exactly (contract text), the unpinned ones are R10's; equality is the model's (`py_eq`). The replay runs 312 checks: 70 positives, 7 accepted, 229 negatives (each the pinned text or a localised schema refusal: 125, of which 79 additionalProperties, 31 not, 11 required, 3 const, 1 uniqueItems; 119 capture, 4 lifecycle, 2 backend) and 6 cross-version cases (X09-X14, X12-X14 under the v3 schema's registered bytes); D§3.2's counts (229, 104) corrected | DESIGN-D1 §15; Q-HE4D1-11 (a) |
+| R131 | Cadence and timing (Q-HE4D1-6 (a)). The set runs synchronously inside the cycle scrape's answer, after the marker check and the ADM-4 record, scheduled at the cycle's scheduled start (the previous cycle's start + 60 s); a cycle whose scrape escalates takes no set. Its order: WORKER-FIRST, the fill, the other four roles, the scan and the lifecycle capture, the backends. The budget ends at the scheduled start + 25 s; a capture not started by then is "set budget", every limit is checked between reads and each read has its size bound (R2-2). **The drain (R2-2, R3-2):** the set only marks the wire; `watch_loop` finishes the current poll's batch in order, then runs zero-timeout polls, each poll's events in order, until one returns no stream event, at most 8, before the next progress check; the mark is cleared when the watch phase ends (and again when one starts), so a trigger from the batch runs no drain poll and none carries over (R4-2). **The record window:** `Pending` before `validFrom`; the loop wakes at `expiresAt - 3 s` (the engine's wall clock) and turns every slot `Expired` at once, with no set after; `capture_view()` derives `Expired` at read time in every phase (R2-4) and latches the first observation, so a wall clock stepped back cannot revive the view (R3-6); each window first checks `a + 2,000 + 1,000 < expiresAt - 3 s` (D1-8). Times are Unix milliseconds | DESIGN-D1 §16; Q-HE4D1-6 (a); D1-8; R2-2, R2-4, R3-2, R3-6, R4-2 |
+| R132 | Statuses and `serve` (Q-HE4D1-7 (a)). `status::CAPTURE_SETUP`, a table of its own: 25 the capture schema, 26 the record's read, 27 its form, 28 the read-path preconditions, 29 the window, 30 the capture roots; distinct, inside 25-39, apart from `SERVING`, `STAGES` and every seal status; `capture_setup` is one exhaustive match (an unusable clock stays 97); 31-39 stay free. `serve`'s twelve steps: `signed_config::load` (11, 12), `ObserverConfig::parse_with_record` (13), `config::check_lifetime` (14; 97), `credentials::observer_inputs` (20), `client_config` (21), `CaptureSchema::embedded` (25), `enrolled::load_record` (26, 27), `Enrolled::new` (27-29), `LinuxWire::new(sealed)` (24), `LinuxCapture::new(sealed)` (30), `Closure::embedded` (22), `observe::run` with the capture engine (80-99). The constructor is named `LinuxCapture::new`, mirroring `LinuxWire::new` (rev 2's `open_after_seal` is a word gate.py's `OBSERVATION_CALLERS` reserves, R2-1); it takes `&Sealed`, which is code review's, and is called once | DESIGN-D1 §17; Q-HE4D1-7 (a); R2-1 |
+| R133 | Memory (§18). Resident for the epoch: three validators (about 3.6 MiB), the record (bytes and value, at most about 4.3 MiB), the memo, at most one held descriptor with its partial hash and one 64 KiB buffer, the view (at most 14 x 256 KiB); transient inside a set: one capture's value, two 1 MiB `maps` reads, the 32 KiB listing buffer and the 64 KiB program buffer; the parsed and rewritten schema values and the record validator are dropped before `observe::run`. At most about 19 MiB of the 84 MiB headroom. The page cache the hash pass charges to the cgroup is reclaimable; T04 measures both (D1-9) | DESIGN-D1 §18; D1-9 |
+| R134 | Gate rules G-D1-1..16 (`tools/gate.py`, §19). G-D1-1: observer-sys in planeon-observer's closure and `SCANNED_CRATES`, its root `#![deny(unsafe_code)]`, no dependency. G-D1-2: `kernel.rs` in `UNSAFE_FILES` and `FD_FILES`, its foreign items exactly `{syscall}`, `MetadataExt` allowed in observer-sys. G-D1-3 (D1-6): one declaration, plain calls only (no path, rename, import or function pointer), seven arguments, the six numbers pinned per target with no shadow, openat's flags, ioctl's request and bpf's command single named constants, the request `FS_IOC_MEASURE_VERITY`, the commands 7, 15 and 16. G-D1-4: four read-only sets with their asserts, exactly seven cgroup file names, no `freeze`, no `write` in observer-sys. G-D1-5 (R3-1, R4-1): five exact private root constants excepted once each from the start-up lint and the `fs` scan (`FS_SCAN_EXCEPTIONS`). G-D1-6 (D1-12, R2-1): `observer_sys` only in `linux_capture.rs`, no `pub use`, no observer-sys type in a public item, `LinuxCapture::new(sealed)` once in `serve`, `BEFORE_SEAL_REFUSED` gains `observer_sys` and `LinuxCapture`, and a self-test that the existing `OBSERVATION_CALLERS` rule passes over D1's real sources and fails when one names `open_after_seal`. G-D1-7: `link_text` and `own_pid` pinned and called only in `linux_capture.rs`. G-D1-8: twelve wiring calls. G-D1-9 (R2-5): 35 contracts, one use site of `NATIVE_PROFILE_V4_SCHEMA` (its `pub static` fallback was not needed). G-D1-10: B1's logic rule for `capture_schema`, `capture_check` and `kernel_text`, `CRATE_PATH_ROOTS` gains `observer_sys`. G-D1-11: the no-panic rule over `enrolled`, `capture`, `linux_capture` and observer-sys's three sources (S8; a brace-free compile-time assert only, R1-1). **R1-2 (G-D1-3, G-D1-4, G-D1-7):** in `kernel.rs` no use declaration renames and no function body holds an item (fn, const, static, use, impl, mod, struct, enum, union, trait, type, extern or a macro); each flag set occurs exactly in its definition, its assert and the openat calls passing it, the verity request and each BPF command exactly in its definition and the calls passing it (as the `SYS_` names are counted); and `link_text`, `own_pid` and `link_at` name the free fn `name` and `link_at` only as pinned and bind no name `kernel.rs` defines at its top level, so neither a rename nor a shadow can rebind the flag words, a BPF command or the link-read path. G-D1-12: observer-sys joins the post-seal rule. G-D1-13: `Roots`, `CgroupDir`, `Opened`, `ProgFd` and `LinuxCapture` join the Debug hazards (`ProcDir` already was). **G-D1-14 (D1-7): planeon-observer's `.symtab` holds `observer_sys::kernel::Roots::open` and `planeon_observer::linux_capture::LinuxCapture::new`, both `#[inline(never)]`, each read by its whole item path (legacy, or v0 through the inherent impl's self type).** G-D1-15: the report lines. **G-D1-16 (owner Q-HE4D1-D3 (a)): for planeon-observer only, the pinned v4 schema bytes occur exactly once and the host-path scan runs on a copy with that one span blanked; a second copy, a changed byte or any needle outside the span fails; `HOST_PATHS` is unchanged for every binary; both targets pass, with the span recorded below (D1-1).** The rule inventory at `a602770` (57 rules) and the word lists are DESIGN-D1 §19's (R3-5). What stays code review's: that `LinuxCapture::new` takes `&Sealed`, what each `KernelView` method calls in turn, and the SAFETY arguments; and the qualified-path form `<LinuxCapture>::new(sealed)`, which G-D1-6's and G-D1-8's patterns do not match, as HE-004C's `<LinuxWire>::new` (PR review round 1, R1-5; carried below) | DESIGN-D1 §19; Q-HE4D1-D3 (a); D1-1, D1-6, D1-7, D1-12; R2-1, R2-5, R3-1, R3-5, R4-1, R4-2 |
+| R135 | Tests (§20). New files only: observer-sys's `tests/dirent.rs`, and in `crates/observer/tests/` `d1_support/mod.rs` (`FakeHost`, a `KernelView` built from a native-profile v4 positive, every access logged, scripted hooks, delays and refusals, on its own clock or HE-004C's rig clock) and the nine files `observer_d1_contracts.rs`, `observer_config_v2.rs`, `observer_enrolled.rs`, `observer_capture_schema.rs`, `observer_kernel_text.rs`, `observer_capture_replay.rs`, `observer_capture.rs`, `observer_capture_epoch.rs` and `observer_status_d1.rs`. Every earlier test file is byte-identical except `tools/test_gate.py`, whose earlier cases change only where the observer's closure, the scanned and unsafe file lists, the foreign items, the start-up exceptions, the wiring order, the contracts count and the binary host-path check's one exempt span for planeon-observer (G-D1-16) change (R1-2; the list is in the PR body) | DESIGN-D1 §20, §23; R1-2 |
+
+### Points settled at build (inside DESIGN-D1's intent)
+
+- **S1.** §7's per-row bound reads "each file's `size` is at most 64 MiB", but the vectors' positives enroll backend
+  executables larger than that, within the schema's own `backendFiles` maximum of 1 GiB: the bound is 64 MiB per
+  `files` row and 1 GiB per `backendFiles` row, the totals (512 MiB and 4 GiB) unchanged, and the totals bound the
+  hashing (R129, R1-3). Recorded in DESIGN-D1 §31.
+- **S2.** The 41 capability names decode `status` masks in the portable engine (`kernel_text.rs`), with a compile-time
+  proof that they are distinct; observer-sys holds no capability table.
+- **S3.** `BPF_F_QUERY_EFFECTIVE` (a query flag) and `BPF_F_ALLOW_OVERRIDE` (an attach flag) are both bit 0, by the
+  kernel's definition in different words; only the two attach flags are asserted distinct.
+- **S4.** A directory entry's name that is not UTF-8 refuses the whole listing.
+- **S5.** `CaptureSchema::embedded()` returns the capture validators and the record validator separately, so `serve`
+  drops the latter after enrollment.
+- **S6.** An unusable wall clock at the window check is `SetupError::Clock`, which `capture_setup` maps to 97.
+- **S7.** A local query's flag word other than exactly `BPF_F_ALLOW_OVERRIDE` or `BPF_F_ALLOW_MULTI` (0 included) makes
+  the capture unavailable ("foreign attach flag").
+- **S8 (G-D1-11; DESIGN-D1 §31, accepted narrowly).** observer-sys's no-panic list removes each item-level
+  compile-time assert, exactly `const _: () = assert!(..);` at brace depth 0 whose argument holds no `{` or `}`, before
+  the scan: §4.2 and G-D1-4 require those asserts, and the compiler, not the running process, evaluates them. A form
+  whose argument holds a block stays and is scanned, so its `assert!` refuses (PR review round 1, R1-1: a block can hold
+  an item, an impl's runtime methods among them). Every other `assert!` still refuses, and crates/observer has no such
+  exception. kernel.rs's 28 forms are all brace-free.
+- The engine's own-pid method is `KernelView::observer_pid` (the word `own_pid` stays with `Roots::own_pid` and its one
+  call, G-D1-7); attach types and the run filesystem's name travel by name, so every kernel ABI value stays in
+  `kernel.rs`. The fill hashes the roles' files and the backends' executables (the files the captures report). A
+  thread replaced before its per-thread reads gives "member gone"; the pinned "member or thread set changed during the
+  inspection" arises when the change falls after the process reads. `sliceCgroups` are emitted in path order.
+- The epoch's drain is cleared when a watch phase ends as well as when one starts (R4-2). The rig answers a wait's ready
+  connections in handle order, so the "drain's place and order" test reopens a stream after the cycle scrape's link to
+  put a stream event after the probe's in one batch. §20's blocked read of 40 s is placed after the budget's end inside
+  a capture that started before it, the only place a 40 s block makes the next cycle late.
+- G-D1 readings, each at least as strict as the text: observer-sys's manifest holds no dependency table of any kind;
+  `SYS_` values in decimal; no `syscall` or `SYS_` name in other observer sources (R4-2); `freeze` and `observer_sys`
+  matched in the raw text; `LinuxCapture` renamed or aliased nowhere; a small v0 path reader for G-D1-14.
+
+### Evidence
+
+- Host tests: `cargo test` runs 96 binaries and 662 tests, all passing (base `a602770`: 84 and 591); every earlier
+  binary keeps its count, and the twelve new ones are observer-sys's library (0), `dirent` (5) and doc tests (0) and
+  planeon-observer's `observer_d1_contracts` (2), `observer_config_v2` (5), `observer_enrolled` (11),
+  `observer_capture_schema` (5), `observer_kernel_text` (10), `observer_capture_replay` (1 test, 312 checks),
+  `observer_capture` (15), `observer_capture_epoch` (14) and `observer_status_d1` (2); `observer_enrolled` (12) pins both
+  inventory totals, `observer_capture` that a file larger than its row is never read (R1-3, R1-4). `git diff --name-status a602770 --
+  '*/tests/*'` lists only added files.
+- The engine over the fake host: every capture of the five positives round-trips (14 per positive, the timing fields and
+  the derived digests aside); the window's steps and refusals (a member gone, threads replaced, the 2 s window, bounds,
+  the observer's own capture, NotFrozen, a pending or stale digest, a held descriptor resumed across sets, a replaced
+  file). Inside HE-004C's epoch, on its unchanged rig: one set per cycle right after the scrape, WORKER-FIRST, "cycle
+  late", the first set and the fill's order, no set after an escalated scrape, a 70 s freeze at every 5 s phase offset
+  containing a WORKER window (a 30 s one between attempts not), no exit on capture failure (81 and 92 still reached), the
+  budget from the scheduled start (an on-time set ends at +25 s, a set 12 s late gets 13 s, a 40 s read blocked after the
+  budget's end makes the next cycle late), Pending before `validFrom`, the wake at `expiresAt - 3 s`, read-time Expired
+  inside a snapshot phase and the latch (a wall clock stepped back in a watch phase and in a snapshot phase), the drain
+  (a bookmark sent during a long set credited before its deadline is judged, `Stale(1)` without it; at most 8 polls; a
+  trigger from the batch or from a drain poll ends the phase with the mark cleared, a scratch mutant without the clears
+  fails). The replay: 70 positives, 7 accepted, 229 negatives (125 schema refusals localised with no prefix fallback),
+  6 cross-version cases, the 37 pinned texts verbatim.
+- The gate's self-test: 264 tests (base 221); 43 new ones in 18 classes cover G-D1-1..16 with their bypass forms (R4-1's
+  cases, R2-1's `OBSERVATION_CALLERS` check over D1's real sources, one refusing fixture per word list, PR review round
+  1's three R1-2 probes and its R1-1 block arguments); 69 earlier items change as R135 says, 56 of them only in the
+  source counts their assertions expect.
+- `gate.py` (both musl release builds): `he-gate: passed`; 35 contract files. planeon-gate (binary, symbols and SBOM),
+  planeon-broker, planeon-containment and planeon-writer are byte-identical to the base's on both targets (x86_64
+  `f534bd63…`, `3ae4f143…`, `77886c4b…`, `684149d7…`; aarch64 `2d62ef0a…`, `5508d7d5…`, `8fd74ad0…`, `cfb11b59…`; their
+  SBOMs too). planeon-observer changes (x86_64 sha256 `b21d814a…`, SBOM `86c5c3ab…`; aarch64 `e9f7b439…`, SBOM
+  `93f468da…`; at the base `240a9285…`, `e735ab8c…`, `3a10d247…`, `732625c2…`), holds its OBSERVER program exactly once
+  and no membarrier, keeps G9's substitute and module symbols, and its SBOM's workspace set is gate-sys, i05-protocol,
+  observer-sys and planeon-observer (the vendored set the 11 LINKED crates).
+- G-D1-14 on the built binaries: `observer_sys::kernel::Roots::open` and
+  `planeon_observer::linux_capture::LinuxCapture::new` are present on both targets (v0 names, read through the inherent
+  impl's self type).
+- G-D1-16 on the built binaries: the 93,041 bytes of the v4 schema occur exactly once, at offset 298,398 (x86_64) and
+  237,704 (aarch64); with that span blanked no host path (`HOST_PATHS`, the build root, the home directory) is found.
+- The 8-word span search (the files HE-004D1 adds or changes against the earlier packets' model and validator sets,
+  every `scripts/*.py` at harness-onion `887cbe7` and the documents DOSSIER-C names; contract text, `vendor/`, `.json`
+  and `.rsp` excluded) finds one span in HE-004D1's text, the edge record v5's file path in PROVENANCE (an identifier; the
+  base cites v4's the same way), and 46 in text unchanged from `a602770`. First-run spans in new text were reworded: nine
+  pinned texts in `capture_check.rs` are named constants (verbatim), a key list is in sorted order, and doc comments,
+  a test loop variable, two gate.py patterns and three lines here were rephrased.
+- `crates/i05-protocol`, `crates/effect-gate/src`, `crates/gate-sys`, `crates/gate`, `crates/gate-tls`, `vendor/`,
+  `licenses/`, B1's five logic modules, `seal.rs` and every earlier test file are byte-identical to `a602770`;
+  `Cargo.lock` gains observer-sys as a path package and planeon-observer's one edge to it.
+
+### Code and audit
+
+- `crates/observer-sys/` (new): `lib.rs` (the root, `#![deny(unsafe_code)]`), `dirent.rs` (the portable record parser),
+  `kernel.rs` (Linux; the one foreign item, the four flag sets, the layouts and the safe API: `Roots`, `RelPath`,
+  `ProcDir`, `CgroupDir`, `ProgFd`, `Opened`), each manual `Debug` printing the type name only.
+- `crates/observer/src/`: `capture_schema.rs`, `capture_check.rs`, `kernel_text.rs` (logic modules, G-D1-10),
+  `enrolled.rs`, `capture.rs` (the portable engine over `KernelView`) and `linux_capture.rs` (Linux; the only module that
+  names observer-sys) are new; `config.rs` (v2), `contracts.rs` (the schema's two items), `observe.rs` (the set, the
+  drain, the expiry wake and latch), `status.rs` (`CAPTURE_SETUP`), `main.rs` (`serve`'s twelve steps) and `lib.rs`
+  change. No `unsafe` outside `kernel.rs`.
+- `contracts/` (four files and PROVENANCE's section), `tools/gate.py`, `tools/test_gate.py` (R134), this section and
+  `README.md`'s observer row; the workspace manifest and lock gain observer-sys as a path package and its one edge.
+
+### Carried
+
+- **T04 and the W03 distribution check:** OBS-INV-1 over every capture entry point (the six calls, the three BPF
+  commands, the verity ioctl, std's reads and metadata, the `/proc/self` link read), with the coverage report and no
+  inventory; OBS-HOSTPOL-1's five accesses (AMEND-3; "exactly"); the gate and the server without NBS dumpable, `/proc`
+  without `hidepid`; a held `/proc/<pid>` descriptor failing once its process exits; **every constant cited by name under
+  Q-HE4D1-D1 (c)** (the BPF flags, commands, layouts and offsets, the 7 hook and 22 census attach-type numbers, the 41
+  capability bits) and the behaviours they rest on (a non-cgroup attach type refused by the query, `BPF_OBJ_GET` refusing
+  a non-bpffs path, unredacted translated instructions with CAP_BPF, map-free programs, the helper and kfunc reading,
+  query counts within 16 and 64; `BPF_OBJ_GET` with `BPF_F_RDONLY` on each hook's program pin returns a descriptor
+  that `BPF_OBJ_GET_INFO_BY_FD` accepts, PR review round 1, R1-7), with R124's residual until then; the `maps` device equal to `fstat`'s `st_dev` on the
+  enrolled filesystems (the rule itself to a later W03 plan amendment, AMEND-3 `carried[1]`); verity (algorithm 1) on
+  every enrolled and backend file; the seal marker on tmpfs; one process per backend component or the earliest right;
+  the content pass's duration, the set's duration against the loop (no 83, 93 or 98 caused), whether a pause in reading
+  watch sockets ends a slow consumer's watch, how often cycles meet the 5 s scrape-to-set bound, the 5 s scan deadline on
+  the enrolled host's process count, the longest single kernel read under load and how often the drain credits a
+  bookmark after its deadline (D1-9, R2-2); the `PER_SPEC_PROGRESS` flip re-checking the 5 s bound and NP-9's 70 s
+  (R2-6); the anonymous peak with D1's share and the page cache the hash pass charges, with reclaim stalls (D1-9); NP-9's
+  T04 share (the broker's quiescent freeze holds `frozen 1` for at least 70 s, the WORKER capture inside it, no thaw of a
+  leaf W1-W4 or W6 holds, no `cgroup.freeze` written by the observer); the vacuous host equalities until real reads.
+- **HE-008:** sign `planeon.observer-config/v2` under the existing domain with `qualificationRecord`; install the record
+  in `/etc/planeon/policy-observer` (recommended `qualification-record.json`, root, 0444, `planeon_etc_t`); keep the
+  configuration's `notAfter` consistent with the record's `expiresAt`, or re-enroll; the observer's host-policy share
+  (OBS-HOSTPOL-1); the `dontaudit` recommendation for the scan's denials (not a grant); the real reads of the seven host
+  fields with the follow-up contract; the off-host measurement of the observer's own file (T04-OBSERVER-IDENTITY).
+- **HE-004-I01:** the capture view's wire form, the declared-host-field mark on the wire, capturer authentication
+  through its peer custody (Q-HE4D1-10 (a)), the per-request freshness of captures.
+- **HE-004D2:** `check_record` on the same record before composing; `check_qualification` and the token, reusing
+  `capture_schema.rs` and `capture_check.rs`; the cross-capture rules; retaining a capture across cycles (`previous`).
+- **W03-PLAN-AMEND-3 and later amendments:** OBS-HOSTPOL-1 and NP-9 as adopted in candidate 5; WORKER-FIRST in HE-004D1's
+  own NP-9 share and packet scope (C4-3); native-profile v4's other unregistered W03 items, the same-device rule for
+  `maps` and `stat`, HE-008's and I01's hand-offs and the I06 successor for OBS-RBAC-1.
+- **The follow-up contract (owner-accepted, Q-HE4D1-1):** a native-profile successor or errata that drops the seven host
+  fields from captures.
+- **S1 and S8:** recorded in DESIGN-D1 §31 (monitor, owner-delegated, 2026-10-19), S8 narrowed by PR review round 1's
+  R1-1.
+- **The qualified-path constructor form (PR review round 1, R1-5):** `<LinuxCapture>::new(sealed)`, like HE-004C's
+  `<LinuxWire>::new(sealed)`, is not matched by the wiring and caller patterns; a later gate change matches
+  `LinuxCapture\s*>?\s*::\s*new` (and `LinuxWire`'s) or counts every `LinuxCapture` token in `main.rs`. The `&Sealed`
+  parameter keeps any extra call after the seal.
+
+### Owner decisions (verbatim as relayed, 2026-10-18)
+
+The dossier questions (subject DOSSIER-D1, sha256 prefix `ff9ace8e`):
+
+> - Q-HE4D1-1 = (a): fill the host fields from the record's declared values, marked R10-side as not observed (a MODEL_DEFINED row); HE-008 and T04 keep the real reads. The owner accepts that those equalities are vacuous until a follow-up successor or errata drops them from captures.
+> - Q-HE4D1-4 = (a): a new observer-sys crate; planeon-gate untouched.
+> - Q-HE4D1-8 and -9 = (a): the next W03 plan amendment, a harness-onion meta packet, adds the observer's HE-008 host-policy share plus a T04 check, and the HE-005 quiescent-freeze obligation. D1 is designed alongside it, with the freeze bracket tested with fakes.
+> - Q-HE4D1-2, 3, 5, 6, 7, 10, 11 and 12 = all (a), as in the dossier.
+> Record all of these verbatim and dated. GO for the D1 design (light work), then independent review rounds.
+
+Q-HE4D1-D1:
+
+> 1. Owner Q-HE4D1-D1 = (c): cite linux/bpf.h and linux/capability.h (v6.12) by name and leave the value check to T04, following the gate-sys channel.rs precedent. No fetch, no vendoring. Record it verbatim and dated, and list the cited constants as a T04 check item.
+
+Q-HE4D1-D2 and Q-HE4D1-D3:
+
+> - Q-HE4D1-D2 = (a): keep the 60 s cadence (Q-HE4D1-6 (a)); the WORKER attempt goes first in each set, right after the scrape. NP-9's minimum becomes "one observer cycle plus the scrape-to-set bound plus one 2 s window, plus margin". R10 states the number, and HE-005 keeps how often. The owner accepts the longer probe-worker freeze.
+> - Q-HE4D1-D3 = (a): the new gate rule G-D1-16, for planeon-observer only, with self-tests. The pinned v4 schema bytes occur exactly once; the host-path scan runs with that one span blanked; any /opt/planeon/ elsewhere, a second copy or a changed byte still fails. The host-path list stays unchanged for every binary.
+> - Q-HE4D1-D1: (c) stands, with the no-fetch mitigations folded.
+
+The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.

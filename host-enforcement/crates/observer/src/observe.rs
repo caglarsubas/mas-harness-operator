@@ -29,15 +29,35 @@
 //!
 //! Every exit also records why in [`Epoch::reason`]. `notAfter` reached exits 94; a wall clock before the epoch or past
 //! the year 9999 exits 97; a poller failure exits 95.
+//!
+//! HE-004D1 (DESIGN-D1 section 16; owner decisions Q-HE4D1-6 and -7 (a), Q-HE4D1-D2 (a); MODEL_DEFINED R131) attaches
+//! the kernel captures with [`Epoch::with_captures`]; without it nothing below runs and the epoch is HE-004C's.
+//! - **One set per cycle, right after its scrape.** In the cycle scrape's answer, after the marker check and the ADM-4
+//!   record replace the observation's, the epoch runs one capture set synchronously, scheduled at the cycle's scheduled
+//!   start (the previous cycle's actual start + 60 s). A cycle whose scrape escalates takes no set; a set's failures are
+//!   slot states and never end the epoch.
+//! - **The drain (R2-2, R3-2).** The set only marks the wire for draining. `watch_loop` first finishes the current
+//!   poll's batch in order, then, before the next progress check, runs zero-timeout polls, processing each poll's events
+//!   in order, until a poll returns no stream event, at most 8 polls, and clears the mark, so a bookmark that arrived
+//!   during a set is credited before its deadline is judged (a ninth poll's worth costs availability only). A trigger
+//!   from the batch ends the watch phase before any drain poll, and one from a drain poll ends it at once; either way
+//!   the mark is cleared when the watch phase ends (and again when the next one starts), so no drain carries over.
+//! - **Expiry (D1-8, R2-4, R3-6).** The loop wakes at the record's `expiresAt - 3 s` (the engine's wall clock) and
+//!   turns every slot Expired; no set starts after that. [`Epoch::capture_view`] derives Expired at read time in every
+//!   phase, and the first observation of expiry is latched, so a wall clock stepped back cannot revive a capture.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::cell::Cell;
+use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
 use i05_protocol::json::Value;
 use rustls::ClientConfig;
 
 use crate::admission::{check_loaded_manifest, Adm4Input, Adm4Record, BindingId, MetricSample, ObservationBinding, Verdict};
+use crate::capture::{CaptureCycle, CaptureViewState};
 use crate::client::{Client, Event, Failure, Handle, Kind, Scraped, Wire};
 use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
 use crate::exposition::Exposition;
@@ -84,6 +104,8 @@ pub const EXPANSION_CAP: u64 = 40_000;
 pub const NODE_CAP: usize = 1_000_000;
 /// The longest wait of the watch loop without another deadline.
 const IDLE_WAKE: Duration = Duration::from_secs(3_600);
+/// The most zero-timeout polls of one drain after a capture set (R3-2).
+pub const DRAIN_POLLS: u32 = 8;
 
 /// Why the epoch ended (section 14's statuses 80-99; `status::observation` maps each).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -148,6 +170,8 @@ pub enum Trace {
     Stale(u32),
     /// The record of a cycle's ADM-4 check replaced the previous one.
     Adm4,
+    /// A capture set ran (HE-004D1): its sequence, the taken slots and the others.
+    Captures { sequence: u64, taken: usize, not_taken: usize },
 }
 
 /// The in-memory observation (Q-HE4-10 (a)); its encoding is HE-004-I01's.
@@ -285,6 +309,13 @@ pub struct Epoch<W: Wire> {
     cycle_active: bool,
     next_cycle: Option<Instant>,
     available: bool,
+    /// HE-004D1: the capture engine, the expiry latch, the drain mark, the current cycle's scheduled start, and each
+    /// drain's poll count (the tests' reading).
+    captures: Option<Box<dyn CaptureCycle>>,
+    capture_expired: Cell<bool>,
+    drain_due: bool,
+    cycle_scheduled: Option<Instant>,
+    drains: Vec<u32>,
 }
 
 /// The number of structural tokens (`{`, `[`, `:` and `,`) outside string literals of a JSON text: every parsed value
@@ -377,9 +408,10 @@ pub fn expansion_weight(inputs: &Inputs) -> Option<u64> {
     Some(total)
 }
 
-/// The epoch with production settings, run to its exit (`serve`'s last step).
-pub fn run<W: Wire>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure) -> ObserverExit {
-    Epoch::new(wire, config, tls, closure, Settings::production()).run()
+/// The epoch with production settings and the capture engine, run to its exit (`serve`'s last step).
+pub fn run<W: Wire>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, captures: Box<dyn CaptureCycle>)
+                    -> ObserverExit {
+    Epoch::new(wire, config, tls, closure, Settings::production()).with_captures(captures).run()
 }
 
 fn after(now: Instant, by: Duration) -> Instant {
@@ -417,7 +449,83 @@ impl<W: Wire> Epoch<W> {
             cycle_active: false,
             next_cycle: None,
             available: false,
+            captures: None,
+            capture_expired: Cell::new(false),
+            drain_due: false,
+            cycle_scheduled: None,
+            drains: Vec::new(),
         }
+    }
+
+    /// Attaches the capture engine (HE-004D1): one set per cycle, the drain, the expiry wake.
+    pub fn with_captures(mut self, captures: Box<dyn CaptureCycle>) -> Epoch<W> {
+        self.captures = Some(captures);
+        self
+    }
+
+    /// The latest capture view: `Current` only while the engine's wall clock is before `expiresAt - 3 s`, `Expired`
+    /// from then on whatever the clock later says (the latch, R3-6); `None` without captures.
+    pub fn capture_view(&self) -> Option<CaptureViewState<'_>> {
+        let captures = self.captures.as_ref()?;
+        if self.capture_expired.get() || captures.expired_now() {
+            self.capture_expired.set(true);
+            return Some(CaptureViewState::Expired);
+        }
+        Some(CaptureViewState::Current(captures.view()))
+    }
+
+    /// The poll count of each drain so far (the tests' reading).
+    pub fn drains(&self) -> &[u32] {
+        &self.drains
+    }
+
+    /// The expiry wake's work: once the engine's wall clock reaches `expiresAt - 3 s`, latch and turn every slot
+    /// Expired.
+    fn check_capture_expiry(&mut self) {
+        let Some(captures) = self.captures.as_mut() else { return };
+        if !self.capture_expired.get() && captures.expired_now() {
+            self.capture_expired.set(true);
+            captures.expire();
+        }
+    }
+
+    /// One capture set right after a cycle's scrape (section 16); it only marks the wire for draining.
+    fn capture_cycle(&mut self) {
+        self.check_capture_expiry();
+        if self.capture_expired.get() {
+            return;
+        }
+        let now = self.client.now();
+        let scheduled = self.cycle_scheduled.unwrap_or(now);
+        let Some(captures) = self.captures.as_mut() else { return };
+        captures.capture_set(scheduled);
+        let view = captures.view();
+        let (sequence, (taken, not_taken)) = (view.sequence, view.counts());
+        self.note(Trace::Captures { sequence, taken, not_taken });
+        self.drain_due = true;
+    }
+
+    /// After the batch: zero-timeout polls, each poll's events in order, until one returns no stream event, at most
+    /// `DRAIN_POLLS`; the mark is cleared.
+    fn drain(&mut self) -> Result<Option<Trigger>, ObserverExit> {
+        let mut polls = 0u32;
+        while polls < DRAIN_POLLS {
+            polls = polls.saturating_add(1);
+            let events = self.client.poll(self.client.now()).map_err(|_| self.poll_failed())?;
+            let streamed = events.iter().any(|(handle, _)| self.streams.iter().any(|stream| stream.handle == Some(*handle)));
+            for (handle, event) in events {
+                if let Some(trigger) = self.on_event(handle, event)? {
+                    self.drains.push(polls);
+                    return Ok(Some(trigger));
+                }
+            }
+            if !streamed {
+                break;
+            }
+        }
+        self.drains.push(polls);
+        self.drain_due = false;
+        Ok(None)
     }
 
     /// Why the epoch ended (set with the exit).
@@ -897,6 +1005,7 @@ impl<W: Wire> Epoch<W> {
         self.probe = None;
         self.queue.clear();
         self.cycle_active = false;
+        self.drain_due = false;
         if self.next_cycle.is_none() {
             self.next_cycle = self.observation.as_ref().map(|observation| after(observation.fresh_stamp, CYCLE));
         }
@@ -904,6 +1013,7 @@ impl<W: Wire> Epoch<W> {
             self.open_stream(index, true);
         }
         let trigger = self.watch_loop();
+        self.drain_due = false;
         self.client.close_all();
         self.probe = None;
         self.queue.clear();
@@ -915,6 +1025,7 @@ impl<W: Wire> Epoch<W> {
     fn watch_loop(&mut self) -> Result<Trigger, ObserverExit> {
         loop {
             self.check_clock()?;
+            self.check_capture_expiry();
             let now = self.client.now();
             for index in 0..self.streams.len() {
                 if let Some(StreamState::Waiting { at, initial }) = self.streams.get(index).map(|stream| stream.state) {
@@ -940,6 +1051,11 @@ impl<W: Wire> Epoch<W> {
             let events = self.client.poll(wake).map_err(|_| self.poll_failed())?;
             for (handle, event) in events {
                 if let Some(trigger) = self.on_event(handle, event)? {
+                    return Ok(trigger);
+                }
+            }
+            if self.drain_due {
+                if let Some(trigger) = self.drain()? {
                     return Ok(trigger);
                 }
             }
@@ -990,11 +1106,17 @@ impl<W: Wire> Epoch<W> {
             let left = self.config.not_after.saturating_sub(wall);
             wake = wake.min(after(now, Duration::from_secs(left)));
         }
+        if !self.capture_expired.get() {
+            if let Some(at) = self.captures.as_ref().and_then(|captures| captures.expiry_wake()) {
+                wake = wake.min(at);
+            }
+        }
         wake.max(now)
     }
 
     fn start_cycle(&mut self, now: Instant) {
         self.cycle_active = true;
+        self.cycle_scheduled = Some(self.next_cycle.unwrap_or(now));
         self.next_cycle = Some(after(now, CYCLE));
         self.cycle_f = None;
         self.note(Trace::Cycle);
@@ -1221,6 +1343,7 @@ impl<W: Wire> Epoch<W> {
                     observation.digest = digest;
                 }
                 self.note(Trace::Adm4);
+                self.capture_cycle();
                 Ok(None)
             }
         }
