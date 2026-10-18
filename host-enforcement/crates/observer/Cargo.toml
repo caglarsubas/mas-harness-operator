@@ -6,11 +6,10 @@ license.workspace = true
 publish.workspace = true
 
 # HE-004A DESIGN section 3 (owner decision Q-HE4A-7 (a)): a library target (src/lib.rs: the seal and the status table)
-# and the binary (src/main.rs); the seal's raw calls are gate-sys's, by path, and no registry crate.
+# and the binary (src/main.rs); the seal's raw calls are gate-sys's, by path, and no registry crate. HE-004B1 DESIGN-B
+# section 3 (owner decision Q-HE4B-6 (a)): the observer links i05-protocol for its strict JSON parser, canonical encoder,
+# py_eq and SHA-256 (the RBAC snapshot and ADM-4 logic); Cargo.lock already lists this edge (it does not separate dev
+# edges), so it is unchanged.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
-
-# The tests pin the embedded programs' sha256 with i05-protocol's CAVP-tested SHA-256, as effect-gate's seal tests do;
-# a test-only edge, not linked into the binary.
-[dev-dependencies]
 i05-protocol = { path = "../i05-protocol" }

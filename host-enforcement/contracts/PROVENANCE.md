@@ -103,6 +103,40 @@ point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s HE-003A3 section), at
 
 - `scripts/i05_gate_channel_v4.py`, sha256 `95c690cdb0744833f16fa6ac5372c2d8e3404fde9fb19a8fa4e9a0334246ae0d`, 77323 bytes
 
+## I06 backend profile and admission semantics v3, the observer's RBAC snapshot and ADM-4 (HE-004B1)
+
+Copied byte for byte from the harness-onion repository, each file at the provider commit its edge row names, read with
+`git show <providerCommit>:<providerPath>`, mode 100644: the I06 backend profile v2 (`architecture/i06-backend-profile-v2/`,
+MET-ENFORCE-012, `4f75dedd20f1ebbe262799651abed8f5ee2fe502`), the I06 backend profile v1 data it keeps reading
+(`architecture/i06-backend-profile/`, MET-ENFORCE-006, `fe50b57c0e6b6d5e5732b1b346bbad8727959a6f`) and the admission
+semantics v3 (`architecture/admission-semantics-v3/`, MET-ENFORCE-015, `4196dae972f2a2636a5176e2cef440c01bf03a98`). All
+ten are registered before use in edge registry record v4, `architecture/artifact-edges/operator-harness-engineering-v4.json`
+(W03-PLAN-AMEND-2, MET-ENFORCE-032, merged as `c69e55f8`; read at harness-onion `75669de`, the same bytes, sha256
+`e30772ff8826650c46d1a8d384625929975e47f2de5cc9030680b5fdb5e7fc86`): its rows 34-43, status REGISTERED_BEFORE_USE, relation
+BYTE_IDENTICAL, consumer packet "HE-004" (the edge rule binds bytes, modes and versions, not the packet label; HE-004B1
+is HE-004's second part under owner decision Q-HE4-2 (a)), consumer paths exactly these. Each sha256, length and mode was
+checked against those rows before use. `crates/observer/src/contracts.rs` embeds the closure, the writer inventory and
+the bootstrap RBAC for the snapshot check; the vectors, criteria, READMEs and the manifest are read by the tests only.
+
+- `contracts/i06-v2/vectors.json` from `architecture/i06-backend-profile-v2/vectors.json`, sha256 `1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e`, 213022 bytes
+- `contracts/i06-v2/criteria.json` from `architecture/i06-backend-profile-v2/criteria.json`, sha256 `026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda`, 10154 bytes
+- `contracts/i06-v2/README.md` from `architecture/i06-backend-profile-v2/README.md`, sha256 `553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb`, 15911 bytes
+- `contracts/i06-v1/identity-closure.json` from `architecture/i06-backend-profile/identity-closure.json`, sha256 `0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb`, 46703 bytes
+- `contracts/i06-v1/writer-inventory.json` from `architecture/i06-backend-profile/writer-inventory.json`, sha256 `8e6b3b7565cfc93a61162b84d740cffb2871eb66ab85e8c4e80ac813f1af3077`, 40914 bytes
+- `contracts/i06-v1/upstream-bootstrap-rbac-v1.37.1.json` from `architecture/i06-backend-profile/upstream-bootstrap-rbac-v1.37.1.json`, sha256 `7529c2a713af2fb90163175924c264d95f4242d7e0c26b1452c77febb13ed50e`, 88532 bytes
+- `contracts/i06-v1/README.md` from `architecture/i06-backend-profile/README.md`, sha256 `ccf952d40b4f6229c0cdea79f976253cd4abb19438c1eebc5794e748a708e4b7`, 19633 bytes
+- `contracts/admission-v3/vectors.json` from `architecture/admission-semantics-v3/vectors.json`, sha256 `a3e2dc9818742ae2188e0e83cf91bb833be836115975b3fb23d5f280f6928cc1`, 249833 bytes
+- `contracts/admission-v3/README.md` from `architecture/admission-semantics-v3/README.md`, sha256 `c3106482b4ff79649cbef7c65797c6fcd6b64f8419e871ae7d89eecad3ff98ab`, 25310 bytes
+- `contracts/admission-v3/admission-manifests/planeon-a2.json` from `architecture/admission-semantics-v3/admission-manifests/planeon-a2.json`, sha256 `1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741`, 8126 bytes
+
+The models are pinned by digest, not copied, and read as specification only where the READMEs are silent (each such
+point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s HE-004B1 section), at harness-onion `75669de` (the same bytes
+as at `3cba1171`, the design's read pin):
+
+- `scripts/i06_backend_profile.py`, sha256 `bea3c953573478be5b03ab81b4ebd859da62d1eaa2a1be8f361b9dd39a98555e`, 44806 bytes
+- `scripts/i06_backend_profile_v2.py`, sha256 `58ceb7a6817aab512a56f9f2a614868ce27660d174be353c5629cc8de335e426`, 6349 bytes
+- `scripts/admission_semantics_v3.py`, sha256 `3db8f51ab55f49dc33cf6f028306bfb6d7aa1c5d7d96f264cfe709dae925ad22`, 38172 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

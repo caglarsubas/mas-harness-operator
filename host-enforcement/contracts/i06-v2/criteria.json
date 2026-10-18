@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "planeon.internal.i06-selection-criteria/v2",
+  "kubernetesBaseline": "v1.37.1",
+  "criteria": [
+    {
+      "id": "SC00",
+      "requirement": "Closed evidence record that names one W02a record by schema version (planeon.internal.native-qualification/v3) and qualification digest (\"sha256:\" and the lowercase hex SHA-256 of W02a's canonical JSON form of the record, spelled as W02a captures spell qualificationDigest); W02a v3's check_record accepts that record; the evidence's implementationId and testOnly equal the record's backendProfile; a test-only backend qualifies only in an explicit fixture call, and the unit-distribution fixture identity never qualifies a production backend. The evidence is per record: combining it with check_qualification's acceptance of the same record is the caller's composition (W03)",
+      "source": "W02a P7(a); W02g review N1; W02g-F review R1-5, R1-6",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC01",
+      "requirement": "Datastore on AF_UNIX only, one member, no peers",
+      "source": "Spec P1",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC02",
+      "requirement": "Apiserver binds a loopback address",
+      "source": "Spec P2",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC03",
+      "requirement": "No anonymous, static-token, bootstrap-token, front-proxy request-header or external (JWT, webhook) authentication; service-account tokens signed in-process (no --service-account-signing-endpoint), the signing key readable by the apiserver only, the only verification key its public half, one fixed issuer and token lookup on; no cluster-admin credential, trusted CA private key or bootstrap token on the host",
+      "source": "Spec P3, P4; W01 F1; kube-apiserver v1.37.1 options (pkg/controlplane/apiserver/options/options.go, pkg/kubeapiserver/options/authentication.go)",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC04",
+      "requirement": "Authorization exactly Node then RBAC from a sealed structured configuration file (the binary default without flags is AlwaysAllow; the file is reloaded on change)",
+      "source": "Spec P3, P5",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC05",
+      "requirement": "Required admission plugins enabled (NodeRestriction is off by default upstream); webhook admission, MutatingAdmissionPolicy, NamespaceAutoProvision, ImagePolicyWebhook and AlwaysAdmit disabled; nothing outside the allowed set",
+      "source": "Spec P6",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC06",
+      "requirement": "Per-controller credentials (upstream default off); only inventory controllers; every required-disabled controller off; no signing key in the controller-manager",
+      "source": "Spec 2.3, 2.5, P4",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC07",
+      "requirement": "Kubelet: no certificate rotation or TLS bootstrap, no static pod source (staticPodPath, staticPodURL and its header), no anonymous or read-only access, Webhook authorization",
+      "source": "Spec 2.3, P4, P5, P9; KubeletConfiguration v1beta1 (staging/src/k8s.io/kubelet/config/v1beta1/types.go)",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC08",
+      "requirement": "Exactly the W02a v3 record's backend components (six required, service proxy and network-policy agent optional), each a separate process in its W02a confined type, from a canonical executable path; W02a v3's backend rules hold because SC00 applies check_record: own domains and API identities; API identities within the W02g closure entry for each component, except that KUBELET may also hold at most one system:node:<node name> identity and APISERVER may hold none; owned, listed file paths; cgroups outside the planeon slice that are neither shared nor nested. Distinct executables with distinct content (one entry type per confined domain) is an I06 rule: W02a v3 lets backend components share code within its single backend owner class",
+      "source": "W02a backend rules; W02g review N1, N3; W02g-F review R1-1, R1-3",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC09",
+      "requirement": "Only local APIServices and no CustomResourceDefinitions",
+      "source": "Spec P7",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC10",
+      "requirement": "No automounted tokens; the only component API clients are the closure's service-proxy and network-policy-agent identities, for the components present",
+      "source": "Spec P8",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC11",
+      "requirement": "Container runtime socket reachable only from the kubelet's confined type",
+      "source": "Spec P9",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC12",
+      "requirement": "Sealed configuration is exactly the profile's file set: control-plane flags and configs, component definitions, kubeconfigs, PKI trust bundles, container runtime and CNI configuration, plus the authentication configuration, admission manifests, audit policy and optional component configuration when used; auto-apply manifest directories empty and sealed",
+      "source": "Spec P5, 2.6",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC13",
+      "requirement": "Pinned, offline, license-allowed artifacts with no runtime downloads or auto-update",
+      "source": "AGENTS.md",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC14",
+      "requirement": "Kubernetes release exactly v1.37.1, the release this inventory and closure were derived from",
+      "source": "W02g baseline",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "SC15",
+      "requirement": "Feature gates at their v1.37 defaults in every Kubernetes component; no emulated or minimum-compatibility version and no runtime-config",
+      "source": "W02g baseline; component-base compatibility registry",
+      "checkedBy": "check_evidence"
+    },
+    {
+      "id": "CL",
+      "requirement": "Closure derivation: upstream identities hold exactly their bootstrap-derived grants; the planeon identities are a closed set with fixed holders and grants (writer grants fixed by the model, the kubelet client's from system:kubelet-api-admin, none for the others); full authority only for system:masters; closure service accounts only for allowed controllers in kube-system",
+      "source": "Spec 2.3; W01 F1",
+      "checkedBy": "check_closure"
+    },
+    {
+      "id": "IC01",
+      "requirement": "Every subject holding a policy write, status write, identity-acquisition or escalation verb, or a workload grant at cluster scope or in kube-system is a closure identity",
+      "source": "Spec 2.3; W01 F1",
+      "checkedBy": "check_rbac_snapshot"
+    },
+    {
+      "id": "IC02",
+      "requirement": "Closure identities with grants exist; an absent controller account may carry only grants of its own bootstrap role (and of its closure entry)",
+      "source": "Spec 2.3",
+      "checkedBy": "check_rbac_snapshot"
+    },
+    {
+      "id": "IC03",
+      "requirement": "No grant beyond the subject's closure entry; the loopback user system:apiserver holds no resource rule of any kind. The snapshot shape carries resource rules only, so an observer that finds a non-resource-URL rule bound to system:apiserver refuses to produce the snapshot (observer obligation, W03)",
+      "source": "Spec 2.3; W01 F1; W02g review N2; W02g-F review R1-7",
+      "checkedBy": "check_rbac_snapshot"
+    },
+    {
+      "id": "IC04",
+      "requirement": "The policy writer's escalate and bind only on the named planeon Roles",
+      "source": "Spec 2.4",
+      "checkedBy": "check_rbac_snapshot"
+    },
+    {
+      "id": "IC05",
+      "requirement": "Required closure identities present",
+      "source": "Spec 2.3",
+      "checkedBy": "check_rbac_snapshot"
+    },
+    {
+      "id": "OR01",
+      "requirement": "An apiserver restart during ACTIVE invalidates the generation: bootstrap-roles and the system-namespace and authentication-info controllers write policy kinds at start",
+      "source": "Spec 5; inventory",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR02",
+      "requirement": "Policy-kind objects carry no ownerReferences, so the wildcard garbage collector cannot delete them; observer-checked",
+      "source": "Inventory: garbage-collector-controller",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR03",
+      "requirement": "No ClusterRole with an aggregationRule is bound in the qualification namespace (the aggregation controller is disabled, so such roles keep stale rules)",
+      "source": "Spec 2.5",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR04",
+      "requirement": "API Priority and Fairness objects affect availability only; system:masters is exempt; only the in-process producer writes them",
+      "source": "Inventory",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR05",
+      "requirement": "No Secret of type kubernetes.io/service-account-token and no bootstrap-token Secret exists; Secret reads then yield no credential; observer-checked",
+      "source": "Spec P4",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR06",
+      "requirement": "No ValidatingWebhookConfiguration, MutatingWebhookConfiguration or MutatingAdmissionPolicy(Binding) object exists, although their admission plugins are disabled; observer-checked",
+      "source": "Spec P6",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR07",
+      "requirement": "The observer starts INSPECTING only after /readyz/poststarthook/rbac/bootstrap-roles succeeds",
+      "source": "Inventory: rbac/bootstrap-roles",
+      "checkedBy": "OPERATIONAL"
+    },
+    {
+      "id": "OR08",
+      "requirement": "Recommendation for W02f: hold the A2 admission policies in sealed file-based admission manifests (ManifestBasedAdmissionControlConfig, beta and default on in v1.37), because API-registered policies cannot guard admission objects",
+      "source": "Upstream facts",
+      "checkedBy": "OPERATIONAL"
+    }
+  ]
+}

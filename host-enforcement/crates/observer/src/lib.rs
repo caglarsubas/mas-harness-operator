@@ -8,7 +8,13 @@
 //! listed in `crates/effect-gate/MODEL_DEFINED.md` (the HE-004A section).
 #![forbid(unsafe_code)]
 
+pub mod admission;
+pub mod contracts;
+pub mod inputs;
+pub mod operational;
+pub mod rbac;
 pub mod seal;
+pub mod snapshot;
 pub mod status;
 
 #[cfg(target_os = "linux")]
