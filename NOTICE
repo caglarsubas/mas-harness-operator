@@ -5,8 +5,10 @@ This product includes software developed by the Kubernetes project and other
 open-source projects identified by go.mod and go.sum.
 
 The effect gate's TLS crate (host-enforcement/crates/gate-tls), and through it
-the effect gate binary planeon-gate (host-enforcement/crates/gate), link vendored
-Rust crates from crates.io, kept under host-enforcement/vendor/<name>-<version>/:
+the effect gate binary planeon-gate (host-enforcement/crates/gate), and the policy
+observer binary planeon-observer (host-enforcement/crates/observer, since HE-004C)
+link vendored Rust crates from crates.io, kept under
+host-enforcement/vendor/<name>-<version>/:
 rustls 0.23.46, ring 0.17.14, rustls-webpki 0.103.15, rustls-pki-types 1.15.1,
 getrandom 0.2.17, libc 0.2.190, once_cell 1.21.4, subtle 2.6.1, untrusted 0.9.0,
 zeroize 1.9.1 and cfg-if 1.0.5, built with cc 1.8.0, find-msvc-tools 0.1.14 and

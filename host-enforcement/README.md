@@ -12,7 +12,8 @@ gate-tls).
 | --- | --- |
 | `Cargo.toml`, `Cargo.lock` | Workspace (edition 2024, Apache-2.0); the lock lists the workspace crates, the 11 LINKED vendored crates as path packages (HE-003D's `[patch.crates-io]`) and the other vendor rows as registry packages with their checksums |
 | `crates/host-common/` | Closed configuration parser; thread counts come from configuration, never from the host |
-| `crates/{containment,broker,observer,writer}/` | Binaries `planeon-*`; argv only, no file access |
+| `crates/{containment,broker,writer}/` | Binaries `planeon-*`; argv only, no file access |
+| `crates/observer/` | `planeon-observer` (HE-004A, B1, C): the OBSERVER seal, the I06 RBAC snapshot, OR and ADM-4 logic, and (HE-004C) the apiserver read client: after the seal it reads its signed configuration and credentials under `/etc/planeon`, connects over TLS 1.3 to the one loopback apiserver and runs the observation epoch; links `gate-sys`, `i05-protocol` and the vendored rustls/ring through its own registry lines (gate-tls is a test-only edge) |
 | `crates/gate/` | `planeon-gate` (HE-003D): the effect gate binary; seal stage 1, the signed configuration, stage 2, the composition and the loop; path dependencies on `effect-gate` and `gate-tls` only |
 | `crates/i05-protocol/` | Library (HE-002): the I05 v3 wire codec, canonical encoder, SHA-256 (NIST CAVP tested), schema subset, outcome mapping and request rendering |
 | `crates/effect-gate/` | Library (HE-002): the I05 v3 gate state machine with an in-memory journal and failure marker; `MODEL_DEFINED.md` lists what the pinned model, not the READMEs, defines |
