@@ -1,0 +1,1825 @@
+{
+ "schemaVersion": "planeon.internal.i06-identity-closure/v1",
+ "kubernetesVersion": "v1.37.1",
+ "scopes": {
+  "CLUSTER": "ClusterRoleBinding: every namespace and every cluster-scoped object",
+  "QUALIFICATION_NAMESPACE": "RoleBinding in the profile's dedicated qualification namespace",
+  "kube-system": "RoleBinding in kube-system (the only protected namespace)"
+ },
+ "identities": [
+  {
+   "kind": "Group",
+   "name": "system:masters",
+   "holder": "APISERVER",
+   "derivation": "F1_LOOPBACK",
+   "mustBePresent": true,
+   "allowedGrants": [
+    {
+     "category": "ALL",
+     "resource": "*",
+     "verb": "*",
+     "scope": "*"
+    }
+   ],
+   "resourceNames": null,
+   "note": "Bypasses authorization and RBAC escalation checks. Its only member is the apiserver's in-process loopback client (W01 review F1); no credential for the group exists on the host (SC03)."
+  },
+  {
+   "kind": "User",
+   "name": "system:apiserver",
+   "holder": "APISERVER",
+   "derivation": "F1_LOOPBACK",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "In-process loopback identity (per-process random bearer token, groups system:authenticated and system:masters) used by the post-start hooks that write through the API (W01 review F1). Its authority comes only from system:masters, so any RBAC grant bound to the name is refused (IC03)."
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-controller-manager",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": true,
+   "allowedGrants": [
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/serviceaccounts/token",
+     "verb": "create",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "Mints TokenRequest tokens for every service account (serviceaccounts/token create at cluster scope), so it is TCB-equivalent to all of them."
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-scheduler",
+   "holder": "SCHEDULER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "No policy-relevant grant in its bootstrap roles."
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-proxy",
+   "holder": "SERVICE_PROXY",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "Bootstrap role system:node-proxier holds no policy-relevant grant."
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:cronjob-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/cronjobs",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "cronjob-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:daemon-set-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "daemonset-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:deployment-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/deployments",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "deployment-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:generic-garbage-collector",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicies",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicies",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicybindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicybindings",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicybindings",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingwebhookconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingwebhookconfigurations",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingwebhookconfigurations",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingwebhookconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingwebhookconfigurations",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingwebhookconfigurations",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/approval",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/approval",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/approval",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterrolebindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterrolebindings",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterrolebindings",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterroles",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterroles",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterroles",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/pods/attach",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/pods/exec",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods/ephemeralcontainers",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods/ephemeralcontainers",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/replicationcontrollers",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/replicationcontrollers",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/daemonsets",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/daemonsets",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/deployments",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/deployments",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/statefulsets",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/statefulsets",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/cronjobs",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/cronjobs",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "garbage-collector-controller (OWNERREF_RULE)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:job-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "batch/jobs",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "job-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:namespace-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces/finalize",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicies",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicybindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingadmissionpolicybindings",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingwebhookconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/mutatingwebhookconfigurations",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingwebhookconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingwebhookconfigurations",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/approval",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/approval",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "certificates.k8s.io/certificatesigningrequests/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterrolebindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterrolebindings",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterroles",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/clusterroles",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/checkpoint",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/pods/attach",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/pods/exec",
+     "verb": "get",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/namespaces/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiextensions.k8s.io/customresourcedefinitions/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "apiregistration.k8s.io/apiservices/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/flowschemas/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations/status",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "flowcontrol.apiserver.k8s.io/prioritylevelconfigurations/status",
+     "verb": "deletecollection",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "namespace-controller (I07_TRIGGERED_ONLY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:persistent-volume-binder",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "persistentvolume-binder-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:replicaset-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "apps/replicasets",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "replicaset-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:replication-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/replicationcontrollers",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "replicationcontroller-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:resourcequota-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "STATUS_WRITE",
+     "resource": "/resourcequotas/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "resourcequota-controller (STATUS_ONLY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:service-account-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "create",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "serviceaccount-controller (I07_TRIGGERED_ONLY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:statefulset-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "WORKLOAD",
+     "resource": "/pods",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "statefulset-controller (NOT_POLICY)"
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:validatingadmissionpolicy-status-controller",
+   "holder": "CONTROLLER_MANAGER",
+   "derivation": "BOOTSTRAP_SUBJECT",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "STATUS_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies/status",
+     "verb": "update",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "validatingadmissionpolicy-status-controller (STATUS_ONLY)"
+  },
+  {
+   "kind": "User",
+   "name": "planeon:policy-writer",
+   "holder": "EFFECT_GATE",
+   "derivation": "PROFILE",
+   "mustBePresent": true,
+   "allowedGrants": [
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/limitranges",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/namespaces",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/resourcequotas",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "/serviceaccounts",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicies",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "create",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "delete",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "patch",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "admissionregistration.k8s.io/validatingadmissionpolicybindings",
+     "verb": "update",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "networking.k8s.io/networkpolicies",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/rolebindings",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "create",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "delete",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "patch",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "POLICY_WRITE",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "update",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "bind",
+     "scope": "QUALIFICATION_NAMESPACE"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "rbac.authorization.k8s.io/roles",
+     "verb": "escalate",
+     "scope": "QUALIFICATION_NAMESPACE"
+    }
+   ],
+   "resourceNames": [
+    "planeon-gate-effect",
+    "planeon-policy-observer"
+   ],
+   "note": "The I07 policy writer, used by the gate only while the generation is CLOSED for maintenance. Its grants are fixed by the model; escalate and bind only on the two named planeon Roles (IC04)."
+  },
+  {
+   "kind": "User",
+   "name": "planeon:effect-gate",
+   "holder": "EFFECT_GATE",
+   "derivation": "PROFILE",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "Creates, reads and deletes the signed Pod, ConfigMap and Service kinds in the qualification namespace; those grants are not policy-relevant because the namespace holds no closure service account."
+  },
+  {
+   "kind": "User",
+   "name": "planeon:policy-observer",
+   "holder": "OBSERVER",
+   "derivation": "PROFILE",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "Reads the policy kinds by name; a get on every resource would include nodes/proxy and pods/exec."
+  },
+  {
+   "kind": "User",
+   "name": "planeon:apiserver-kubelet-client",
+   "holder": "APISERVER",
+   "derivation": "PROFILE",
+   "mustBePresent": false,
+   "allowedGrants": [
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes",
+     "verb": "proxy",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/log",
+     "verb": "*",
+     "scope": "CLUSTER"
+    },
+    {
+     "category": "SPECIAL",
+     "resource": "/nodes/proxy",
+     "verb": "*",
+     "scope": "CLUSTER"
+    }
+   ],
+   "resourceNames": null,
+   "note": "The apiserver's client certificate towards the kubelet API; exactly the rules of the upstream ClusterRole system:kubelet-api-admin."
+  },
+  {
+   "kind": "User",
+   "name": "planeon:netpol-agent",
+   "holder": "NETWORK_POLICY_AGENT",
+   "derivation": "PROFILE",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "The network-policy agent's client certificate (a host component, P8); reads NetworkPolicies, Pods and Namespaces only."
+  },
+  {
+   "kind": "Group",
+   "name": "system:nodes",
+   "holder": "KUBELET",
+   "derivation": "NODE_AUTHORIZER",
+   "mustBePresent": false,
+   "allowedGrants": [],
+   "resourceNames": null,
+   "note": "Authorized by the Node authorizer, not RBAC: serviceaccounts/token create only for service accounts of pods bound to the node (graph-limited); CSR create is not graph-limited but inert because CSR signing and approval are disabled. NodeRestriction is required (SC05)."
+  }
+ ]
+}

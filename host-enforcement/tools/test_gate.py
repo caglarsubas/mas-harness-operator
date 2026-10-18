@@ -1072,10 +1072,25 @@ class ContractTests(unittest.TestCase):
     # HE-003A2 (DESIGN section 2, Q-A2-1 (a)): the two seccomp-v4 programs join them (17); the v3 ones stay pinned.
     # HE-004A (DESIGN section 2, Q-HE4A-4 (a)): the two OBSERVER programs join them (19).
     # HE-003A3 (DESIGN section 2): the I05 v4 README and vectors join them (21).
+    # HE-004B1 (DESIGN-B section 2): edge record v4's ten HE-004 rows join them (31).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 21)
+            self.assertEqual(len(gate.CONTRACTS), 31)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith(("contracts/i06-", "contracts/admission-v3/"))}, {
+                "contracts/i06-v2/vectors.json": "1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e",
+                "contracts/i06-v2/criteria.json": "026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda",
+                "contracts/i06-v2/README.md": "553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb",
+                "contracts/i06-v1/identity-closure.json": "0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb",
+                "contracts/i06-v1/writer-inventory.json": "8e6b3b7565cfc93a61162b84d740cffb2871eb66ab85e8c4e80ac813f1af3077",
+                "contracts/i06-v1/upstream-bootstrap-rbac-v1.37.1.json":
+                    "7529c2a713af2fb90163175924c264d95f4242d7e0c26b1452c77febb13ed50e",
+                "contracts/i06-v1/README.md": "ccf952d40b4f6229c0cdea79f976253cd4abb19438c1eebc5794e748a708e4b7",
+                "contracts/admission-v3/vectors.json": "a3e2dc9818742ae2188e0e83cf91bb833be836115975b3fb23d5f280f6928cc1",
+                "contracts/admission-v3/README.md": "c3106482b4ff79649cbef7c65797c6fcd6b64f8419e871ae7d89eecad3ff98ab",
+                "contracts/admission-v3/admission-manifests/planeon-a2.json":
+                    "1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741"})
             self.assertEqual(gate.CONTRACTS["contracts/i05-v4/README.md"],
                              "b0af1f8784c7e9bcdd3793a1002d1000e222a13e5a7613b50b04ce5a116ed04d")
             self.assertEqual(gate.CONTRACTS["contracts/i05-v4/vectors.json"],
@@ -1378,12 +1393,17 @@ class WorkspaceShapeTests(Tree):
 
     def test_planeon_observer_links_exactly_its_crate_and_gate_sys(self):
         # HE-004A DESIGN-A section 6 (D2-4): OBSERVER_LINKED_CRATES is planeon-observer's closure (a dev-dependency is
-        # not in check_workspace's result).
+        # not in check_workspace's result). HE-004B1 DESIGN-B section 3 (Q-HE4B-6 (a)): i05-protocol joins it, so the
+        # HE-004A shape (gate-sys alone) now refuses too.
         self.write("Cargo.toml", WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]', '"crates/gate-tls", "crates/observer"]'))
         self.write("crates/observer/Cargo.toml", '[package]\nname = "planeon-observer"\nedition.workspace = true\n')
-        good = {**WORKSPACE, "planeon-observer": {"gate-sys"}}
+        self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol"))
+        good = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol"}}
         self.assertEqual(gate.check_workspace_shape(self.base, good), 6)
-        for dependencies in (set(), {"gate-sys", "i05-protocol"}, {"effect-gate"}, {"gate-sys", "planeon-broker"}):
+        self.assertEqual(gate.check_workspace_shape(self.base, {**good, "planeon-observer": {"i05-protocol"},
+                                                                "i05-protocol": {"gate-sys"}}), 6)
+        for dependencies in (set(), {"gate-sys"}, {"i05-protocol"}, {"gate-sys", "i05-protocol", "effect-gate"},
+                             {"effect-gate"}, {"gate-sys", "i05-protocol", "planeon-broker"}):
             with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
                 gate.check_workspace_shape(self.base, {**good, "planeon-observer": dependencies, "planeon-broker": set()})
         without = {name: dependencies for name, dependencies in good.items() if name != "planeon-observer"}
@@ -2404,6 +2424,75 @@ class ObserverWiringTests(Tree):
             self.refused(gate.check_observer_wiring, gate.GATE_MAIN, text, message)
 
 
+class ObserverWiringRebindTests(Tree):
+    """HE-003A3 PR review round 1, R1-2 (carried to HE-004B1): serve binds gate in no other let pattern, assigns it nowhere,
+    and after the observer's attach names it only in gate.apiserver_address() and Substrate::new(gate, ..)."""
+
+    TREE = {gate.GATE_MAIN: WIRING_MAIN}
+    OBSERVER = "    let gate = gate.with_observer(Box::new(KernelObserver::new(LinuxKernelReads::new(kernel))));\n"
+
+    def after(self, extra):
+        return WIRING_MAIN.replace(self.OBSERVER, self.OBSERVER + extra)
+
+    def test_later_binding_forms_refuse(self):
+        before = "    let gate = match PolicyGate"
+        for text, message in (
+                (self.after("    let (gate, _x) = (gate, 1);\n"), "binds gate in the pattern `let \\(gate, _x\\)`"),
+                (self.after("    let mut gate = gate;\n"), "binds gate in the pattern `let mut gate`"),
+                (self.after("    let Some(gate) = maybe(gate) else { return 1 };\n"), "binds gate in the pattern"),
+                (self.after("    let Wrap { gate, .. } = wrap(gate);\n"), "binds gate in the pattern"),
+                (self.after("    let ref gate = gate;\n"), "binds gate in the pattern"),
+                (self.after("    gate = other_gate();\n"), "assigns to gate"),
+                (self.after("    let gate = gate;\n"), "rebinds gate"),
+                (self.after("    let gate: PolicyGate = gate;\n"), "rebinds gate"),
+                (self.after("    let wrapped = Wrapper { gate };\n"), "names gate after the observer's attach"),
+                (self.after("    drop(gate);\n"), "names gate after the observer's attach"),
+                (self.after("    let _ = gate.into_policy();\n"), "names gate after the observer's attach"),
+                (self.after("    let f = move || gate;\n"), "names gate after the observer's attach"),
+                (WIRING_MAIN.replace(before, "    let (gate, _r) = (x, 1);\n" + before), "binds gate in the pattern"),
+                (WIRING_MAIN.replace(before, "    gate = x;\n" + before), "assigns to gate")):
+            self.refused(gate.check_observer_wiring, gate.GATE_MAIN, text, message)
+
+    def test_the_allowed_uses_pass(self):
+        # gate.apiserver_address() between the attach and Substrate::new(gate, ..); before the attach a match arm, a
+        # comparison and a name holding the word are neither bindings nor assignments.
+        text = self.after("    let upstream = UpstreamClient::new(connector, gate . apiserver_address ( ), effect);\n")
+        text = text.replace("Ok(gate) => gate", "Ok(gate) if gate == gate => gate").replace(
+            "    let stores", "    let gate_count = 1;\n    let stores")
+        self.write(gate.GATE_MAIN, text)
+        self.assertEqual(gate.check_observer_wiring(self.base), 2)
+
+
+class ObservationPathTests(Tree):
+    """HE-003A3 PR review round 1, R1-3 (carried to HE-004B1): the observers are pinned by path: observation.rs defines no
+    module outside its strict test module, Unobserved and KernelObserver exactly once each at its top level, and its
+    pinned impls at its top level."""
+
+    TREE = OBSERVATION_TREE
+
+    def test_a_nested_or_second_observer_type_refuses(self):
+        observation = self.TREE[gate.OBSERVATION_RS]
+        unobserved = "pub struct Unobserved;\nimpl WorkerObserver for Unobserved { fn observe() {} }\n"
+        for text, message in (
+                # The review's probe: the pinned impl moved into a nested module with its own Unobserved, re-exported.
+                (observation.replace(unobserved, "pub struct Unobserved;\nmod inner {\n    pub struct Unobserved;\n"
+                                     "    impl WorkerObserver for Unobserved { fn observe() {} }\n}\npub use inner::Unobserved;\n"),
+                 "defines a module outside its strict test module"),
+                (observation + "pub mod shadow;\n", "defines a module outside its strict test module"),
+                (observation + "fn f() { struct KernelObserver<K> { k: K } }\n", "KernelObserver exactly once at its top level"),
+                (observation + "pub type Unobserved = u8;\n", "Unobserved exactly once at its top level"),
+                (observation.replace("pub struct Unobserved;\n", "fn f() { pub struct Unobserved; }\n"),
+                 "Unobserved exactly once at its top level"),
+                (observation.replace(unobserved, "pub struct Unobserved;\nfn hidden() {\n"
+                                     "    impl WorkerObserver for Unobserved { fn observe() {} }\n}\n"),
+                 "holds `impl WorkerObserver for Unobserved` below its top level"),
+                (observation.replace("pub struct KernelObserver<K> { reads: K }\n", ""), "KernelObserver exactly once")):
+            self.refused(gate.check_observation, gate.OBSERVATION_RS, text, message)
+        # A strict in-source test module may hold its own helpers, even one named like an observer.
+        self.write(gate.OBSERVATION_RS, observation + "#[cfg(test)]\nmod tests {\n    struct Unobserved;\n    fn t() {}\n}\n")
+        self.assertEqual(gate.check_observation(self.base), 14)
+
+
 class DebugKernelRootTests(Tree):
     """HE-003A3 (D2-7): KernelRoot joins the Debug hazards, so no struct holding it derives Debug."""
 
@@ -2832,12 +2921,13 @@ class ObserverLinkedCrateTests(Tree):
 
     def test_the_tree_passes(self):
         self.assertEqual(gate.SCANNED_CRATES, gate.LINKED_CRATES + ("crates/observer",))
-        self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys"))
+        self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol"))
         # 13 sources of the gate's linked crates and 4 of the observer's.
         for check in (gate.check_linked_sources, gate.check_foreign_items, gate.check_debug_derives, gate.check_socket_modules,
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
             self.assertEqual(check(self.base), 17, check.__name__)
-        self.assertEqual(gate.check_observer_post_seal(self.base), 4)
+        # HE-004B1: 4 of the observer's and i05-protocol's 2.
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
         self.assertEqual(gate.check_post_seal_sources(self.base), 13, "the gate's post-seal crates do not include the observer")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_LIB], "#![forbid(unsafe_code)]")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_MAIN], "#![forbid(unsafe_code)]")
@@ -2903,16 +2993,42 @@ class ObserverLinkedCrateTests(Tree):
         self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                    + "fn f(d: &Dir) { let _ = d.file(n, FileMode::Existing); let _ = d.sync(); }\n")
         self.write(OBSERVER_SEAL, seal + "fn f(blocked: bool, clocks: u8) -> bool { let synced = blocked; synced }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 4)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
         # R1-1: a module path segment, comments and literals pass; drop() is not the Drop trait.
         self.write(OBSERVER_SEAL, seal + "use std::sync::atomic::AtomicU8;\n// Dir::sync, File::lock and impl Drop are refused\n"
                    "fn g(x: u8) -> &'static str { drop(x); \"file lock sync Drop\" }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 4)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
         for rel in list(OBSERVER_TREE):
             if rel.startswith("crates/observer/"):
                 (self.base / rel).unlink()
         with self.assertRaisesRegex(gate.GateError, "crates/observer has no sources .observer post-seal check"):
             gate.check_observer_post_seal(self.base)
+
+    def test_i05_protocol_joins_the_observer_post_seal_list(self):
+        # HE-004B1 DESIGN-B section 6 (owner decision Q-HE4B-6 (a)): i05-protocol's sources join the rule, with json.rs's
+        # one memory-only `impl Drop for Value` excepted once; gate-sys stays outside.
+        self.assertEqual(gate.OBSERVER_POST_SEAL_CRATES, ("crates/observer", "crates/i05-protocol"))
+        json_rs = self.TREE[gate.I05_JSON]
+        drop = "impl Drop for Value {\n    fn drop(&mut self) { let mut pending = Vec::new(); pending.clear(); }\n}\n"
+        self.write(gate.I05_JSON, json_rs + drop)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
+        self.write(gate.I05_JSON, json_rs + "impl  Drop\n    for Value { fn drop(&mut self) {} }\n")
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
+        message = "names .* .observer post-seal check"
+        for rel, text in ((gate.I05_JSON, json_rs + drop + drop),
+                          (gate.I05_JSON, json_rs + "impl Drop for Doc { fn drop(&mut self) {} }\n"),
+                          (gate.I05_JSON, json_rs + "impl core::ops::Drop for Value { fn drop(&mut self) {} }\n"),
+                          ("crates/i05-protocol/src/lib.rs", LINKED_TREE["crates/i05-protocol/src/lib.rs"] + drop),
+                          ("crates/i05-protocol/src/frame.rs", drop),
+                          (gate.I05_JSON, json_rs + "fn f(m: &Mutex<u8>) { let _ = m.lock(); }\n"),
+                          (gate.I05_JSON, json_rs + "fn f(d: &Dir) { let _ = d.sync(); }\n"),
+                          (gate.I05_JSON, json_rs + "fn f(h: &File) { let _ = h.sync_all(); }\n"),
+                          ("crates/i05-protocol/src/frame.rs", "fn f(file: u8) -> u8 { file }\n"),
+                          (gate.I05_JSON, json_rs + "fn f(s: &S) { let _ = s.set_nonblocking(true); }\n")):
+            self.refused(gate.check_observer_post_seal, rel, text, message)
+        # Comments and literals pass; gate-sys's own definitions stay outside (OBSERVER_TREE's openat.rs).
+        self.write(gate.I05_JSON, json_rs + "// impl Drop for Doc, file, lock and sync in a comment\nconst T: &str = \"Drop file\";\n")
+        self.assertEqual(gate.check_observer_post_seal(self.base), 6)
 
 
 class ObserverBinaryTests(unittest.TestCase):
@@ -2942,6 +3058,159 @@ class ObserverBinaryTests(unittest.TestCase):
         self.assertEqual(gate.OBSERVER_PROGRAMS["aarch64-unknown-linux-musl"], "contracts/seccomp-v3/OBSERVER.aarch64.bpf")
         self.assertTrue(set(gate.OBSERVER_PROGRAMS.values()) <= set(gate.CONTRACTS))
         self.assertFalse(hasattr(gate, "OBSERVER_WRAPPER_JUSTIFICATIONS"), "no observer wrapper inventory in HE-004A")
+
+
+LOGIC_TREE = {
+    **OBSERVER_TREE,
+    "crates/observer/src/inputs.rs": "use std::collections::{BTreeMap, BTreeSet, VecDeque};\nuse std::fmt::{self, Write};\n"
+                                     "use i05_protocol::json::{JStr, Value};\n"
+                                     "pub fn n(items: &[Value]) -> usize { let wide = items.len() as u64; usize::try_from(wide).unwrap_or(0) }\n"
+                                     "// HashMap, std::fs::read, unwrap() and panic! in a comment\n"
+                                     "const NOTE: &str = \"std::process HashSet expect( super::x\";\n",
+    "crates/observer/src/rbac.rs": "use crate::inputs::{self, n};\nuse crate::contracts;\n"
+                                   "pub fn f() -> std::cmp::Ordering { std::cmp::Ordering::Less }\n"
+                                   "pub fn g(x: &[u8]) -> Option<&str> { std :: str :: from_utf8(x).ok() }\n",
+    "crates/observer/src/snapshot.rs": "use i05_protocol::sha256::{self, Sha256};\nuse crate::rbac;\n"
+                                       "pub fn h() -> Vec<u8> { Vec::<u8>::new() }\npub fn k(x: u8) -> u8 { <u8 as Clone>::clone(&x) }\n"
+                                       "pub fn m() -> self::rbac::X { x() }\n"
+                                       "#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() { assert_eq!(1, 1); let _ = Some(1).unwrap(); }\n}\n",
+    "crates/observer/src/operational.rs": "use i05_protocol::contracts::I07_V3_POLICY_KINDS;\n"
+                                          "pub fn kinds() -> &'static [u8] { I07_V3_POLICY_KINDS }\n"
+                                          "pub fn e(r: Result<u8, u8>) -> u8 { r.unwrap_or_else(|e| e) }\n",
+    "crates/observer/src/admission.rs": "use std::fmt;\npub fn z(v: Vec<u8>) -> impl std::iter::Iterator<Item = u8> { v.into_iter() }\n"
+                                        "pub fn expected(x: Result<u8, u8>) -> bool { x.expect_err(\"e\") == 1 }\n"
+                                        "pub fn w() -> ::std::string::String { String::new() }\n",
+}
+
+
+class ObserverLogicTests(Tree):
+    """HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2): the observer logic modules' path-root whitelist, its refused forms
+    and words, and the no-panic tripwire outside strict #[cfg(test)] blocks."""
+
+    TREE = LOGIC_TREE
+
+    def test_the_tree_passes(self):
+        self.assertEqual(gate.OBSERVER_LOGIC_NAMES, ("inputs", "rbac", "snapshot", "operational", "admission"))
+        self.assertEqual(gate.check_observer_logic(self.base), 5)
+
+    def test_each_module_is_required(self):
+        for rel in gate.OBSERVER_LOGIC:
+            (self.base / rel).unlink()
+            with self.assertRaisesRegex(gate.GateError, "is missing .observer logic rules"):
+                gate.check_observer_logic(self.base)
+            self.write(rel, self.TREE[rel])
+
+    def test_paths_outside_the_whitelist_refuse(self):
+        rel = "crates/observer/src/rbac.rs"
+        good = self.TREE[rel]
+        for text, message in (
+                # Use declarations: std modules outside the list, other crates' modules, the seal and status, super::,
+                # foreign self::, a glob, a rename.
+                ("use std::collections::HashMap;\n", "imports std::collections::HashMap"),
+                ("use std::collections;\n", "imports std::collections,"),
+                ("use std::sync::Arc;\n", "imports std::sync::Arc"),
+                ("use std::time::Instant;\n", "imports std::time::Instant"),
+                ("use std::io::Read;\n", "imports std::io::Read"),
+                ("use core::cell::Cell;\n", "imports core::cell::Cell"),
+                ("use alloc::rc::Rc;\n", "imports alloc::rc::Rc"),
+                ("use crate::seal::Sealed;\n", "imports crate::seal::Sealed"),
+                ("use crate::status;\n", "imports crate::status"),
+                ("use super::inputs::Inputs;\n", "imports super::inputs::Inputs"),
+                ("use self::helper::X;\n", "imports self::helper::X"),
+                ("use gate_sys::Dir;\n", "imports gate_sys::Dir"),
+                ("use ::gate_sys::Dir;\n", "imports gate_sys::Dir"),
+                ("use planeon_observer::seal;\n", "imports planeon_observer::seal"),
+                ("use i05_protocol::schema::Schema;\n", "imports i05_protocol::schema::Schema"),
+                ("use i05_protocol::Value;\n", "imports i05_protocol::Value"),
+                ("use i05_protocol::{json, regex};\n", "imports i05_protocol::regex"),
+                ("use crate::*;\n", "imports a glob"),
+                ("use i05_protocol::json::*;\n", "imports a glob"),
+                ("use crate::inputs as other;\n", "renames an import"),
+                ("use std::fmt as f;\n", "renames an import"),
+                ("fn f() { use std::time::Instant; }\n", "imports std::time::Instant"),
+                # Code paths, spaced or with a leading `::`, and the refused words.
+                ("fn f() { let _ = std::time::Instant::now(); }\n", "names std::time::Instant::now"),
+                ("fn f() { let _ = ::std::env::args(); }\n", "names ::std::env::args"),
+                ("fn f() { let _ = std :: thread :: current(); }\n", "names std::thread::current"),
+                ("fn f() { crate::seal::seal_stage1(); }\n", "names crate::seal::seal_stage1"),
+                ("fn f() { super::x(); }\n", "names super::x"),
+                ("fn f() { self::g(); }\n", "names self::g"),
+                ("fn f() { gate_sys::Dir::at(p); }\n", "names gate_sys::Dir::at"),
+                ("fn f() { let _ = i05_protocol::schema::Schema::from_json(b); }\n", "names i05_protocol::schema"),
+                ("fn f() { let _ = ::other::thing(); }\n", "names ::other::thing"),
+                ("fn f() { let _: std::collections::BTreeMap<u8, u8> = x(); let _ = HashSet::<u8>::new(); }\n", "HashMap, HashSet or RandomState"),
+                ("fn f() { let _ = RandomState::new(); }\n", "HashMap, HashSet or RandomState"),
+                ("const X: &[u8] = include_bytes!(\"../../../contracts/i06-v1/README.md\");\n", "include_bytes! or include_str!"),
+                ("const X: &str = include_str! (\"x\");\n", "include_bytes! or include_str!")):
+            self.refused(gate.check_observer_logic, rel, good + text, message)
+
+    def test_the_no_panic_tripwire(self):
+        rel = "crates/observer/src/operational.rs"
+        good = self.TREE[rel]
+        for text, name in (("fn f(x: Option<u8>) -> u8 { x.unwrap() }\n", "unwrap"), ("fn f(x: Option<u8>) -> u8 { x.expect (\"y\") }\n", "expect"),
+                           ("fn f() { panic!(\"x\") }\n", "panic!"), ("fn f() -> u8 { unreachable!() }\n", "unreachable!"),
+                           ("fn f() -> u8 { todo!() }\n", "todo!"), ("fn f() -> u8 { unimplemented!() }\n", "unimplemented!"),
+                           ("fn f(x: u8) { assert!(x > 0); }\n", "assert!"), ("fn f(x: u8) { assert_eq!(x, 0); }\n", "assert_eq!"),
+                           ("fn f(x: u8) { assert_ne!(x, 0); }\n", "assert_ne!"), ("fn f(x: u8) { debug_assert!(x > 0); }\n", "debug_assert!"),
+                           ("fn f(x: u8) { debug_assert_eq!(x, 0); }\n", "debug_assert!"), ("fn f(x: u8) { debug_assert_ne!(x, 0); }\n", "debug_assert!"),
+                           ("fn f(x: Option<u8>) -> u8 { Option::unwrap(x) }\n", "unwrap")):
+            self.refused(gate.check_observer_logic, rel, good + text, "names %s.* outside a strict #\\[cfg\\(test\\)\\] mod tests block" % re.escape(name))
+        # Only a strict in-source test module is exempt (the HE-003A3 form).
+        panicking = "    #[test]\n    fn t() { let _ = Some(1).unwrap(); }\n}\n"
+        for opening in ("#[cfg(test)] mod tests {\n", "#[cfg(any(test, unix))]\nmod tests {\n", "#[cfg(test)]\nmod other {\n",
+                        "#[allow(unused)]\n#[cfg(test)]\nmod tests {\n"):
+            self.refused(gate.check_observer_logic, rel, good + opening + panicking, "no-panic tripwire")
+        self.write(rel, good + "#[cfg(test)]\nmod tests {\n" + panicking)
+        self.assertEqual(gate.check_observer_logic(self.base), 5)
+
+
+INCLUDE_TREE = {
+    **OBSERVER_TREE,
+    gate.OBSERVER_CONTRACTS: "pub const A: &[u8] = include_bytes!(\"../../../contracts/i06-v1/identity-closure.json\");\n"
+                             "pub const B: &str = include_str! ( \"../../../contracts/i06-v2/README.md\" );\n"
+                             "// include_bytes!(\"../../../tools/gate.py\") in a comment\n",
+    OBSERVER_SEAL: "pub static X: &[u8; 1904] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf\");\n"
+                   "pub static A: &[u8; 1816] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.aarch64.bpf\");\n",
+}
+
+
+class ObserverIncludeTests(Tree):
+    """HE-004B1 DESIGN-B section 6 (D2-5): the observer's embedded contracts live in contracts.rs, each include one plain
+    literal naming a registered contract file; seal.rs embeds only its two OBSERVER programs."""
+
+    TREE = INCLUDE_TREE
+
+    def test_the_tree_passes(self):
+        self.assertEqual((gate.OBSERVER_CONTRACTS, gate.OBSERVER_SEAL_RS), ("crates/observer/src/contracts.rs", OBSERVER_SEAL))
+        self.assertEqual(gate.check_observer_includes(self.base), 4)
+
+    def test_other_forms_paths_and_files_refuse(self):
+        contracts = self.TREE[gate.OBSERVER_CONTRACTS]
+        for rel, text, message in (
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(\"../../../contracts/i06-v1/upstream-facts-v1.37.1.json\");\n",
+                 "not a registered contract file"),
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(\"../../../tools/gate.py\");\n",
+                 "not a registered contract file"),
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(\"../../../../host-enforcement/contracts/i06-v2/README.md\");\n",
+                 "not a registered contract file"),
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(concat!(\"../../../contracts/\", \"i06-v2/README.md\"));\n",
+                 "not one plain path literal"),
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(r\"../../../contracts/i06-v2/README.md\");\n",
+                 "not one plain path literal"),
+                (gate.OBSERVER_CONTRACTS, contracts + "pub const C: &[u8] = include_bytes!(\"..\\x2f..\\x2f..\\x2fcontracts/i06-v2/README.md\");\n",
+                 "not one plain path literal"),
+                ("crates/observer/src/status.rs", self.TREE["crates/observer/src/status.rs"]
+                 + "pub const C: &[u8] = include_bytes!(\"../../../contracts/i06-v2/README.md\");\n", "only crates/observer/src/contracts.rs embeds"),
+                ("crates/observer/src/rbac.rs", "pub const C: &str = include_str!(\"../../../contracts/i06-v2/README.md\");\n",
+                 "only crates/observer/src/contracts.rs embeds"),
+                (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/i06-v2/README.md\");\n",
+                 "not an OBSERVER program"),
+                (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf\");\n",
+                 "not an OBSERVER program")):
+            self.refused(gate.check_observer_includes, rel, text, message)
+        (self.base / gate.OBSERVER_CONTRACTS).unlink()
+        with self.assertRaisesRegex(gate.GateError, "contracts.rs is missing .observer contracts rule"):
+            gate.check_observer_includes(self.base)
 
 
 def fake_sha(name):

@@ -1,0 +1,4609 @@
+{
+ "schemaVersion": "planeon.internal.i06-upstream-bootstrap-rbac/v1",
+ "kubernetesVersion": "v1.37.1",
+ "kubernetesCommit": "f78e722310e50bcaca9276be22276d9e91d91308",
+ "fixtures": {
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-roles.yaml": "4f7ebc5f6bc39f6936f1d14a0bd2195ba54fd85d0278f29513e22ad132481aeb",
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/controller-roles.yaml": "f040a04f36565c8da40b2435b960d50e5b00c090c248936ab121f479a4ef057a",
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/namespace-roles.yaml": "fab59cdcbe79771bcd3ea8179195e51ae3e9d99b3e8ebe7ee928625b720cbc50",
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-role-bindings.yaml": "fc4d63dea4fdc1707771a2cb6e2308e30b23800fd5b8939220aeb77ea4a8610a",
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/controller-role-bindings.yaml": "2f5067b93557f5e3b2997afd77adea20e2133faf9c51ea16da99275462a7d0f7",
+  "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/namespace-role-bindings.yaml": "238b64341b606d858e0e79ebe5b8201a4d2dd0124e363b903c9e514aa3582f8d"
+ },
+ "derivation": "Effective rules of every subject named by a ClusterRoleBinding (scope CLUSTER) or RoleBinding (scope = its namespace) in the default-feature-gate golden fixtures, resolved against the fixture roles. Non-resource URL rules are dropped. The aggregation-only ClusterRoles admin, edit and view are not bound.",
+ "subjects": [
+  {
+   "kind": "Group",
+   "name": "system:authenticated",
+   "rules": [
+    {
+     "apiGroups": [
+      "authorization.k8s.io"
+     ],
+     "resources": [
+      "selfsubjectaccessreviews",
+      "selfsubjectrulesreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:basic-user"
+    },
+    {
+     "apiGroups": [
+      "authentication.k8s.io"
+     ],
+     "resources": [
+      "selfsubjectreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:basic-user"
+    }
+   ]
+  },
+  {
+   "kind": "Group",
+   "name": "system:masters",
+   "rules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "*"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/cluster-admin"
+    }
+   ]
+  },
+  {
+   "kind": "Group",
+   "name": "system:monitoring",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/metrics"
+     ],
+     "verbs": [
+      "get"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:monitoring"
+    }
+   ]
+  },
+  {
+   "kind": "Group",
+   "name": "system:serviceaccounts",
+   "rules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "clustertrustbundles"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:cluster-trust-bundle-discovery"
+    }
+   ]
+  },
+  {
+   "kind": "Group",
+   "name": "system:unauthenticated",
+   "rules": []
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:attachdetach-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims",
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "volumeattachments"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csidrivers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csinodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:attachdetach-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:bootstrap-signer",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-public",
+     "binding": "RoleBinding/kube-public/system:controller:bootstrap-signer"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [
+      "cluster-info"
+     ],
+     "scope": "kube-public",
+     "binding": "RoleBinding/kube-public/system:controller:bootstrap-signer"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "kube-public",
+     "binding": "RoleBinding/kube-public/system:controller:bootstrap-signer"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system:controller:bootstrap-signer"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:certificate-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests/approval",
+      "certificatesigningrequests/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "approve"
+     ],
+     "resourceNames": [
+      "kubernetes.io/kube-apiserver-client-kubelet"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "sign"
+     ],
+     "resourceNames": [
+      "kubernetes.io/kube-apiserver-client",
+      "kubernetes.io/kube-apiserver-client-kubelet",
+      "kubernetes.io/kubelet-serving",
+      "kubernetes.io/legacy-unknown"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    },
+    {
+     "apiGroups": [
+      "authorization.k8s.io"
+     ],
+     "resources": [
+      "subjectaccessreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:certificate-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:cloud-provider",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system:controller:cloud-provider"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:clusterrole-aggregation-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "rbac.authorization.k8s.io"
+     ],
+     "resources": [
+      "clusterroles"
+     ],
+     "verbs": [
+      "escalate",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:clusterrole-aggregation-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:cronjob-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "cronjobs"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    },
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "jobs"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    },
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "cronjobs/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    },
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "cronjobs/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "delete",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:cronjob-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:daemon-set-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "daemonsets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "daemonsets/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "daemonsets/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "list",
+      "patch",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/binding"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "controllerrevisions"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:daemon-set-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:deployment-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "deployments"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "deployments/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "deployments/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:deployment-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:device-taint-eviction-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceslices"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "deviceclasses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "devicetaintrules/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "devicetaintrules"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:device-taint-eviction-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:disruption-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "deployments"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "replicationcontrollers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "policy"
+     ],
+     "resources": [
+      "poddisruptionbudgets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "statefulsets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "policy"
+     ],
+     "resources": [
+      "poddisruptionbudgets/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*/scale"
+     ],
+     "verbs": [
+      "get"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:disruption-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:endpoint-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods",
+      "services"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpoint-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpoint-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints/restricted"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpoint-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpoint-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:endpointslice-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes",
+      "pods",
+      "services"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslice-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "services/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslice-controller"
+    },
+    {
+     "apiGroups": [
+      "discovery.k8s.io"
+     ],
+     "resources": [
+      "endpointslices"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslice-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslice-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:endpointslicemirroring-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints",
+      "services"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslicemirroring-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "services/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslicemirroring-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslicemirroring-controller"
+    },
+    {
+     "apiGroups": [
+      "discovery.k8s.io"
+     ],
+     "resources": [
+      "endpointslices"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslicemirroring-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:endpointslicemirroring-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:ephemeral-volume-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ephemeral-volume-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ephemeral-volume-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ephemeral-volume-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ephemeral-volume-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:expand-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:expand-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:expand-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:expand-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:expand-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:generic-garbage-collector",
+   "rules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:generic-garbage-collector"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:generic-garbage-collector"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:horizontal-pod-autoscaler",
+   "rules": [
+    {
+     "apiGroups": [
+      "autoscaling"
+     ],
+     "resources": [
+      "horizontalpodautoscalers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "autoscaling"
+     ],
+     "resources": [
+      "horizontalpodautoscalers/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*/scale"
+     ],
+     "verbs": [
+      "get",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "metrics.k8s.io"
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "custom.metrics.k8s.io"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "external.metrics.k8s.io"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:horizontal-pod-autoscaler"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:job-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "jobs"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:job-controller"
+    },
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "jobs/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:job-controller"
+    },
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "jobs/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:job-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "list",
+      "patch",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:job-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:job-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:kube-apiserver-serving-clustertrustbundle-publisher",
+   "rules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "attest"
+     ],
+     "resourceNames": [
+      "kubernetes.io/kube-apiserver-serving"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:kube-apiserver-serving-clustertrustbundle-publisher"
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "clustertrustbundles"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:kube-apiserver-serving-clustertrustbundle-publisher"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:kube-apiserver-serving-clustertrustbundle-publisher"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:kube-controller-manager",
+   "rules": [
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:kube-dns",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints",
+      "services"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-dns"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:kube-scheduler",
+   "rules": [
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-scheduler"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:leader-election-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:legacy-service-account-token-cleaner",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "get"
+     ],
+     "resourceNames": [
+      "kube-apiserver-legacy-service-account-token-tracking"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:legacy-service-account-token-cleaner"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets"
+     ],
+     "verbs": [
+      "delete",
+      "patch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:legacy-service-account-token-cleaner"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:namespace-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:namespace-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces/finalize",
+      "namespaces/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:namespace-controller"
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "delete",
+      "deletecollection",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:namespace-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:node-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:node-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:persistent-volume-binder",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "storageclasses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:persistent-volume-binder"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:pod-garbage-collector",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "delete",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pod-garbage-collector"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pod-garbage-collector"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pod-garbage-collector"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:podcertificaterequestcleaner",
+   "rules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "podcertificaterequests"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:podcertificaterequestcleaner"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:pv-protection-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pv-protection-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pv-protection-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:pvc-protection-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pvc-protection-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pvc-protection-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pvc-protection-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:pvc-protection-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:replicaset-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replicaset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replicaset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replicaset-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "list",
+      "patch",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replicaset-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replicaset-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:replication-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "replicationcontrollers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replication-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "replicationcontrollers/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replication-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "replicationcontrollers/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replication-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "list",
+      "patch",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replication-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:replication-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:resource-claim-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims",
+      "resourceclaims/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims/binding"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resource-claim-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:resourcequota-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resourcequota-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "resourcequotas/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resourcequota-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:resourcequota-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:root-ca-cert-publisher",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "create",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:root-ca-cert-publisher"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:root-ca-cert-publisher"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:route-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:route-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/status"
+     ],
+     "verbs": [
+      "patch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:route-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:route-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:selinux-warning-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:selinux-warning-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:selinux-warning-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:selinux-warning-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:selinux-warning-controller"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csidrivers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:selinux-warning-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:service-account-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-account-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-account-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:service-cidrs-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "networking.k8s.io"
+     ],
+     "resources": [
+      "servicecidrs"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-cidrs-controller"
+    },
+    {
+     "apiGroups": [
+      "networking.k8s.io"
+     ],
+     "resources": [
+      "servicecidrs/finalizers"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-cidrs-controller"
+    },
+    {
+     "apiGroups": [
+      "networking.k8s.io"
+     ],
+     "resources": [
+      "servicecidrs/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-cidrs-controller"
+    },
+    {
+     "apiGroups": [
+      "networking.k8s.io"
+     ],
+     "resources": [
+      "ipaddresses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-cidrs-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-cidrs-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:service-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "services"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "services/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:service-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:statefulset-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "statefulsets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "statefulsets/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "statefulsets/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "controllerrevisions"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "delete",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:statefulset-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:storage-version-migrator-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "patch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:storage-version-migrator-controller"
+    },
+    {
+     "apiGroups": [
+      "apiextensions.k8s.io"
+     ],
+     "resources": [
+      "customresourcedefinitions"
+     ],
+     "verbs": [
+      "get"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:storage-version-migrator-controller"
+    },
+    {
+     "apiGroups": [
+      "apiextensions.k8s.io"
+     ],
+     "resources": [
+      "customresourcedefinitions/status"
+     ],
+     "verbs": [
+      "patch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:storage-version-migrator-controller"
+    },
+    {
+     "apiGroups": [
+      "storagemigration.k8s.io"
+     ],
+     "resources": [
+      "storageversionmigrations/status"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:storage-version-migrator-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:token-cleaner",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system:controller:token-cleaner"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system:controller:token-cleaner"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:ttl-after-finished-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "batch"
+     ],
+     "resources": [
+      "jobs"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ttl-after-finished-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ttl-after-finished-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:ttl-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ttl-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:ttl-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:validatingadmissionpolicy-status-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      "admissionregistration.k8s.io"
+     ],
+     "resources": [
+      "validatingadmissionpolicies"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:validatingadmissionpolicy-status-controller"
+    },
+    {
+     "apiGroups": [
+      "admissionregistration.k8s.io"
+     ],
+     "resources": [
+      "validatingadmissionpolicies/status"
+     ],
+     "verbs": [
+      "get",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:validatingadmissionpolicy-status-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:validatingadmissionpolicy-status-controller"
+    }
+   ]
+  },
+  {
+   "kind": "ServiceAccount",
+   "name": "system:serviceaccount:kube-system:volumeattributesclass-protection-controller",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:volumeattributesclass-protection-controller"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:volumeattributesclass-protection-controller"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "volumeattributesclasses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:volumeattributesclass-protection-controller"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:controller:volumeattributesclass-protection-controller"
+    }
+   ]
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-controller-manager",
+   "rules": [
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "get",
+      "update"
+     ],
+     "resourceNames": [
+      "kube-controller-manager"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets",
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets"
+     ],
+     "verbs": [
+      "delete"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps",
+      "namespaces",
+      "secrets",
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "get"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets",
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "authentication.k8s.io"
+     ],
+     "resources": [
+      "tokenreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "authorization.k8s.io"
+     ],
+     "resources": [
+      "subjectaccessreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "serviceaccounts/token"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [
+      "extension-apiserver-authentication"
+     ],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::extension-apiserver-authentication-reader"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-controller-manager"
+    }
+   ]
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-proxy",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "endpoints",
+      "services"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:node-proxier"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:node-proxier"
+    },
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:node-proxier"
+    },
+    {
+     "apiGroups": [
+      "networking.k8s.io"
+     ],
+     "resources": [
+      "servicecidrs"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:node-proxier"
+    },
+    {
+     "apiGroups": [
+      "discovery.k8s.io"
+     ],
+     "resources": [
+      "endpointslices"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:node-proxier"
+    }
+   ]
+  },
+  {
+   "kind": "User",
+   "name": "system:kube-scheduler",
+   "rules": [
+    {
+     "apiGroups": [
+      "",
+      "events.k8s.io"
+     ],
+     "resources": [
+      "events"
+     ],
+     "verbs": [
+      "create",
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [
+      "kube-scheduler"
+     ],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "delete",
+      "deletecollection",
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods"
+     ],
+     "verbs": [
+      "delete",
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "bindings",
+      "pods/binding"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/status"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "replicationcontrollers",
+      "services"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "apps",
+      "extensions"
+     ],
+     "resources": [
+      "replicasets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "apps"
+     ],
+     "resources": [
+      "statefulsets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "policy"
+     ],
+     "resources": [
+      "poddisruptionbudgets"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims",
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "authentication.k8s.io"
+     ],
+     "resources": [
+      "tokenreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "authorization.k8s.io"
+     ],
+     "resources": [
+      "subjectaccessreviews"
+     ],
+     "verbs": [
+      "create"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csinodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "volumeattachments"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csidrivers"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "csistoragecapacities"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "deviceclasses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims/status"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "pods/finalizers"
+     ],
+     "verbs": [
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceslices"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims"
+     ],
+     "verbs": [
+      "create",
+      "delete"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "devicetaintrules"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "resource.k8s.io"
+     ],
+     "resources": [
+      "resourceclaims/binding"
+     ],
+     "verbs": [
+      "patch",
+      "update"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:volume-scheduler"
+    },
+    {
+     "apiGroups": [
+      "storage.k8s.io"
+     ],
+     "resources": [
+      "storageclasses"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:volume-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "persistentvolumeclaims"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "patch",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "CLUSTER",
+     "binding": "ClusterRoleBinding/system:volume-scheduler"
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "configmaps"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": [
+      "extension-apiserver-authentication"
+     ],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::extension-apiserver-authentication-reader"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leases"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-scheduler"
+    },
+    {
+     "apiGroups": [
+      "coordination.k8s.io"
+     ],
+     "resources": [
+      "leasecandidates"
+     ],
+     "verbs": [
+      "create",
+      "get",
+      "list",
+      "update",
+      "watch"
+     ],
+     "resourceNames": [],
+     "scope": "kube-system",
+     "binding": "RoleBinding/kube-system/system::leader-locking-kube-scheduler"
+    }
+   ]
+  }
+ ],
+ "referencedRoles": {
+  "system:kubelet-api-admin": {
+   "fixture": "plugin/pkg/auth/authorizer/rbac/bootstrappolicy/testdata/cluster-roles.yaml",
+   "rules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ],
+     "resourceNames": []
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes"
+     ],
+     "verbs": [
+      "proxy"
+     ],
+     "resourceNames": []
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/log",
+      "nodes/metrics",
+      "nodes/proxy",
+      "nodes/stats"
+     ],
+     "verbs": [
+      "*"
+     ],
+     "resourceNames": []
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "nodes/configz",
+      "nodes/healthz",
+      "nodes/pods"
+     ],
+     "verbs": [
+      "*"
+     ],
+     "resourceNames": []
+    }
+   ]
+  }
+ }
+}

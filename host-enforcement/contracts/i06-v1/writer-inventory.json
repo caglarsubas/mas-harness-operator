@@ -1,0 +1,1093 @@
+{
+ "schemaVersion": "planeon.internal.i06-writer-inventory/v1",
+ "kubernetesVersion": "v1.37.1",
+ "kubernetesCommit": "f78e722310e50bcaca9276be22276d9e91d91308",
+ "facts": "architecture/i06-backend-profile/upstream-facts-v1.37.1.json",
+ "controllers": [
+  {
+   "name": "serviceaccount-token-controller",
+   "serviceAccount": null,
+   "defaultState": "CONDITIONAL",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets",
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "create"
+     ]
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces",
+      "secrets",
+      "serviceaccounts",
+      "configmaps"
+     ],
+     "verbs": [
+      "get"
+     ]
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "secrets",
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "update"
+     ]
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ]
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "serviceaccounts/token"
+     ],
+     "verbs": [
+      "create"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/service_accounts.go:31-43",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "No legacy service-account token Secrets; keeps the signing key readable by the apiserver only (SC03)"
+  },
+  {
+   "name": "endpoints-controller",
+   "serviceAccount": "endpoint-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:385-391",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "endpointslice-controller",
+   "serviceAccount": "endpointslice-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/discovery.go:30-36",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "endpointslice-mirroring-controller",
+   "serviceAccount": "endpointslicemirroring-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/discovery.go:59-65",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "replicationcontroller-controller",
+   "serviceAccount": "replication-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:412-418",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "pod-garbage-collector-controller",
+   "serviceAccount": "pod-garbage-collector",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:439-445",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "resourcequota-controller",
+   "serviceAccount": "resourcequota-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "watch"
+     ]
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "resourcequotas/status"
+     ],
+     "verbs": [
+      "update"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/core.go:463-469",
+   "profile": "ALLOWED",
+   "disposition": "STATUS_ONLY",
+   "reason": "Writes ResourceQuota status (usage); quota admission re-evaluates in the apiserver at persist time"
+  },
+  {
+   "name": "namespace-controller",
+   "serviceAccount": "namespace-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "delete"
+     ]
+    },
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "namespaces/finalize",
+      "namespaces/status"
+     ],
+     "verbs": [
+      "update"
+     ]
+    },
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "delete",
+      "deletecollection"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/core.go:516-522",
+   "profile": "ALLOWED",
+   "disposition": "I07_TRIGGERED_ONLY",
+   "reason": "Acts only on terminating namespaces; deleting a namespace is an I07 policy write"
+  },
+  {
+   "name": "serviceaccount-controller",
+   "serviceAccount": "service-account-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      ""
+     ],
+     "resources": [
+      "serviceaccounts"
+     ],
+     "verbs": [
+      "create"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/core.go:569-575",
+   "profile": "ALLOWED",
+   "disposition": "I07_TRIGGERED_ONLY",
+   "reason": "Creates the default ServiceAccount when a namespace is created through I07; the pinned ServiceAccount UID detects recreation"
+  },
+  {
+   "name": "garbage-collector-controller",
+   "serviceAccount": "generic-garbage-collector",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "patch",
+      "update",
+      "delete"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/core.go:624-630",
+   "profile": "ALLOWED",
+   "disposition": "OWNERREF_RULE",
+   "reason": "Wildcard writer acting only through ownerReferences; policy-kind objects carry none (OR02)"
+  },
+  {
+   "name": "daemonset-controller",
+   "serviceAccount": "daemon-set-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/apps.go:35-41",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "job-controller",
+   "serviceAccount": "job-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/batch.go:35-41",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "podgroup-protection-controller",
+   "serviceAccount": "podgroup-protection-controller",
+   "defaultState": "GATED_OFF",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/scheduling.go:32-40",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "deployment-controller",
+   "serviceAccount": "deployment-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/apps.go:120-126",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "replicaset-controller",
+   "serviceAccount": "replicaset-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/apps.go:94-100",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "horizontal-pod-autoscaler-controller",
+   "serviceAccount": "horizontal-pod-autoscaler",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/autoscaling.go:35-41",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "disruption-controller",
+   "serviceAccount": "disruption-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/policy.go:30-36",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "statefulset-controller",
+   "serviceAccount": "statefulset-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/apps.go:67-73",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "cronjob-controller",
+   "serviceAccount": "cronjob-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/batch.go:73-79",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "certificatesigningrequest-signing-controller",
+   "serviceAccount": "certificate-controller",
+   "defaultState": "CONDITIONAL",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "delete"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests/status",
+      "certificatesigningrequests/approval"
+     ],
+     "verbs": [
+      "update"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "approve"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "sign"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/certificates.go:47-53",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "P4: no credential minting on the host"
+  },
+  {
+   "name": "certificatesigningrequest-approving-controller",
+   "serviceAccount": "certificate-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "delete"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests/status",
+      "certificatesigningrequests/approval"
+     ],
+     "verbs": [
+      "update"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "approve"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "sign"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/certificates.go:188-194",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "P4: no credential minting on the host"
+  },
+  {
+   "name": "certificatesigningrequest-cleaner-controller",
+   "serviceAccount": "certificate-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch",
+      "delete"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "certificatesigningrequests/status",
+      "certificatesigningrequests/approval"
+     ],
+     "verbs": [
+      "update"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "approve"
+     ]
+    },
+    {
+     "apiGroups": [
+      "certificates.k8s.io"
+     ],
+     "resources": [
+      "signers"
+     ],
+     "verbs": [
+      "sign"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/certificates.go:211-217",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "P4: the CSR controllers share one account and stay off together"
+  },
+  {
+   "name": "podcertificaterequest-cleaner-controller",
+   "serviceAccount": "podcertificaterequestcleaner",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/certificates.go:233-241",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "ttl-controller",
+   "serviceAccount": "ttl-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:600-606",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "bootstrap-signer-controller",
+   "serviceAccount": "bootstrap-signer",
+   "defaultState": "OFF_BY_DEFAULT",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/bootstrap.go:27-34",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "No bootstrap tokens (SC03)"
+  },
+  {
+   "name": "token-cleaner-controller",
+   "serviceAccount": "token-cleaner",
+   "defaultState": "OFF_BY_DEFAULT",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/bootstrap.go:55-62",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "No bootstrap tokens (SC03)"
+  },
+  {
+   "name": "node-ipam-controller",
+   "serviceAccount": "node-controller",
+   "defaultState": "CONDITIONAL",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:80-86",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "node-lifecycle-controller",
+   "serviceAccount": "node-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:164-170",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "persistentvolume-binder-controller",
+   "serviceAccount": "persistent-volume-binder",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:234-240",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "persistentvolume-attach-detach-controller",
+   "serviceAccount": "attachdetach-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:273-279",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "persistentvolume-expander-controller",
+   "serviceAccount": "expand-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:321-327",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "clusterrole-aggregation-controller",
+   "serviceAccount": "clusterrole-aggregation-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "rbac.authorization.k8s.io"
+     ],
+     "resources": [
+      "clusterroles"
+     ],
+     "verbs": [
+      "escalate",
+      "get",
+      "list",
+      "watch",
+      "update",
+      "patch"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/rbac.go:26-32",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "The only controller holding 'escalate'; aggregated ClusterRoles are excluded from the profile (OR03)"
+  },
+  {
+   "name": "persistentvolumeclaim-protection-controller",
+   "serviceAccount": "pvc-protection-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:709-715",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "persistentvolume-protection-controller",
+   "serviceAccount": "pv-protection-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:738-744",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "volumeattributesclass-protection-controller",
+   "serviceAccount": "volumeattributesclass-protection-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:765-773",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "ttl-after-finished-controller",
+   "serviceAccount": "ttl-after-finished-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:797-803",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "root-ca-certificate-publisher-controller",
+   "serviceAccount": "root-ca-cert-publisher",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/certificates.go:256-262",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "kube-apiserver-serving-clustertrustbundle-publisher-controller",
+   "serviceAccount": "kube-apiserver-serving-clustertrustbundle-publisher",
+   "defaultState": "CONDITIONAL",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/certificates.go:290-296",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "Holds 'attest' on signers; cluster trust bundles are not used by the profile"
+  },
+  {
+   "name": "ephemeral-volume-controller",
+   "serviceAccount": "ephemeral-volume-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:357-363",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "storageversion-garbage-collector-controller",
+   "serviceAccount": "storage-version-garbage-collector",
+   "defaultState": "GATED_OFF",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:970-980",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "resourceclaim-controller",
+   "serviceAccount": "resource-claim-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/resource.go:67-76",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "resourcepoolstatusrequest-controller",
+   "serviceAccount": "resourcepoolstatusrequest-controller",
+   "defaultState": "GATED_OFF",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/resource.go:100-108",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "device-taint-eviction-controller",
+   "serviceAccount": "device-taint-eviction-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/resource.go:32-42",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "legacy-serviceaccount-token-cleaner-controller",
+   "serviceAccount": "legacy-service-account-token-cleaner",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:821-827",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "No legacy token Secrets exist (token controller disabled); avoids a cluster-wide Secret writer"
+  },
+  {
+   "name": "validatingadmissionpolicy-status-controller",
+   "serviceAccount": "validatingadmissionpolicy-status-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "admissionregistration.k8s.io"
+     ],
+     "resources": [
+      "validatingadmissionpolicies"
+     ],
+     "verbs": [
+      "get",
+      "list",
+      "watch"
+     ]
+    },
+    {
+     "apiGroups": [
+      "admissionregistration.k8s.io"
+     ],
+     "resources": [
+      "validatingadmissionpolicies/status"
+     ],
+     "verbs": [
+      "get",
+      "patch",
+      "update"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/validatingadmissionpolicystatus.go:33-39",
+   "profile": "ALLOWED",
+   "disposition": "STATUS_ONLY",
+   "reason": "Writes ValidatingAdmissionPolicy status (type checking)"
+  },
+  {
+   "name": "taint-eviction-controller",
+   "serviceAccount": "node-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:203-211",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "service-cidr-controller",
+   "serviceAccount": "service-cidrs-controller",
+   "defaultState": "ON",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/networking.go:31-39",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  },
+  {
+   "name": "storage-version-migrator-controller",
+   "serviceAccount": "storage-version-migrator-controller",
+   "defaultState": "ON",
+   "policyKindRules": [
+    {
+     "apiGroups": [
+      "*"
+     ],
+     "resources": [
+      "*"
+     ],
+     "verbs": [
+      "list",
+      "patch"
+     ]
+    },
+    {
+     "apiGroups": [
+      "apiextensions.k8s.io"
+     ],
+     "resources": [
+      "customresourcedefinitions"
+     ],
+     "verbs": [
+      "get"
+     ]
+    },
+    {
+     "apiGroups": [
+      "apiextensions.k8s.io"
+     ],
+     "resources": [
+      "customresourcedefinitions/status"
+     ],
+     "verbs": [
+      "patch"
+     ]
+    }
+   ],
+   "source": "cmd/kube-controller-manager/app/storageversionmigrator.go:34-40",
+   "profile": "REQUIRED_DISABLED",
+   "disposition": "DISABLED",
+   "reason": "Wildcard list/patch on every resource; storage migrations happen only in reboot maintenance"
+  },
+  {
+   "name": "selinux-warning-controller",
+   "serviceAccount": "selinux-warning-controller",
+   "defaultState": "OFF_BY_DEFAULT",
+   "policyKindRules": [],
+   "source": "cmd/kube-controller-manager/app/core.go:997-1006",
+   "profile": "ALLOWED",
+   "disposition": "NOT_POLICY",
+   "reason": "No policy-kind rules in its bootstrap role"
+  }
+ ],
+ "apiserverWriters": [
+  {
+   "name": "rbac/bootstrap-roles",
+   "kind": "POST_START_HOOK",
+   "cadence": "STARTUP_ONCE",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "STARTUP_BEFORE_INSPECTING",
+   "reason": "Reconciles the bootstrap roles and bindings built into the pinned apiserver binary once per start: adds missing rules and subjects, recreates a binding whose roleRef changed, may create kube-system and kube-public, and primes the aggregate-to-* roles and the public-info-viewer binding from existing objects. An apiserver restart during ACTIVE invalidates the generation (OR01); the observer inspects only after this hook's readyz check passes (OR07)",
+   "source": "pkg/registry/rbac/rest/storage_rbac.go:59,131-141,162-340; staging/src/k8s.io/component-helpers/auth/rbac/reconciliation/namespace.go:28-45"
+  },
+  {
+   "name": "start-system-namespaces-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "SYSTEM_NAMESPACES_ONLY",
+   "reason": "Creates only kube-system, kube-public, default and kube-node-lease if absent; never updates or deletes",
+   "source": "pkg/controlplane/apiserver/server.go:140,144-149; pkg/controlplane/controller/systemnamespaces/system_namespaces_controller.go:49-58,73,78-103; list: pkg/controlplane/apiserver/options/options.go:131 + cmd/kube-apiserver/app/options/options.go:97"
+  },
+  {
+   "name": "start-cluster-authentication-info-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "SYSTEM_NAMESPACES_ONLY",
+   "reason": "One ConfigMap in kube-system; may create kube-system",
+   "source": "pkg/controlplane/apiserver/server.go:232-258; pkg/controlplane/controller/clusterauthenticationtrust/cluster_authentication_trust_controller.go:51-54,171-219,471-475"
+  },
+  {
+   "name": "priority-and-fairness-config-producer",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "AVAILABILITY_ONLY",
+   "reason": "FlowSchemas and PriorityLevelConfigurations every minute; scheduling of requests, not admission (OR04)",
+   "source": "pkg/registry/flowcontrol/rest/storage_flowcontrol.go:53,100-229; pkg/registry/flowcontrol/ensurer/strategy.go:141-155,199-217,252-334"
+  },
+  {
+   "name": "priority-and-fairness-config-consumer",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "STATUS_ONLY",
+   "reason": "FlowSchema status",
+   "source": "staging/src/k8s.io/apiserver/pkg/server/config.go:942-955; staging/src/k8s.io/apiserver/pkg/util/flowcontrol/apf_controller.go:613-633; staging/src/k8s.io/apiserver/pkg/util/flowcontrol/apf_filter.go:42; client from loopback: staging/src/k8s.io/apiserver/pkg/server/options/feature.go:81-85, pkg/controlplane/apiserver/config.go:159-178"
+  },
+  {
+   "name": "kube-apiserver-autoregistration",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164); client built from aggregator loopback config at pkg/controlplane/apiserver/aggregator.go:151",
+   "writesPolicyKinds": true,
+   "disposition": "LOCAL_APISERVICES_ONLY",
+   "reason": "APIServices for built-in group versions; CRD-driven APIServices cannot exist because CRDs are forbidden (SC09)",
+   "source": "pkg/controlplane/apiserver/aggregator.go:150-197,355-380; staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister/autoregister_controller.go:44-50,208-290; pkg/controlplane/controller/crdregistration/crdregistration_controller.go:140,213,226"
+  },
+  {
+   "name": "apiservice-status-local-available-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "STATUS_ONLY",
+   "reason": "APIService status",
+   "source": "staging/src/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:218,337-350; staging/src/k8s.io/kube-aggregator/pkg/controllers/status/local/local_available_controller.go:142"
+  },
+  {
+   "name": "apiservice-status-remote-available-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "STATUS_ONLY",
+   "reason": "APIService status",
+   "source": "staging/src/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:352-373; staging/src/k8s.io/kube-aggregator/pkg/controllers/status/remote/remote_available_controller.go:420"
+  },
+  {
+   "name": "start-apiextensions-controllers",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164); CR instance deletion bypasses HTTP authn/authz/admission (direct REST storage DeleteCollection with rest.ValidateAllObjectFunc)",
+   "writesPolicyKinds": true,
+   "disposition": "ABSENT_BY_PROFILE",
+   "reason": "CRD status and the CRD finalizer act only on CustomResourceDefinitions, which the profile forbids (SC09)",
+   "source": "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:166,187,217-224,230-261; controller writes: staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish/establishing_controller.go:167, nonstructuralschema/nonstructuralschema_controller.go:172, status/naming_controller.go:274, apiapproval/apiapproval_controller.go:166, finalizer/crd_finalizer.go:135,158,172-173,185,196-222; storage: staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/customresource_handler.go:606-612; staging/src/k8s.io/apiserver/pkg/registry/rest/rest.go:248-251"
+  },
+  {
+   "name": "ResourceQuota admission plugin (in-process, request-driven)",
+   "kind": "CONTROLLER",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164); loopback client injected into admission plugins at pkg/controlplane/apiserver/config.go:386-402 and staging/src/k8s.io/apiserver/pkg/admission/initializer/initializer.go:83",
+   "writesPolicyKinds": true,
+   "disposition": "STATUS_ONLY",
+   "reason": "Quota usage on admitted requests",
+   "source": "staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/resource_access.go:79-80; default-on: pkg/kubeapiserver/options/plugins.go:174"
+  },
+  {
+   "name": "NamespaceAutoProvision admission plugin (in-process, request-driven)",
+   "kind": "CONTROLLER",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": true,
+   "disposition": "REQUIRED_DISABLED",
+   "reason": "Off by default and forbidden (SC05)",
+   "source": "plugin/pkg/admission/namespace/autoprovision/admission.go:36,93,108-109"
+  },
+  {
+   "name": "bootstrap-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/instance.go:213-257,358-376; pkg/controlplane/controller/kubernetesservice/controller.go:146-165,212-245; interval/TTL defaults pkg/controlplane/instance.go:115-119"
+  },
+  {
+   "name": "start-kubernetes-service-cidr-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/instance.go:378-390; pkg/controlplane/controller/defaultservicecidr/default_servicecidr_controller.go:47,61,123-179"
+  },
+  {
+   "name": "start-service-ip-repair-controllers",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/registry/core/rest/storage_core.go:128-133,516-559; interval default 3m pkg/controlplane/instance.go:125-126"
+  },
+  {
+   "name": "start-legacy-token-tracking-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/apiserver/server.go:302-305; pkg/controlplane/controller/legacytokentracking/controller.go:40-47,165-208"
+  },
+  {
+   "name": "start-kube-apiserver-identity-lease-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/apiserver/server.go:53-62,260-284"
+  },
+  {
+   "name": "start-kube-apiserver-identity-lease-garbage-collector",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/apiserver/server.go:53-56,73-75,286-295 (name=kube-apiserver passed at pkg/controlplane/instance.go:326); pkg/controlplane/controller/apiserverleasegc/gc_controller.go:95,129"
+  },
+  {
+   "name": "scheduling/bootstrap-system-priority-classes",
+   "kind": "POST_START_HOOK",
+   "cadence": "STARTUP_ONCE",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/registry/scheduling/rest/storage_scheduling.go:48,168-214"
+  },
+  {
+   "name": "start-kube-apiserver-coordinated-leader-election-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/apiserver/server.go:156-189"
+  },
+  {
+   "name": "built-in-resources-storage-version-updater",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "system:apiserver (UID random), groups [system:authenticated, system:masters] via the privileged loopback bearer token (staging/src/k8s.io/apiserver/pkg/server/config.go:1206-1213, wired at :748; token = random UUID, staging/src/k8s.io/apiserver/pkg/server/options/serving_with_loopback.go:92; hooks receive it via PostStartHookContext, staging/src/k8s.io/apiserver/pkg/server/hooks.go:161-164)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "staging/src/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:85,419-467"
+  },
+  {
+   "name": "peer-endpoint-reconciler-controller",
+   "kind": "POST_START_HOOK",
+   "cadence": "CONTINUOUS",
+   "identity": "in-process storage (no request identity)",
+   "writesPolicyKinds": false,
+   "disposition": "NOT_POLICY",
+   "reason": "Writes no policy kind",
+   "source": "pkg/controlplane/apiserver/server.go:191-208; pkg/controlplane/apiserver/peer.go:107; staging/src/k8s.io/apiserver/pkg/reconcilers/peer_endpoint_lease.go:54-95"
+  }
+ ]
+}

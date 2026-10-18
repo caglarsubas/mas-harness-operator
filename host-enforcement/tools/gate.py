@@ -65,6 +65,19 @@ substrate) with their imports and the stage-2 refusal of KernelRoots; adds Kerne
 struct bodies with the STRUCT-ANGLE rule (owner decision Q-HE4A-5 (a)): the generic list and any where-clause skipped
 with a context-aware bracket scanner, angles nesting in type position and ignored in expressions.
 
+HE-004B1 (the observer's RBAC snapshot, OR predicates and ADM-4 logic; DESIGN-B rev 2.2 section 6, owner decisions
+Q-HE4B-0..12) pins edge record v4's ten I06 v2, I06 v1 and admission v3 files among the contract files; planeon-observer
+links i05-protocol too (its closure and SBOM follow); the observer post-seal rule also reads i05-protocol's sources, with
+the single memory-only `impl Drop for Value` in json.rs excepted once; the observer's five logic modules (inputs, rbac,
+snapshot, operational, admission) name only whitelisted path roots (their own modules and the embedded contracts,
+i05-protocol's json, sha256 and contracts, std's ordered collections and pure modules), no super:: or foreign self::
+path, glob, renaming import, HashMap, HashSet or RandomState, no include macro, and no panicking macro or call outside
+strict #[cfg(test)] blocks; every include_bytes!/include_str! of the observer's sources is one plain literal naming a
+registered contract file, only in contracts.rs (and seal.rs's two OBSERVER programs). Carried from HE-003A3's PR review
+(R1-2, R1-3): serve binds gate in no other let pattern and assigns it nowhere, and after the observer's attach names it
+only in gate.apiserver_address() and Substrate::new(gate, ..); observation.rs defines no module outside its strict test
+module and Unobserved and KernelObserver exactly once each at its top level.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -74,6 +87,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import posixpath
 import re
 import shutil
 import struct
@@ -128,6 +142,8 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # decision Q-HE4A-4 (a)): the two OBSERVER programs its record v2 and v3 register for HE-004 (MET-ENFORCE-025), which
 # the observer's seal embeds (19 files). HE-003A3 (DESIGN section 2, owner decisions Q-A3-1..15 (a)): the I05 gate
 # channel v4 README and vectors its record v4 registers for HE-003A3 (MET-ENFORCE-030, merged as fd362f9e), 21 files.
+# HE-004B1 (DESIGN-B section 2, owner decision Q-HE4B-7 (a)): the ten I06 v2, I06 v1 and admission v3 files record v4
+# registers for HE-004 (rows 34-43), 31 files.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -150,6 +166,18 @@ CONTRACTS = {
     "contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf": "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3",
     "contracts/seccomp-v3/OBSERVER.aarch64.bpf": "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707",
     "contracts/seccomp-v3/OBSERVER.x86_64.bpf": "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a",
+    "contracts/i06-v2/vectors.json": "1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e",
+    "contracts/i06-v2/criteria.json": "026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda",
+    "contracts/i06-v2/README.md": "553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb",
+    "contracts/i06-v1/identity-closure.json": "0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb",
+    "contracts/i06-v1/writer-inventory.json": "8e6b3b7565cfc93a61162b84d740cffb2871eb66ab85e8c4e80ac813f1af3077",
+    "contracts/i06-v1/upstream-bootstrap-rbac-v1.37.1.json":
+        "7529c2a713af2fb90163175924c264d95f4242d7e0c26b1452c77febb13ed50e",
+    "contracts/i06-v1/README.md": "ccf952d40b4f6229c0cdea79f976253cd4abb19438c1eebc5794e748a708e4b7",
+    "contracts/admission-v3/vectors.json": "a3e2dc9818742ae2188e0e83cf91bb833be836115975b3fb23d5f280f6928cc1",
+    "contracts/admission-v3/README.md": "c3106482b4ff79649cbef7c65797c6fcd6b64f8419e871ae7d89eecad3ff98ab",
+    "contracts/admission-v3/admission-manifests/planeon-a2.json":
+        "1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741",
 }
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
@@ -160,9 +188,11 @@ HOST_PATHS = (b"/Users/", b"/opt/planeon/", b"/private/tmp/", b"/private/var/")
 # DESIGN section 5 (O4): the gate binary's own crate joins them.
 LINKED_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate")
 # HE-004A DESIGN-A section 6 (D2-4): planeon-observer links exactly its own crate and gate-sys (a closure check), and the
-# observer's crate joins every scan of the linked crates' sources (gate-sys is already among them).
+# observer's crate joins every scan of the linked crates' sources (gate-sys is already among them). HE-004B1 DESIGN-B
+# sections 3 and 6 (owner decision Q-HE4B-6 (a)): it links i05-protocol too, which every linked-crate scan already
+# reads (LINKED_CRATES); the closure check and the SBOM's workspace set follow.
 OBSERVER_CRATE = "crates/observer"
-OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys")
+OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol")
 SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE,)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
@@ -488,6 +518,14 @@ OBSERVER_STATEMENT = re.compile(r"\blet\s+gate\s*=\s*gate\s*\.\s*with_observer\s
                                 r"\s*new\s*\(\s*LinuxKernelReads\s*::\s*new\s*\(\s*kernel\s*\)\s*\)\s*\)\s*\)\s*;")
 WIRING_ORDER = (re.compile(r"\bLinuxOs\s*::\s*with_net\s*\("), ROOTS_STATEMENT, re.compile(r"\bFileStores\s*::\s*open_bound\s*\("),
                 OBSERVER_STATEMENT, re.compile(r"\bSubstrate\s*::\s*new\s*\(\s*gate\s*,"))
+# HE-003A3 PR review round 1, R1-2 and R1-3 (carried to HE-004B1): serve's other binding forms of gate, and the
+# observation module's own shape.
+LET_WORD = re.compile(r"\blet\b")
+GATE_ASSIGNMENT = re.compile(r"\bgate\s*=(?![=>])")
+AFTER_ATTACH_USES = (re.compile(r"\bgate\s*\.\s*apiserver_address\s*\(\s*\)"),
+                     re.compile(r"\bSubstrate\s*::\s*new\s*\(\s*(gate)\s*,"))
+MODULE_ITEM = re.compile(r"\bmod\s+[A-Za-z_]\w*")
+OBSERVATION_HOME_TYPES = ("Unobserved", "KernelObserver")
 # HE-003A DESIGN section 8: the types whose Debug would format a std File (whose own Debug reads the descriptor's link
 # with a call the EFFECT_GATE program kills) or print a descriptor. derive(Debug), also under cfg_attr, is refused on a
 # struct or enum of the linked crates whose field types mention one of them anywhere (Option<File> included); manual
@@ -557,6 +595,48 @@ OBSERVER_POST_SEAL_FORBIDDEN = tuple(
     ("lock_shared", "flock"), ("try_lock", "flock"), ("try_lock_shared", "flock"), ("unlock", "flock"),
     ("lock", "flock; also Mutex::lock"), ("write_at", "pwrite64"), ("write_all_at", "pwrite64"),
     ("Drop", "a destructor run under the filter, R1-4")))
+# HE-004B1 DESIGN-B sections 3 and 6 (owner decision Q-HE4B-6 (a)): i05-protocol, linked into planeon-observer since
+# HE-004B1, joins the observer post-seal rule (gate-sys stays outside it). Its one observer-list word, the memory-only
+# `impl Drop for Value` in json.rs (a parsed value freed iteratively: munmap and brk, both in the OBSERVER row; a recorded
+# residual), is removed once from that file's code before the word scan; a second one, another type's Drop, or the impl
+# in another file still refuses.
+OBSERVER_POST_SEAL_CRATES = (OBSERVER_CRATE, "crates/i05-protocol")
+I05_JSON = "crates/i05-protocol/src/json.rs"
+OBSERVER_DROP_EXCEPTIONS = {I05_JSON: re.compile(r"\bimpl\s+Drop\s+for\s+Value\b")}
+# HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2): the observer's five logic modules. Read with comments removed, literal
+# contents emptied and the whitespace around `::` removed, every path rooted at a crate (a leading `::`, or a first
+# segment in CRATE_PATH_ROOTS), in a use declaration or in the code, starts with one of OBSERVER_LOGIC_PATHS: the logic
+# modules and the embedded contracts, i05-protocol's json, sha256 and contracts, std's ordered collections and its pure
+# modules. Refused there besides: super:: paths and self:: paths to anything but the logic modules (neither is in the
+# whitelist), globs and renaming imports (`as` inside a use declaration only: casts are not imports, D3-2), the words
+# HashMap, HashSet and RandomState (std's default hasher asks getrandom), include_bytes!/include_str! (the embedded
+# contracts live in contracts.rs), and, outside strict #[cfg(test)] mod tests blocks, the panicking macros and calls
+# (the i05-protocol precedent: every input gets an error). The claim is "no system call beyond memory allocation" for
+# these modules' own code; indexing and arithmetic overflow are code review's (each index guarded, checked arithmetic).
+OBSERVER_LOGIC_NAMES = ("inputs", "rbac", "snapshot", "operational", "admission")
+OBSERVER_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in OBSERVER_LOGIC_NAMES)
+OBSERVER_CONTRACTS = "crates/observer/src/contracts.rs"
+OBSERVER_SEAL_RS = "crates/observer/src/seal.rs"
+CRATE_PATH_ROOTS = ("std", "core", "alloc", "crate", "self", "super", "i05_protocol", "gate_sys", "planeon_observer")
+OBSERVER_LOGIC_PATHS = (tuple(("crate", name) for name in OBSERVER_LOGIC_NAMES + ("contracts",))
+                        + tuple(("self", name) for name in OBSERVER_LOGIC_NAMES)
+                        + (("i05_protocol", "json"), ("i05_protocol", "sha256"), ("i05_protocol", "contracts"))
+                        + tuple(("std", "collections", name) for name in ("BTreeMap", "BTreeSet", "VecDeque"))
+                        + tuple(("std", name) for name in ("cmp", "fmt", "string", "vec", "iter", "ops", "str", "borrow",
+                                                           "convert", "option", "result")))
+CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
+OBSERVER_LOGIC_WORDS = ((re.compile(r"\b(?:HashMap|HashSet|RandomState)\b"), "HashMap, HashSet or RandomState (getrandom)"),
+                        (re.compile(r"\binclude_(?:bytes|str)\s*!"), "include_bytes! or include_str! (only contracts.rs embeds)"))
+PANICS = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bunwrap\s*\(", "unwrap("), (r"\bexpect\s*\(", "expect("), (r"\bpanic\s*!", "panic!"),
+    (r"\bunreachable\s*!", "unreachable!"), (r"\btodo\s*!", "todo!"), (r"\bunimplemented\s*!", "unimplemented!"),
+    (r"\bassert\s*!", "assert!"), (r"\bassert_eq\s*!", "assert_eq!"), (r"\bassert_ne\s*!", "assert_ne!"),
+    (r"\bdebug_assert(?:_eq|_ne)?\s*!", "debug_assert!")))
+# The contracts module (DESIGN-B section 6, D2-5): in crates/observer's sources every include_bytes!/include_str! is one
+# plain string literal (no escape, no raw string, no concat!) naming, relative to its file, a registered CONTRACTS file;
+# only contracts.rs and seal.rs hold one, and seal.rs only its two OBSERVER programs.
+OBSERVER_INCLUDE = re.compile(r"\binclude_(?:bytes|str)\s*!")
+OBSERVER_INCLUDE_FORM = re.compile(r'\binclude_(?:bytes|str)\s*!\s*\(\s*"([^"\\]*)"\s*\)')
 CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/effect-gate/src/lib.rs": "#![forbid(unsafe_code)]",
                "crates/gate-sys/src/lib.rs": "#![deny(unsafe_code)]",
@@ -1353,18 +1433,98 @@ def check_observer_post_seal(base: Path) -> int:
     path call, function item, turbofish, import; PR review round 1, R1-1) nor Drop (R1-4), each of which reaches a system
     call the OBSERVER filter kills or would run code under it. In HE-004A only the not-yet-serving exit runs after the
     seal; the rule settles the list before HE-004B..D add code. A list, not a proof: T04's steady-state trace stays the
-    proof. The number of sources."""
+    proof. HE-004B1 DESIGN-B section 6: i05-protocol's sources too (OBSERVER_POST_SEAL_CRATES), json.rs's one `impl Drop
+    for Value` removed once from its code first (OBSERVER_DROP_EXCEPTIONS). The number of sources."""
+    count = 0
+    for crate in OBSERVER_POST_SEAL_CRATES:
+        found = 0
+        for path in sorted((base / crate / "src").rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
+            raw = path.read_text(encoding="utf-8")
+            text, code = PATH_SPACE.sub("::", raw), PATH_SPACE.sub("::", rust_code(raw))
+            if rel in OBSERVER_DROP_EXCEPTIONS:
+                code = OBSERVER_DROP_EXCEPTIONS[rel].sub(" ", code, count=1)
+            for pattern, name in POST_SEAL_FORBIDDEN:
+                require(not re.search(pattern, text), "%s names %s (observer post-seal check)" % (rel, name))
+            for pattern, name in OBSERVER_POST_SEAL_FORBIDDEN:
+                require(not re.search(pattern, code), "%s names %s (observer post-seal check)" % (rel, name))
+            found += 1
+        require(found or crate != OBSERVER_CRATE, "%s has no sources (observer post-seal check)" % OBSERVER_CRATE)
+        count += found
+    return count
+
+
+def allowed_logic_path(path: tuple[str, ...], rooted: bool) -> bool:
+    """Whether a path of an observer logic module passes the whitelist: a path not rooted at a crate (its first segment
+    a local name, or an imported module or type) passes; a rooted one must start with an OBSERVER_LOGIC_PATHS entry."""
+    if not rooted and path[0] not in CRATE_PATH_ROOTS:
+        return True
+    return any(path[:len(prefix)] == prefix for prefix in OBSERVER_LOGIC_PATHS)
+
+
+def check_observer_logic(base: Path) -> int:
+    """HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2) over the observer's logic modules (OBSERVER_LOGIC, each required),
+    read with comments removed, literal contents emptied and the whitespace around `::` removed: every use path (no
+    rename, no glob) and every crate-rooted code path starts with an OBSERVER_LOGIC_PATHS entry; none of
+    OBSERVER_LOGIC_WORDS; and, outside strict #[cfg(test)] mod tests blocks, none of PANICS. The number of modules."""
+    for rel in OBSERVER_LOGIC:
+        require((base / rel).is_file(), "%s is missing (observer logic rules)" % rel)
+    for rel in OBSERVER_LOGIC:
+        raw = (base / rel).read_text(encoding="utf-8")
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (observer logic rules)" % (rel, error)) from None
+        for path, rename in source_uses(rel, raw):
+            require(rename is None, "%s renames an import (observer logic rules)" % rel)
+            require(path[-1] != "*", "%s imports a glob (observer logic rules)" % rel)
+            require(allowed_logic_path(path, False), "%s imports %s, outside the observer logic whitelist (observer logic "
+                    "rules)" % (rel, "::".join(path)))
+        for match in CODE_PATH.finditer(USE_DECLARATION.sub(" ", code)):
+            leading, root, tail = match.groups()
+            path = (root,) + tuple(tail.split("::")[1:])
+            require(allowed_logic_path(path, bool(leading)), "%s names %s%s, outside the observer logic whitelist "
+                    "(observer logic rules)" % (rel, leading or "", "::".join(path)))
+        for pattern, name in OBSERVER_LOGIC_WORDS:
+            require(not pattern.search(code), "%s names %s (observer logic rules)" % (rel, name))
+        scanned = code
+        for start, end in reversed(cfg_test_blocks(scanned)):
+            scanned = scanned[:start] + " " + scanned[end:]
+        for pattern, name in PANICS:
+            require(not pattern.search(scanned), "%s names %s outside a strict #[cfg(test)] mod tests block (observer "
+                    "no-panic tripwire)" % (rel, name))
+    return len(OBSERVER_LOGIC)
+
+
+def check_observer_includes(base: Path) -> int:
+    """HE-004B1 DESIGN-B section 6 (D2-5): crates/observer/src/contracts.rs exists; in crates/observer's sources (read
+    without comments, literals kept) every include_bytes!/include_str! is OBSERVER_INCLUDE_FORM, one plain literal that
+    names, relative to its file, a registered CONTRACTS file; only contracts.rs and seal.rs hold one, seal.rs only the
+    OBSERVER programs. The number of embedded files."""
+    require((base / OBSERVER_CONTRACTS).is_file(), "%s is missing (observer contracts rule)" % OBSERVER_CONTRACTS)
     count = 0
     for path in sorted((base / OBSERVER_CRATE / "src").rglob("*.rs")):
         rel = path.relative_to(base).as_posix()
         raw = path.read_text(encoding="utf-8")
-        text, code = PATH_SPACE.sub("::", raw), PATH_SPACE.sub("::", rust_code(raw))
-        for pattern, name in POST_SEAL_FORBIDDEN:
-            require(not re.search(pattern, text), "%s names %s (observer post-seal check)" % (rel, name))
-        for pattern, name in OBSERVER_POST_SEAL_FORBIDDEN:
-            require(not re.search(pattern, code), "%s names %s (observer post-seal check)" % (rel, name))
-        count += 1
-    require(count, "%s has no sources (observer post-seal check)" % OBSERVER_CRATE)
+        try:
+            code, kept = rust_code(raw), rust_code(raw, literals=True)
+        except GateError as error:
+            raise GateError("%s: %s (observer contracts rule)" % (rel, error)) from None
+        forms = OBSERVER_INCLUDE_FORM.findall(kept)
+        require(len(OBSERVER_INCLUDE.findall(code)) == len(forms) == len(OBSERVER_INCLUDE.findall(kept)),
+                "%s holds an include_bytes! or include_str! that is not one plain path literal (observer contracts rule)"
+                % rel)
+        if not forms:
+            continue
+        require(rel in (OBSERVER_CONTRACTS, OBSERVER_SEAL_RS), "%s embeds a file; only %s embeds contract bytes "
+                "(observer contracts rule)" % (rel, OBSERVER_CONTRACTS))
+        for literal in forms:
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(rel), literal))
+            require(target in CONTRACTS, "%s embeds %s, which is not a registered contract file (observer contracts rule)"
+                    % (rel, literal))
+            require(rel != OBSERVER_SEAL_RS or target in OBSERVER_PROGRAMS.values(),
+                    "%s embeds %s, not an OBSERVER program (observer contracts rule)" % (rel, literal))
+        count += len(forms)
     return count
 
 
@@ -1514,7 +1674,8 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
     require(closure == set(LINKED_CRATES), "the crates effect-gate, gate-tls and planeon-gate link are %s, not %s "
             "(workspace shape)" % (sorted(str(path) for path in closure), sorted(LINKED_CRATES)))
     # HE-004A DESIGN-A section 6 (D2-4): planeon-observer, a member, links exactly its own crate and gate-sys (its
-    # path dependencies, transitively; a dev-dependency is not linked and not in `workspace`).
+    # path dependencies, transitively; a dev-dependency is not linked and not in `workspace`). HE-004B1 (Q-HE4B-6 (a)):
+    # and i05-protocol.
     if "planeon-observer" in names:
         require("planeon-observer" in workspace, "no planeon-observer crate in the workspace (workspace shape)")
         observer = {names.get(name) for name in linked(workspace, "planeon-observer")}
@@ -2204,6 +2365,11 @@ def cfg_test_blocks(code: str) -> list[tuple[int, int]]:
     return blocks
 
 
+def brace_depth(code: str, index: int) -> int:
+    """The brace depth at `index` of a source read without comments and with literal contents emptied."""
+    return code.count("{", 0, index) - code.count("}", 0, index)
+
+
 def check_observation(base: Path) -> int:
     """HE-003A3 DESIGN sections 4-6 (D2-1, D2-5, D3-1, D3-2, D3-4) over the linked crates' non-test sources:
     - callers: each OBSERVATION_CALLERS word occurs (read without comments, literals kept) only as its one definition
@@ -2265,6 +2431,21 @@ def check_observation(base: Path) -> int:
             seen[header] += 1
     require(all(count == 1 for count in seen.values()), "the observation's impls are not each exactly once: %s (%s)"
             % (sorted(header for header, count in seen.items() if count != 1), rule))
+    # HE-003A3 PR review round 1, R1-3 (carried to HE-004B1): the observers are pinned by path, not only by type name.
+    # observation.rs defines no module outside its strict test module, Unobserved and KernelObserver each exactly once at
+    # its top level, and its pinned impls lie at its top level, so no nested module holds a second observer type.
+    own = codes[OBSERVATION_RS]
+    for start, end in reversed(cfg_test_blocks(own)):
+        own = own[:start] + " " + own[end:]
+    require(not MODULE_ITEM.search(own), "%s defines a module outside its strict test module (%s, R1-3)"
+            % (OBSERVATION_RS, rule))
+    for name in OBSERVATION_HOME_TYPES:
+        found = list(re.finditer(r"\b(?:struct|enum|union|type|trait)\s+%s\b" % name, own))
+        require(len(found) == 1 and brace_depth(own, found[0].start()) == 0,
+                "%s does not define %s exactly once at its top level (%s, R1-3)" % (OBSERVATION_RS, name, rule))
+    for position, header in impl_headers(OBSERVATION_RS, own):
+        require(header not in OBSERVATION_IMPLS or brace_depth(own, position) == 0,
+                "%s holds `%s` below its top level (%s, R1-3)" % (OBSERVATION_RS, header, rule))
     for rel, code in codes.items():
         for pattern in OBSERVATION_ALIASES:
             require(not pattern.search(PATH_SPACE.sub("::", code)), "%s renames or aliases an observation type (%s)"
@@ -2329,7 +2510,45 @@ def check_observer_wiring(base: Path) -> int:
     bindings = [match.start() for match in re.finditer(r"\blet\s+gate\b", code)]
     require(len(bindings) == 2 and bindings[1] == positions[3],
             "%s rebinds gate other than as the PolicyGate and its observer (observer wiring)" % GATE_MAIN)
+    # HE-003A3 PR review round 1, R1-2 (carried to HE-004B1): no other binding form of gate anywhere (a let pattern
+    # holding gate is exactly `gate`: no `let (gate, ..)`, `let mut gate`, `let Some(gate)`), no assignment to it, and
+    # after the observer's attach gate occurs only as `gate.apiserver_address()` and in `Substrate::new(gate, ..)`, so no
+    # later shadowing, rebinding or moving call can hand the substrate another gate.
+    for word in LET_WORD.finditer(code):
+        pattern = let_pattern(code, word.end())
+        require(not re.search(r"\bgate\b", pattern) or pattern.strip() == "gate",
+                "%s binds gate in the pattern `let %s` (observer wiring, R1-2)" % (GATE_MAIN, " ".join(pattern.split())))
+    for assignment in GATE_ASSIGNMENT.finditer(code):
+        require(re.search(r"\blet\s+$", code[:assignment.start()]),
+                "%s assigns to gate (observer wiring, R1-2)" % GATE_MAIN)
+    after = OBSERVER_STATEMENT.search(code).end()
+    tail = code[after:]
+    allowed = ({match.start() for match in AFTER_ATTACH_USES[0].finditer(tail)}
+               | {match.start(1) for match in AFTER_ATTACH_USES[1].finditer(tail)})
+    for use in re.finditer(r"\bgate\b", tail):
+        require(use.start() in allowed, "%s names gate after the observer's attach other than in gate.apiserver_address() "
+                "and Substrate::new(gate, ..) (observer wiring, R1-2)" % GATE_MAIN)
     return 2
+
+
+def let_pattern(code: str, start: int) -> str:
+    """A let statement's pattern: from `start` (after `let`) to the first `=` (not `==`, `=>`, `<=`, `>=` or `!=`), type
+    annotation `:` (not `::`) or `;` at bracket depth 0."""
+    depth, index = 0, start
+    while index < len(code):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif depth == 0 and char == ";":
+            break
+        elif depth == 0 and char == ":" and not code.startswith("::", index) and code[index - 1] != ":":
+            break
+        elif depth == 0 and char == "=" and code[index + 1:index + 2] not in ("=", ">") and code[index - 1] not in "=<>!":
+            break
+        index += 1
+    return code[start:index]
 
 
 def check_macros(base: Path) -> int:
@@ -2575,9 +2794,18 @@ def main() -> int:
             "std APIs (plus set_modified and is_terminal), each of which reaches a system call the EFFECT_GATE filter "
             "kills (lexical tripwire)" % check_post_seal_sources(HE))
         say("observer post-seal: %d sources of %s name none of those std APIs nor, in any form, %s, each of which reaches "
-            "a system call the OBSERVER filter kills or runs code under it (lexical tripwire, %s only)"
-            % (check_observer_post_seal(HE), OBSERVER_CRATE, ", ".join(name.split(" ")[0] for _, name
-                                                                       in OBSERVER_POST_SEAL_FORBIDDEN), OBSERVER_CRATE))
+            "a system call the OBSERVER filter kills or runs code under it (lexical tripwire, %s only; %s's one impl Drop "
+            "for Value excepted)"
+            % (check_observer_post_seal(HE), " and ".join(OBSERVER_POST_SEAL_CRATES),
+               ", ".join(name.split(" ")[0] for _, name in OBSERVER_POST_SEAL_FORBIDDEN), " and ".join(OBSERVER_POST_SEAL_CRATES),
+               I05_JSON))
+        say("observer logic: %d modules of %s (%s) name only the whitelisted path roots %s, no super:: or foreign self::"
+            " path, glob, renaming import, HashMap, HashSet, RandomState or include macro, and no panicking macro or call "
+            "outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
+            % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES),
+               ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
+        say("observer contracts: %d embedded files, each one plain literal naming a registered contract file, only in %s "
+            "and (the OBSERVER programs) %s (HE-004B1)" % (check_observer_includes(HE), OBSERVER_CONTRACTS, OBSERVER_SEAL_RS))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
