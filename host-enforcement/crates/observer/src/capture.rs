@@ -34,10 +34,8 @@
 //! the entry: the capture is unavailable and the entry is recomputed) and measures verity; the record's verity digest
 //! binds the content the memo hashed, which keeps the memo sound across inode reuse (D1-9).
 //!
-//! **The declared host fields (Q-HE4D1-1 (a), R120).** `host`, `selinuxBefore`, `selinuxAfter`, `kernelPolicyDigest`,
-//! `booleansObserved`, `hardeningObserved` and `bootEntryObserved` are copied from the record, never read; the view
-//! carries [`DECLARED_HOST_FIELDS`] and [`HOST_FIELDS_OBSERVED`] = false. The model's equalities on them hold by
-//! construction until HE-008 and T04 supply real reads, or a follow-up contract drops them.
+//! **The captures are native-profile v5's (HE-004D2 DESIGN-D2 section 4.3, unit B1, Amendment A2).** They carry no host,
+//! policy or boot field: those are record-only in v5 (T04-HOST-BOOT, T04-POLICY-STABLE, T04-HOST-LOCKS, T04-BOOT-ENTRY).
 
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -77,10 +75,6 @@ pub const MAX_CANDIDATES: usize = 4_096;
 /// The seven domains the lifecycle capture counts.
 pub const DOMAINS: [&str; 7] = ["planeon_server_t", "planeon_observer_t", "planeon_broker_t", "planeon_worker_t",
                                 "planeon_gate_t", "planeon_contain_t", "planeon_policy_writer_t"];
-/// The declared host fields (R120), never observed by R10.
-pub const DECLARED_HOST_FIELDS: [&str; 7] =
-    ["host", "selinuxBefore", "selinuxAfter", "kernelPolicyDigest", "booleansObserved", "hardeningObserved", "bootEntryObserved"];
-pub const HOST_FIELDS_OBSERVED: bool = false;
 
 /// A process file of the closed read set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,7 +234,6 @@ pub enum Slot {
 pub struct CaptureView {
     pub sequence: u64,
     pub record_digest: String,
-    pub declared_host_fields: [&'static str; 7],
     /// The five roles, in the model's order.
     pub roles: [Slot; 5],
     pub lifecycle: Slot,
@@ -354,16 +347,6 @@ fn unavailable<T>(why: &str) -> Result<T, Halt> {
     Err(Halt::Unavailable(why.to_string()))
 }
 
-/// The record's values a capture copies (the declared host fields and the common binding).
-struct Declared {
-    host: Value,
-    status: Value,
-    policy_digest: Value,
-    booleans: Value,
-    hardening: Value,
-    boot_entry: Value,
-}
-
 /// An integer value of a `u64`.
 fn number(value: u64) -> Value {
     Value::Int(Int::from_u64(value))
@@ -395,7 +378,6 @@ pub struct CaptureEngine<K: KernelView> {
     kernel: K,
     enrolled: Enrolled,
     schema: CaptureSchema,
-    declared: Declared,
     memo: Memo<K::Held>,
     view: CaptureView,
     buffer: Vec<u8>,
@@ -404,39 +386,15 @@ pub struct CaptureEngine<K: KernelView> {
 impl<K: KernelView> CaptureEngine<K> {
     /// The engine for one epoch: its view starts Pending.
     pub fn new(kernel: K, enrolled: Enrolled, schema: CaptureSchema) -> CaptureEngine<K> {
-        let record = enrolled.record.value();
-        let field = |path: &[&str]| path.iter().try_fold(record, |node, key| node.get(key)).cloned().unwrap_or(Value::Null);
-        let mut hardening = field(&["hardening"]);
-        if let Value::Object(members) = &mut hardening {
-            if let Some(Value::Object(seal)) = members.get_key_mut(&JStr::new("sealMarker")) {
-                seal.remove(&JStr::new("selinuxLabel"));
-            }
-        }
-        let line = record
-            .get("bootEntries")
-            .and_then(|entries| entries.get("ENROLLED"))
-            .and_then(|entry| entry.get("kernelCmdline"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let declared = Declared {
-            host: field(&["host"]),
-            status: field(&["selinux", "status"]),
-            policy_digest: field(&["selinux", "policyDigest"]),
-            booleans: field(&["selinux", "booleans"]),
-            hardening,
-            boot_entry: object(vec![("entryId", field(&["bootEntries", "ENROLLED", "entryId"])),
-                                    ("cmdlineSha256", Value::str(&sha256::prefixed(line.as_bytes())))]),
-        };
         let view = CaptureView {
             sequence: 0,
             record_digest: enrolled.record.digest().to_string(),
-            declared_host_fields: DECLARED_HOST_FIELDS,
             roles: [Slot::Pending, Slot::Pending, Slot::Pending, Slot::Pending, Slot::Pending],
             lifecycle: Slot::Pending,
             backends: enrolled.backends.iter().map(|backend| (backend.component.clone(), Slot::Pending)).collect(),
             set_started_ms: 0,
         };
-        CaptureEngine { kernel, enrolled, schema, declared, memo: Memo { entries: BTreeMap::new(), partial: None }, view,
+        CaptureEngine { kernel, enrolled, schema, memo: Memo { entries: BTreeMap::new(), partial: None }, view,
                         buffer: vec![0u8; HASH_CHUNK] }
     }
 
@@ -553,8 +511,8 @@ impl<K: KernelView> CaptureEngine<K> {
     /// One P1 role capture (or its slot state).
     fn role(&mut self, index: usize, scheduled: Instant, budget_end: Instant) -> Result<Value, Halt> {
         let expires = self.expires_ms();
-        let CaptureEngine { kernel, enrolled, memo, declared, .. } = self;
-        let mut window = Window { kernel, enrolled, memo, declared, index, expires, started: None, start_ms: 0 };
+        let CaptureEngine { kernel, enrolled, memo, .. } = self;
+        let mut window = Window { kernel, enrolled, memo, index, expires, started: None, start_ms: 0 };
         window.capture(scheduled, budget_end)
     }
 
@@ -633,7 +591,6 @@ struct Window<'a, K: KernelView> {
     kernel: &'a mut K,
     enrolled: &'a Enrolled,
     memo: &'a mut Memo<K::Held>,
-    declared: &'a Declared,
     index: usize,
     expires: u64,
     started: Option<Instant>,
@@ -818,22 +775,15 @@ impl<K: KernelView> Window<'_, K> {
     fn common(&self, role: &str, a: u64, b: u64, d: u64) -> Result<Vec<(&'static str, Value)>, Halt> {
         let observed = kernel_text::utc_text(a / 1_000).ok_or_else(|| Halt::Unavailable("wall clock unusable".to_string()))?;
         Ok(vec![
-            ("schemaVersion", Value::str(capture_check::V4_CAPTURE)),
+            ("schemaVersion", Value::str(capture_check::V5_CAPTURE)),
             ("evidenceClass", Value::str("DATA_CHECK_ONLY")),
             ("capturer", Value::str("OBSERVER")),
             ("qualificationDigest", Value::str(self.enrolled.record.digest())),
             ("role", Value::str(role)),
-            ("host", self.declared.host.clone()),
-            ("selinuxBefore", self.declared.status.clone()),
-            ("selinuxAfter", self.declared.status.clone()),
-            ("kernelPolicyDigest", self.declared.policy_digest.clone()),
             ("observedAt", Value::str(&observed)),
             ("inspectionStartedMs", number(a)),
             ("inspectionFinishedMs", number(b)),
             ("deadlineMs", number(d)),
-            ("booleansObserved", self.declared.booleans.clone()),
-            ("hardeningObserved", self.declared.hardening.clone()),
-            ("bootEntryObserved", self.declared.boot_entry.clone()),
         ])
     }
 
@@ -1226,12 +1176,11 @@ impl<K: KernelView> CaptureEngine<K> {
         let scan = scan.as_ref().map_err(|why| Halt::Unavailable(why.clone()))?;
         let counts = object(DOMAINS.iter().map(|domain| (*domain, number(scan.counts.get(domain).copied().unwrap_or(0)))).collect());
         Ok(object(vec![
-            ("schemaVersion", Value::str(capture_check::V4_LIFECYCLE)),
+            ("schemaVersion", Value::str(capture_check::V5_LIFECYCLE)),
             ("evidenceClass", Value::str("DATA_CHECK_ONLY")),
             ("capturer", Value::str("OBSERVER")),
             ("qualificationDigest", Value::str(self.enrolled.record.digest())),
             ("subject", Value::str("HOST_CONTAINMENT")),
-            ("host", self.declared.host.clone()),
             ("observedAt", Value::str(&observed)),
             ("sealMarker", object(vec![("path", Value::str(&marker_path)), ("digest", Value::str(&sha256::prefixed(&content))),
                                        ("uid", number(u64::from(facts.uid))), ("mode", Value::str(&kernel_text::mode_text(facts.mode)))])),
@@ -1241,10 +1190,8 @@ impl<K: KernelView> CaptureEngine<K> {
                 object(vec![("path", Value::str(&enrolled::cgroup_path(rel))), ("populated", number(*populated))])
             }).collect())),
             ("domainProcessCounts", counts),
-            ("booleansObserved", self.declared.booleans.clone()),
             ("sliceMembers", Value::Array(Vec::new())),
             ("sliceDescendants", number(descendants)),
-            ("bootEntryObserved", self.declared.boot_entry.clone()),
         ]))
     }
 
@@ -1276,12 +1223,11 @@ impl<K: KernelView> CaptureEngine<K> {
             return unavailable("file differs from its record row");
         }
         Ok(object(vec![
-            ("schemaVersion", Value::str(capture_check::V4_BACKEND)),
+            ("schemaVersion", Value::str(capture_check::V5_BACKEND)),
             ("evidenceClass", Value::str("DATA_CHECK_ONLY")),
             ("capturer", Value::str("OBSERVER")),
             ("qualificationDigest", Value::str(self.enrolled.record.digest())),
             ("component", Value::str(&component)),
-            ("host", self.declared.host.clone()),
             ("observedAt", Value::str(&observed)),
             ("process", object(vec![("pid", signed(i64::from(pid))), ("startTicks", number(start)), ("processLabel", Value::str(&label)),
                                     ("cgroupPath", Value::str(&cgroup_path))])),

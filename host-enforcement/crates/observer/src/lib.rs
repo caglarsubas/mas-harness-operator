@@ -14,6 +14,10 @@
 //! (`http`), the exposition and watch-line readers (`exposition`, `watch`), the requests from B1's specs (`requests`),
 //! quota headroom (`quota`), the UTC text of the wall clock (`utc`) and the observation epoch (`observe`). B1's five
 //! logic modules and `contracts` are unchanged; the HE-004C rows of MODEL_DEFINED start at R106.
+//!
+//! HE-004D2 (DESIGN-D2 rev 2; owner decisions Q-HE4D2-1..11, all (a)) adds pure logic modules, the R10 ports of the
+//! qualification and I06 evidence checks and their fixture composition. Nothing here or in `serve` names them
+//! (`tools/gate.py`, G-D2-5), so none is reachable from the binary's `main`; only the host tests call them.
 #![forbid(unsafe_code)]
 
 pub mod admission;
@@ -21,12 +25,14 @@ pub mod capture;
 pub mod capture_check;
 pub mod capture_schema;
 pub mod client;
+pub mod composition;
 pub mod config;
 pub mod contracts;
 pub mod credentials;
 pub mod enrolled;
 pub mod exposition;
 pub mod http;
+pub mod i06_evidence;
 pub mod inputs;
 pub mod kernel_text;
 #[cfg(target_os = "linux")]
@@ -35,8 +41,10 @@ pub mod linux_capture;
 pub mod linux_net;
 pub mod observe;
 pub mod operational;
+pub mod qualification;
 pub mod quota;
 pub mod rbac;
+pub mod record_check;
 pub mod requests;
 pub mod seal;
 pub mod signed_config;

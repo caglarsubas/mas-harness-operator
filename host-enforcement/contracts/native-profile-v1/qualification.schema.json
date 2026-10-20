@@ -1,0 +1,1358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:planeon:internal:native-qualification:v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/record"
+    },
+    {
+      "$ref": "#/$defs/capture"
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^/[A-Za-z0-9_./+-]+$"
+    },
+    "time": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tenantId",
+        "environmentId",
+        "runNonce",
+        "capacityNonce",
+        "namespace",
+        "validFrom",
+        "expiresAt"
+      ],
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "environmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "runNonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "capacityNonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[ -~]+$"
+        },
+        "validFrom": {
+          "$ref": "#/$defs/time"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/time"
+        }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "machine",
+        "kernelRelease",
+        "kernelNotesDigest",
+        "bootId"
+      ],
+      "properties": {
+        "machine": {
+          "enum": [
+            "x86_64",
+            "aarch64"
+          ]
+        },
+        "kernelRelease": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "kernelNotesDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "bootId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sequence",
+        "policyload",
+        "enforcing",
+        "denyUnknown"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967294
+        },
+        "policyload": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "enforcing": {
+          "const": 1
+        },
+        "denyUnknown": {
+          "const": 1
+        }
+      }
+    },
+    "namespaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user",
+        "mnt",
+        "pid",
+        "net"
+      ],
+      "properties": {
+        "user": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "mnt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "net": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offset",
+        "length",
+        "permissions"
+      ],
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "permissions": {
+          "enum": [
+            "r-xp",
+            "r-xs",
+            "--xp",
+            "--xs"
+          ]
+        }
+      }
+    },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "mode",
+        "size",
+        "sha256",
+        "verityDigest",
+        "selinuxLabel",
+        "executableSegments"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "mode": {
+          "enum": [
+            "0444",
+            "0555"
+          ]
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "verityDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "selinuxLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[ -~]+$"
+        },
+        "executableSegments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/segment"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        }
+      }
+    },
+    "program": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "programId",
+        "programType",
+        "translatedSha256",
+        "instructionBytes",
+        "mapIds",
+        "ifindex"
+      ],
+      "properties": {
+        "programId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "programType": {
+          "enum": [
+            9,
+            18
+          ]
+        },
+        "translatedSha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "instructionBytes": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 65536
+        },
+        "mapIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "ifindex": {
+          "const": 0
+        }
+      }
+    },
+    "cgroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "inode",
+        "memoryMaxBytes",
+        "pidsMax",
+        "cpuQuotaMicros",
+        "cpuPeriodMicros"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "memoryMaxBytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 1099511627776
+        },
+        "pidsMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "cpuQuotaMicros": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1000000
+        },
+        "cpuPeriodMicros": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1000000
+        }
+      }
+    },
+    "fileObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry",
+        "device",
+        "inode",
+        "uid",
+        "gid",
+        "nlink",
+        "contentDigest",
+        "measuredVerity"
+      ],
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/file"
+        },
+        "device": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "uid": {
+          "const": 0
+        },
+        "gid": {
+          "const": 0
+        },
+        "nlink": {
+          "const": 1
+        },
+        "contentDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "measuredVerity": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "offset",
+        "length",
+        "permissions",
+        "device",
+        "inode"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864
+        },
+        "permissions": {
+          "enum": [
+            "r-xp",
+            "r-xs",
+            "--xp",
+            "--xs"
+          ]
+        },
+        "device": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "observedProgram": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program",
+        "localIds",
+        "effectiveIds"
+      ],
+      "properties": {
+        "program": {
+          "$ref": "#/$defs/program"
+        },
+        "localIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "effectiveIds": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "qualificationProfile",
+        "profileDigest",
+        "scope",
+        "host",
+        "selinux",
+        "roles",
+        "files",
+        "endpointTuples"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "planeon.internal.native-qualification/v1"
+        },
+        "qualificationProfile": {
+          "const": "SELINUX_FSVERITY_CGROUP_BPF_V1"
+        },
+        "profileDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "host": {
+          "$ref": "#/$defs/host"
+        },
+        "selinux": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policyDigest",
+            "status"
+          ],
+          "properties": {
+            "policyDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "status": {
+              "$ref": "#/$defs/status"
+            }
+          }
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "SERVER",
+            "OBSERVER",
+            "BROKER",
+            "WORKER"
+          ],
+          "properties": {
+            "SERVER": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "executable",
+                "artifactDigest",
+                "interpreterPath",
+                "uid",
+                "gid",
+                "processLabel",
+                "namespaceInodes",
+                "cgroup",
+                "seccompMode",
+                "filePaths",
+                "bpfPrograms",
+                "outboundEndpointIds"
+              ],
+              "properties": {
+                "executable": {
+                  "const": "/opt/planeon/bin/harness-live-proxy-serve"
+                },
+                "artifactDigest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "interpreterPath": {
+                  "const": "/opt/planeon/python/3.12.14/bin/python3.12"
+                },
+                "uid": {
+                  "const": 0
+                },
+                "gid": {
+                  "const": 0
+                },
+                "processLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[ -~]+$"
+                },
+                "namespaceInodes": {
+                  "$ref": "#/$defs/namespaces"
+                },
+                "cgroup": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "inode",
+                    "memoryMaxBytes",
+                    "pidsMax",
+                    "cpuQuotaMicros",
+                    "cpuPeriodMicros"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": "/sys/fs/cgroup/planeon-live/proxy-server"
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "memoryMaxBytes": {
+                      "type": "integer",
+                      "minimum": 1048576,
+                      "maximum": 1099511627776
+                    },
+                    "pidsMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4096
+                    },
+                    "cpuQuotaMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    },
+                    "cpuPeriodMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    }
+                  }
+                },
+                "seccompMode": {
+                  "const": 2
+                },
+                "filePaths": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/path"
+                  },
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true
+                },
+                "bpfPrograms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "INET_SOCK_CREATE",
+                    "INET4_BIND",
+                    "INET6_BIND",
+                    "INET4_CONNECT",
+                    "INET6_CONNECT",
+                    "UDP4_SENDMSG",
+                    "UDP6_SENDMSG"
+                  ],
+                  "properties": {
+                    "INET_SOCK_CREATE": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP4_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP6_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    }
+                  }
+                },
+                "outboundEndpointIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[ -~]+$"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "OBSERVER": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "executable",
+                "artifactDigest",
+                "interpreterPath",
+                "uid",
+                "gid",
+                "processLabel",
+                "namespaceInodes",
+                "cgroup",
+                "seccompMode",
+                "filePaths",
+                "bpfPrograms",
+                "outboundEndpointIds"
+              ],
+              "properties": {
+                "executable": {
+                  "const": "/opt/planeon/bin/harness-policy-observer"
+                },
+                "artifactDigest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "interpreterPath": {
+                  "const": null
+                },
+                "uid": {
+                  "const": 0
+                },
+                "gid": {
+                  "const": 0
+                },
+                "processLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[ -~]+$"
+                },
+                "namespaceInodes": {
+                  "$ref": "#/$defs/namespaces"
+                },
+                "cgroup": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "inode",
+                    "memoryMaxBytes",
+                    "pidsMax",
+                    "cpuQuotaMicros",
+                    "cpuPeriodMicros"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": "/sys/fs/cgroup/planeon-live/policy-observer"
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "memoryMaxBytes": {
+                      "type": "integer",
+                      "minimum": 1048576,
+                      "maximum": 1099511627776
+                    },
+                    "pidsMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4096
+                    },
+                    "cpuQuotaMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    },
+                    "cpuPeriodMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    }
+                  }
+                },
+                "seccompMode": {
+                  "const": 2
+                },
+                "filePaths": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/path"
+                  },
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true
+                },
+                "bpfPrograms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "INET_SOCK_CREATE",
+                    "INET4_BIND",
+                    "INET6_BIND",
+                    "INET4_CONNECT",
+                    "INET6_CONNECT",
+                    "UDP4_SENDMSG",
+                    "UDP6_SENDMSG"
+                  ],
+                  "properties": {
+                    "INET_SOCK_CREATE": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP4_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP6_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    }
+                  }
+                },
+                "outboundEndpointIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[ -~]+$"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "BROKER": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "executable",
+                "artifactDigest",
+                "interpreterPath",
+                "uid",
+                "gid",
+                "processLabel",
+                "namespaceInodes",
+                "cgroup",
+                "seccompMode",
+                "filePaths",
+                "bpfPrograms",
+                "outboundEndpointIds"
+              ],
+              "properties": {
+                "executable": {
+                  "const": "/opt/planeon/bin/harness-capacity-broker"
+                },
+                "artifactDigest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "interpreterPath": {
+                  "const": null
+                },
+                "uid": {
+                  "const": 0
+                },
+                "gid": {
+                  "const": 0
+                },
+                "processLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[ -~]+$"
+                },
+                "namespaceInodes": {
+                  "$ref": "#/$defs/namespaces"
+                },
+                "cgroup": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "inode",
+                    "memoryMaxBytes",
+                    "pidsMax",
+                    "cpuQuotaMicros",
+                    "cpuPeriodMicros"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": "/sys/fs/cgroup/planeon-live/capacity-broker"
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "memoryMaxBytes": {
+                      "type": "integer",
+                      "minimum": 1048576,
+                      "maximum": 1099511627776
+                    },
+                    "pidsMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4096
+                    },
+                    "cpuQuotaMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    },
+                    "cpuPeriodMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    }
+                  }
+                },
+                "seccompMode": {
+                  "const": 2
+                },
+                "filePaths": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/path"
+                  },
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true
+                },
+                "bpfPrograms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "INET_SOCK_CREATE",
+                    "INET4_BIND",
+                    "INET6_BIND",
+                    "INET4_CONNECT",
+                    "INET6_CONNECT",
+                    "UDP4_SENDMSG",
+                    "UDP6_SENDMSG"
+                  ],
+                  "properties": {
+                    "INET_SOCK_CREATE": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP4_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP6_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    }
+                  }
+                },
+                "outboundEndpointIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[ -~]+$"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "WORKER": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "executable",
+                "artifactDigest",
+                "interpreterPath",
+                "uid",
+                "gid",
+                "processLabel",
+                "namespaceInodes",
+                "cgroup",
+                "seccompMode",
+                "filePaths",
+                "bpfPrograms",
+                "outboundEndpointIds"
+              ],
+              "properties": {
+                "executable": {
+                  "const": "/opt/planeon/bin/harness-live-probe-exec"
+                },
+                "artifactDigest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "interpreterPath": {
+                  "const": "/opt/planeon/python/3.12.14/bin/python3.12"
+                },
+                "uid": {
+                  "type": "integer",
+                  "minimum": 10000,
+                  "maximum": 2147483647
+                },
+                "gid": {
+                  "type": "integer",
+                  "minimum": 10000,
+                  "maximum": 2147483647
+                },
+                "processLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "^[ -~]+$"
+                },
+                "namespaceInodes": {
+                  "$ref": "#/$defs/namespaces"
+                },
+                "cgroup": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "path",
+                    "inode",
+                    "memoryMaxBytes",
+                    "pidsMax",
+                    "cpuQuotaMicros",
+                    "cpuPeriodMicros"
+                  ],
+                  "properties": {
+                    "path": {
+                      "const": "/sys/fs/cgroup/planeon-live/probe-worker"
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "memoryMaxBytes": {
+                      "type": "integer",
+                      "minimum": 1048576,
+                      "maximum": 1099511627776
+                    },
+                    "pidsMax": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4096
+                    },
+                    "cpuQuotaMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    },
+                    "cpuPeriodMicros": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 1000000
+                    }
+                  }
+                },
+                "seccompMode": {
+                  "const": 2
+                },
+                "filePaths": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/path"
+                  },
+                  "minItems": 1,
+                  "maxItems": 128,
+                  "uniqueItems": true
+                },
+                "bpfPrograms": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "INET_SOCK_CREATE",
+                    "INET4_BIND",
+                    "INET6_BIND",
+                    "INET4_CONNECT",
+                    "INET6_CONNECT",
+                    "UDP4_SENDMSG",
+                    "UDP6_SENDMSG"
+                  ],
+                  "properties": {
+                    "INET_SOCK_CREATE": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_BIND": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET4_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "INET6_CONNECT": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP4_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    },
+                    "UDP6_SENDMSG": {
+                      "$ref": "#/$defs/program"
+                    }
+                  }
+                },
+                "outboundEndpointIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[ -~]+$"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              }
+            }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 4,
+          "maxItems": 128
+        },
+        "endpointTuples": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceClass",
+        "qualificationDigest",
+        "role",
+        "host",
+        "selinuxBefore",
+        "selinuxAfter",
+        "kernelPolicyDigest",
+        "observedAt",
+        "inspectionStartedMs",
+        "inspectionFinishedMs",
+        "deadlineMs",
+        "process",
+        "files",
+        "executableMaps",
+        "bpfPrograms"
+      ],
+      "properties": {
+        "evidenceClass": {
+          "const": "DATA_CHECK_ONLY"
+        },
+        "qualificationDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "role": {
+          "enum": [
+            "SERVER",
+            "OBSERVER",
+            "BROKER",
+            "WORKER"
+          ]
+        },
+        "host": {
+          "$ref": "#/$defs/host"
+        },
+        "selinuxBefore": {
+          "$ref": "#/$defs/status"
+        },
+        "selinuxAfter": {
+          "$ref": "#/$defs/status"
+        },
+        "kernelPolicyDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/time"
+        },
+        "inspectionStartedMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "inspectionFinishedMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "deadlineMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "process": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pid",
+            "startTicks",
+            "uid",
+            "gid",
+            "processLabel",
+            "namespaceInodes",
+            "cgroup",
+            "seccompMode"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 2147483647
+            },
+            "startTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "uid": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "gid": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "processLabel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[ -~]+$"
+            },
+            "namespaceInodes": {
+              "$ref": "#/$defs/namespaces"
+            },
+            "cgroup": {
+              "$ref": "#/$defs/cgroup"
+            },
+            "seccompMode": {
+              "const": 2
+            }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileObservation"
+          },
+          "minItems": 1,
+          "maxItems": 128
+        },
+        "executableMaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mapping"
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "bpfPrograms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "INET_SOCK_CREATE",
+            "INET4_BIND",
+            "INET6_BIND",
+            "INET4_CONNECT",
+            "INET6_CONNECT",
+            "UDP4_SENDMSG",
+            "UDP6_SENDMSG"
+          ],
+          "properties": {
+            "INET_SOCK_CREATE": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "INET4_BIND": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "INET6_BIND": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "INET4_CONNECT": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "INET6_CONNECT": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "UDP4_SENDMSG": {
+              "$ref": "#/$defs/observedProgram"
+            },
+            "UDP6_SENDMSG": {
+              "$ref": "#/$defs/observedProgram"
+            }
+          }
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endpointId",
+        "kind",
+        "addressFamily",
+        "ipAddress",
+        "port"
+      ],
+      "properties": {
+        "endpointId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[ -~]+$"
+        },
+        "kind": {
+          "enum": [
+            "CAMPAIGN_PROXY",
+            "KUBERNETES_API_PROXY"
+          ]
+        },
+        "addressFamily": {
+          "enum": [
+            "IPV4",
+            "IPV6"
+          ]
+        },
+        "ipAddress": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 45
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

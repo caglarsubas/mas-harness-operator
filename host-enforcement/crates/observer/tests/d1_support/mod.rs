@@ -1,4 +1,4 @@
-//! Test support for HE-004D1 (DESIGN-D1 section 20): `FakeHost`, a `KernelView` built from a native-profile v4 positive,
+//! Test support for HE-004D1 (DESIGN-D1 section 20): `FakeHost`, a `KernelView` built from a native-profile v5 positive,
 //! with its processes, tasks, `status`, `stat`, `attr/current` and `cgroup` text, `exe` and namespace links, `maps`
 //! lines (devices through the inverse of `makedev`), cgroup files and children, pins and program facts, query answers
 //! (or a scripted error), enrolled files' facts, verity digests and bytes, the seal marker's bytes (the canonical seal
@@ -11,6 +11,8 @@
 //! of the fake's own bytes (backend rows shrink to small sizes), every program the sha256 of the fake's translated
 //! instructions, and the seal marker the digest of the canonical seal content, so the captures the engine takes can
 //! equal the positive's captures apart from those digests, the record's `qualificationDigest` and the timing fields.
+//! HE-004D2 unit B1 (DESIGN-D2 section 4.4): the positives are native-profile v5's, whose records, profiles and endpoints
+//! are v4's and whose captures carry no host, policy or boot field.
 #![allow(dead_code)]
 
 use std::cell::{Cell, RefCell};
@@ -26,7 +28,7 @@ use planeon_observer::capture_schema::CaptureSchema;
 use planeon_observer::enrolled::{record_form, Enrolled, RecordBytes};
 use planeon_observer::kernel_text;
 
-pub const VECTORS: &str = include_str!("../../../../contracts/native-profile-v4/vectors.json");
+pub const VECTORS: &str = include_str!("../../../../contracts/native-profile-v5/vectors.json");
 
 pub fn vectors() -> Value {
     json::parse(VECTORS).expect("the vectors parse")
@@ -707,7 +709,6 @@ pub fn derive_scoped(positive: &Value, window: Option<(&str, &str)>) -> Derived 
     let mut roles = Vec::new();
     for capture in list(positive, "captures") {
         let mut capture = rebind(capture);
-        set(&mut capture, &["hardeningObserved", "sealMarker", "digest"], value_of(&sha256::prefixed(&seal)));
         for index in 0..list(&capture, "files").len() {
             let path = text(field(&list(&capture, "files")[index], "entry"), "path").to_string();
             let digest = files.get(&path).expect("a files row").clone();
