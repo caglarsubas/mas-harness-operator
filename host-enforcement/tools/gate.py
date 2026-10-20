@@ -107,6 +107,20 @@ logic modules take B1's logic rule (G-D1-10); the no-panic, post-seal and Debug 
 (G-D1-11..13); planeon-observer's symbol table holds the two not-inlined constructors (G-D1-14); and its host-path scan
 exempts exactly one span, the pinned v4 schema's bytes, which must occur once (G-D1-16; HOST_PATHS unchanged).
 
+HE-004D2 (the observer's qualification and acceptance logic; DESIGN-D2 rev 2 section 12, owner decisions Q-HE4D2-1..11,
+all (a)) registers edge record v6's five HE-004D2 rows among the contract files (G-D2-1, 40 files); contracts.rs may embed
+only the files OBSERVER_EMBEDDED_CONTRACTS names (G-D2-2); observer-sys's lib.rs, dirent.rs and Cargo.toml join kernel.rs
+among the whole-file pins (G-D2-10, R4-1); and serve's two Linux constructors are counted in their qualified forms too
+(G-D2-11, R1-5). Unit B1 registers edge record v7's six rows (46 files), lets contracts.rs embed native-profile v5's
+schema for the capture validators, and holds both schema constants to one use site each (G-D2-3). The acceptance tokens
+(EvidenceAccepted from A3) are minted only by their one function and never changed or copied (G-D2-8, with design review
+round 2's R2-1 field-type and cfg_attr rules). Its logic modules (record_check in phase A's A2, then i06_evidence and
+qualification; composition in phase B) take B1's logic rule with D1's whitelist plus the four modules (G-D2-4); none
+of their names, nor any type they define, occurs in another crates/observer source, and they implement nothing on another
+type (G-D2-5, the source-level proof that serve cannot reach them); /opt/planeon/ occurs only in record_check.rs's one
+interpreter-tree constant (G-D2-6), whose two root constants join G-D1-5's exceptions (G-D2-9); and planeon-observer's
+symbol table holds no symbol of the four modules on either target (G-D2-7, build-time corroboration).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -179,7 +193,11 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # HE-004B1 (DESIGN-B section 2, owner decision Q-HE4B-7 (a)): the ten I06 v2, I06 v1 and admission v3 files record v4
 # registers for HE-004 (rows 34-43), 31 files. HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's three HE-004D1
 # rows (native-profile v4's schema, vectors and README) and its native-profile v3 schema row, held under the byte rule
-# for the cross-version cases X12-X14 (owner decision Q-HE4D1-11 (a)), 35 files.
+# for the cross-version cases X12-X14 (owner decision Q-HE4D1-11 (a)), 35 files. HE-004D2 (DESIGN-D2 section 2, G-D2-1):
+# edge record v6's five HE-004D2 rows (the native-profile v1 and v2 schemas, which check_migration pins, and I06 v3's
+# vectors, criteria and README), read by the tests only, 40 files. HE-004D2 unit B1 (DESIGN-D2 sections 2 and 4, G-D2-1;
+# owner decision Q-HE4D2-3 (a)): edge record v7's six HE-004D2 rows (native-profile v5's schema, which the capture
+# validators load, its vectors and README, and the native-profile v1, v2 and v3 vectors the history replay reads), 46.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -220,7 +238,32 @@ CONTRACTS = {
     "contracts/native-profile-v4/README.md": "a4205a5388dc83827bb39670bcc9477b030f29829128abf19f7578321c170174",
     "contracts/native-profile-v3/qualification.schema.json":
         "ae5cbb6aa39f4edfa2d9919f25e55bad9ab214a99ca927c5afe7e2d943946ac5",
+    "contracts/native-profile-v1/qualification.schema.json":
+        "bef248bfa82b234124c014f98e40c5791bced3171bb118b7ed1bb7b8daaf95c3",
+    "contracts/native-profile-v2/qualification.schema.json":
+        "55bd641fd229f21e04ec00813bcfe600890584e982e290a210720ac5cb160ab0",
+    "contracts/i06-v3/vectors.json": "4752b648abdd82d21ea622a1b26c721143577478c0a2491204e0d584c1d6f081",
+    "contracts/i06-v3/criteria.json": "752533c57b5f93e4c4158a9c17b52eb88d236a3632ab0b66b669e8f8041f57c7",
+    "contracts/i06-v3/README.md": "9ee406f43060f266a7b5dd2679aa8352f0815584c45e33d0ab193ea7f90c0c77",
+    "contracts/native-profile-v5/qualification.schema.json":
+        "70bda12463cee83301bc10fa6285023dc0e07b281a87ca70d44ec746cf262113",
+    "contracts/native-profile-v5/vectors.json": "b630c362b20bfa7b362bb2ee28734a403303a0dc54b2d627c11a332b226333a1",
+    "contracts/native-profile-v5/README.md": "76b584ca769f0afdd5142fcf3f96e3b5b2d053a172d5713f970dc77594e77692",
+    "contracts/native-profile-v1/vectors.json": "cd1be009b721bb596887335184a33ab8e1f24aed8215477b63e28f058110748f",
+    "contracts/native-profile-v2/vectors.json": "6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396",
+    "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
 }
+# HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
+# closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
+# validator's; native-profile v5's schema, unit B1's, the capture validators'). Every other registered file is read by
+# the tests only.
+OBSERVER_EMBEDDED_CONTRACTS = ("contracts/i06-v1/identity-closure.json", "contracts/i06-v1/writer-inventory.json",
+                               "contracts/i06-v1/upstream-bootstrap-rbac-v1.37.1.json",
+                               "contracts/native-profile-v4/qualification.schema.json",
+                               "contracts/native-profile-v5/qualification.schema.json")
+# HE-004D2 DESIGN-D2 sections 4.1 and 12 (G-D2-3, G-D1-9 generalised): the schema constants of contracts.rs, each defined
+# there once and named once in capture_schema.rs, inside CaptureSchema::embedded, and nowhere else.
+NATIVE_PROFILE_SCHEMAS = ("NATIVE_PROFILE_V4_SCHEMA", "NATIVE_PROFILE_V5_SCHEMA")
 ACCEPTED = ("ACCEPTED_AND", "ACCEPTED_OR", "ALLOWED_EXCEPTION_EXPRESSION", "DEFAULT_ALLOWED")
 MACHINE = {"x86_64-unknown-linux-musl": 62, "aarch64-unknown-linux-musl": 183}
 RELATIVE = {"x86_64-unknown-linux-musl": 8, "aarch64-unknown-linux-musl": 1027}
@@ -337,6 +380,23 @@ OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
 # The v1 parse no longer appears in serve (G-D1-8).
 OBSERVER_V1_PARSE = re.compile(r"\bObserverConfig::parse\s*\(")
+# HE-004D2 (G-D2-11; HE-004D1 PR review round 1, R1-5): the two Linux constructors in the spellings of a path to `new`:
+# `LinuxWire::new`, `<LinuxWire>::new`, `< LinuxCapture >::new`, and (HE-004D2 PR review round 1, R1-7) empty generic
+# arguments and a parenthesised type, `LinuxWire::<>::new`, `<(LinuxWire)>::new`, `<LinuxCapture<>>::new`, spaces allowed.
+# serve also names each type only once (check_observer_serve); in the whole crate neither type is renamed with `as`,
+# no `type` item names either (R2-1, R3-1), and each is named in code only in its own file and inside main.rs's serve
+# (check_observer_capture_callers, R3-1), so no other spelling of the type's path reaches `new` a second time. A type
+# item is read to its `;` at bracket depth 0 (R4-1). The two home files are pinned whole (OBSERVER_HOME_PINS, owner
+# decision Q-D2-END), so no added associated fn, trait impl, alias, default or projection can give another route there
+# (R2-2, R3-1, R4-2), and outside them and main.rs's serve the naming rule refuses any code naming either type. These
+# rules are textual: serve's own control flow around its one counted construction (a loop, or a closure or iterator
+# calling it more than once) is not read by them and stays code review's (PR review round 5, R5-1), beside R118's residual.
+def constructor_call(name: str) -> re.Pattern:
+    return re.compile(r"\b%s\b(?:\s*<\s*>)?(?:\s*\))*(?:\s*>)?(?:\s*::\s*<\s*>)?\s*::\s*new\b" % name)
+
+
+LINUX_CAPTURE_NEW = constructor_call("LinuxCapture")
+QUALIFIED_CONSTRUCTORS = ((constructor_call("LinuxWire"), "LinuxWire"), (LINUX_CAPTURE_NEW, "LinuxCapture"))
 FN_SERVE = re.compile(r"\bfn\s+serve\s*\(")
 SEAL_TOKEN = re.compile(r"\s*(::|=>|b\"\"|\"\"|''|[A-Za-z_]\w*|[0-9]\w*|[(){},;=&])")
 SEAL_KEYWORDS = {"let", "match", "return"}
@@ -546,18 +606,27 @@ D1_ROOT_CONSTANTS = {
     OBSERVER_ENROLLED: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"), root_constant("PIN_ROOT", "/sys/fs/bpf/planeon")),
     OBSERVER_CAPTURE_CHECK: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"),),
 }
+# HE-004D2 DESIGN-D2 section 5.4 (G-D2-9; B2's two, Q-HE4B-5 (a)): record_check.rs's two private root constants, under
+# the same anchored patterns.
+OBSERVER_RECORD_CHECK = "crates/observer/src/record_check.rs"
+D2_ROOT_CONSTANTS = {
+    OBSERVER_RECORD_CHECK: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"), root_constant("PIN_ROOT", "/sys/fs/bpf/planeon")),
+}
+ROOT_CONSTANTS = {**D1_ROOT_CONSTANTS, **D2_ROOT_CONSTANTS}
+# HE-004D2 DESIGN-D2 sections 5.4 and 9 (G-D2-6): the one /opt/planeon/ text of crates/observer's sources.
+INTERPRETER_TREE = root_constant("INTERPRETER_TREE", "/opt/planeon/python/")
 STARTUP_EXCEPTIONS = {
     LINUX_OS: ((CGROUP_ROOT, CGROUP_ROOT_CALL), (PROC_ROOT, PROC_ROOT_CALL)),
     SEAL: ((STATUS_READ,
             re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')),),
     CHANNEL: ((SOCKCREATE_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/thread-self/attr"\s*\)')),
               (PEER_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*&\s*format\s*!\s*\(\s*"/proc/\{\}"\s*,\s*pid\s*\)\s*\)'))),
-    **D1_ROOT_CONSTANTS,
+    **ROOT_CONSTANTS,
 }
 # HE-004D1 DESIGN-D1 section 19 (G-D1-5, R3-1): the linked-source scan refuses the word fs in the raw text of every
 # non-test source, so the same five expressions are removed once each, in their own files, before that scan (as R96's
 # one cgroup2-root open in linux_os.rs); the PROC_ROOT one holds no fs. Any other fs word still refuses.
-FS_SCAN_EXCEPTIONS = D1_ROOT_CONSTANTS
+FS_SCAN_EXCEPTIONS = ROOT_CONSTANTS
 # HE-002S DESIGN section 6 (D8): the foreign symbols each linked source declares, exactly; no other linked source
 # declares a foreign item. Extern items are private, none is declared `safe`, and no linked source names link_name.
 # PR review round 1, R1-1: the sources are read with comments removed and literal contents emptied (rust_code), every
@@ -647,9 +716,23 @@ LINK_PATH_PINS = {
 # PR review round 3, R3-1 (monitor decision (a)): observer-sys's kernel.rs pinned whole by sha256, checked like CONTRACTS,
 # alongside the lexical rules above, which stay for intent and clear refusals. The pinned link-read functions' callees
 # (the free fn `name`, and ProcLink's name() in any impl, through an alias or a trait impl) cannot change without a new
-# pin; any change to the file refuses.
+# pin; any change to the file refuses. HE-004D2 (DESIGN-D2 section 12, G-D2-10; HE-004D1 PR review round 4, R4-1): the
+# crate's other two sources and its manifest are pinned the same way, so no module can be added to observer-sys (an
+# inline `pub mod` in lib.rs included) and no dependency or target can join it; kernel.rs's pin is unchanged.
 OBSERVER_SYS_PINS = {
     "crates/observer-sys/src/kernel.rs": "0b3d0151c9eaf1f44dd56436795aefd8cb7140ce9f4d16fe5f4eaf7130e61d43",
+    "crates/observer-sys/src/lib.rs": "e718fc32fc13a28b4bfc58d6917cd9ac88479e2f5779ab9d351fdc5723f19029",
+    "crates/observer-sys/src/dirent.rs": "133b05b3b231757078efd6c62259dcdafcd3b60f0f9fbae0ba0c0653c15ef510",
+    "crates/observer-sys/Cargo.toml": "4d1299774cccfd74a5a8f7e353c47afde7c6014cc7eb04deadad3d05e5d6fcc4",
+}
+# HE-004D2 PR review round 4, owner decision Q-D2-END (a): the two Linux constructors' home files pinned whole, as kernel.rs
+# was in HE-004D1, so no alias, default, projection or further constructor route can be written where naming the type is
+# allowed. With the naming rule (each type named in code only in its own file and inside main.rs's serve), no alias or
+# added route to a second construction remains outside these reviewed bytes; serve's own control flow around its one
+# counted construction stays code review's (R5-1).
+OBSERVER_HOME_PINS = {
+    "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
+    "crates/observer/src/linux_net.rs": "bc9b4f510222874a197b9a2676946cea827c0871e05fc1ea07682a0bd93bf8c9",
 }
 # HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-9, D2-2): Dir::read_link is pub (gate-sys's host tests call it), so among
 # the linked crates' non-test sources, read without comments and with literals kept, the word read_link appears exactly
@@ -841,7 +924,19 @@ D1_LOGIC_NAMES = ("capture_schema", "capture_check", "kernel_text")
 D1_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in D1_LOGIC_NAMES)
 D1_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + (("i05_protocol", "schema"),)
                   + tuple(("crate", name) for name in D1_LOGIC_NAMES) + tuple(("self", name) for name in D1_LOGIC_NAMES))
-LOGIC_MODULES = tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
+# HE-004D2 DESIGN-D2 section 12 (G-D2-4): the four D2 logic modules take B1's rule with D1's whitelist plus their own
+# paths; each joins LOGIC_MODULES as its unit adds it (D2_LOGIC_BUILT). D1's rule already refuses, among others,
+# crate::capture, crate::observe, crate::enrolled, gate_sys, observer_sys, i05_protocol::regex and std::net there.
+D2_LOGIC_NAMES = ("record_check", "qualification", "i06_evidence", "composition")
+D2_LOGIC_BUILT = ("record_check", "i06_evidence", "qualification", "composition")
+D2_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in D2_LOGIC_BUILT)
+D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NAMES)
+                  + tuple(("self", name) for name in D2_LOGIC_NAMES))
+LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
+                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC))
+# G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
+D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
+PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
 CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
 OBSERVER_LOGIC_WORDS = ((re.compile(r"\b(?:HashMap|HashSet|RandomState)\b"), "HashMap, HashSet or RandomState (getrandom)"),
                         (re.compile(r"\binclude_(?:bytes|str)\s*!"), "include_bytes! or include_str! (only contracts.rs embeds)"))
@@ -1827,8 +1922,17 @@ def check_observer_serve(base: Path) -> int:
     """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
     body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
     call appears exactly once, in that order: load, parse, lifetime, credentials, TLS configuration, wire, embedded closure,
-    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse. What each called function calls
-    in turn stays code review's. The number of calls."""
+    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse. HE-004D2 (G-D2-11; HE-004D1
+    PR review round 1, R1-5): the two Linux constructors are also counted in their qualified forms (`<LinuxWire>::new`,
+    `< LinuxCapture >::new`, and since HE-004D2 PR review round 1, R1-7, `LinuxWire::<>::new`, `<(LinuxWire)>::new` and
+    `<LinuxCapture<>>::new`), each exactly once in serve, and serve names each of the two types only once; with neither
+    type renamed with `as` or named by a `type` item anywhere in the crate, and each named in code only in its own file
+    and in serve (G-D1-6, R2-1, R3-1, R4-1, check_observer_capture_callers), a second construction in any spelling of the
+    type's path refuses. The two home files are pinned whole (check_observer_home_pins, owner decision Q-D2-END), so no
+    added associated fn, trait impl, alias, default or projection gives another route (R2-2, R3-1, R4-2); the pinned
+    bytes hold no constructor call besides each type's own `fn new`. The rules are textual: serve's own control flow
+    around its one counted construction (a loop, or a closure or iterator calling it more than once) is not read and
+    stays code review's (R5-1), as what any other called function does in turn. The number of calls."""
     rel = OBSERVER_MAIN
     require((base / rel).is_file(), "%s is missing (observer wiring order)" % rel)
     try:
@@ -1848,6 +1952,11 @@ def check_observer_serve(base: Path) -> int:
         positions.append(calls[0].start())
     require(positions == sorted(positions), "serve does not call %s in this order (observer wiring order)"
             % ", ".join(name for _, name in OBSERVER_WIRING))
+    for pattern, name in QUALIFIED_CONSTRUCTORS:
+        require(len(pattern.findall(body)) == 1, "serve constructs %s other than exactly once, counting its qualified "
+                "forms (observer wiring order, G-D2-11)" % name)
+        require(len(re.findall(r"\b%s\b" % name, body)) == 1, "serve names %s other than once, in its one construction "
+                "(observer wiring order, G-D2-11, R1-7)" % name)
     return len(OBSERVER_WIRING)
 
 
@@ -1855,7 +1964,9 @@ def check_observer_contracts_module(base: Path) -> int:
     """HE-004C DESIGN-C section 15 (G7; HE-004B1 PR review R1-3): crates/observer/src/contracts.rs, read without comments
     and with literals kept, holds only CONTRACT_BYTES_ITEM items naming a registered contract file (relative to it) and
     CONTRACT_PIN_ITEM items whose text is one of the CONTRACTS pins; nothing else (no fn, use, static, other type,
-    attribute, mod or unpinned value). The number of items."""
+    attribute, mod or unpinned value). HE-004D2 (G-D2-2): each embedded file is one of OBSERVER_EMBEDDED_CONTRACTS; any
+    other registered file (a predecessor schema, a vector set, I06 v3's files) is the tests' to read. The number of
+    items."""
     rel = OBSERVER_CONTRACTS
     require((base / rel).is_file(), "%s is missing (contracts pin)" % rel)
     try:
@@ -1867,6 +1978,8 @@ def check_observer_contracts_module(base: Path) -> int:
         target = posixpath.normpath(posixpath.join(posixpath.dirname(rel), item.group(1)))
         require(target in CONTRACTS, "%s embeds %s, which is not a registered contract file (contracts pin)"
                 % (rel, item.group(1)))
+        require(target in OBSERVER_EMBEDDED_CONTRACTS, "%s embeds %s, a registered contract file it may not embed; only "
+                "the tests read it (contracts pin, G-D2-2)" % (rel, item.group(1)))
         items += 1
     pins = set(CONTRACTS.values())
     for item in CONTRACT_PIN_ITEM.finditer(code):
@@ -3106,7 +3219,12 @@ def check_observer_capture_callers(base: Path) -> int:
     static, pub struct field or pub enum variant of it names an observer-sys type (the R1-3 socket-item shape); read
     without comments and with the whitespace around `::` removed, LinuxCapture::new occurs only as the one call
     `LinuxCapture::new(sealed)` inside main.rs's serve, `impl LinuxCapture` (with its `fn new(`) and `struct
-    LinuxCapture` only in linux_capture.rs, and LinuxCapture is renamed or aliased nowhere. The number of sources."""
+    LinuxCapture` only in linux_capture.rs, and LinuxCapture is renamed or aliased nowhere. HE-004D2 (G-D2-11, R1-5): the
+    constructor is counted in its qualified forms too (`<LinuxCapture>::new`, `< LinuxCapture >::new`). HE-004D2 PR review
+    round 2 (R2-1): LinuxWire is renamed or aliased nowhere either, and a parenthesised aliased type counts. Round 3
+    (R3-1): no `type` item names either type, with any whitespace (a parenthesised, defaulted, where-clause or projected
+    alias), and each type is named in code only in its own file (linux_capture.rs, linux_net.rs) and inside main.rs's fn
+    serve. The number of sources."""
     rule = "capture callers, G-D1-6"
     sources = observer_sources(base, (OBSERVER_CRATE,))
     for rel in (OBSERVER_LINUX_CAPTURE, OBSERVER_MAIN):
@@ -3118,10 +3236,21 @@ def check_observer_capture_callers(base: Path) -> int:
             code = PATH_SPACE.sub("::", rust_code(raw))
         except GateError as error:
             raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
-        require(not re.search(r"\bLinuxCapture\s+as\b|\bas\s+LinuxCapture\b|\btype\s+\w+\s*(?:<[^>]*>)?\s*=\s*[\w:<> ]*"
-                              r"\bLinuxCapture\b|\btype\s+LinuxCapture\b", code),
-                "%s renames or aliases LinuxCapture (%s)" % (rel, rule))
-        calls = list(re.finditer(r"\bLinuxCapture::new\b", code))
+        # R2-1: LinuxWire as well, so serve's one naming of each type is its one counted construction (an alias elsewhere
+        # in the crate would let serve construct it again under another name; serve's own control flow is R5-1's).
+        # R3-1: a `type` item naming either type anywhere up to its `;` is an alias, whatever its whitespace, bounds,
+        # defaults or projection. R4-1: the item is read to its `;` at bracket depth 0 (item_text), so a `;` inside an
+        # array type or a block does not end it early.
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s)" % (rel, rule)) from None
+        for constructed in ("LinuxCapture", "LinuxWire"):
+            named = re.compile(r"\b%s\b" % constructed)
+            require(not re.search(r"\b{0}\s+as\b|\bas\s+{0}\b".format(constructed), code)
+                    and not any(named.search(text) for text in type_items),
+                    "%s renames or aliases %s (%s)" % (rel, constructed, rule))
+        calls = list(LINUX_CAPTURE_NEW.finditer(code))
         impls = list(re.finditer(r"\bimpl\s+LinuxCapture\s*\{", code))
         structs = list(re.finditer(r"\bstruct\s+LinuxCapture\b", code))
         if rel == OBSERVER_MAIN:
@@ -3144,6 +3273,16 @@ def check_observer_capture_callers(base: Path) -> int:
         else:
             require(not impls and not structs, "%s defines LinuxCapture or its inherent impl; only %s does (%s)"
                     % (rel, OBSERVER_LINUX_CAPTURE, rule))
+        # R3-1: each type is named in code only in its own file and inside main.rs's serve (its import and its one
+        # construction), which also closes a generic default or projection naming it in any other file.
+        for constructed, home in (("LinuxCapture", OBSERVER_LINUX_CAPTURE), ("LinuxWire", OBSERVER_LINUX_NET)):
+            if rel == home:
+                continue
+            named = [found.start() for found in re.finditer(r"\b%s\b" % constructed, code)]
+            if rel == OBSERVER_MAIN:
+                serve = body_of(code, FN_SERVE, "%s's fn serve (%s)" % (rel, rule))
+                named = [at for at in named if not serve[0] < at < serve[1]]
+            require(not named, "%s names %s outside %s and main.rs's serve (%s, R3-1)" % (rel, constructed, home, rule))
     return len(sources)
 
 
@@ -3352,33 +3491,313 @@ def check_observer_sys_pins(base: Path) -> int:
     return len(OBSERVER_SYS_PINS)
 
 
+def check_observer_home_pins(base: Path) -> int:
+    """HE-004D2 owner decision Q-D2-END (a): every OBSERVER_HOME_PINS file is present, not a symlink, and byte-exact (its
+    sha256 equals its pin). The number of pinned files."""
+    for rel, expected in OBSERVER_HOME_PINS.items():
+        path = base / rel
+        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (constructor home pin, Q-D2-END)" % rel)
+        require(sha256(path.read_bytes()) == expected,
+                "%s differs from its pinned bytes (constructor home pin, Q-D2-END)" % rel)
+    return len(OBSERVER_HOME_PINS)
+
+
 def check_native_profile_use(base: Path) -> int:
-    """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5): read without comments, NATIVE_PROFILE_V4_SCHEMA occurs in
-    crates/observer's sources only as its definition in contracts.rs and once in capture_schema.rs, inside
-    CaptureSchema::embedded, so the schema's bytes have one use site (G-D1-16 checks the binary). The number of
-    occurrences."""
-    rule = "native-profile schema use, G-D1-9"
-    word = re.compile(r"\bNATIVE_PROFILE_V4_SCHEMA\b")
+    """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5), generalised by HE-004D2 (DESIGN-D2 section 12, G-D2-3) to each of
+    NATIVE_PROFILE_SCHEMAS: read without comments, the constant occurs in crates/observer's sources only as its definition
+    in contracts.rs and once in capture_schema.rs, inside CaptureSchema::embedded, so each schema's bytes have one use
+    site (G-D1-16 checks the binary for the v4 one). The number of occurrences (two per schema)."""
+    rule = "native-profile schema use, G-D1-9, G-D2-3"
     schema_rs = "crates/observer/src/capture_schema.rs"
     total = 0
+    sources = []
     for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
         try:
-            code = PATH_SPACE.sub("::", rust_code(raw))
+            sources.append((rel, PATH_SPACE.sub("::", rust_code(raw))))
         except GateError as error:
             raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
-        found = list(word.finditer(code))
-        if rel == OBSERVER_CONTRACTS:
-            require(len(found) == 1 and re.search(r"\bpub\s+const\s+NATIVE_PROFILE_V4_SCHEMA\s*:", code),
-                    "%s does not define NATIVE_PROFILE_V4_SCHEMA exactly once (%s)" % (rel, rule))
-        elif rel == schema_rs:
-            start, end = body_of(code, re.compile(r"\bfn\s+embedded\s*\("), "%s's fn embedded (%s)" % (rel, rule))
-            require(len(found) == 1 and start < found[0].start() < end,
-                    "%s does not use NATIVE_PROFILE_V4_SCHEMA exactly once, in CaptureSchema::embedded (%s)" % (rel, rule))
-        else:
-            require(not found, "%s names NATIVE_PROFILE_V4_SCHEMA; only %s uses it (%s)" % (rel, schema_rs, rule))
-        total += len(found)
-    require(total == 2, "NATIVE_PROFILE_V4_SCHEMA is not defined and used once each (%s)" % rule)
+    for constant in NATIVE_PROFILE_SCHEMAS:
+        word = re.compile(r"\b%s\b" % constant)
+        count = 0
+        for rel, code in sources:
+            found = list(word.finditer(code))
+            if rel == OBSERVER_CONTRACTS:
+                require(len(found) == 1 and re.search(r"\bpub\s+const\s+%s\s*:" % constant, code),
+                        "%s does not define %s exactly once (%s)" % (rel, constant, rule))
+            elif rel == schema_rs:
+                start, end = body_of(code, re.compile(r"\bfn\s+embedded\s*\("), "%s's fn embedded (%s)" % (rel, rule))
+                require(len(found) == 1 and start < found[0].start() < end,
+                        "%s does not use %s exactly once, in CaptureSchema::embedded (%s)" % (rel, constant, rule))
+            else:
+                require(not found, "%s names %s; only %s uses it (%s)" % (rel, constant, schema_rs, rule))
+            count += len(found)
+        require(count == 2, "%s is not defined and used once each (%s)" % (constant, rule))
+        total += count
     return total
+
+
+# --- HE-004D2: the D2 logic modules' isolation and host-path literal, and their absence from the binary (DESIGN-D2 12) ---
+
+def check_observer_d2_isolation(base: Path) -> int:
+    """HE-004D2 DESIGN-D2 sections 9 and 12 (G-D2-5; owner decision Q-HE4D2-5 (a); D2-4): the source-level construction
+    that keeps the D2 logic modules unreachable from serve. Over crates/observer's non-test sources, read without comments,
+    literal contents emptied and the whitespace around `::` removed: the D2 files present are exactly D2_LOGIC_BUILT (so
+    each takes the logic rule, G-D2-4); (a) the four module names occur outside the D2 files only in lib.rs, each built one
+    exactly as its line-anchored `pub mod <name>;` and nothing else there; (b) the D2 type set is derived from the D2
+    files, every name they define as a struct, enum, union, trait or type item at any depth outside strict test blocks,
+    each defined once among them, and none of those names occurs in another crates/observer source (whatever it is there,
+    a definition included); (c) in the D2 files every impl header is exactly `impl <a name of that set> {` (no `for`, no
+    generic parameter) and every `pub use` names only D2 paths. With the existing pre-main, macro and included-code rules
+    (forced exports, assembled names), no other source can reach a D2 item. The number of D2 type names."""
+    rule = "D2 isolation, G-D2-5"
+    sources = observer_sources(base, (OBSERVER_CRATE,))
+    d2_files = {"crates/observer/src/%s.rs" % name: name for name in D2_LOGIC_NAMES}
+    present = sorted(name for rel, name in d2_files.items() if (base / rel).is_file())
+    require(present == sorted(D2_LOGIC_BUILT), "the D2 modules present (%s) are not exactly those that take the logic rule "
+            "(%s) (%s)" % (", ".join(present) or "none", ", ".join(D2_LOGIC_BUILT), rule))
+    codes = {}
+    for rel, raw in sources:
+        try:
+            codes[rel] = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    defined: dict[str, str] = {}
+    for rel in sorted(rel for rel in codes if rel in d2_files):
+        scanned = codes[rel]
+        for start, end in reversed(cfg_test_blocks(scanned)):
+            scanned = scanned[:start] + " " + scanned[end:]
+        for item in D2_TYPE_ITEM.finditer(scanned):
+            name = item.group(1)
+            require(name not in defined, "%s defines %s, which %s defines too (%s)" % (rel, name, defined.get(name), rule))
+            defined[name] = rel
+    module_words = re.compile(r"\b(?:%s)\b" % "|".join(D2_LOGIC_NAMES))
+    type_words = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(name) for name in sorted(defined))) if defined else None
+    for rel, code in codes.items():
+        if rel in d2_files:
+            continue
+        rest = code
+        if rel == OBSERVER_LIB:
+            for name in D2_LOGIC_BUILT:
+                declaration = re.compile(r"(?m)^[ \t]*pub\s+mod\s+%s\s*;" % name)
+                require(len(declaration.findall(rest)) == 1, "%s does not declare `pub mod %s;` exactly once, on its own line (%s)"
+                        % (rel, name, rule))
+                rest = declaration.sub(" ", rest)
+        found = module_words.search(rest)
+        require(not found, "%s names the D2 module %s other than in lib.rs's one `pub mod` line (%s)"
+                % (rel, found.group(0) if found else "", rule))
+        hit = type_words.search(code) if type_words else None
+        require(not hit, "%s names %s, a type the D2 module %s defines (%s)"
+                % (rel, hit.group(0) if hit else "", defined.get(hit.group(0)) if hit else "", rule))
+    for rel in sorted(rel for rel in codes if rel in d2_files):
+        code = codes[rel]
+        for _, header in impl_headers(rel, code):
+            form = re.fullmatch(r"impl ([A-Za-z_]\w*)", header)
+            require(form and form.group(1) in defined, "%s has the impl header `%s`; every impl in a D2 module is exactly "
+                    "`impl <a type it defines> {` (%s)" % (rel, header, rule))
+        for declaration in PUB_USE_DECLARATION.finditer(code):
+            for path, _ in use_paths(declaration.group(1)):
+                require(len(path) > 1 and path[0] in ("crate", "self") and path[1] in D2_LOGIC_NAMES,
+                        "%s re-exports %s, not a D2 item (%s)" % (rel, "::".join(path), rule))
+    return len(defined)
+
+
+def check_observer_interpreter_tree(base: Path) -> int:
+    """HE-004D2 DESIGN-D2 sections 5.4 and 9 (G-D2-6): in crates/observer's non-test sources, raw text, `/opt/planeon/`
+    occurs only in record_check.rs, exactly once, as the line-anchored `const INTERPRETER_TREE: &str =
+    "/opt/planeon/python/";` (G-D1-5's anchoring: a `pub` form, a raw string, a second one or a comment is not removed and
+    refuses). The number of excepted expressions."""
+    rule = "host-path literal, G-D2-6"
+    count = 0
+    for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
+        rest = raw
+        if rel == OBSERVER_RECORD_CHECK:
+            found = len(INTERPRETER_TREE[1].findall(raw))
+            require(found == 1, "%s holds `%s` %d times, not exactly once (%s)" % (rel, INTERPRETER_TREE[0], found, rule))
+            rest = INTERPRETER_TREE[1].sub(" ", raw, count=1)
+            count += 1
+        require("/opt/planeon/" not in rest, "%s holds /opt/planeon/ other than as record_check.rs's one `%s` (%s)"
+                % (rel, INTERPRETER_TREE[0], rule))
+    require(count == 1 or "record_check" not in D2_LOGIC_BUILT, "%s is missing (%s)" % (OBSERVER_RECORD_CHECK, rule))
+    return count
+
+
+def check_d2_absent(names: set[str]) -> int:
+    """HE-004D2 DESIGN-D2 sections 9 and 12 (G-D2-7; D2-4): no symbol of planeon-observer's .symtab has an item path
+    (legacy or v0, `item_path`) or a first-crate-root path (`symbol_path`, which also reads trait impls and closures)
+    beginning `planeon_observer::<a D2 module>`. A symbol that only mentions a D2 name (another module, a generic argument)
+    passes. Build-time corroboration of G-D2-5, not its proof: an inlined function leaves no symbol. It holds until a
+    reviewed packet wires the composition (W02-PROD). The number of symbols read."""
+    for name in names:
+        for path in (item_path(name), symbol_path(name)[0]):
+            if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in D2_LOGIC_NAMES:
+                raise GateError("planeon-observer's symbol table holds %s, a symbol of the D2 module %s (G-D2-7)" % (name, path[1]))
+    return len(names)
+
+
+# HE-004D2 DESIGN-D2 sections 8.1 and 12 (G-D2-8; owner decision Q-HE4D2-6 (a); D2-1; design review round 2, R2-1): the
+# acceptance tokens, each with its file and its one minting function, as their units add them (EvidenceAccepted in A3,
+# QualificationAccepted in B2, Composed in B3); the three token files; a token field's closed type list.
+D2_TOKENS = {"EvidenceAccepted": ("crates/observer/src/i06_evidence.rs", "check_evidence"),
+             "QualificationAccepted": ("crates/observer/src/qualification.rs", "check_qualification"),
+             "Composed": ("crates/observer/src/composition.rs", "compose_fixture")}
+D2_TOKENS_BUILT = ("EvidenceAccepted", "QualificationAccepted", "Composed")
+# G-D2-8: the production entry, whose body names none of these (it answers Unavailable until W02-PROD wires it).
+PRODUCTION_ENTRY = ("crates/observer/src/composition.rs", "compose_production")
+PRODUCTION_REFUSED_NAMES = ("compose_fixture", "Composed", "check_qualification", "check_evidence")
+D2_TOKEN_FILES = tuple("crates/observer/src/%s.rs" % name for name in ("qualification", "i06_evidence", "composition"))
+TOKEN_FIELD_TYPES = ("String", "bool", "u64", "i64", "&'staticstr")
+TOKEN_DERIVE_REFUSED = re.compile(r"\b(?:Clone|Copy|Default|Hash|Deserialize|Serialize)\b")
+SELF_LITERAL = re.compile(r"\bSelf\s*[({]")
+GETTER = re.compile(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bfn\s+[A-Za-z_]\w*\s*\(\s*&\s*self\s*\)\s*->\s*([^{;]+)\{")
+
+
+def token_attributes(code: str, start: int) -> list[str]:
+    """The outer attributes directly before the item at `start` (a `pub` visibility skipped), innermost last."""
+    found, cursor = [], start
+    while True:
+        before = code[:cursor].rstrip()
+        before = re.sub(r"\bpub\s*(?:\([^)]*\))?\s*$", "", before).rstrip() if not found else before
+        if not before.endswith("]"):
+            return found
+        depth, index = 0, len(before) - 1
+        while index >= 0:
+            depth += {"]": 1, "[": -1}.get(before[index], 0)
+            if depth == 0:
+                break
+            index -= 1
+        opening = re.search(r"#\s*$", before[:index])
+        require(index >= 0 and opening, "an attribute the token rule cannot read")
+        found.append(before[opening.start():])
+        cursor = opening.start()
+
+
+def check_observer_child_modules(base: Path) -> int:
+    """HE-004D2 PR review round 1, R1-6 (beside G-D2-5, G-D2-4 and G-D2-8): a child module of a logic module in its own
+    file (`mod bridge;` in i06_evidence.rs, loading src/i06_evidence/bridge.rs) reaches its parent's private items and
+    fields through `super::` without naming the module or its types, and the rules that read the logic files by path would
+    not see it. So the observer crate's src/ holds no directory, and no logic module (B1's, D1's and D2's), read without
+    comments and outside strict test blocks, declares a module, out-of-line or inline. The number of logic modules."""
+    rule = "observer child modules, R1-6"
+    source = base / OBSERVER_CRATE / "src"
+    directories = sorted(path.relative_to(base).as_posix() for path in source.rglob("*") if path.is_dir())
+    require(not directories, "%s is a directory under %s/src; a child module's file there could reach a module's private "
+            "items (%s)" % (directories[0] if directories else "", OBSERVER_CRATE, rule))
+    for rel, _ in LOGIC_MODULES:
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+        try:
+            code = rust_code((base / rel).read_text(encoding="utf-8"))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        for start, end in reversed(cfg_test_blocks(code)):
+            code = code[:start] + " " * (end - start) + code[end:]
+        found = re.search(r"\bmod\s+(?:r#)?[A-Za-z_]\w*\s*[;{]", code)
+        require(not found, "%s declares a module (`%s`) outside a strict test block (%s)"
+                % (rel, re.sub(r"\s+", " ", found.group(0)) if found else "", rule))
+    return len(LOGIC_MODULES)
+
+
+def check_observer_tokens(base: Path) -> int:
+    """HE-004D2 DESIGN-D2 sections 8.1 and 12 (G-D2-8, D2-1, R2-1). Each built token, read without comments and with
+    literal contents emptied: one struct, whose fields are private and each of a type in TOKEN_FIELD_TYPES (no Cell,
+    RefCell, atomic, Mutex, RwLock, OnceCell or other type that a `&self` method could change), and none of whose
+    attributes derives (also inside cfg_attr) Clone, Copy, Default, Hash, Deserialize or Serialize; one inherent impl
+    `impl <Token> {` holding only getters `fn <name>(&self) -> <type>` whose type names neither the token nor Self; in its
+    file the token's name only in the struct, that impl header, the minting function's signature and its one literal
+    `<Token> {` inside that function's body; the literal form nowhere else; outside the impl and strict test blocks,
+    every `.<field>` of a token field name is a getter call `.<field>(`, so no assignment, compound assignment,
+    parenthesised place, borrow, method call or rebinding reaches a field (HE-004D2 PR review round 1, R1-1); and each
+    getter's body is exactly `self.<name>` or `&self.<name>`, its own field. In the token files present, no `Self {` or
+    `Self(` outside strict test blocks (a child module's file is check_observer_child_modules', R1-6). Once Composed is built, `fn compose_production`'s body names none of
+    PRODUCTION_REFUSED_NAMES. The number of tokens checked."""
+    rule = "acceptance token, G-D2-8"
+    codes = {}
+    for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
+        try:
+            codes[rel] = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+
+    def outside_tests(code: str) -> str:
+        for start, end in reversed(cfg_test_blocks(code)):
+            code = code[:start] + " " * (end - start) + code[end:]
+        return code
+
+    for rel in D2_TOKEN_FILES:
+        if rel in codes:
+            found = SELF_LITERAL.search(outside_tests(codes[rel]))
+            require(not found, "%s writes `%s`; a token file names every struct or variant literal's type (%s)"
+                    % (rel, re.sub(r"\s+", "", found.group(0)) if found else "", rule))
+    for token in D2_TOKENS_BUILT:
+        rel, minting = D2_TOKENS[token]
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+        code = codes[rel]
+        scanned = outside_tests(code)
+        name = re.compile(r"\b%s\b" % token)
+        literal = re.compile(r"\b%s\s*\{" % token)
+        structs = list(re.finditer(r"\bstruct\s+%s\b" % token, code))
+        require(len(structs) == 1, "%s does not define struct %s exactly once (%s)" % (rel, token, rule))
+        fields = struct_fields(code, structs[0].end())
+        names = []
+        for field in fields:
+            form = re.fullmatch(r"\s*([a-z_]\w*)\s*:\s*(.+?)\s*", field, re.S)
+            require(form, "%s's %s has a field the token rule cannot read: %r (%s)" % (rel, token, field.strip(), rule))
+            require(re.sub(r"\s+", "", form.group(2)) in TOKEN_FIELD_TYPES, "%s's %s field %s is of type %s, outside %s (%s)"
+                    % (rel, token, form.group(1), form.group(2), ", ".join(TOKEN_FIELD_TYPES), rule))
+            names.append(form.group(1))
+        require(names, "%s's %s has no named field (%s)" % (rel, token, rule))
+        for attribute in token_attributes(code, re.search(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bstruct\s+%s\b" % token,
+                                                           code).start()):
+            if re.search(r"\bderive\b", attribute):
+                refused = TOKEN_DERIVE_REFUSED.search(attribute)
+                require(not refused, "%s derives %s on %s (%s)" % (rel, refused.group(0) if refused else "", token, rule))
+        impls = list(re.finditer(r"\bimpl\s+%s\s*\{" % token, code))
+        require(len(impls) == 1, "%s does not hold exactly one `impl %s {` (%s)" % (rel, token, rule))
+        body = code[impls[0].end():block_end(code, impls[0].end() - 1) - 1]
+        functions = len(re.findall(r"\bfn\b", body))
+        getters = list(GETTER.finditer(body))
+        require(functions == len(getters), "%s's impl %s holds a method other than a `fn <name>(&self) -> <type>` getter (%s)"
+                % (rel, token, rule))
+        for getter in getters:
+            require(not re.search(r"\b(?:%s|Self)\b" % token, getter.group(1)), "%s's impl %s has a getter returning %s (%s)"
+                    % (rel, token, getter.group(1).strip(), rule))
+            # R1-1: a getter answers its own field, so no getter reads other than the minted value.
+            getter_name = re.search(r"\bfn\s+([A-Za-z_]\w*)", getter.group(0)).group(1)
+            getter_body = re.sub(r"\s+", "", body[getter.end():block_end(body, getter.end() - 1) - 1])
+            require(getter_name in names and getter_body in ("self.%s" % getter_name, "&self.%s" % getter_name),
+                    "%s's impl %s has a getter %s whose body is not `self.%s` or `&self.%s` of its own field (%s)"
+                    % (rel, token, getter_name, getter_name, getter_name, rule))
+        require(not re.search(r"(?<!')\b(?:const|type|static)\b", re.sub(r"\{[^{}]*\}", "", body)),
+                "%s's impl %s holds an item other than its getters (%s)" % (rel, token, rule))
+        definition = re.compile(r"\bfn\s+%s\s*\(" % minting)
+        opening, end = body_of(code, definition, "%s's fn %s (%s)" % (rel, minting, rule))
+        signature = code[definition.search(code).start():opening]
+        inside = [found for found in literal.finditer(code) if opening < found.start() < end]
+        outside = [found for found in literal.finditer(code) if not (opening < found.start() < end)
+                   and found.start() not in (structs[0].end() - len(token), impls[0].start() + code[impls[0].start():].find(token))]
+        require(len(inside) == 1 and not outside, "%s writes the %s literal other than once, in fn %s (%s)"
+                % (rel, token, minting, rule))
+        require(len(name.findall(signature)) == 1 and len(name.findall(code)) == 4,
+                "%s names %s other than in its struct, its impl header, fn %s's signature and its one literal (%s)"
+                % (rel, token, minting, rule))
+        for other, other_code in codes.items():
+            if other != rel:
+                require(not literal.search(other_code), "%s writes the %s literal; only %s's fn %s does (%s)"
+                        % (other, token, rel, minting, rule))
+        # R1-1: outside the impl (whose getters read `self.<field>`), a token field name follows a dot only as a getter
+        # call, so no assignment, compound assignment, parenthesised place, `&mut`, method call or rebinding reaches it.
+        impl_end = block_end(code, impls[0].end() - 1)
+        for field in names:
+            for use in re.finditer(r"\.\s*(?:r#)?%s\b(?!\s*\()" % field, scanned):
+                require(impls[0].start() <= use.start() < impl_end,
+                        "%s uses the %s field %s other than through its getter (%s)" % (rel, token, field, rule))
+    if "Composed" in D2_TOKENS_BUILT:
+        rel, entry = PRODUCTION_ENTRY
+        code = codes.get(rel, "")
+        opening, end = body_of(code, re.compile(r"\bfn\s+%s\s*\(" % entry), "%s's fn %s (%s)" % (rel, entry, rule))
+        found = re.search(r"\b(?:%s)\b" % "|".join(PRODUCTION_REFUSED_NAMES), code[opening:end])
+        require(not found, "%s's fn %s names %s; the production entry answers Unavailable until W02-PROD (%s)"
+                % (rel, entry, found.group(0) if found else "", rule))
+    return len(D2_TOKENS_BUILT)
 
 
 def check_observer_wiring(base: Path) -> int:
@@ -3818,7 +4237,9 @@ def main() -> int:
             "items two fn main and fn serve, its only attributes the crate's forbid and the two cfgs; no socket or thread "
             "name through the stage-2 statement" % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
         say("observer wiring order: serve calls %d steps each exactly once, in this order: %s, and not the v1 parse "
-            "(HE-004C, G5; HE-004D1, G-D1-8)" % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
+            "(HE-004C, G5; HE-004D1, G-D1-8); LinuxWire and LinuxCapture are constructed exactly once each, their "
+            "qualified forms counted (HE-004D2, G-D2-11)"
+            % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
             "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
             "variant except the data types %s, and hold no fn-pointer or Fn-trait type in a pub alias, const, static, "
@@ -3858,17 +4279,34 @@ def main() -> int:
                ", ".join(name.split(" ")[0] for _, name in OBSERVER_POST_SEAL_FORBIDDEN), " and ".join(OBSERVER_POST_SEAL_CRATES),
                I05_JSON))
         say("observer logic: %d modules of %s (%s; HE-004D1, G-D1-10: %s, whose whitelist adds i05_protocol::schema and "
-            "the three modules) name only the whitelisted path roots %s, no super:: or foreign self:: path, glob, renaming "
-            "import, HashMap, HashSet, RandomState or include macro, and no panicking macro or call outside strict "
-            "#[cfg(test)] blocks (lexical tripwire, HE-004B1)"
+            "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules) name only the whitelisted "
+            "path roots %s, no super:: or foreign self:: path, glob, renaming import, HashMap, HashSet, RandomState or "
+            "include macro, and no panicking macro or call outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
             % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES), ", ".join(D1_LOGIC_NAMES),
-               ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
+               ", ".join(D2_LOGIC_BUILT), ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
+        say("observer D2 isolation: the D2 modules present are %s; outside them the module names occur only as lib.rs's "
+            "pub mod lines, and none of the %d type names they define occurs in another %s source; every D2 impl is "
+            "`impl <its own type> {` and no D2 file re-exports another item (HE-004D2, G-D2-5)"
+            % (", ".join(D2_LOGIC_BUILT), check_observer_d2_isolation(HE), OBSERVER_CRATE))
+        say("observer child modules: %s/src holds no directory, and none of the %d logic modules declares a module "
+            "outside a strict test block (HE-004D2 PR review round 1, R1-6)" % (OBSERVER_CRATE, check_observer_child_modules(HE)))
+        say("observer host-path literal: /opt/planeon/ occurs in %s only as %d exact `%s` (HE-004D2, G-D2-6)"
+            % (OBSERVER_CRATE, check_observer_interpreter_tree(HE), INTERPRETER_TREE[0]))
+        say("observer acceptance tokens: %d token(s) (%s), each with private fields of %s, no Clone, Copy, Default, Hash or "
+            "serde derive (cfg_attr included), one impl of `&self` getters returning neither it nor Self, named only in its "
+            "struct, impl header, minting signature and one literal inside the minting function, each getter returning its "
+            "own field, a field reached outside the impl only by its getter call (R1-1); no `Self {` or `Self(` in %s "
+            "(HE-004D2, G-D2-8)"
+            % (check_observer_tokens(HE), ", ".join("%s in %s's %s" % (token, D2_TOKENS[token][0], D2_TOKENS[token][1])
+                                                     for token in D2_TOKENS_BUILT),
+               ", ".join(TOKEN_FIELD_TYPES), ", ".join(D2_TOKEN_FILES)))
         say("observer contracts: %d embedded files, each one plain literal naming a registered contract file, only in %s "
             "and (the OBSERVER programs) %s (HE-004B1); besides them only %s's include_bytes!(\"%s\") (HE-004C)"
             % (check_observer_includes(HE), OBSERVER_CONTRACTS, OBSERVER_SEAL_RS, OBSERVER_SIGNED_CONFIG,
                OBSERVER_KEY_INCLUDE))
         say("contracts pin: %s holds %d items, each a pub const of a registered contract file's bytes or of a registered "
-            "pin, and nothing else (HE-004C, R1-3)" % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE)))
+            "pin, and nothing else (HE-004C, R1-3); it embeds only %s (HE-004D2, G-D2-2)"
+            % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE), ", ".join(OBSERVER_EMBEDDED_CONTRACTS)))
         say("observer no-panic: %d sources (the HE-004C modules, main.rs, status.rs, enrolled.rs, capture.rs and "
             "linux_capture.rs, and observer-sys's three after their item-level compile-time asserts) name no panicking "
             "macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; HE-004D1, G-D1-11)" % check_observer_no_panic(HE))
@@ -3883,8 +4321,10 @@ def main() -> int:
             % (check_observer_read_only(HE), ", ".join(OPEN_FLAG_SETS), ", ".join(READ_ONLY_FLAGS), WRITE_MASK,
                ", ".join(CGROUP_FILE_NAMES)))
         say("capture callers: %d sources of %s; only %s names observer_sys, re-exports nothing and names no observer-sys "
-            "item in a pub item, field or variant; LinuxCapture::new is called once, as LinuxCapture::new(sealed) in serve; "
-            "LinuxCapture is defined, implemented and renamed nowhere else (HE-004D1, G-D1-6)"
+            "item in a pub item, field or variant; LinuxCapture::new is called once, as LinuxCapture::new(sealed) in serve, "
+            "its qualified forms counted (HE-004D2, G-D2-11); LinuxCapture is defined, implemented and renamed nowhere "
+            "else (HE-004D1, G-D1-6); neither LinuxCapture nor LinuxWire is renamed or named by a type item, and each is "
+            "named only in its own file and in serve (HE-004D2 PR review rounds 2 and 3, R2-1, R3-1)"
             % (check_observer_capture_callers(HE), OBSERVER_CRATE, OBSERVER_LINUX_CAPTURE))
         say("link reads: link_text reads only ProcLink's five names %s and own_pid only the proc root's self link, both "
             "defined once in %s and called (%d calls) only in %s (HE-004D1, G-D1-7)"
@@ -3897,11 +4337,14 @@ def main() -> int:
         say("link-read path: %d functions of %s (%s) equal their pinned signatures and bodies, whitespace and comments "
             "aside (HE-004D1 PR review round 2, R2-1)" % (check_observer_link_pins(HE), OBSERVER_SYS_KERNEL,
                                                           ", ".join(LINK_PATH_PINS)))
-        say("observer-sys pin: %d file matches its pinned sha256 (%s) (HE-004D1 PR review round 3, R3-1)"
+        say("observer-sys pins: %d files match their pinned sha256 (%s) (HE-004D1 PR review round 3, R3-1; HE-004D2, "
+            "G-D2-10: R4-1's lib.rs, dirent.rs and Cargo.toml)"
             % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
-        say("native-profile schema: NATIVE_PROFILE_V4_SCHEMA occurs %d times in %s, its definition in %s and its one use "
-            "in CaptureSchema::embedded (HE-004D1, G-D1-9)" % (check_native_profile_use(HE), OBSERVER_CRATE,
-                                                               OBSERVER_CONTRACTS))
+        say("constructor home pins: %d files match their pinned sha256 (%s) (HE-004D2, owner decision Q-D2-END)"
+            % (check_observer_home_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_HOME_PINS.items())))
+        say("native-profile schemas: %s occur %d times in %s, each its definition in %s and its one use in "
+            "CaptureSchema::embedded (HE-004D1, G-D1-9; HE-004D2, G-D2-3)"
+            % (" and ".join(NATIVE_PROFILE_SCHEMAS), check_native_profile_use(HE), OBSERVER_CRATE, OBSERVER_CONTRACTS))
         say("unsafe: the lexical tripwire finds the word only in %s among %d workspace sources"
             % (" and ".join(UNSAFE_FILES), check_unsafe(HE)))
         lock = tomllib.loads((HE / "Cargo.lock").read_text(encoding="utf-8"))["package"]
@@ -3921,6 +4364,8 @@ def main() -> int:
                         "or __membarrier; the composed client is linked: a rustls %s symbol and %s (no wrapper "
                         "inventory: owner decision Q-HE4A-B2 (a))" % (target, size, OBSERVER_PROGRAMS[target], client, module))
                     say("%s planeon-observer capture symbols (G-D1-14): %s" % (target, ", ".join(check_capture_symbols(names))))
+                    say("%s planeon-observer D2 symbols (G-D2-7): none of its %d symbols has a path in planeon_observer::%s"
+                        % (target, check_d2_absent(names), ", ::".join(D2_LOGIC_NAMES)))
                     say("%s planeon-observer exempt span (G-D1-16): the %d bytes of %s occur exactly once, at offset %d "
                         "(length %d); the host-path scan (%s, the build root and the home directory) reads the binary "
                         "with that one span blanked and finds none; HOST_PATHS is unchanged, and every other binary is "

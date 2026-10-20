@@ -1,11 +1,13 @@
-//! HE-004D1 DESIGN-D1 sections 6.1-6.3 (owner decision Q-HE4D1-3 (a); MODEL_DEFINED R122): the embedded schema's
-//! canonical digest pin, and the `if/then/else` rewrite: the truth table over all eight (A, B, C) combinations with
-//! siblings and an existing `allOf` kept in order, the closed forms, and the pinned schema's exactly two rewritten nodes,
-//! no `else` left and every variant loading.
+//! HE-004D1 DESIGN-D1 sections 6.1-6.3 (owner decision Q-HE4D1-3 (a); MODEL_DEFINED R122): the embedded schemas'
+//! canonical digest pins, and the `if/then/else` rewrite: the truth table over all eight (A, B, C) combinations with
+//! siblings and an existing `allOf` kept in order, the closed forms, and each pinned schema's exactly two rewritten nodes,
+//! no `else` left and every variant loading. HE-004D2 unit B1 (DESIGN-D2 section 4.1): the loader is split, native-profile
+//! v4's schema for the record and v5's for the captures, so the pin and conditional tests run once per schema.
 
 use i05_protocol::json::{self, Value};
 use i05_protocol::schema::Schema;
-use planeon_observer::capture_schema::{rewrite_conditionals, CaptureSchema, RewriteError, SchemaLoadError, CANONICAL_PIN};
+use planeon_observer::capture_schema::{rewrite_conditionals, CaptureSchema, RecordSchema, RewriteError, SchemaLoadError,
+                                       CAPTURE_CANONICAL_PIN, RECORD_CANONICAL_PIN};
 use planeon_observer::contracts;
 
 fn parse(text: &str) -> Value {
@@ -113,34 +115,49 @@ fn else_keys(value: &Value) -> usize {
 }
 
 #[test]
-fn the_pinned_schema_has_exactly_two_conditionals_and_every_variant_loads() {
-    let text = std::str::from_utf8(contracts::NATIVE_PROFILE_V4_SCHEMA).expect("ASCII");
-    let original = parse(text);
-    assert_eq!(else_keys(&original), 2);
-    let (value, places) = rewrite_conditionals(&original).expect("the pinned schema rewrites");
-    assert_eq!(places, vec!["$defs/capture/allOf/0".to_string(), "$defs/capture/allOf/3".to_string()]);
-    assert_eq!(else_keys(&value), 0);
-    // The two plain if/then members (allOf/1 and allOf/2) are unchanged.
-    let before = original.get("$defs").and_then(|defs| defs.get("capture")).and_then(|capture| capture.get("allOf"));
-    let after = value.get("$defs").and_then(|defs| defs.get("capture")).and_then(|capture| capture.get("allOf"));
-    let (before, after) = (before.and_then(Value::as_array).expect("allOf"), after.and_then(Value::as_array).expect("allOf"));
-    assert_eq!(before.len(), after.len());
-    assert!(json::json_eq(&before[1], &after[1]) && json::json_eq(&before[2], &after[2]));
-    assert!(!json::json_eq(&before[0], &after[0]) && !json::json_eq(&before[3], &after[3]));
+fn each_pinned_schema_has_exactly_two_conditionals_and_every_variant_loads() {
+    for bytes in [contracts::NATIVE_PROFILE_V4_SCHEMA, contracts::NATIVE_PROFILE_V5_SCHEMA] {
+        let text = std::str::from_utf8(bytes).expect("ASCII");
+        let original = parse(text);
+        assert_eq!(else_keys(&original), 2);
+        let (value, places) = rewrite_conditionals(&original).expect("the pinned schema rewrites");
+        assert_eq!(places, vec!["$defs/capture/allOf/0".to_string(), "$defs/capture/allOf/3".to_string()]);
+        assert_eq!(else_keys(&value), 0);
+        // The two plain if/then members (allOf/1 and allOf/2) are unchanged.
+        let before = original.get("$defs").and_then(|defs| defs.get("capture")).and_then(|capture| capture.get("allOf"));
+        let after = value.get("$defs").and_then(|defs| defs.get("capture")).and_then(|capture| capture.get("allOf"));
+        let (before, after) = (before.and_then(Value::as_array).expect("allOf"), after.and_then(Value::as_array).expect("allOf"));
+        assert_eq!(before.len(), after.len());
+        assert!(json::json_eq(&before[1], &after[1]) && json::json_eq(&before[2], &after[2]));
+        assert!(!json::json_eq(&before[0], &after[0]) && !json::json_eq(&before[3], &after[3]));
+    }
     assert!(CaptureSchema::embedded().is_ok(), "every variant loads");
+    assert!(RecordSchema::from_bytes(contracts::NATIVE_PROFILE_V4_SCHEMA).is_ok());
+    assert!(CaptureSchema::from_bytes(contracts::NATIVE_PROFILE_V5_SCHEMA).is_ok());
 }
 
 #[test]
-fn the_canonical_digest_pin_is_checked() {
-    assert_eq!(CANONICAL_PIN, "3bf244b21f91e30062ad56a7a21f3f0b4554daa71a0c3b624bcac058fee58d80");
-    let text = std::str::from_utf8(contracts::NATIVE_PROFILE_V4_SCHEMA).expect("ASCII");
-    let encoded = json::canonical(&parse(text)).expect("canonical");
-    assert_eq!(i05_protocol::sha256::hex(&i05_protocol::sha256::digest(&encoded)), CANONICAL_PIN);
-    // Whitespace does not change the canonical pin; a changed value does.
-    let spaced = text.replacen("{", "{ ", 1);
-    assert!(CaptureSchema::from_bytes(spaced.as_bytes()).is_ok());
-    let changed = text.replacen("\"DATA_CHECK_ONLY\"", "\"DATA_CHECK_ONLY_\"", 1);
-    assert!(matches!(CaptureSchema::from_bytes(changed.as_bytes()), Err(SchemaLoadError::Pin)));
-    assert!(matches!(CaptureSchema::from_bytes(&contracts::NATIVE_PROFILE_V4_SCHEMA[1..]), Err(SchemaLoadError::Parse)));
-    assert!(matches!(CaptureSchema::from_bytes(b"\xff"), Err(SchemaLoadError::Parse)));
+fn each_canonical_digest_pin_is_checked() {
+    assert_eq!(RECORD_CANONICAL_PIN, "3bf244b21f91e30062ad56a7a21f3f0b4554daa71a0c3b624bcac058fee58d80");
+    assert_eq!(CAPTURE_CANONICAL_PIN, "5f6703ca38d0919f6446772e8edd75e92609a9a3971b8cb052b53a7e9ab50393");
+    let record_load = |bytes: &[u8]| RecordSchema::from_bytes(bytes).map(|_| ());
+    let capture_load = |bytes: &[u8]| CaptureSchema::from_bytes(bytes).map(|_| ());
+    let loads: [(&[u8], &str, &dyn Fn(&[u8]) -> Result<(), SchemaLoadError>); 2] =
+        [(contracts::NATIVE_PROFILE_V4_SCHEMA, RECORD_CANONICAL_PIN, &record_load),
+         (contracts::NATIVE_PROFILE_V5_SCHEMA, CAPTURE_CANONICAL_PIN, &capture_load)];
+    for (bytes, pin, load) in loads {
+        let text = std::str::from_utf8(bytes).expect("ASCII");
+        let encoded = json::canonical(&parse(text)).expect("canonical");
+        assert_eq!(i05_protocol::sha256::hex(&i05_protocol::sha256::digest(&encoded)), pin);
+        // Whitespace does not change the canonical pin; a changed value does.
+        let spaced = text.replacen("{", "{ ", 1);
+        assert_eq!(load(spaced.as_bytes()), Ok(()));
+        let changed = text.replacen("\"DATA_CHECK_ONLY\"", "\"DATA_CHECK_ONLY_\"", 1);
+        assert_eq!(load(changed.as_bytes()), Err(SchemaLoadError::Pin));
+        assert_eq!(load(&bytes[1..]), Err(SchemaLoadError::Parse));
+        assert_eq!(load(b"\xff"), Err(SchemaLoadError::Parse));
+    }
+    // Each loader takes its own schema only.
+    assert_eq!(record_load(contracts::NATIVE_PROFILE_V5_SCHEMA), Err(SchemaLoadError::Pin));
+    assert_eq!(capture_load(contracts::NATIVE_PROFILE_V4_SCHEMA), Err(SchemaLoadError::Pin));
 }

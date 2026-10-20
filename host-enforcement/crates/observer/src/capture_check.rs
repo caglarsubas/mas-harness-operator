@@ -1,13 +1,14 @@
-//! The R10 port of native-profile v4's three capture checks (HE-004D1 DESIGN-D1 section 15; owner decision Q-HE4D1-11
-//! (a); MODEL_DEFINED R130): `check_capture`, `check_lifecycle_capture` and `check_backend_capture`, with `capture_class`,
-//! the member-set rule, the boot entry, the window, the data bound and the shape step. A logic module: pure, no panic,
-//! std's ordered collections and i05-protocol's json, sha256 and schema only. HE-004D2 reuses it for
-//! `check_qualification`.
+//! The R10 port of the three capture checks (HE-004D1 DESIGN-D1 section 15; owner decision Q-HE4D1-11 (a); MODEL_DEFINED
+//! R130), on native-profile v5 since HE-004D2's unit B1 (DESIGN-D2 section 4.2, Amendment A2): `check_capture`,
+//! `check_lifecycle_capture` and `check_backend_capture`, with `capture_class`, the member-set rule, the window, the data
+//! bound and the shape step. A logic module: pure, no panic, std's ordered collections and i05-protocol's json, sha256
+//! and schema only. HE-004D2 reuses it for `check_qualification`.
 //!
-//! The rule order is the model's (`native_qualification_v4.py` lines 510-706): the "not a v4 ..." type check, the
-//! capture's data bound and canonical length, the schema step, then each rule in turn. The model's per-call shape step
-//! of the record is discharged by [`CheckedRecord`], which only `Enrolled::new` makes, after the record's own shape
-//! (the record is immutable for the epoch). Refusals pinned by a vector are contract text and appear verbatim; the
+//! The rule order is the model's (`native_qualification_v5.py` lines 64-240): the "not a v5 ..." type check, the
+//! capture's data bound and canonical length, the schema step, then each rule in turn. v5 drops the host, policy and
+//! boot fields from the captures and with them v4's equalities on them; the record keeps its own rules. The record stays
+//! native-profile v4's. The model's per-call shape step of the record is discharged by [`CheckedRecord`], which only
+//! `Enrolled::new` makes, and `check_record` after the same steps (the record is immutable for the epoch). Refusals pinned by a vector are contract text and appear verbatim; the
 //! unpinned ones (all under eight words) are written independently. Equality is i05-protocol's `py_eq`; sorting follows
 //! Python's tuple order over ASCII. A refusal is [`Refusal::Model`] (a rule), [`Refusal::Schema`] (the schema step),
 //! [`Refusal::Data`] (the data bound) or [`Refusal::Missing`], where Python would raise `KeyError` or `TypeError` (not
@@ -17,7 +18,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use i05_protocol::json::{self, Object, Value};
-use i05_protocol::sha256;
 
 use crate::capture_schema::CaptureSchema;
 use crate::kernel_text;
@@ -25,11 +25,12 @@ use crate::kernel_text;
 /// The cgroup2 root, for the lifecycle rule's slice (G-D1-5).
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
-/// The schema versions of the three capture families and the record (upstream identifiers).
+/// The schema versions of the record (native-profile v4) and the three capture families (native-profile v5) (upstream
+/// identifiers).
 pub const V4_RECORD: (&str, &str) = ("planeon.internal.native-qualification/v4", "SELINUX_FSVERITY_CGROUP_BPF_V4");
-pub const V4_CAPTURE: &str = "planeon.internal.native-qualification-capture/v4";
-pub const V4_LIFECYCLE: &str = "planeon.internal.native-qualification-lifecycle/v4";
-pub const V4_BACKEND: &str = "planeon.internal.native-qualification-backend/v4";
+pub const V5_CAPTURE: &str = "planeon.internal.native-qualification-capture/v5";
+pub const V5_LIFECYCLE: &str = "planeon.internal.native-qualification-lifecycle/v5";
+pub const V5_BACKEND: &str = "planeon.internal.native-qualification-backend/v5";
 /// The resident roles, in the model's order.
 pub const ROLES: [&str; 5] = ["SERVER", "OBSERVER", "BROKER", "WORKER", "EFFECT_GATE"];
 /// The roles that run one process.
@@ -85,7 +86,8 @@ pub enum Refusal {
 }
 
 /// A record whose shape was checked once (the v4 identity, the data bound, the canonical length and the `record`
-/// variant); only `Enrolled::new` makes one. Its value and the digest of its canonical encoding.
+/// variant); only `Enrolled::new` makes one, and `check_record` after the same steps. Its value and the digest of its
+/// canonical encoding.
 pub struct CheckedRecord {
     value: Value,
     digest: String,
@@ -103,7 +105,7 @@ impl CheckedRecord {
     }
 }
 
-/// The constructor `Enrolled::new` calls after the record's shape step.
+/// The constructor `Enrolled::new` and `check_record` call after the record's shape step.
 pub(crate) fn checked_record(value: Value, digest: String) -> CheckedRecord {
     CheckedRecord { value, digest }
 }
@@ -268,15 +270,6 @@ fn within(record: &Value, observed: &Value, message: &'static str) -> Result<(),
     require(start <= now && now < end, message)
 }
 
-/// The boot entry observed is the enrolled one.
-fn boot_entry(record: &Value, observed: &Value) -> Result<(), Refusal> {
-    let enrolled = at(at(record, "bootEntries")?, "ENROLLED")?;
-    let line = text(at(enrolled, "kernelCmdline")?)?;
-    let expected = object(vec![("entryId", at(enrolled, "entryId")?.clone()),
-                               ("cmdlineSha256", Value::str(&sha256::prefixed(line.as_bytes())))]);
-    require(eq(observed, &expected), "observed on a boot entry other than the enrolled one")
-}
-
 /// The model's same-set test: no element repeated, and the two lists equal once sorted.
 fn same_set(observed: &Value, enrolled: &Value) -> Result<bool, Refusal> {
     let (mut observed, mut enrolled) = (strings(observed)?, strings(enrolled)?);
@@ -348,27 +341,15 @@ fn map_key(mapping: &Value) -> Result<MapKey, Refusal> {
 /// The model's `check_capture` for one resident role (see the module documentation for the order).
 pub fn check_capture(record: &CheckedRecord, capture: &Value, role: &str, schema: &CaptureSchema) -> Result<(), Refusal> {
     let record_value = record.value();
-    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V4_CAPTURE) && capture.as_object().is_some(),
-            "not a v4 capture")?;
+    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V5_CAPTURE) && capture.as_object().is_some(),
+            "not a v5 capture")?;
     shape(capture, schema.capture_valid(capture))?;
     require(ROLES.contains(&role) && capture.get("role").and_then(Value::as_str) == Some(role)
                 && capture.get("qualificationDigest").and_then(Value::as_str) == Some(record.digest()),
             "capture binding")?;
-    require(eq(at(capture, "host")?, at(record_value, "host")?), "wrong boot/kernel")?;
-    let selinux = at(record_value, "selinux")?;
-    let status = at(selinux, "status")?;
-    let even = int(at(status, "sequence")?)? % 2 == 0;
-    require(even && eq(at(capture, "selinuxBefore")?, status) && eq(status, at(capture, "selinuxAfter")?)
-                && eq(at(capture, "kernelPolicyDigest")?, at(selinux, "policyDigest")?),
-            "active policy changed")?;
-    let hardening = at(record_value, "hardening")?;
-    let seal = without(at(hardening, "sealMarker")?, &["selinuxLabel"])?;
-    let mut declared = hardening.as_object().cloned().ok_or(Refusal::Missing)?;
-    declared.insert(json::JStr::new("sealMarker"), seal);
-    require(eq(at(capture, "booleansObserved")?, at(selinux, "booleans")?)
-                && eq(at(capture, "hardeningObserved")?, &Value::Object(declared)),
-            "host lock state differs")?;
-    boot_entry(record_value, at(capture, "bootEntryObserved")?)?;
+    // Since native-profile v5 a capture carries no host, policy or boot member; the record alone declares them, and four
+    // T04 proofs cover them (HOST-BOOT, POLICY-STABLE, HOST-LOCKS, BOOT-ENTRY). `check_record` checks, on the record,
+    // that the SELinux policy sequence is even.
     within(record_value, at(capture, "observedAt")?, "expired capture")?;
     let (a, b, d) = (int(at(capture, "inspectionStartedMs")?)?, int(at(capture, "inspectionFinishedMs")?)?,
                      int(at(capture, "deadlineMs")?)?);
@@ -575,12 +556,10 @@ fn installed_path(path: &str) -> bool {
 /// The model's `check_lifecycle_capture` (the one-shot containment subject's absence, the planeon slice's census).
 pub fn check_lifecycle_capture(record: &CheckedRecord, capture: &Value, schema: &CaptureSchema) -> Result<(), Refusal> {
     let record_value = record.value();
-    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V4_LIFECYCLE) && capture.as_object().is_some(),
-            "not a v4 lifecycle capture")?;
+    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V5_LIFECYCLE) && capture.as_object().is_some(),
+            "not a v5 lifecycle capture")?;
     shape(capture, schema.lifecycle_valid(capture))?;
-    require(capture.get("qualificationDigest").and_then(Value::as_str) == Some(record.digest())
-                && eq(at(capture, "host")?, at(record_value, "host")?),
-            "lifecycle capture binding")?;
+    require(capture.get("qualificationDigest").and_then(Value::as_str) == Some(record.digest()), "lifecycle capture binding")?;
     within(record_value, at(capture, "observedAt")?, "expired lifecycle capture")?;
     let hardening = at(record_value, "hardening")?;
     require(eq(at(capture, "sealMarker")?, &without(at(hardening, "sealMarker")?, &["selinuxLabel"])?), "seal marker differs")?;
@@ -592,8 +571,8 @@ pub fn check_lifecycle_capture(record: &CheckedRecord, capture: &Value, schema: 
     let contained = at(at(capture, "domainProcessCounts")?, "planeon_contain_t")?;
     require(at(cgroup, "path")?.as_str() == Some(containment) && absent_or_empty && eq(contained, &Value::int(0)),
             "containment subject still resident")?;
-    require(eq(at(capture, "booleansObserved")?, at(at(record_value, "selinux")?, "booleans")?), "host lock state differs")?;
-    boot_entry(record_value, at(capture, "bootEntryObserved")?)?;
+    // No SELinux boolean or boot entry is compared here since native-profile v5: the record declares them, T04 proves
+    // them (T04-HOST-LOCKS, T04-BOOT-ENTRY).
     require(items(at(capture, "sliceMembers")?)?.is_empty(), "process directly in the planeon slice")?;
     let rows = items(at(capture, "sliceCgroups")?)?;
     let mut order: Vec<String> = Vec::new();
@@ -634,12 +613,10 @@ pub fn check_lifecycle_capture(record: &CheckedRecord, capture: &Value, schema: 
 /// The model's `check_backend_capture` (ENTRY_BOUND: domain entry plus the measured file, not the running image).
 pub fn check_backend_capture(record: &CheckedRecord, capture: &Value, schema: &CaptureSchema) -> Result<(), Refusal> {
     let record_value = record.value();
-    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V4_BACKEND) && capture.as_object().is_some(),
-            "not a v4 backend capture")?;
+    require(capture.get("schemaVersion").and_then(Value::as_str) == Some(V5_BACKEND) && capture.as_object().is_some(),
+            "not a v5 backend capture")?;
     shape(capture, schema.backend_valid(capture))?;
-    require(capture.get("qualificationDigest").and_then(Value::as_str) == Some(record.digest())
-                && eq(at(capture, "host")?, at(record_value, "host")?),
-            "backend capture binding")?;
+    require(capture.get("qualificationDigest").and_then(Value::as_str) == Some(record.digest()), "backend capture binding")?;
     within(record_value, at(capture, "observedAt")?, "expired backend capture")?;
     let component = at(capture, "component")?;
     let entry = component.as_str().and_then(|name| at(record_value, "backendComponents").ok()?.get(name));

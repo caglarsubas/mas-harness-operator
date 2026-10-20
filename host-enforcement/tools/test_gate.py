@@ -1079,10 +1079,12 @@ class ContractTests(unittest.TestCase):
     # HE-003A3 (DESIGN section 2): the I05 v4 README and vectors join them (21).
     # HE-004B1 (DESIGN-B section 2): edge record v4's ten HE-004 rows join them (31).
     # HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's four native-profile rows join them (35).
+    # HE-004D2 (DESIGN-D2 section 2, G-D2-1): edge record v6's five HE-004D2 rows join them (40), and unit B1's six of edge
+    # record v7 (46).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 35)
+            self.assertEqual(len(gate.CONTRACTS), 46)
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/native-profile-")}, {
                 "contracts/native-profile-v4/qualification.schema.json":
@@ -1091,9 +1093,25 @@ class ContractTests(unittest.TestCase):
                     "dede64ab3202a9e28094f062b5dad868c13ca02423e2380af8666ecf2e7a86e6",
                 "contracts/native-profile-v4/README.md": "a4205a5388dc83827bb39670bcc9477b030f29829128abf19f7578321c170174",
                 "contracts/native-profile-v3/qualification.schema.json":
-                    "ae5cbb6aa39f4edfa2d9919f25e55bad9ab214a99ca927c5afe7e2d943946ac5"})
+                    "ae5cbb6aa39f4edfa2d9919f25e55bad9ab214a99ca927c5afe7e2d943946ac5",
+                "contracts/native-profile-v1/qualification.schema.json":
+                    "bef248bfa82b234124c014f98e40c5791bced3171bb118b7ed1bb7b8daaf95c3",
+                "contracts/native-profile-v2/qualification.schema.json":
+                    "55bd641fd229f21e04ec00813bcfe600890584e982e290a210720ac5cb160ab0",
+                "contracts/native-profile-v5/qualification.schema.json":
+                    "70bda12463cee83301bc10fa6285023dc0e07b281a87ca70d44ec746cf262113",
+                "contracts/native-profile-v5/vectors.json": "b630c362b20bfa7b362bb2ee28734a403303a0dc54b2d627c11a332b226333a1",
+                "contracts/native-profile-v5/README.md": "76b584ca769f0afdd5142fcf3f96e3b5b2d053a172d5713f970dc77594e77692",
+                "contracts/native-profile-v1/vectors.json": "cd1be009b721bb596887335184a33ab8e1f24aed8215477b63e28f058110748f",
+                "contracts/native-profile-v2/vectors.json": "6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396",
+                "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
-                              if path.startswith(("contracts/i06-", "contracts/admission-v3/"))}, {
+                              if path.startswith("contracts/i06-v3/")}, {
+                "contracts/i06-v3/vectors.json": "4752b648abdd82d21ea622a1b26c721143577478c0a2491204e0d584c1d6f081",
+                "contracts/i06-v3/criteria.json": "752533c57b5f93e4c4158a9c17b52eb88d236a3632ab0b66b669e8f8041f57c7",
+                "contracts/i06-v3/README.md": "9ee406f43060f266a7b5dd2679aa8352f0815584c45e33d0ab193ea7f90c0c77"})
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith(("contracts/i06-v1/", "contracts/i06-v2/", "contracts/admission-v3/"))}, {
                 "contracts/i06-v2/vectors.json": "1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e",
                 "contracts/i06-v2/criteria.json": "026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda",
                 "contracts/i06-v2/README.md": "553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb",
@@ -3190,7 +3208,11 @@ LOGIC_TREE = {
                                             "use crate::kernel_text;\npub fn f(x: &[u8]) -> Option<&str> { std::str::from_utf8(x).ok() }\n",
     "crates/observer/src/kernel_text.rs": "use std::collections::BTreeMap;\n"
                                           "pub fn hex(b: &[u8]) -> String { i05_protocol::sha256::hex(b) }\n",
+    # HE-004D2 (G-D2-4): every D2 logic module built so far.
+    **{rel: "use crate::capture_check::Refusal;\nuse crate::kernel_text;\npub fn d() -> u8 { 0 }\n" for rel in gate.D2_LOGIC},
 }
+# HE-004D2 (G-D2-4): the logic modules, B1's five, D1's three and the D2 modules built so far.
+LOGIC_COUNT = 8 + len(gate.D2_LOGIC_BUILT)
 
 
 class ObserverLogicTests(Tree):
@@ -3201,7 +3223,7 @@ class ObserverLogicTests(Tree):
 
     def test_the_tree_passes(self):
         self.assertEqual(gate.OBSERVER_LOGIC_NAMES, ("inputs", "rbac", "snapshot", "operational", "admission"))
-        self.assertEqual(gate.check_observer_logic(self.base), 8)
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
 
     def test_each_module_is_required(self):
         for rel in gate.OBSERVER_LOGIC:
@@ -3271,7 +3293,7 @@ class ObserverLogicTests(Tree):
                         "#[allow(unused)]\n#[cfg(test)]\nmod tests {\n"):
             self.refused(gate.check_observer_logic, rel, good + opening + panicking, "no-panic tripwire")
         self.write(rel, good + "#[cfg(test)]\nmod tests {\n" + panicking)
-        self.assertEqual(gate.check_observer_logic(self.base), 8)
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
 
 
 INCLUDE_TREE = {
@@ -4658,10 +4680,12 @@ class ObserverRootConstantTests(Tree):
     TREE = {**D1_TREE, gate.OBSERVER_ENROLLED: ENROLLED_TEXT, gate.OBSERVER_CAPTURE_CHECK: CHECK_TEXT}
 
     def test_the_tree_passes(self):
+        # HE-004D2 (G-D2-9): record_check.rs's two expressions follow D1's five.
         self.assertEqual([expression for _, expressions in gate.FS_SCAN_EXCEPTIONS.items() for expression, _ in expressions],
                          ['const PROC_ROOT: &str = "/proc";', 'const CGROUP_ROOT: &str = "/sys/fs/cgroup";',
                           'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";',
-                          'const CGROUP_ROOT: &str = "/sys/fs/cgroup";'])
+                          'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const CGROUP_ROOT: &str = "/sys/fs/cgroup";',
+                          'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";'])
         self.assertEqual(gate.check_sources(self.base), 22)
         self.assertEqual(gate.check_linked_sources(self.base), 20)
         # A rustfmt-wrapped expression is removed once (both scans).
@@ -4829,10 +4853,16 @@ NATIVE_CONTRACTS = (GOOD_CONTRACTS_MODULE
                     + "pub const NATIVE_PROFILE_V4_SCHEMA: &[u8] =\n"
                       "    include_bytes!(\"../../../contracts/native-profile-v4/qualification.schema.json\");\n"
                       "pub const NATIVE_PROFILE_V4_SCHEMA_SHA256: &str =\n"
-                      "    \"c3e91c087ebc6a13e8a96a066f80710ac968c8def434d1d1b97415811715ed10\";\n")
+                      "    \"c3e91c087ebc6a13e8a96a066f80710ac968c8def434d1d1b97415811715ed10\";\n"
+                      # HE-004D2 (G-D2-3): the v5 capture schema beside it.
+                      "pub const NATIVE_PROFILE_V5_SCHEMA: &[u8] =\n"
+                      "    include_bytes!(\"../../../contracts/native-profile-v5/qualification.schema.json\");\n"
+                      "pub const NATIVE_PROFILE_V5_SCHEMA_SHA256: &str =\n"
+                      "    \"70bda12463cee83301bc10fa6285023dc0e07b281a87ca70d44ec746cf262113\";\n")
 NATIVE_SCHEMA_RS = "crates/observer/src/capture_schema.rs"
 NATIVE_SCHEMA_TEXT = ("impl CaptureSchema {\n    pub fn embedded() -> Loaded {\n"
-                      "        CaptureSchema::from_bytes(crate::contracts::NATIVE_PROFILE_V4_SCHEMA)\n    }\n\n"
+                      "        let record = RecordSchema::from_bytes(crate::contracts::NATIVE_PROFILE_V4_SCHEMA);\n"
+                      "        CaptureSchema::from_bytes(crate::contracts::NATIVE_PROFILE_V5_SCHEMA)\n    }\n\n"
                       "    pub fn from_bytes(bytes: &[u8]) -> Loaded { load(bytes) }\n}\n")
 
 
@@ -4843,9 +4873,10 @@ class ObserverNativeProfileTests(Tree):
     TREE = {gate.OBSERVER_CONTRACTS: NATIVE_CONTRACTS, NATIVE_SCHEMA_RS: NATIVE_SCHEMA_TEXT, CAPTURE_RS: CAPTURE_TEXT}
 
     def test_the_tree_passes(self):
-        self.assertEqual(len(gate.CONTRACTS), 35)
-        self.assertEqual(gate.check_native_profile_use(self.base), 2)
-        self.assertEqual(gate.check_observer_contracts_module(self.base), 5)
+        # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
+        self.assertEqual(len(gate.CONTRACTS), 46)
+        self.assertEqual(gate.check_native_profile_use(self.base), 4)
+        self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
     def test_a_second_use_refuses(self):
         rule = "G-D1-9"
@@ -4871,7 +4902,7 @@ class ObserverD1LogicTests(Tree):
     def test_the_whitelist_and_its_refusals(self):
         self.assertEqual(gate.D1_LOGIC_NAMES, ("capture_schema", "capture_check", "kernel_text"))
         self.assertIn("observer_sys", gate.CRATE_PATH_ROOTS)
-        self.assertEqual(gate.check_observer_logic(self.base), 8)
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
         rel = "crates/observer/src/capture_check.rs"
         good = self.TREE[rel]
         for text, message in (("use std::fs::File;\n", "imports std::fs::File"),
@@ -4889,7 +4920,7 @@ class ObserverD1LogicTests(Tree):
         # i05_protocol::schema is D1's, not B1's.
         self.write("crates/observer/src/kernel_text.rs", self.TREE["crates/observer/src/kernel_text.rs"]
                    + "use i05_protocol::schema::Schema;\nuse crate::capture_check;\n")
-        self.assertEqual(gate.check_observer_logic(self.base), 8)
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
         self.refused(gate.check_observer_logic, "crates/observer/src/inputs.rs", self.TREE["crates/observer/src/inputs.rs"]
                      + "use crate::kernel_text;\n", "imports crate::kernel_text")
 
@@ -5286,6 +5317,12 @@ class ObserverSysPinTests(Tree):
         for anchor in (self.FREE_NAME, self.PROC_LINK):
             self.assertEqual(self.text.count(anchor), 1, anchor)
         self.write_bytes(self.real)
+        # HE-004D2 (G-D2-10, R4-1): the other three pinned files, as they are.
+        for rel in gate.OBSERVER_SYS_PINS:
+            if rel != KERNEL:
+                path = self.base / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes((gate.HE / rel).read_bytes())
 
     def write_bytes(self, data):
         path = self.base / KERNEL
@@ -5299,9 +5336,12 @@ class ObserverSysPinTests(Tree):
         self.write_bytes(self.real)
 
     def test_the_real_file_passes(self):
-        self.assertEqual(set(gate.OBSERVER_SYS_PINS), {KERNEL})
+        # HE-004D2 (G-D2-10, R4-1): kernel.rs's pin is unchanged and three files join it.
+        self.assertEqual(set(gate.OBSERVER_SYS_PINS), {KERNEL, gate.OBSERVER_SYS_LIB, OBSERVER_SYS_DIRENT,
+                                                       "crates/observer-sys/Cargo.toml"})
         self.assertEqual(gate.OBSERVER_SYS_PINS[KERNEL], gate.sha256(self.real))
-        self.assertEqual(gate.check_observer_sys_pins(self.base), 1)
+        self.assertEqual(gate.OBSERVER_SYS_PINS[KERNEL], "0b3d0151c9eaf1f44dd56436795aefd8cb7140ce9f4d16fe5f4eaf7130e61d43")
+        self.assertEqual(gate.check_observer_sys_pins(self.base), 4)
 
     def test_a_one_byte_change_refuses(self):
         middle = len(self.real) // 2
@@ -5337,6 +5377,804 @@ class ObserverSysPinTests(Tree):
             # The R2-1 pins still pass: the edit is outside link_text, own_pid and link_at.
             self.assertEqual(gate.check_observer_link_pins(self.base), 3)
             self.refuses(text.encode("utf-8"), "%s differs from its pinned bytes \\(%s\\)" % (KERNEL, self.RULE))
+
+
+# --- HE-004D2 (DESIGN-D2 rev 2 section 12) --------------------------------------------------------------------------------
+
+D2_V6_CONTRACTS = ("contracts/native-profile-v1/qualification.schema.json", "contracts/native-profile-v2/qualification.schema.json",
+                   "contracts/i06-v3/vectors.json", "contracts/i06-v3/criteria.json", "contracts/i06-v3/README.md")
+D2_V7_CONTRACTS = ("contracts/native-profile-v5/qualification.schema.json", "contracts/native-profile-v5/vectors.json",
+                   "contracts/native-profile-v5/README.md", "contracts/native-profile-v1/vectors.json",
+                   "contracts/native-profile-v2/vectors.json", "contracts/native-profile-v3/vectors.json")
+
+
+class D2ContractCountTests(unittest.TestCase):
+    """HE-004D2 G-D2-1: edge record v6's five HE-004D2 rows and edge record v7's six make 46 registered files; over a copy
+    of the real contracts/ tree, a missing one of the eleven, a changed one, and an unregistered file refuse."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.base = Path(self.directory.name)
+        for rel in list(gate.CONTRACTS) + ["contracts/PROVENANCE.md"]:
+            path = self.base / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes((gate.HE / rel).read_bytes())
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_the_forty_six_files_pass(self):
+        self.assertEqual(len(gate.CONTRACTS), 46)
+        self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 46)
+
+    def test_a_missing_changed_or_unregistered_file_refuses(self):
+        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS:
+            path = self.base / rel
+            data = path.read_bytes()
+            path.unlink()
+            with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
+                gate.check_contracts(self.base)
+            path.write_bytes(data[:-1] + bytes([data[-1] ^ 1]))
+            with self.assertRaisesRegex(gate.GateError, "differs from its registered bytes: %s" % re.escape(rel)):
+                gate.check_contracts(self.base)
+            path.write_bytes(data)
+        for rel in ("contracts/native-profile-v6/qualification.schema.json", "contracts/native-profile-v5/extra.json",
+                    "contracts/i06-v4/vectors.json"):
+            path = self.base / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"{}")
+            with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
+                gate.check_contracts(self.base)
+            path.unlink()
+        self.assertEqual(gate.check_contracts(self.base), 46)
+
+
+class D2EmbeddedContractTests(Tree):
+    """HE-004D2 G-D2-2: contracts.rs embeds only OBSERVER_EMBEDDED_CONTRACTS (I06 v1's three files, the v4 schema and,
+    from unit B1, the v5 schema); embedding any other registered file (a predecessor schema, a vector set, a README, I06
+    v3's files) refuses, and an unregistered file refuses as before."""
+
+    TREE = {gate.OBSERVER_CONTRACTS: NATIVE_CONTRACTS}
+    RULE = "G-D2-2"
+
+    def test_the_real_module_and_the_fixture_pass(self):
+        self.assertEqual(gate.OBSERVER_EMBEDDED_CONTRACTS,
+                         ("contracts/i06-v1/identity-closure.json", "contracts/i06-v1/writer-inventory.json",
+                          "contracts/i06-v1/upstream-bootstrap-rbac-v1.37.1.json",
+                          "contracts/native-profile-v4/qualification.schema.json",
+                          "contracts/native-profile-v5/qualification.schema.json"))
+        self.assertTrue(set(gate.OBSERVER_EMBEDDED_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
+        self.write(gate.OBSERVER_CONTRACTS, (gate.HE / gate.OBSERVER_CONTRACTS).read_text(encoding="utf-8"))
+        self.assertEqual(gate.check_observer_contracts_module(self.base), 11)
+
+    def test_other_registered_files_refuse(self):
+        for rel in ("contracts/native-profile-v1/qualification.schema.json",
+                    "contracts/native-profile-v2/qualification.schema.json",
+                    "contracts/native-profile-v3/qualification.schema.json", "contracts/native-profile-v4/vectors.json",
+                    "contracts/native-profile-v4/README.md", "contracts/native-profile-v5/vectors.json",
+                    "contracts/native-profile-v5/README.md", "contracts/native-profile-v1/vectors.json",
+                    "contracts/native-profile-v2/vectors.json", "contracts/native-profile-v3/vectors.json",
+                    "contracts/i06-v3/criteria.json", "contracts/i06-v3/vectors.json", "contracts/i06-v2/README.md",
+                    "contracts/i06-v1/README.md", "contracts/i07-v3/policy-kinds.json"):
+            self.assertIn(rel, gate.CONTRACTS)
+            text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
+            self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text, self.RULE)
+        for rel in ("contracts/native-profile-v6/vectors.json", "contracts/i06-v4/vectors.json"):
+            text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
+            self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text,
+                         "not a registered contract file")
+
+
+class D2SchemaConstantTests(Tree):
+    """HE-004D2 G-D2-3 (G-D1-9 generalised): each of NATIVE_PROFILE_SCHEMAS is defined once in contracts.rs and named once
+    in capture_schema.rs, inside CaptureSchema::embedded, and nowhere else; the old single-constant cases hold for v5."""
+
+    TREE = {gate.OBSERVER_CONTRACTS: NATIVE_CONTRACTS, NATIVE_SCHEMA_RS: NATIVE_SCHEMA_TEXT, CAPTURE_RS: CAPTURE_TEXT,
+            gate.OBSERVER_RECORD_CHECK: "pub fn f() {}\n"}
+    RULE = "G-D2-3"
+
+    def test_both_constants_once(self):
+        self.assertEqual(gate.NATIVE_PROFILE_SCHEMAS, ("NATIVE_PROFILE_V4_SCHEMA", "NATIVE_PROFILE_V5_SCHEMA"))
+        self.assertEqual(gate.check_native_profile_use(self.base), 4)
+        # The real sources: contracts.rs and capture_schema.rs as built.
+        for rel in (gate.OBSERVER_CONTRACTS, NATIVE_SCHEMA_RS):
+            self.write(rel, (gate.HE / rel).read_text(encoding="utf-8"))
+        self.assertEqual(gate.check_native_profile_use(self.base), 4)
+
+    def test_other_uses_of_the_v5_constant_refuse(self):
+        use = "crate::contracts::NATIVE_PROFILE_V5_SCHEMA"
+        for rel, text in ((NATIVE_SCHEMA_RS, NATIVE_SCHEMA_TEXT.replace("load(bytes)", "load(%s)" % use)),
+                          (NATIVE_SCHEMA_RS, NATIVE_SCHEMA_TEXT.replace("from_bytes(%s)" % use, "from_bytes(%s); %s" % (use, use))),
+                          (NATIVE_SCHEMA_RS, NATIVE_SCHEMA_TEXT.replace(use, "&[]")),
+                          (gate.OBSERVER_RECORD_CHECK, "pub fn f() -> usize { %s.len() }\n" % use),
+                          (CAPTURE_RS, CAPTURE_TEXT + "fn f() -> &'static [u8] { %s }\n" % use),
+                          (gate.OBSERVER_CONTRACTS, NATIVE_CONTRACTS.replace("NATIVE_PROFILE_V5_SCHEMA:", "NATIVE_PROFILE_SCHEMA_V5:"))):
+            self.refused(gate.check_native_profile_use, rel, text, "NATIVE_PROFILE_V5_SCHEMA.*" + self.RULE)
+        # A second use of the v4 constant still refuses, as G-D1-9.
+        self.refused(gate.check_native_profile_use, gate.OBSERVER_RECORD_CHECK, "pub fn f() -> usize { crate::contracts::NATIVE_PROFILE_V4_SCHEMA.len() }\n",
+                     "NATIVE_PROFILE_V4_SCHEMA.*G-D1-9")
+
+
+class D2ConstructorHomePinTests(Tree):
+    """HE-004D2 owner decision Q-D2-END (a): linux_net.rs and linux_capture.rs are pinned whole; for each, a one-byte
+    change, an added byte, a removed byte, an appended alias or default (round 4's probes), a missing file and a symlink
+    refuse; the real files pass. Run on the real files."""
+
+    def setUp(self):
+        super().setUp()
+        self.real = {rel: (gate.HE / rel).read_bytes() for rel in gate.OBSERVER_HOME_PINS}
+        for rel, data in self.real.items():
+            self.write_bytes(rel, data)
+
+    def write_bytes(self, rel, data):
+        path = self.base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            path.unlink()
+        path.write_bytes(data)
+
+    def refuses(self, rel, data, message="%s differs from its pinned bytes"):
+        self.write_bytes(rel, data)
+        with self.assertRaisesRegex(gate.GateError, (message % re.escape(rel)) + ".*Q-D2-END"):
+            gate.check_observer_home_pins(self.base)
+        self.write_bytes(rel, self.real[rel])
+
+    def test_the_real_files_pass(self):
+        self.assertEqual(gate.OBSERVER_HOME_PINS, {
+            "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
+            "crates/observer/src/linux_net.rs": "bc9b4f510222874a197b9a2676946cea827c0871e05fc1ea07682a0bd93bf8c9"})
+        self.assertEqual(gate.check_observer_home_pins(self.base), 2)
+
+    def test_each_file_refuses_a_change_missing_or_a_symlink(self):
+        for rel, alias in (("crates/observer/src/linux_net.rs", b"pub type W<T: Into<[u8; 1]> = LinuxWire> = T;\n"),
+                           ("crates/observer/src/linux_capture.rs", b"pub struct H<T = LinuxCapture>(T);\n")):
+            data = self.real[rel]
+            middle = len(data) // 2
+            self.refuses(rel, data[:middle] + bytes([data[middle] ^ 1]) + data[middle + 1:])
+            self.refuses(rel, data + b"\n")
+            self.refuses(rel, data[:-1])
+            self.refuses(rel, data + alias)
+            (self.base / rel).unlink()
+            with self.assertRaisesRegex(gate.GateError, "%s is missing or a symlink" % re.escape(rel)):
+                gate.check_observer_home_pins(self.base)
+            (self.base / "real.bin").write_bytes(data)
+            (self.base / rel).symlink_to(self.base / "real.bin")
+            with self.assertRaisesRegex(gate.GateError, "%s is missing or a symlink" % re.escape(rel)):
+                gate.check_observer_home_pins(self.base)
+            (self.base / rel).unlink()
+            self.write_bytes(rel, data)
+        self.assertEqual(gate.check_observer_home_pins(self.base), 2)
+
+
+class D2ObserverSysPinTests(Tree):
+    """HE-004D2 G-D2-10 (HE-004D1 PR review round 4, R4-1): observer-sys's lib.rs, dirent.rs and Cargo.toml are pinned
+    whole beside kernel.rs; for each, a one-byte change, an added byte, a missing file and a symlink refuse; R4-1's own
+    probe, an inline `pub mod kernel { }` in lib.rs, refuses; the real files pass. Run on the real files."""
+
+    RULE = "observer-sys pin, R3-1"
+    NEW = (gate.OBSERVER_SYS_LIB, OBSERVER_SYS_DIRENT, "crates/observer-sys/Cargo.toml")
+
+    def setUp(self):
+        super().setUp()
+        self.real = {rel: (gate.HE / rel).read_bytes() for rel in gate.OBSERVER_SYS_PINS}
+        for rel, data in self.real.items():
+            self.put(rel, data)
+
+    def put(self, rel, data):
+        path = self.base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            path.unlink()
+        path.write_bytes(data)
+
+    def refuses(self, rel, data, message="%s differs from its pinned bytes"):
+        self.put(rel, data)
+        with self.assertRaisesRegex(gate.GateError, message % re.escape(rel) if "%s" in message else message):
+            gate.check_observer_sys_pins(self.base)
+        self.put(rel, self.real[rel])
+
+    def test_the_real_files_pass(self):
+        self.assertEqual(gate.OBSERVER_SYS_PINS, {
+            "crates/observer-sys/src/kernel.rs": "0b3d0151c9eaf1f44dd56436795aefd8cb7140ce9f4d16fe5f4eaf7130e61d43",
+            "crates/observer-sys/src/lib.rs": "e718fc32fc13a28b4bfc58d6917cd9ac88479e2f5779ab9d351fdc5723f19029",
+            "crates/observer-sys/src/dirent.rs": "133b05b3b231757078efd6c62259dcdafcd3b60f0f9fbae0ba0c0653c15ef510",
+            "crates/observer-sys/Cargo.toml": "4d1299774cccfd74a5a8f7e353c47afde7c6014cc7eb04deadad3d05e5d6fcc4"})
+        self.assertEqual({rel: len(data) for rel, data in self.real.items() if rel in self.NEW},
+                         {gate.OBSERVER_SYS_LIB: 895, OBSERVER_SYS_DIRENT: 3264, "crates/observer-sys/Cargo.toml": 410})
+        self.assertEqual(gate.check_observer_sys_pins(self.base), 4)
+
+    def test_each_new_file_refuses_a_change(self):
+        for rel in self.NEW:
+            data = self.real[rel]
+            middle = len(data) // 2
+            self.refuses(rel, data[:middle] + bytes([data[middle] ^ 1]) + data[middle + 1:])
+            self.refuses(rel, data + b"\n")
+            self.refuses(rel, data[:-1])
+
+    def test_each_new_file_missing_or_a_symlink_refuses(self):
+        for rel in self.NEW:
+            (self.base / rel).unlink()
+            with self.assertRaisesRegex(gate.GateError, "%s is missing or a symlink" % re.escape(rel)):
+                gate.check_observer_sys_pins(self.base)
+            (self.base / "real.bin").write_bytes(self.real[rel])
+            (self.base / rel).symlink_to(self.base / "real.bin")
+            with self.assertRaisesRegex(gate.GateError, "%s is missing or a symlink" % re.escape(rel)):
+                gate.check_observer_sys_pins(self.base)
+            (self.base / rel).unlink()
+            self.put(rel, self.real[rel])
+        self.assertEqual(gate.check_observer_sys_pins(self.base), 4)
+
+    def test_the_r4_1_probes_refuse(self):
+        lib = self.real[gate.OBSERVER_SYS_LIB]
+        self.refuses(gate.OBSERVER_SYS_LIB, lib + b"pub mod kernel { }\n")
+        self.refuses(gate.OBSERVER_SYS_LIB, lib + b"pub mod extra;\n")
+        self.refuses("crates/observer-sys/Cargo.toml", self.real["crates/observer-sys/Cargo.toml"]
+                     + b"\n[dependencies]\nlibc = \"0.2\"\n")
+
+
+class D2QualifiedConstructorTests(Tree):
+    """HE-004D2 G-D2-11 (HE-004D1 PR review round 1, R1-5): serve constructs LinuxWire and LinuxCapture exactly once each,
+    counting `<T>::new`, `< T >::new` and (HE-004D2 PR review round 1, R1-7) `T::<>::new`, `<(T)>::new` and `<T<>>::new`,
+    and names each type only once; only main.rs's serve calls LinuxCapture::new in any of these forms."""
+
+    TREE = D1_TREE
+    CLOSURE = "    let Ok(closure) = Closure::embedded() else { return status::CLOSURE };\n"
+
+    def test_the_fixture_passes(self):
+        self.assertEqual([name for _, name in gate.QUALIFIED_CONSTRUCTORS], ["LinuxWire", "LinuxCapture"])
+        self.assertEqual(gate.check_observer_serve(self.base), 12)
+        self.assertEqual(gate.check_observer_capture_callers(self.base), 4)
+
+    def test_a_second_qualified_construction_in_serve_refuses(self):
+        for extra, name in (("    let _again = <LinuxCapture>::new(sealed);\n", "LinuxCapture"),
+                            ("    let _again = < LinuxCapture > :: new(sealed);\n", "LinuxCapture"),
+                            ("    let _again = <LinuxWire>::new(sealed);\n", "LinuxWire"),
+                            ("    let _again = < LinuxWire >::new(sealed);\n", "LinuxWire")):
+            text = GOOD_OBSERVER_MAIN.replace(self.CLOSURE, extra + self.CLOSURE)
+            self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text,
+                         "serve constructs %s other than exactly once.*G-D2-11" % name)
+            if name == "LinuxCapture":
+                self.refused(gate.check_observer_capture_callers, gate.OBSERVER_MAIN, text, "G-D1-6")
+
+    def test_the_pr_review_round1_spellings_refuse(self):
+        # HE-004D2 PR review round 1, R1-7: empty generic arguments and a parenthesised type, spaces allowed; and any
+        # second naming of either type in serve.
+        for extra, name in (("    let _again = LinuxWire::<>::new(sealed);\n", "LinuxWire"),
+                            ("    let _again = <(LinuxWire)>::new(sealed);\n", "LinuxWire"),
+                            ("    let _again = LinuxWire :: < > :: new(sealed);\n", "LinuxWire"),
+                            ("    let _again = LinuxCapture::<>::new(sealed);\n", "LinuxCapture"),
+                            ("    let _again = <(LinuxCapture)>::new(sealed);\n", "LinuxCapture"),
+                            ("    let _again = <LinuxCapture<>>::new(sealed);\n", "LinuxCapture")):
+            text = GOOD_OBSERVER_MAIN.replace(self.CLOSURE, extra + self.CLOSURE)
+            self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text,
+                         "serve constructs %s other than exactly once.*G-D2-11" % name)
+            if name == "LinuxCapture":
+                self.refused(gate.check_observer_capture_callers, gate.OBSERVER_MAIN, text, "G-D1-6")
+        for name in ("LinuxWire", "LinuxCapture"):
+            text = GOOD_OBSERVER_MAIN.replace(self.CLOSURE, "    let _kept: Option<%s> = None;\n" % name + self.CLOSURE)
+            self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text, "serve names %s other than once.*R1-7" % name)
+        for rel in (CAPTURE_RS, LINUX_CAPTURE):
+            for extra in ("fn f(s: &Sealed) { let _ = LinuxCapture::<>::new(s); }\n",
+                          "fn f(s: &Sealed) { let _ = <(LinuxCapture)>::new(s); }\n",
+                          "fn f(s: &Sealed) { let _ = <LinuxCapture<>>::new(s); }\n"):
+                self.refused(gate.check_observer_capture_callers, rel, self.TREE[rel] + extra,
+                             "names LinuxCapture::new; only main.rs's serve calls it")
+
+    def test_a_linux_wire_alias_refuses(self):
+        # HE-004D2 PR review round 2, R2-1: an alias of LinuxWire outside main.rs, paired with a second construction
+        # through it in serve; a renaming import; a parenthesised aliased type.
+        main = GOOD_OBSERVER_MAIN.replace(self.CLOSURE, "    let Ok(_again) = planeon_observer::linux_net::W::new(sealed) "
+                                          "else { return status::SOCKETS };\n" + self.CLOSURE)
+        self.write(gate.OBSERVER_MAIN, main)
+        for rel, extra in (("crates/observer/src/linux_net.rs", "pub type W = LinuxWire;\n"),
+                           (gate.OBSERVER_LIB, "pub type W = linux_net::LinuxWire;\n"),
+                           (gate.OBSERVER_LIB, "pub use linux_net::LinuxWire as W;\n"),
+                           (CAPTURE_RS, "type W = (crate::linux_net::LinuxWire);\n")):
+            self.refused(gate.check_observer_capture_callers, rel, self.TREE.get(rel, "") + extra,
+                         "renames or aliases LinuxWire .*G-D1-6")
+        self.write(gate.OBSERVER_MAIN, self.TREE[gate.OBSERVER_MAIN])
+        self.assertEqual(gate.check_observer_capture_callers(self.base), 4)
+
+    def test_the_round3_alias_and_naming_forms_refuse(self):
+        # HE-004D2 PR review round 3, R3-1: a type item naming either type in any form (split across lines, a tab, a
+        # defaulted parameter, a where clause, a projection), in its own file or elsewhere; the type named outside its
+        # own file and main.rs's serve (a struct default, a size_of outside serve).
+        net = "crates/observer/src/linux_net.rs"
+        for rel, text in ((net, "pub type W = (\n    LinuxWire\n);\n"), (net, "pub type W = (\tLinuxWire);\n"),
+                          (net, "pub type W<T = LinuxWire> = T;\n"), (net, "pub type W where u8: Copy = LinuxWire;\n"),
+                          (net, "pub type W = <[LinuxWire; 1] as IntoIterator>::Item;\n"),
+                          (gate.OBSERVER_LIB, self.TREE[gate.OBSERVER_LIB] + "pub type W<T = linux_net::LinuxWire> = T;\n"),
+                          (LINUX_CAPTURE, self.TREE[LINUX_CAPTURE] + "pub type C = (\n    LinuxCapture\n);\n"),
+                          (LINUX_CAPTURE, self.TREE[LINUX_CAPTURE] + "pub type C<T = LinuxCapture> = T;\n")):
+            name = "LinuxCapture" if rel == LINUX_CAPTURE else "LinuxWire"
+            self.refused(gate.check_observer_capture_callers, rel, text, "renames or aliases %s .*G-D1-6" % name)
+        for rel, extra, name in ((CAPTURE_RS, "pub struct H<T = crate::linux_net::LinuxWire>(T);\n", "LinuxWire"),
+                                 (gate.OBSERVER_LIB, "pub struct H<T = linux_net::LinuxWire>(T);\n", "LinuxWire"),
+                                 (CAPTURE_RS, "pub struct H<T = crate::linux_capture::LinuxCapture>(T);\n", "LinuxCapture"),
+                                 (gate.OBSERVER_MAIN, "fn width() -> usize {\n    std::mem::size_of::<LinuxWire>()\n}\n",
+                                  "LinuxWire")):
+            self.refused(gate.check_observer_capture_callers, rel, self.TREE[rel] + extra,
+                         "names %s outside .*main.rs's serve .*R3-1" % name)
+
+    def test_the_round4_type_items_refuse(self):
+        # HE-004D2 PR review round 4, R4-1: a `;` inside an array type or a block does not end a type item early, in the
+        # home files where naming the type is allowed.
+        net = "crates/observer/src/linux_net.rs"
+        capture = self.TREE[LINUX_CAPTURE]
+        for rel, text, name in ((net, "pub type W where [u8; 1]: Copy = LinuxWire;\n", "LinuxWire"),
+                                (net, "pub type W<T: Into<[u8; 1]> = LinuxWire> = T;\n", "LinuxWire"),
+                                (net, "pub type W = <[u8; 1] as crate::capture::Pick<LinuxWire>>::Out;\n", "LinuxWire"),
+                                (LINUX_CAPTURE, capture + "pub type C where [u8; 1]: Copy = LinuxCapture;\n", "LinuxCapture"),
+                                (LINUX_CAPTURE, capture + "pub type C<T: Into<[u8; 1]> = LinuxCapture> = T;\n", "LinuxCapture"),
+                                (LINUX_CAPTURE, capture + "pub type C = <[u8; { 1 }] as crate::capture::Pick<LinuxCapture>>::Out;\n",
+                                 "LinuxCapture")):
+            self.refused(gate.check_observer_capture_callers, rel, text, "renames or aliases %s .*G-D1-6" % name)
+        self.refused(gate.check_observer_capture_callers, net, "pub type W = [u8; 1]", "a type item the alias rule cannot read")
+
+    def test_a_qualified_call_elsewhere_refuses(self):
+        for rel in (CAPTURE_RS, LINUX_CAPTURE):
+            for extra in ("fn f(s: &Sealed) { let _ = < LinuxCapture >::new(s); }\n",
+                          "fn f(s: &Sealed) { let _ = <LinuxCapture>::new(s); }\n"):
+                self.refused(gate.check_observer_capture_callers, rel, self.TREE[rel] + extra,
+                             "names LinuxCapture::new; only main.rs's serve calls it")
+
+
+RECORD_CHECK = "crates/observer/src/record_check.rs"
+
+
+class D2LogicTests(Tree):
+    """HE-004D2 G-D2-4: each D2 logic module takes B1's logic rule with D1's whitelist plus the four D2 modules: crate::capture,
+    crate::observe, crate::enrolled, gate-sys, observer-sys, i05-protocol's regex and std::net refuse, as do a HashMap, an
+    unwrap( and an include_str!; B1's and D1's modules may not name a D2 module."""
+
+    TREE = LOGIC_TREE
+
+    def test_the_group_and_its_refusals(self):
+        self.assertEqual(gate.D2_LOGIC_NAMES, ("record_check", "qualification", "i06_evidence", "composition"))
+        self.assertEqual(gate.D2_LOGIC_BUILT, ("record_check", "i06_evidence", "qualification", "composition"))
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
+        good = self.TREE[RECORD_CHECK]
+        for text, message in (
+                ("use crate::capture::CaptureEngine;\n", "imports crate::capture::CaptureEngine"),
+                ("use crate::observe::Epoch;\n", "imports crate::observe::Epoch"),
+                ("use crate::enrolled::Enrolled;\n", "imports crate::enrolled::Enrolled"),
+                ("fn f() { crate::capture::fill(); }\n", "names crate::capture::fill"),
+                ("fn f() { gate_sys::Dir::at(p); }\n", "names gate_sys::Dir::at"),
+                ("fn f() { let _ = observer_sys::kernel::Roots::open(); }\n", "names observer_sys::kernel"),
+                ("use i05_protocol::regex::Regex;\n", "imports i05_protocol::regex::Regex"),
+                ("use std::net::IpAddr;\n", "imports std::net::IpAddr"),
+                ("fn f() -> bool { std :: net :: Ipv4Addr::LOCALHOST.is_loopback() }\n", "names std::net::Ipv4Addr"),
+                ("use super::capture_check;\n", "imports super::capture_check"),
+                ("use crate::capture_check as checks;\n", "renames an import"),
+                ("use crate::capture_check::*;\n", "imports a glob"),
+                ("fn f() { let _: HashMap<u8, u8> = x(); }\n", "HashMap, HashSet or RandomState"),
+                ("const X: &str = include_str!(\"x\");\n", "include_bytes! or include_str!"),
+                ("fn f(x: Option<u8>) -> u8 { x.unwrap() }\n", "no-panic tripwire"),
+                ("fn f(x: Option<u8>) -> u8 { x.expect(\"y\") }\n", "no-panic tripwire"),
+                ("fn f(x: u8) { assert!(x > 0); }\n", "no-panic tripwire")):
+            self.refused(gate.check_observer_logic, RECORD_CHECK, good + text, message)
+        # D1's modules and the other D2 modules are on D2's whitelist; a strict test block may panic.
+        self.write(RECORD_CHECK, good + "use crate::capture_schema::RecordSchema;\nuse crate::qualification;\n"
+                   "use i05_protocol::schema::Schema;\nfn g() -> u8 { self::composition::x() }\n"
+                   "#[cfg(test)]\nmod tests {\n    fn t() { Some(1).unwrap(); }\n}\n")
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
+        # B1's and D1's modules may not name a D2 module.
+        for rel in ("crates/observer/src/inputs.rs", "crates/observer/src/capture_check.rs"):
+            self.refused(gate.check_observer_logic, rel, self.TREE[rel] + "use crate::record_check;\n", "imports crate::record_check")
+
+
+D2_ISOLATION_RECORD = ("//! A record_check fixture (IpText and qualification in a comment pass).\n"
+                       "pub struct RecordAccepted {\n    record: u8,\n}\n\n"
+                       "impl RecordAccepted {\n    pub fn record(&self) -> u8 {\n        self.record\n    }\n}\n\n"
+                       "#[derive(Debug, PartialEq, Eq)]\npub struct IpText;\n\nenum Walk {\n    Node,\n}\n\n"
+                       "pub enum Production {\n    Unavailable(&'static str),\n}\n\n"
+                       "pub fn check_record() -> &'static str {\n    let _ = Walk::Node;\n    \"composition qualification\"\n}\n\n"
+                       "#[cfg(test)]\nmod tests {\n    struct Local;\n}\n")
+D2_ISOLATION_TREE = {
+    gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\n// record_check and composition in a comment\npub mod capture;\npub mod capture_check;\n"
+                       "pub mod observe;\n" + "".join("pub mod %s;\n" % name for name in gate.D2_LOGIC_BUILT),
+    RECORD_CHECK: D2_ISOLATION_RECORD,
+    # Every other D2 module built so far, as a type-free stub.
+    **{"crates/observer/src/%s.rs" % name: "pub fn %s_entry() {}\n" % name for name in gate.D2_LOGIC_BUILT if name != "record_check"},
+    "crates/observer/src/observe.rs": "//! record_check and RecordAccepted in a comment.\n"
+                                      "pub fn run() -> &'static str { \"qualification IpText\" }\n",
+    "crates/observer/src/capture_check.rs": "pub enum Refusal {\n    Missing,\n}\npub struct CheckedRecord;\n",
+    CAPTURE_RS: CAPTURE_TEXT,
+    gate.OBSERVER_MAIN: GOOD_OBSERVER_MAIN,
+}
+
+
+class D2ChildModuleTests(Tree):
+    """HE-004D2 PR review round 1, R1-6: the observer's src/ holds no directory and no logic module declares a module
+    outside a strict test block, so no child module's file reaches a logic module's private items through `super::`. The
+    reviewer's form refuses: `mod bridge;` in i06_evidence.rs, and i06_evidence/bridge.rs adding a method to a non-D2 type
+    and re-flagging a token."""
+
+    TREE = LOGIC_TREE
+    RULE = "R1-6"
+
+    def test_the_tree_passes(self):
+        self.assertEqual(gate.check_observer_child_modules(self.base), len(gate.LOGIC_MODULES))
+        self.write(RECORD_CHECK, self.TREE[RECORD_CHECK] + "#[cfg(test)]\nmod tests {\n    mod inner {}\n}\n")
+        self.assertEqual(gate.check_observer_child_modules(self.base), len(gate.LOGIC_MODULES))
+
+    def test_a_module_in_a_logic_file_refuses(self):
+        for rel, _ in gate.LOGIC_MODULES:
+            for extra in ("mod bridge;\n", "pub(crate) mod bridge;\n", "mod bridge {\n    pub fn f() {}\n}\n",
+                          "#[cfg(not(test))]\nmod tests {\n}\n"):
+                self.refused(gate.check_observer_child_modules, rel, self.TREE[rel] + extra, "declares a module .*" + self.RULE)
+
+    def test_a_directory_under_src_refuses(self):
+        self.write("crates/observer/src/i06_evidence/bridge.rs",
+                   "impl CheckedRecord {\n    pub fn bridge_whitespace(&self, point: u32) -> bool {\n"
+                   "        super::whitespace(point)\n    }\n}\n\npub fn launder() -> bool {\n"
+                   "    let mut token = match super::check_evidence(true) {\n        Ok(token) => token,\n"
+                   "        Err(_) => return false,\n    };\n    token.fixture = false;\n    token.fixture()\n}\n")
+        with self.assertRaisesRegex(gate.GateError, "src/i06_evidence is a directory under crates/observer/src.*" + self.RULE):
+            gate.check_observer_child_modules(self.base)
+
+
+class D2IsolationTests(Tree):
+    """HE-004D2 G-D2-5 (D2-4): the D2 modules' names occur outside them only as lib.rs's pub mod lines; the D2 type set is
+    derived from the D2 files and none of its names occurs in another observer source; every D2 impl is `impl <own type>
+    {`; no D2 file re-exports another item; the D2 files present are exactly those that take the logic rule. The words in
+    a comment or a string pass."""
+
+    TREE = D2_ISOLATION_TREE
+    RULE = "G-D2-5"
+
+    def test_the_tree_passes(self):
+        self.assertEqual(gate.check_observer_d2_isolation(self.base), 4)
+
+    def test_the_module_names_outside_lib_rs_refuse(self):
+        for rel, extra in (("crates/observer/src/observe.rs", "pub fn f() -> u8 { qualification::check_qualification() }\n"),
+                           ("crates/observer/src/observe.rs", "pub fn f() -> u8 { crate::record_check::check_record() }\n"),
+                           (CAPTURE_RS, "use crate::composition as c;\n"),
+                           (gate.OBSERVER_MAIN, "use planeon_observer::i06_evidence;\n"),
+                           (gate.OBSERVER_LIB, "pub use record_check::check_record;\n"),
+                           # A pub mod line for a D2 module not built yet.
+                           *[(gate.OBSERVER_LIB, "pub mod %s;\n" % name) for name in gate.D2_LOGIC_NAMES
+                             if name not in gate.D2_LOGIC_BUILT][:1]):
+            self.refused(gate.check_observer_d2_isolation, rel, self.TREE[rel] + extra, "names the D2 module .*" + self.RULE)
+        lib = self.TREE[gate.OBSERVER_LIB]
+        for text in (lib.replace("pub mod record_check;\n", ""), lib + "pub mod record_check;\n",
+                     lib.replace("pub mod record_check;\n", "pub(crate) mod record_check;\n")):
+            self.refused(gate.check_observer_d2_isolation, gate.OBSERVER_LIB, text, "does not declare `pub mod record_check;`")
+
+    def test_the_d2_type_names_elsewhere_refuse(self):
+        for rel, extra in ((gate.OBSERVER_MAIN, "fn f(p: Production) {}\n"), (CAPTURE_RS, "pub fn f() -> IpText { x() }\n"),
+                           ("crates/observer/src/observe.rs", "type Accepted = RecordAccepted;\n"),
+                           ("crates/observer/src/observe.rs", "fn f() { let _ = Walk::Node; }\n")):
+            self.refused(gate.check_observer_d2_isolation, rel, self.TREE[rel] + extra, "a type the D2 module .*" + self.RULE)
+        # A new D2 type passes, and naming it elsewhere refuses.
+        self.write(RECORD_CHECK, D2_ISOLATION_RECORD + "struct Matcher;\n\nimpl Matcher {\n    fn new() -> u8 {\n        0\n    }\n}\n")
+        self.assertEqual(gate.check_observer_d2_isolation(self.base), 5)
+        self.refused(gate.check_observer_d2_isolation, CAPTURE_RS, CAPTURE_TEXT + "pub fn f(m: &Matcher) {}\n", "names Matcher")
+        # A D2 type that an observer source defines or names (D1's Refusal, a helper trait named in observe.rs) refuses.
+        self.refused(gate.check_observer_d2_isolation, RECORD_CHECK, D2_ISOLATION_RECORD + "pub enum Refusal {}\n", "names Refusal")
+        self.write(RECORD_CHECK, D2_ISOLATION_RECORD + "trait Helper {}\n")
+        self.refused(gate.check_observer_d2_isolation, "crates/observer/src/observe.rs",
+                     self.TREE["crates/observer/src/observe.rs"] + "fn f(h: &dyn Helper) {}\n", "names Helper")
+        self.write(RECORD_CHECK, D2_ISOLATION_RECORD)
+        # Two D2 files defining one name refuse (the set stays unambiguous).
+        self.refused(gate.check_observer_d2_isolation, "crates/observer/src/composition.rs", "pub struct IpText;\n",
+                     "defines IpText, which crates/observer/src/composition.rs defines too")
+
+    def test_impl_headers_and_re_exports_refuse(self):
+        for extra in ("impl CheckedRecord {\n    pub fn more(&self) {}\n}\n", "impl CaptureCycle for RecordAccepted {}\n",
+                      "impl<T> Walk {}\n", "impl<T: Clone> Helper for T {}\ntrait Helper {}\n", "impl IpText for u8 {}\n",
+                      "impl std::fmt::Display for IpText {}\n", "pub fn f() { impl CheckedRecord {} }\n"):
+            self.refused(gate.check_observer_d2_isolation, RECORD_CHECK, D2_ISOLATION_RECORD + extra, "impl header .*" + self.RULE)
+        self.refused(gate.check_observer_d2_isolation, RECORD_CHECK, D2_ISOLATION_RECORD + "pub use crate::capture_check::Refusal;\n",
+                     "re-exports crate::capture_check::Refusal")
+        self.refused(gate.check_observer_d2_isolation, RECORD_CHECK, D2_ISOLATION_RECORD + "pub(crate) use crate::observe::run;\n",
+                     "re-exports crate::observe::run")
+
+    def test_the_present_d2_files_are_the_built_ones(self):
+        self.assertEqual(sorted(gate.D2_LOGIC_BUILT), sorted(gate.D2_LOGIC_NAMES))
+        # A D2 file present before its unit builds it (it would escape the logic rule) refuses.
+        with mock.patch.object(gate, "D2_LOGIC_BUILT", ("record_check", "i06_evidence", "qualification")):
+            with self.assertRaisesRegex(gate.GateError, "not exactly those that take the logic rule"):
+                gate.check_observer_d2_isolation(self.base)
+        # A built D2 file missing refuses.
+        for rel in ("crates/observer/src/composition.rs", RECORD_CHECK):
+            (self.base / rel).unlink()
+            with self.assertRaisesRegex(gate.GateError, "not exactly those that take the logic rule"):
+                gate.check_observer_d2_isolation(self.base)
+            self.write(rel, self.TREE[rel])
+        self.assertEqual(gate.check_observer_d2_isolation(self.base), 4)
+
+
+class D2InterpreterTreeTests(Tree):
+    """HE-004D2 G-D2-6: /opt/planeon/ occurs in crates/observer's sources only as record_check.rs's one exact, line-anchored
+    INTERPRETER_TREE constant; a second occurrence, the literal elsewhere, a pub form, a raw string and a comment refuse."""
+
+    EXPRESSION = 'const INTERPRETER_TREE: &str = "/opt/planeon/python/";'
+    TREE = {RECORD_CHECK: "pub fn f() {}\n" + EXPRESSION + "\n", CAPTURE_RS: CAPTURE_TEXT}
+
+    def test_the_one_expression_passes(self):
+        self.assertEqual(gate.INTERPRETER_TREE[0], self.EXPRESSION)
+        self.assertEqual(gate.check_observer_interpreter_tree(self.base), 1)
+        self.write(RECORD_CHECK, "pub fn f() {}\n    const INTERPRETER_TREE: &str =\n        \"/opt/planeon/python/\";\n")
+        self.assertEqual(gate.check_observer_interpreter_tree(self.base), 1)
+
+    def test_other_forms_refuse(self):
+        good = self.TREE[RECORD_CHECK]
+        message = "G-D2-6"
+        for text in (good + 'const BIN: &str = "/opt/planeon/bin/";\n', good + "// see /opt/planeon/python/ above\n",
+                     good + self.EXPRESSION + "\n", good.replace(self.EXPRESSION, "pub " + self.EXPRESSION),
+                     good.replace(self.EXPRESSION, "pub(crate) " + self.EXPRESSION),
+                     good.replace('"/opt/planeon/python/"', 'r"/opt/planeon/python/"'),
+                     good.replace("/opt/planeon/python/", "/opt/planeon/python/3.12/"),
+                     good.replace(self.EXPRESSION, "const OTHER: u8 = 0;")):
+            self.refused(gate.check_observer_interpreter_tree, RECORD_CHECK, text, message)
+        self.refused(gate.check_observer_interpreter_tree, CAPTURE_RS, CAPTURE_TEXT + self.EXPRESSION + "\n", message)
+        (self.base / RECORD_CHECK).unlink()
+        with self.assertRaisesRegex(gate.GateError, "record_check.rs is missing"):
+            gate.check_observer_interpreter_tree(self.base)
+
+
+class D2RootConstantTests(Tree):
+    """HE-004D2 G-D2-9: record_check.rs's CGROUP_ROOT and PIN_ROOT are excepted once each from the start-up lint and the
+    linked-source fs scan, under G-D1-5's anchored patterns; a second /sys literal, the expression in another file, a pub
+    form and fs in a comment refuse."""
+
+    TEXT = ('const CGROUP_ROOT: &str = "/sys/fs/cgroup";\n/// The pins.\nconst PIN_ROOT: &str = "/sys/fs/bpf/planeon";\n'
+            "pub fn f() {}\n")
+    TREE = {**D1_TREE, RECORD_CHECK: TEXT}
+
+    def test_the_tree_passes(self):
+        self.assertEqual([expression for expression, _ in gate.D2_ROOT_CONSTANTS[RECORD_CHECK]],
+                         ['const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";'])
+        self.assertIn(RECORD_CHECK, gate.STARTUP_EXCEPTIONS)
+        self.assertIn(RECORD_CHECK, gate.FS_SCAN_EXCEPTIONS)
+        self.assertGreater(gate.check_sources(self.base), 0)
+        self.assertGreater(gate.check_linked_sources(self.base), 0)
+
+    def test_other_forms_refuse(self):
+        for old in ('const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";'):
+            for text in (self.TEXT.replace(old, "pub " + old), self.TEXT + old + "\n",
+                         self.TEXT.replace(old, old.replace('= "', '= r"'))):
+                self.refused(gate.check_sources, RECORD_CHECK, text, "uses /sys .start-up lint")
+                self.refused(gate.check_linked_sources, RECORD_CHECK, text, "names a std fs item")
+        for text in (self.TEXT + 'fn f() { let _ = "/sys/fs/cgroup/planeon.slice"; }\n',):
+            self.refused(gate.check_sources, RECORD_CHECK, text, "uses /sys .start-up lint")
+        self.refused(gate.check_linked_sources, RECORD_CHECK, self.TEXT + "// a fs-verity digest\n", "names a std fs item")
+        self.refused(gate.check_sources, CAPTURE_RS, CAPTURE_TEXT + 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";\n',
+                     "uses /sys .start-up lint")
+
+
+class D2SymbolTests(unittest.TestCase):
+    """HE-004D2 G-D2-7 (D2-4): no planeon-observer symbol has a path in a D2 module, by item path (legacy, v0, an inherent
+    impl) or by its first crate root (a trait impl, a closure); a symbol that only mentions a D2 name passes."""
+
+    REFUSED = ("_ZN16planeon_observer13qualification19check_qualification17h0123456789abcdefE",
+               "_RNvNtCs5pXa2Z9YbGW_16planeon_observer13qualification19check_qualification",
+               "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer12record_checkNtB2_6IpText9canonical",
+               "_RNvXs_NtCs5pXa2Z9YbGW_16planeon_observer12record_checkNtB4_6IpTextNtNtCsifRdLFh1usa_4core3fmt5Debug3fmt",
+               "_RNCNvNtCs5pXa2Z9YbGW_16planeon_observer12i06_evidence14check_evidence0B5_",
+               "_ZN16planeon_observer11composition13compose_fixture17h0123456789abcdefE")
+    PASSED = ("_RNvNtCs5pXa2Z9YbGW_16planeon_observer7capture13qualification",
+              "_RINvNtCsifRdLFh1usa_4core3ptr13drop_in_placeNtNtCs5pXa2Z9YbGW_16planeon_observer12record_check6IpTextEB4_",
+              "_ZN4core3ptr61drop_in_place$LT$planeon_observer..record_check..RecordAccepted$GT$17h0123456789abcdefE",
+              "_ZN16planeon_observer7capture11composition17h0123456789abcdefE",
+              "_ZN18planeon_observer_x12record_check1f17h0123456789abcdefE", "record_check", "main")
+
+    def test_d2_symbols_refuse_and_mentions_pass(self):
+        self.assertEqual(gate.check_d2_absent(set(self.PASSED)), len(self.PASSED))
+        for name in self.REFUSED:
+            with self.assertRaisesRegex(gate.GateError, "a symbol of the D2 module .*G-D2-7"):
+                gate.check_d2_absent(set(self.PASSED) | {name})
+
+
+EVIDENCE_RS = "crates/observer/src/i06_evidence.rs"
+TOKEN_TEXT = ("//! An i06_evidence fixture (`EvidenceAccepted {` and `Self {` in a comment pass).\n"
+              "#[derive(Debug, PartialEq, Eq)]\npub struct EvidenceAccepted {\n    record_digest: String,\n"
+              "    evidence_digest: String,\n    fixture: bool,\n}\n\n"
+              "impl EvidenceAccepted {\n    pub fn record_digest(&self) -> &str {\n        &self.record_digest\n    }\n\n"
+              "    pub fn fixture(&self) -> bool {\n        self.fixture\n    }\n}\n\n"
+              "pub enum EvidenceRefusal {\n    Rule(&'static str),\n}\n\n"
+              "pub fn check_evidence(flag: bool) -> Result<EvidenceAccepted, EvidenceRefusal> {\n"
+              "    let record_digest = String::from(\"Self { }\");\n    if flag {\n        return Err(EvidenceRefusal::Rule(\"x\"));\n    }\n"
+              "    Ok(EvidenceAccepted { record_digest, evidence_digest: String::new(), fixture: flag })\n}\n")
+
+
+QUALIFICATION_RS = "crates/observer/src/qualification.rs"
+QUALIFICATION_TOKEN_TEXT = ("//! A qualification fixture (B2).\n#[derive(Debug, PartialEq, Eq)]\npub struct QualificationAccepted {\n"
+                            "    record_digest: String,\n    valid_from: u64,\n    expires_at: u64,\n    fixture: bool,\n}\n\n"
+                            "impl QualificationAccepted {\n    pub fn valid_from(&self) -> u64 {\n        self.valid_from\n    }\n\n"
+                            "    pub fn fixture(&self) -> bool {\n        self.fixture\n    }\n}\n\n"
+                            "pub fn check_qualification(flag: bool) -> Result<QualificationAccepted, u8> {\n"
+                            "    Ok(QualificationAccepted { record_digest: String::new(), valid_from: 0, expires_at: 0, "
+                            "fixture: flag })\n}\n")
+
+
+COMPOSITION_RS = "crates/observer/src/composition.rs"
+COMPOSITION_TOKEN_TEXT = ("//! A composition fixture (B3).\nuse crate::i06_evidence::EvidenceAccepted;\n"
+                          "use crate::qualification::QualificationAccepted;\n\n#[derive(Debug, PartialEq, Eq)]\n"
+                          "pub struct Composed {\n    record_digest: String,\n    valid_from: u64,\n}\n\n"
+                          "impl Composed {\n    pub fn valid_from(&self) -> u64 {\n        self.valid_from\n    }\n}\n\n"
+                          "pub enum Production {\n    Unavailable(&'static str),\n}\n\n"
+                          "pub fn compose_fixture(evidence: EvidenceAccepted, qualification: QualificationAccepted) "
+                          "-> Result<Composed, u8> {\n    let _ = evidence;\n"
+                          "    Ok(Composed { record_digest: String::new(), valid_from: qualification.valid_from() })\n}\n\n"
+                          "pub fn compose_production(evidence: &EvidenceAccepted, qualification: &QualificationAccepted)\n"
+                          "                          -> Result<Production, u8> {\n"
+                          "    if evidence.fixture() || qualification.fixture() {\n        return Err(0);\n    }\n"
+                          "    Ok(Production::Unavailable(\"W02-PROD Composed compose_fixture\"))\n}\n")
+
+
+class D2TokenTests(Tree):
+    """HE-004D2 G-D2-8 (D2-1; design review round 2, R2-1): the evidence token (A3), the qualification token (B2) and the
+    composition (B3), whose production entry names none of compose_fixture, Composed, check_qualification and
+    check_evidence. One literal, in the minting function (check_evidence, check_qualification, compose_fixture); private
+    fields of the closed types; no Clone, Copy, Default, Hash or serde derive (also under cfg_attr); one impl of `&self`
+    getters returning neither the token nor Self, each returning its own field; the token named only in its struct, impl
+    header, the minting signature and the literal; outside the impl, a field reached only by its getter call; no `Self {`
+    or `Self(` in a token file. Each of the reviewers' forms refuses; the real getters pass."""
+
+    TREE = {EVIDENCE_RS: TOKEN_TEXT, CAPTURE_RS: CAPTURE_TEXT, QUALIFICATION_RS: QUALIFICATION_TOKEN_TEXT,
+            COMPOSITION_RS: COMPOSITION_TOKEN_TEXT}
+    RULE = "G-D2-8"
+    IMPL_END = "        self.fixture\n    }\n}\n"
+
+    def method(self, text):
+        return TOKEN_TEXT.replace(self.IMPL_END, "        self.fixture\n    }\n\n" + text + "}\n")
+
+    def test_the_fixture_and_the_built_tokens(self):
+        self.assertEqual(gate.D2_TOKENS_BUILT, ("EvidenceAccepted", "QualificationAccepted", "Composed"))
+        self.assertEqual(gate.D2_TOKENS["EvidenceAccepted"], (EVIDENCE_RS, "check_evidence"))
+        self.assertEqual(gate.D2_TOKENS["QualificationAccepted"], (QUALIFICATION_RS, "check_qualification"))
+        self.assertEqual(gate.D2_TOKENS["Composed"], (COMPOSITION_RS, "compose_fixture"))
+        self.assertEqual(gate.check_observer_tokens(self.base), 3)
+        # A strict test block may name Self; a `pub(crate)` getter passes.
+        self.write(EVIDENCE_RS, TOKEN_TEXT.replace("    pub fn fixture(&self)", "    pub(crate) fn fixture(&self)")
+                   + "#[cfg(test)]\nmod tests {\n    struct Local;\n    impl Local {\n        fn new() -> Local {\n"
+                     "            Self {}\n        }\n    }\n}\n")
+        self.assertEqual(gate.check_observer_tokens(self.base), 3)
+
+    def test_the_composition_s_forms_refuse(self):
+        # B3: the production entry naming the fixture entry, the composed token or either check; no production entry;
+        # a second Composed literal; a re-flag of the composition's window.
+        entry = "    Ok(Production::Unavailable(\"W02-PROD Composed compose_fixture\"))\n"
+        for text, message in (("    let _ = compose_fixture;\n", "compose_production names compose_fixture"),
+                              # Composed there is also a fifth naming of the token, which the name count refuses first.
+                              ("    let _: Option<Composed> = None;\n", "names Composed other than"),
+                              ("    crate::qualification::check_qualification(true);\n",
+                               "compose_production names check_qualification"),
+                              ("    crate::i06_evidence::check_evidence(true);\n", "compose_production names check_evidence")):
+            self.refused(gate.check_observer_tokens, COMPOSITION_RS, COMPOSITION_TOKEN_TEXT.replace(entry, text + entry), message)
+        self.refused(gate.check_observer_tokens, COMPOSITION_RS,
+                     COMPOSITION_TOKEN_TEXT.replace("pub fn compose_production(", "pub fn production("),
+                     "fn compose_production .*not exactly one such function")
+        for text in (COMPOSITION_TOKEN_TEXT + "fn forge() -> u8 {\n    let _ = Composed { record_digest: String::new(), "
+                     "valid_from: 0 };\n    0\n}\n",
+                     COMPOSITION_TOKEN_TEXT + "pub fn widen(mut held: Held) {\n    held.valid_from = 0;\n}\n",
+                     COMPOSITION_TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Debug, Default)]")):
+            self.refused(gate.check_observer_tokens, COMPOSITION_RS, text, self.RULE)
+
+    def test_the_qualification_token_s_forms_refuse(self):
+        # B2: its file missing, a second literal, a field outside the closed types, the re-flag, a free re-flag function.
+        (self.base / QUALIFICATION_RS).unlink()
+        with self.assertRaisesRegex(gate.GateError, "qualification.rs is missing .*" + self.RULE):
+            gate.check_observer_tokens(self.base)
+        self.write(QUALIFICATION_RS, QUALIFICATION_TOKEN_TEXT)
+        method = lambda text: QUALIFICATION_TOKEN_TEXT.replace("        self.fixture\n    }\n}\n",
+                                                               "        self.fixture\n    }\n\n" + text + "}\n")
+        for text in (QUALIFICATION_TOKEN_TEXT + "fn forge() -> u8 {\n    let _ = QualificationAccepted { record_digest: "
+                     "String::new(), valid_from: 0, expires_at: 0, fixture: false };\n    0\n}\n",
+                     QUALIFICATION_TOKEN_TEXT.replace("    expires_at: u64,\n", "    expires_at: u128,\n"),
+                     QUALIFICATION_TOKEN_TEXT.replace("    valid_from: u64,\n", "    pub valid_from: u64,\n"),
+                     QUALIFICATION_TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Debug, Clone)]"),
+                     method("    pub fn as_production(self) -> Self {\n        Self { fixture: false, ..self }\n    }\n"),
+                     method("    pub fn widen(&mut self) {\n        self.expires_at += 60;\n    }\n"),
+                     QUALIFICATION_TOKEN_TEXT + "pub fn reflag(mut token: QualificationAccepted) -> QualificationAccepted {\n"
+                                                "    token.fixture = false;\n    token\n}\n",
+                     QUALIFICATION_TOKEN_TEXT + "pub fn extend(held: &mut Held) {\n    held.expires_at = u64::MAX;\n}\n"):
+            self.refused(gate.check_observer_tokens, QUALIFICATION_RS, text, self.RULE)
+        self.refused(gate.check_observer_tokens, CAPTURE_RS, CAPTURE_TEXT + "fn f() { let _ = QualificationAccepted { }; }\n",
+                     "writes the QualificationAccepted literal")
+
+    def test_a_second_literal_refuses(self):
+        self.refused(gate.check_observer_tokens, EVIDENCE_RS, TOKEN_TEXT + "fn forge() -> u8 {\n    let _ = EvidenceAccepted {"
+                     " record_digest: String::new(), evidence_digest: String::new(), fixture: false };\n    0\n}\n", self.RULE)
+        self.refused(gate.check_observer_tokens, CAPTURE_RS, CAPTURE_TEXT + "fn f() { let _ = EvidenceAccepted { }; }\n",
+                     "writes the EvidenceAccepted literal")
+
+    def test_fields_and_derives_refuse(self):
+        for text in (TOKEN_TEXT.replace("    fixture: bool,\n", "    pub fixture: bool,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    pub(crate) fixture: bool,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: std::cell::Cell<bool>,\n")
+                     .replace("        self.fixture\n", "        self.fixture.get()\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: Cell<bool>,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: RefCell<bool>,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: AtomicBool,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: Mutex<bool>,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: RwLock<bool>,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: OnceCell<bool>,\n"),
+                     TOKEN_TEXT.replace("    fixture: bool,\n", "    fixture: Box<bool>,\n"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Debug, Clone)]"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Copy, Debug)]"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Default)]"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Debug, Hash)]"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]", "#[derive(Debug)]\n#[derive(serde::Deserialize)]"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]\n", "#[derive(Debug, PartialEq, Eq)]\n"
+                                        "#[cfg_attr(not(test), derive(Clone))]\n"),
+                     TOKEN_TEXT.replace("#[derive(Debug, PartialEq, Eq)]\npub struct", "#[cfg_attr(not(test), derive(Clone, Debug))]\npub struct")):
+            self.refused(gate.check_observer_tokens, EVIDENCE_RS, text, self.RULE)
+
+    def test_the_reviewers_minting_and_re_flag_forms_refuse(self):
+        for text in (
+                # A minting method, the re-flag through a functional update, a by-value method returning Self.
+                self.method("    pub fn forge(record_digest: String) -> Self {\n        Self { record_digest, evidence_digest: "
+                            "String::new(), fixture: false }\n    }\n"),
+                self.method("    pub fn as_production(self) -> Self {\n        Self { fixture: false, ..self }\n    }\n"),
+                self.method("    pub fn keep(self) -> Self {\n        self\n    }\n"),
+                # A getter returning the token, an associated function, a `&mut self` setter, an item in the impl.
+                self.method("    pub fn again(&self) -> EvidenceAccepted {\n        x()\n    }\n"),
+                self.method("    pub fn make() -> u8 {\n        0\n    }\n"),
+                self.method("    pub fn set(&mut self, flag: bool) {\n        self.fixture = flag;\n    }\n"),
+                self.method("    const KEPT: u8 = 0;\n"),
+                # A tuple-style Self( anywhere in the token file.
+                TOKEN_TEXT + "pub struct Pair(u8);\n\nimpl Pair {\n    pub fn new() -> Pair {\n        Self(0)\n    }\n}\n",
+                # A free re-flag function, and a swap of the flag.
+                TOKEN_TEXT + "pub fn reflag(mut token: EvidenceAccepted) -> EvidenceAccepted {\n    token.fixture = false;\n"
+                             "    token\n}\n",
+                TOKEN_TEXT + "pub fn swap(token: &mut Held, other: &mut bool) {\n    std::mem::swap(&mut token.fixture, other);\n}\n",
+                TOKEN_TEXT + "pub fn bump(held: &mut Held) {\n    held.record_digest += \"x\";\n}\n",
+                TOKEN_TEXT.replace("Result<EvidenceAccepted, EvidenceRefusal>", "Result<Box<EvidenceAccepted>, EvidenceRefusal>")
+                .replace("    Ok(EvidenceAccepted {", "    let _: Option<EvidenceAccepted> = None;\n    Ok(EvidenceAccepted {")):
+            self.refused(gate.check_observer_tokens, EVIDENCE_RS, text, self.RULE)
+
+    def test_the_pr_review_round1_forms_refuse(self):
+        # HE-004D2 PR review round 1, R1-1: a function in the token's file obtains a token from the minting function (its
+        # type inferred, so the token's name count stays four) and reaches a field other than by its getter call: compound
+        # assignments, a parenthesised place, a borrow of one, a method call on the field, a rebinding, a raw identifier,
+        # a plain read. A getter answering other than its own field refuses too. Getter calls pass.
+        evidence = lambda statement: TOKEN_TEXT + (
+            "pub fn launder() -> bool {\n    let mut token = match check_evidence(true) {\n        Ok(token) => token,\n"
+            "        Err(_) => return false,\n    };\n    %s\n    token.fixture()\n}\n" % statement)
+        qualification = lambda statement: QUALIFICATION_TOKEN_TEXT + (
+            "pub fn launder() -> u64 {\n    let mut token = match check_qualification(true) {\n        Ok(token) => token,\n"
+            "        Err(_) => return 0,\n    };\n    %s\n    token.valid_from()\n}\n" % statement)
+        self.write(EVIDENCE_RS, evidence("let _ = (token.record_digest(), token . fixture ());"))
+        self.write(QUALIFICATION_RS, qualification("let _ = token.fixture();"))
+        self.assertEqual(gate.check_observer_tokens(self.base), 3)
+        self.write(QUALIFICATION_RS, QUALIFICATION_TOKEN_TEXT)
+        for statement in ("token.fixture ^= true;", "(token.fixture) = false;", "std::mem::swap(&mut (token.fixture), &mut false);",
+                          "token.fixture.clone_from(&false);", "token.record_digest.push_str(\"x\");",
+                          "let held = &mut token;\n    held.fixture ^= true;", "token.r#fixture = false;",
+                          "let flag = token.fixture;\n    let _ = flag;"):
+            self.refused(gate.check_observer_tokens, EVIDENCE_RS, evidence(statement), "uses the EvidenceAccepted field")
+        for statement in ("token.expires_at *= 2;", "token.valid_from <<= 1;", "token.expires_at >>= 1;",
+                          "token.valid_from /= 1;", "token.expires_at %= 7;", "token.valid_from = token.valid_from() + 1;"):
+            self.refused(gate.check_observer_tokens, QUALIFICATION_RS, qualification(statement),
+                         "uses the QualificationAccepted field")
+        # A lying getter, a getter reading another field, a getter whose name is no field.
+        for text in (TOKEN_TEXT.replace(self.IMPL_END, "        false\n    }\n}\n"),
+                     TOKEN_TEXT.replace(self.IMPL_END, "        self.record_digest.is_empty()\n    }\n}\n"),
+                     TOKEN_TEXT.replace("    pub fn fixture(&self) -> bool {", "    pub fn production(&self) -> bool {")):
+            self.refused(gate.check_observer_tokens, EVIDENCE_RS, text, "whose body is not")
+
+    def test_self_literals_refuse_in_every_token_file(self):
+        # qualification.rs (PredecessorSchemas built with Self { .. }) and composition.rs are token files as well.
+        for rel in (QUALIFICATION_RS, "crates/observer/src/composition.rs"):
+            kept = self.TREE.get(rel, "")
+            self.refused(gate.check_observer_tokens, rel, kept + "pub struct PredecessorSchemas {\n    v1: u8,\n}\n\n"
+                         "impl PredecessorSchemas {\n    pub fn from_bytes() -> PredecessorSchemas {\n        Self { v1: 0 }\n"
+                         "    }\n}\n", "writes `Self\\{`")
+            self.refused(gate.check_observer_tokens, rel, kept + "pub struct Pair(u8);\npub fn pair() -> Pair {\n    Self (0)\n}\n",
+                         "writes `Self\\(`")
+            self.write(rel, kept + "pub struct PredecessorSchemas {\n    v1: u8,\n}\n\nimpl PredecessorSchemas {\n"
+                            "    pub fn from_bytes() -> PredecessorSchemas {\n        PredecessorSchemas { v1: 0 }\n    }\n}\n")
+            self.assertEqual(gate.check_observer_tokens(self.base), 3)
+            if rel in self.TREE:
+                self.write(rel, kept)
+            else:
+                (self.base / rel).unlink()
+
 
 class OutputPrefixTests(unittest.TestCase):
     def test_every_line_carries_the_prefix(self):

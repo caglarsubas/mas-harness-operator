@@ -2009,6 +2009,51 @@ R120-R135.
   `LinuxCapture\s*>?\s*::\s*new` (and `LinuxWire`'s) or counts every `LinuxCapture` token in `main.rs`. The `&Sealed`
   parameter keeps any extra call after the seal.
 
+### Amendment A2 (HE-004D2 unit B1: native-profile v5)
+
+HE-004D2's unit B1 (owner decision Q-HE4D2-2 (a); DESIGN-D2 §4) moves D1's captures onto native-profile v5 (edge v7,
+harness-onion slot 252, MET-ENFORCE-038), whose captures no longer carry the seven host fields. The record contract,
+its schema, its loader and its preconditions stay v4's. The rows above stay as history; this amendment states what
+changed:
+
+- **R120:** the declared host fields are gone. `DECLARED_HOST_FIELDS`, `HOST_FIELDS_OBSERVED`,
+  `CaptureView.declared_host_fields` and the `Declared` copy are removed, and no capture carries `host`,
+  `selinuxBefore`, `selinuxAfter`, `kernelPolicyDigest`, `booleansObserved`, `hardeningObserved` or
+  `bootEntryObserved`. The rest of the row stands.
+- **R122:** the load is split. `CaptureSchema::embedded` stays `serve`'s one call (any refusal is still 25) and names
+  each embedded schema once (G-D2-3): `RecordSchema::from_bytes(NATIVE_PROFILE_V4_SCHEMA)` (the pin
+  `RECORD_CANONICAL_PIN`, `3bf244b2…`; the closed rewrite, still needed for v4's two `else` objects; the record
+  validator, dropped after enrollment) and `CaptureSchema::from_bytes(NATIVE_PROFILE_V5_SCHEMA)` (the pin
+  `CAPTURE_CANONICAL_PIN`, `5f6703ca…`; the same closed rewrite of `$defs/capture/allOf/0` and `/3`; the capture,
+  lifecycle and backend validators over v5's definitions). The v5 schema enters through `contracts.rs`
+  (`NATIVE_PROFILE_V5_SCHEMA`, sha256 `70bda124…`); G-D1-16's one exempt span stays the v4 schema's, which the record
+  validator still embeds.
+- **R130:** the port follows the v5 model. The three type checks refuse with "not a v5 capture", "not a v5 lifecycle
+  capture" and "not a v5 backend capture". The replay runs 330 checks: 70 positive captures, 7 accepted, 247 negatives
+  (148 schema refusals, each localised: 102 additionalProperties, 31 not, 11 required, 3 const and 1 uniqueItems; 134
+  capture, 10 lifecycle and 4 backend; and 99 pinned model texts) and 6 cross-version cases (X09-X11: v4's positive
+  captures under the v5 checks; X12-X14: v5's positive captures under the registered v4 schema, both `mustInclude` pairs
+  of each localised). The pinned texts are 35 (were 37). The localisation helpers moved to the shared
+  `tests/schema_support/mod.rs`.
+- **P1's order:** `check_capture` keeps v4's order (type, shape, binding, window, deadline, then the rest) without the
+  host rules ("wrong boot/kernel", "active policy changed", "host lock state differs" and the boot entry; `boot_entry`
+  has no caller left and is removed). The lifecycle and backend bindings check `qualificationDigest` only; the lifecycle
+  check's booleans and boot-entry rules are gone. Under v4, "active policy changed" also refused a record whose SELinux
+  status sequence was odd, its one part not copied from the record itself. That condition now lives only in
+  `check_record` ("unstable policy epoch"), and `serve` does not run `check_record` until W02-PROD and HE-008 wire the
+  composition, so until then nothing on the deployed observer's path refuses an odd sequence (PR review round 1, R1-3;
+  carried below).
+- **R134 (G-D1-9):** 46 contracts; the use-site rule counts `NATIVE_PROFILE_V4_SCHEMA` and `NATIVE_PROFILE_V5_SCHEMA`,
+  each named once in `capture_schema.rs` and once in `contracts.rs` (G-D2-3).
+- **R135:** four D1 test files change, and only for v5 (DESIGN-D2 §4.4, D2-6): `tests/d1_support/mod.rs` (the v5
+  positives, no seal digest written into a capture's `hardeningObserved`), `tests/observer_capture.rs` (the
+  `declared_host_fields` assertion goes), `tests/observer_capture_replay.rs` (above) and
+  `tests/observer_capture_schema.rs` (the pin and rewrite tests once per schema, with each loader refusing the other's
+  schema). `tests/observer_d1_contracts.rs` and every other earlier test file are byte-identical.
+- **Carried, closed:** the vacuous host equalities are in no capture any more; what they stood for is T04's four host
+  proofs under Q-NPE-3 (b), T04-HOST-BOOT, T04-POLICY-STABLE, T04-HOST-LOCKS and T04-BOOT-ENTRY. The follow-up contract
+  (Q-HE4D1-1) is discharged by native-profile v5 (slot 252). HE-004-I01's declared-host-field mark on the wire is moot.
+
 ### Owner decisions (verbatim as relayed, 2026-10-18)
 
 The dossier questions (subject DOSSIER-D1, sha256 prefix `ff9ace8e`):
@@ -2028,5 +2073,138 @@ Q-HE4D1-D2 and Q-HE4D1-D3:
 > - Q-HE4D1-D2 = (a): keep the 60 s cadence (Q-HE4D1-6 (a)); the WORKER attempt goes first in each set, right after the scrape. NP-9's minimum becomes "one observer cycle plus the scrape-to-set bound plus one 2 s window, plus margin". R10 states the number, and HE-005 keeps how often. The owner accepts the longer probe-worker freeze.
 > - Q-HE4D1-D3 = (a): the new gate rule G-D1-16, for planeon-observer only, with self-tests. The pinned v4 schema bytes occur exactly once; the host-path scan runs with that one span blanked; any /opt/planeon/ elsewhere, a second copy or a changed byte still fails. The host-path list stays unchanged for every binary.
 > - Q-HE4D1-D1: (c) stands, with the no-fetch mitigations folded.
+
+The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-004D2: the I06 evidence composition, check_qualification and the acceptance token (`record_check`, `qualification`, `i06_evidence`, `composition`; `contracts/native-profile-v1/`, `-v2/`, `-v5/`, the v3 vectors, `contracts/i06-v3/`)
+
+The packet (DESIGN-D2 revision 2, sha256 `8be61d58…`; owner decisions Q-HE4D2-1..11 all (a) and the monitor's Q-NPE-9 (a)
+and Q-NPE-10, quoted at the end) adds the observer's qualification and acceptance logic as four pure modules that the
+binary never reaches: R10's ports of native-profile v4's `check_record` and `check_migration`, native-profile v5's
+`check_qualification`, and I06 v3's evidence check around I06 v1's SC00-SC15, each ending in an acceptance token, and the
+composition of the two tokens, whose production entry answers unavailable until W02-PROD. Its first v5 unit (B1) moves
+HE-004D1's captures onto native-profile v5; that change is the HE-004D1 section's Amendment A2. Eleven contract files
+are copied byte for byte (edge records v6 and v7; provenance in `contracts/PROVENANCE.md`). The models are pinned by
+digest, read as specification only where the READMEs are silent, and never copied: `native_qualification_v4.py`
+(`f7c71807…`, harness-onion `887cbe7`, "NQ4"), `native_qualification_v5.py` (`d9926f4d…`, `27c54605`, "NQ5"),
+`i06_backend_profile_v3.py` (`dfb00e90…`, `35b733b`, "I3M") and `i06_backend_profile.py` (`bea3c953…`, "I1M").
+planeon-gate, planeon-broker, planeon-containment and planeon-writer are byte-identical; observer-sys, gate-sys,
+i05-protocol, effect-gate's sources, gate-tls, `crates/gate`, B1's five logic modules, `seal.rs`, `main.rs`, `status.rs`,
+`observe.rs`, `enrolled.rs`, `kernel_text.rs`, `linux_capture.rs` and HE-004C's modules are unchanged. Its rules are
+R136-R147.
+
+### Points taken from the pinned models (the READMEs are silent)
+
+| # | Point | Model |
+|---|---|---|
+| Q1 | `check_record`'s order: the v4 identity; the shape step (data bound, canonical length, `record` variant); the profile binding; the boot entries; the scope and the window; the resource labels; the signed endpoints, their tuple, kinds and loopback; the policy epoch; the two inventories; per role ownership, cgroup inode, endpoints, capabilities and hook programs; executables and closures; the lifecycle subjects and the seal digest; the static closures and labels; the backend components, executables and the in-set census | NQ4 `:266-479` |
+| Q2 | `check_migration`'s order: the shape step, the profile binding, the inputs' types, the attested-empty and retained-records rules, each predecessor in v1, v2, v3 order (version and validity, reboot, nonces), nonce reuse, then the nonce scan over every key and string of the profile and the record | NQ4 `:709-737` |
+| Q3 | `check_qualification`'s order: `check_record`, the test-only rule, the role set, each role capture, the lifecycle capture, the backend set and each backend capture, the cross rules (process identity, inode and path identity, the worker's parent, the domain counts, the census against the role cgroups, the delegated service's two leaves, the populated flags), then `check_migration` | NQ5 `:243-298` |
+| Q4 | I06 v3's wrapper: the fixture flag's type, the closed v2 record and its version, the closed W02a reference and its version, `check_record` (refusals prefixed), the reference digest, test-only agreement, the fixture gate, then I06 v1 on the projection with production meaning "not a fixture call" | I3M `:68-88` |
+| Q5 | I06 v1's `check_evidence` order, SC00 to SC12's sealed set | I1M `:425-593` |
+| Q6 | Python's readings the models rely on: `ipaddress.ip_address` and `str()` for endpoint and SC02 addresses (CPython 3.12.14); `str.split(" ")` for boot entries (empty words kept); `str.strip()`'s whitespace; `re.fullmatch` for the kernel-parameter and I06 v1 patterns | NQ4 `:73-76, 211-214`; I1M `:37, 183-184` |
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R136 | Scope and isolation (Q-HE4D2-4 (a), -5 (a)). No runtime wiring: no `serve` step, epoch hook, status, kernel read or system call. The four modules are unreachable from `serve` by construction (G-D2-5: their names occur outside them only as `lib.rs`'s four `pub mod` lines; the type names they define, derived at gate time, occur in no other observer source; every impl is `impl <own type> {`; no re-export; and, since PR review round 1 (R1-6), no child module: the crate's `src/` holds no directory and no logic module declares a module outside a strict test block, so nothing reaches a D2 module's items through `super::` from another file), with G-D2-7 (no planeon-observer symbol in a D2 module) and G-D1-16 as build-time corroboration (D2-4) | DESIGN-D2 §1, §9; Q-HE4D2-4, -5 (a); D2-4 |
+| R137 | Contracts: 46 (edge record v6's five rows at A1, edge record v7's six at B1, three of them the v1-v3 history vectors, Q-HE4D2-3 (a)); `contracts.rs` embeds exactly five files (I06 v1's three, the v4 and v5 schemas; G-D2-2); every other registered file is read by the tests only | DESIGN-D2 §2; Q-HE4D2-3 (a) |
+| R138 | Unit B1, native-profile v5 (Q-HE4D2-2 (a)): the schema load split (v4 for the record, v5 for the captures, each with its canonical pin), the v5 capture checks without the host rules, the producer without the seven host members; recorded as the HE-004D1 section's Amendment A2, D1's rows kept as history | DESIGN-D2 §4; Q-HE4D2-2 (a) |
+| R139 | `check_record` (Q1): the schema's canonical pin is checked once, when `RecordSchema` is built, not per call; Python's `KeyError`, `TypeError` and `AttributeError` are `Refusal::Missing`; the IP text (`ip_text`, CPython 3.12.14's reading of the forms these contracts admit: four decimal octets without leading zeros, IPv6 groups with one `::` at most, a trailing dotted IPv4, a zone parsed then refused; RFC 5952's canonical text), the eleven kernel-parameter matchers (the `initrd=` class: letters, digits and `_ . / \ + -`, the backslash included) and the string walk are R10's own code; the in-set census's eight backend exec types are the table `BACKEND_EXEC_TYPES`, which a test holds equal to the vendored schema's constants (the model reads them from the schema; the check takes validators only); the three root literals (`CGROUP_ROOT`, `PIN_ROOT`, `INTERPRETER_TREE`) are private and exact (G-D2-6, G-D2-9). Times before 1970 refuse (D1's `utc_seconds`); a profile with no canonical encoding is `Missing`; an endpoint address given as a JSON number or boolean is "fixed canonical numeric endpoint", any other non-text R10's "not an IP address" | DESIGN-D2 §5; NQ4 `:463-464` |
+| R140 | `PredecessorSchemas::from_bytes(v1, v2, v3)` checks the three canonical pins ("unreviewed vN schema") once, at construction, so the order differs from the model's only when a pin and an earlier rule fail together, which no vector does; `Histories` holds the three lists as JSON values, so "migration inputs" stays reachable; a pinned schema whose `record` variant does not load is R10's "predecessor schema does not load" | DESIGN-D2 §6.1-6.2 |
+| R141 | `check_qualification(&QualificationInput, &CaptureSchema, &RecordSchema, &PredecessorSchemas, test_fixture)` in Q3's order, D1's three capture checks taking the `CheckedRecord` that `check_record` mints; on success only `QualificationAccepted { record_digest, valid_from, expires_at, fixture }`, the window in Unix seconds (parsed by the parser `check_record`'s window rule already applied). Settled at build: the test-only rule reads `testOnly` only without the fixture flag, with Python's truth value; in the two set rules a capture that is not an object is `Missing`, and a name that is not text is `Missing` when two or more captures meet the sort and the set rule's text when it is alone (Python sorts an all-numeric name list and then refuses with the text: both refuse); the backend names are `backendComponents`' keys; process, inode and path identity are compared with `py_eq` pairwise, `by_role` takes a role's last capture and the census lets a later row override, as Python's dicts do; the populated check's order cannot matter, since D1's lifecycle check already requires every cgroup it reads. The retained-capture rule (`previous`) is not ported (Q-HE4D2-8 (a)) | DESIGN-D2 §6.3-6.4; Q-HE4D2-8 (a) |
+| R142 | `check_evidence` in Q4's then Q5's order, on the projection (the record without `w02aRecord`, at I06 v1's version), production meaning "not a fixture call"; `check_record`'s refusal wrapped with the prefix "SC00 W02a v4 refuses the backend record: "; I06 v1's two production-only rules ported though W02a v4 never reaches them (Q-HE4D2-10 (a)); SC02's loopback through `ip_text`, an IPv4-mapped loopback **not** loopback (stricter than CPython); `str.strip()` as R10's own copy of CPython 3.12's 29 whitespace code points; the implementation, path and digest patterns as hand-written matchers; the fixture flag's type rule is the boundary `fixture_flag(&Value)`, called before the check, which takes a `bool` (so G13, `testFixture: 1`, is replayed through R10 code); on success only `EvidenceAccepted { record_digest, evidence_digest, fixture }`. Five unpinned texts are R10's own words (DESIGN-D2 §21 counted four; the fifth, "SC00 the fixture implementation must be test-only", is seven words by spaces but nine by the span checker's tokens) | DESIGN-D2 §7, §21; Q-HE4D2-10 (a) |
+| R143 | The composition (Q-HE4D2-6 (a)): `compose_fixture(EvidenceAccepted, QualificationAccepted)` consumes both tokens, refuses a token minted without the fixture flag (`ProductionTokenInFixture`) and two records (`RecordMismatch`), and makes `Composed { record_digest, evidence_digest, valid_from, expires_at }`; `compose_production(&, &)` refuses a fixture token (`FixtureTokenInProduction`) and otherwise answers `Production::Unavailable("W02-PROD")`. No production token can be made today: v4's schema admits only the test-only backend, so `check_qualification` without the flag refuses and I06 v3 refuses every production evidence record. Both entries decide through private helpers on booleans, which the module's own test drives through every branch without a token | DESIGN-D2 §8; Q-HE4D2-6 (a) |
+| R144 | Caller obligations (Q-HE4D2-7 (a)): (1) a profile that the pinned proxy profile contract accepts and (2) complete v1-v3 histories are carried to W02-PROD and HE-008, D2 taking both only as test inputs; (3) the inspector obligation is D1's (NP-3); (4) the fixture flag is enforced by the tokens' flags and the two entries | DESIGN-D2 §8.3; Q-HE4D2-7 (a) |
+| R145 | The replay: 413 checks. Native 262: `observer_record_replay` 216 (196 record negatives, 127 pinned texts over 44 and 69 schema refusals over 56; 11 accepted; X05-X08 and X15 under the registered v3 schema; X01-X04, the v3 vectors' positive records under `check_record`, "not a v4 record") and `observer_qualification_replay` 46 (the five v5 positives, accepted with the v1-v3 positives' records as histories, each token's digest, window and flag asserted; 19 qualification cases over 13 texts; native-profile v4's 22 migration cases). I06 151 (`observer_evidence_replay`). X01-X04 use the registered v3 positives, not R10-built values, because Q-HE4D2-3 (a) registers them (D2-2); I06 X01's v1 subject is built from the v3 positive; the v1 halves stay out. The 80 best-match refusals are localised by D1's rule, shared as `tests/schema_support`; twelve need its branch walk, because the v4 schema's `backendProfile` is a one-branch `oneOf` of constants that jsonschema's best match descends into: record R58, R59, V25, V28 and evidence E60, E61, E70, E71, G09, G10, X03, X04, each pinned by its replay | DESIGN-D2 §11; Q-HE4D2-3 (a), -10 (a); D2-2 |
+| R146 | Gate rules G-D2-1..12 (`tools/gate.py`): 46 contracts (G-D2-1); the five embedded files (G-D2-2); both schema constants defined once in `contracts.rs` and named once in `CaptureSchema::embedded` (G-D2-3, G-D1-9 generalised); the four modules under B1's logic rule with D1's whitelist plus the four (G-D2-4); isolation (G-D2-5, R136); `/opt/planeon/` only in `INTERPRETER_TREE` (G-D2-6); no D2 symbol on either target (G-D2-7, item path and first crate root); the tokens (G-D2-8: one literal, in the minting function; private fields of `String`, `bool`, `u64`, `i64` or `&'static str`; no `Clone`, `Copy`, `Default`, `Hash` or serde derive, `cfg_attr` included; one impl of `&self` getters returning neither the token nor `Self`, each with the body `self.<name>` or `&self.<name>` of its own field; the token named in its file only by its struct, impl header, minting signature and literal; outside that impl, a token field reached only by its getter call (`.<field>(`), so no assignment, compound assignment, parenthesised place, `&mut`, method call or rebinding of a field (PR review round 1, R1-1); no `Self {` or `Self(` in the three token files (child modules are R136's rule, `check_observer_child_modules`); `compose_production`'s body naming none of `compose_fixture`, `Composed`, `check_qualification`, `check_evidence`; D2-1, R2-1); the two record_check roots among G-D1-5's exceptions (G-D2-9); observer-sys's `lib.rs`, `dirent.rs` and `Cargo.toml` pinned beside `kernel.rs` (G-D2-10, R4-1); the qualified constructor forms counted, empty generic arguments and a parenthesised type included, and each of `LinuxWire` and `LinuxCapture` named once in `serve`, renamed with `as` nowhere, named by no `type` item, and named in code only in its own file and inside `serve` (G-D2-11, R1-5; PR review round 1, R1-7; round 2, R2-1; round 3, R3-1); each type item read to its `;` at bracket depth 0 (round 4, R4-1); and the two home files, `linux_capture.rs` and `linux_net.rs`, pinned whole by sha256 beside the observer-sys pins (owner decision Q-D2-END), so no added associated fn, trait impl, alias, default or projection gives a second construction route (R2-2, R3-1, R4-2); these rules are textual, and `serve`'s own control flow around its one counted construction (a loop, or a closure or iterator calling it more than once) stays code review's (round 5, R5-1), beside R118's residual; the report lines (G-D2-12). `D2_LOGIC_BUILT` and `D2_TOKENS_BUILT` grew unit by unit, and G-D2-5 refuses a D2 file present before its unit builds it | DESIGN-D2 §12; D2-1, R2-1, R4-1, R1-5 |
+| R147 | Tests (§15): new `d2_support`, `schema_support`, `observer_d2_contracts`, `observer_record_replay`, `observer_record_text`, `observer_evidence_replay`, `observer_qualification_replay`, `observer_composition` and `composition.rs`'s unit test. Every earlier test file is byte-identical except tools/test_gate.py and the four HE-004D1 test files that the native-profile v5 re-vendor changes (tests/d1_support/mod.rs, tests/observer_capture.rs, tests/observer_capture_replay.rs, tests/observer_capture_schema.rs) (the R1-2 wording; Amendment A2 says how each still exercises its intent) | DESIGN-D2 §15, §22 |
+
+### Points settled at build (inside DESIGN-D2's intent)
+
+- **The exec-type table (R139):** above; `observer_record_text` holds it equal to the vendored schema.
+- **`tests/schema_support` (R145):** the localisation helpers became a shared test module in phase A for D2's replays,
+  D1's rule unchanged as `localised`; B1 moved D1's capture replay onto it.
+- **The twelve branch-walk localisations (R145):** listed above; each replay pins its list.
+- **The fixture flag's boundary (R142):** `fixture_flag`, so G13 is replayed and counted in the 151.
+- **The own-words texts (R142):** "SC00 test-only evidence refused in production" (I1M `:446`), "SC00 fixture identity
+  refused in production" (`:447-448`), "SC08 W02a component keys out of range" (`:459`), "SC08 component executable not
+  a canonical path: " and the name (`:469`), and "SC00 the fixture implementation must be test-only" (`:441`).
+- **planeon-observer's change.** In phase A (no D2 code reachable) it changed on both targets only through link-time
+  optimisation: no D2 symbol and no D2 word in any symbol; none of the D2 modules' string literals in the binary unless
+  the base holds it too; the symbol differences are std and i05-protocol generic instances (`BTreeSet<String>`
+  iteration emitted out of line, x86_64's `Vec<u8>::push_mut` inlined) and renumbered local suffixes and aarch64
+  exception labels; `.rodata` keeps its size, `.text` -512 B (x86_64) and -128 B (aarch64). Unit B1 then changed it
+  for D1's v5 re-vendor: the v5 schema's 46,190 bytes occur once, the v4 schema's still once (G-D1-16's span), the
+  three "not a v5 …" texts replace v4's, the removed host texts are gone, and outside the two schema spans none of the
+  seven host member names occurs. B2 and B3 left it byte-identical to B1's build.
+- **B2 and B3:** `QualificationInput` holds owned values with public fields and no impl; the composition's two entries
+  decide through private helpers on booleans; the logic rule's ban on `super::` and globs makes the module test import
+  through `crate::composition::…`.
+- **Readings of the gate rules, each at least as strict as the text:** G-D2-5's present-files rule; G-D2-7 also reads
+  a symbol's first crate root; G-D2-8's field types are a closed list and `compose_production` must exist exactly once.
+
+### Evidence
+
+- Host tests: `cargo test` runs 102 binaries and 688 tests, all passing (base `1a0c529`: 96 and 662); the new binaries
+  are `observer_d2_contracts` (5), `observer_record_replay` (2; 216 checks), `observer_record_text` (6),
+  `observer_evidence_replay` (2; 151 checks), `observer_qualification_replay` (5; 46 checks) and `observer_composition`
+  (4); planeon-observer's library tests go 15 → 17 (`composition`'s two). Every earlier binary keeps its count,
+  `observer_capture_replay`'s one test now making 330 checks (Amendment A2).
+- The gate's self-test: 317 tests (base 276; 307 before PR review round 1, whose fixes add five: R1-1's token forms,
+  R1-6's three child-module cases and R1-7's spellings; round 2 adds R2-1's alias case, round 3 R3-1's forms and round 4
+  R4-1's type items and Q-D2-END's two home-pin tests). Earlier items change only as the R1-2 wording says (the contracts count,
+  the logic-module set and the fixtures that hold its files, the observer-sys pins, the schema constants, the root
+  exceptions, the qualified constructor forms, the report lines).
+- `gate.py` (both musl release builds): `he-gate: passed`; 46 contract files; 12 logic modules; 13 derived D2 type
+  names; 3 tokens; G-D2-7: none of planeon-observer's 2,677 (x86_64) and 2,759 (aarch64) symbols is in a D2 module;
+  G-D1-16: the v4 schema's 93,041 bytes once, at offset 298,407 (x86_64) and 237,769 (aarch64), no host path outside
+  the span. planeon-gate, planeon-broker, planeon-containment and planeon-writer and their SBOMs are byte-identical to
+  the base's; planeon-observer x86_64 `6300391b…` (SBOM `2a0e04ce…`), aarch64 `a2aa1000…` (SBOM `c0cd835d…`).
+- The 8-word span search (every file the packet adds or changes, against the earlier packets' model and validator
+  sets, every `scripts/*.py` at harness-onion `887cbe7`, `35b733b` and `27c54605`, and the documents DOSSIER-C names;
+  spans also in the contracts' JSON or BPF data, `vendor/`, `.json` and `.rsp` excluded) finds, in added lines, only
+  identifiers: I06 v1's ordered tables in `i06_evidence.rs`, the role-domain table in `qualification.rs`, the four T04
+  proof names, contract or edge-record file paths, the packet's field names and one run of regex escapes in `gate.py`.
+  Since PR review round 1 (R1-2) the contracts' README prose is no longer exempt; that exemption had hidden one comment in `record_check.rs` restating
+  native-profile v4's README, now reworded with R144's phrase.
+  First-run prose spans were reworded (doc comments in `record_check.rs` and `qualification.rs`, two comments in
+  `capture_check.rs`); the refusal helper is `refuse_unless` and pinned texts whose neighbours matched are named
+  constants.
+- The §14 word list over every added or changed `.rs` line: no hit.
+
+### Code and audit
+
+- `crates/observer/src/`: `record_check.rs`, `i06_evidence.rs`, `qualification.rs` and `composition.rs` (logic modules,
+  G-D2-4) are new; `lib.rs` (four `pub mod` lines), `contracts.rs` (the v5 schema), `capture_schema.rs`,
+  `capture_check.rs` and `capture.rs` (unit B1) change. No `unsafe`, no `std::net`, no network or file access.
+- `contracts/` (eleven files and PROVENANCE's section), `tools/gate.py`, `tools/test_gate.py` (R146), this section,
+  Amendment A2 and `README.md`'s observer row. No manifest, lock, `vendor/`, `licenses/` or `ci/` change.
+
+### Carried
+
+- **HE-008 / W02-PROD:** the live composition and its inputs (the profile under the proxy profile contract; the signed
+  endpoints; the complete v1-v3 histories and NP-2's ledger; the I06 evidence record), the production backend profile
+  and the I06 successor bound to it, and the change to G-D2-7 when the composition is wired. Wiring it also puts
+  `check_record`, and with it the record's even status sequence, on `serve`'s path (Amendment A2, R1-3).
+- **HE-004-I01:** retaining a capture across cycles (the rule not ported) and per-request freshness; the capture view's
+  wire form, now without a declared-field mark.
+- **T04:** the four host proofs of Q-NPE-3 (b) (T04-HOST-BOOT, T04-POLICY-STABLE, T04-HOST-LOCKS, T04-BOOT-ENTRY); every
+  earlier HE-004D1 T04 item stands.
+- **The ClusterRole I06 successor** (its own slot, Q-NPE-5 (a)): if it re-binds the evidence, a later packet re-vendors
+  D2's I06 files; if it only names the observer's grants, it changes B1's embedded closure.
+- **What stays code review's:** every index guarded and every arithmetic step checked; the IP and grammar matchers equal
+  to Python on inputs the vectors do not reach (their table tests are the evidence); the tokens' getters exposing nothing
+  mutable.
+
+### Owner decisions (verbatim as relayed, 2026-10-19)
+
+> Monitor relay, owner decisions, 2026-10-19:
+> - Q-HE4D2-3 = (a): widen edge v7 by 3 rows for the v1–v3 history vectors (62 rows), for the exact 413-check replay.
+> - Q-HE4D2-1, 2 and 4–11 = all (a) as in DOSSIER-D2.md (b3e14e9b): build on v5, with the independent units on edge v6 now and a fallback to v4 if 252 slips; D2 carries D1's re-vendor as unit 1; no runtime wiring, and D2 stays unreachable from serve; the DESIGN-B token; caller obligations carried; the retained-capture rule not ported; I06 v3; the 413-check scope; fold in R4-1 and R1-5.
+> Monitor decisions (contract details, owner-delegated; I'll tell the owner):
+> - Q-NPE-9 (a): re-derive Q03 as an eighth case with its refusal unchanged, using the v5 SERVER capture. Record the scope miscount; this amends Q-NPE-4's "7" to 8.
+> - Q-NPE-10: NATIVE-PROFILE-V5.
 
 The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.

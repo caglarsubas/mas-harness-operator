@@ -168,6 +168,57 @@ which the observer checks at load:
 
 - `scripts/native_qualification_v4.py`, sha256 `f7c718072d1ffbb9b8bbc310e6141d476ea5f25296f70ff8c1bc9ada3db02387`, 67218 bytes
 
+## Native-profile v5, I06 v3 and the predecessor contracts (HE-004D2)
+
+Phase A: the five rows edge registry record v6 labels HE-004D2,
+`architecture/artifact-edges/operator-harness-engineering-v6.json` (sha256
+`0ac7c2da62de87837f5a36a967a2c5b9c286ecab2e03f335a8eebbd32df9d24d`, 30225 bytes, MET-ENFORCE-036, read by exact path at
+harness-onion `35b733b`), status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004D2,
+consumer paths exactly these. Each was copied byte for byte with `git show <commit>:<providerPath>` from the local
+harness-onion clone and its sha256 and length checked before use: the two predecessor schemas at their rows' provider
+commits (`3f52d53c` for v1, `46bcc3e3` for v2), and I06 v3's three files, whose rows name provider packet MET-ENFORCE-033
+with a null `providerCommit`, at harness-onion main `35b733b`. None is embedded: `check_migration`'s predecessor schemas
+and I06 v3's vectors reach the observer only from its tests (`tools/gate.py`, G-D2-2).
+
+- `contracts/native-profile-v1/qualification.schema.json` from `architecture/native-qualification-inputs/qualification.schema.json`, sha256 `bef248bfa82b234124c014f98e40c5791bced3171bb118b7ed1bb7b8daaf95c3`, 37185 bytes
+- `contracts/native-profile-v2/qualification.schema.json` from `architecture/native-profile-v2/qualification.schema.json`, sha256 `55bd641fd229f21e04ec00813bcfe600890584e982e290a210720ac5cb160ab0`, 65003 bytes
+- `contracts/i06-v3/vectors.json` from `architecture/i06-backend-profile-v3/vectors.json`, sha256 `4752b648abdd82d21ea622a1b26c721143577478c0a2491204e0d584c1d6f081`, 213011 bytes
+- `contracts/i06-v3/criteria.json` from `architecture/i06-backend-profile-v3/criteria.json`, sha256 `752533c57b5f93e4c4158a9c17b52eb88d236a3632ab0b66b669e8f8041f57c7`, 10561 bytes
+- `contracts/i06-v3/README.md` from `architecture/i06-backend-profile-v3/README.md`, sha256 `9ee406f43060f266a7b5dd2679aa8352f0815584c45e33d0ab193ea7f90c0c77`, 14910 bytes
+
+The native-profile v3 schema, the sixth row record v6 labels HE-004D2, is already held under the byte rule (the HE-004D1
+section above); `check_migration` pins it too. The I06 v3 model is pinned by digest, not copied, and read as
+specification only where the README is silent (each such point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s
+HE-004D2 section), at harness-onion `35b733b`; the v4 model and I06 v1's model are the ones pinned above:
+
+- `scripts/i06_backend_profile_v3.py`, sha256 `dfb00e90199d436ae63b79261f2e04870d7861cb0f7a424971657a4d777754de`, 18283 bytes
+
+Unit B1: the six rows edge registry record v7 labels HE-004D2,
+`architecture/artifact-edges/operator-harness-engineering-v7.json` as merged (sha256
+`6af45e361a66331a9ee0216d3eea42f3a17770fd3c7d33e78e2a025d301bfa92`, 31448 bytes, MET-ENFORCE-038, read by exact path at
+harness-onion main `27c54605`; it supersedes record v6, `0ac7c2da…`, and holds 62 rows), status REGISTERED_BEFORE_USE,
+relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004D2, consumer paths exactly these. Before any byte was copied,
+each row's sha256, size, mode, provider path, consumer path and consumer packet were compared with HE-004D2's design and
+with the provider's bytes; all six agreed. Each file was then copied byte for byte with `git show <commit>:<providerPath>`
+and its sha256 and length checked: native-profile v5's three files at `27c54605` (their rows name provider packet
+MET-ENFORCE-038 with a null `providerCommit`), and the three predecessor vector sets at their rows' provider commits
+(`3f52d53c`, `46bcc3e3`, `a29c93c7`; owner decision Q-HE4D2-3 (a) widened the record by these three rows).
+`crates/observer/src/contracts.rs` embeds the v5 schema, from which the capture validators are built (the record
+validator stays native-profile v4's); the vectors and the README are read by the tests and as contract text only.
+
+- `contracts/native-profile-v5/qualification.schema.json` from `architecture/native-profile-v5/qualification.schema.json`, sha256 `70bda12463cee83301bc10fa6285023dc0e07b281a87ca70d44ec746cf262113`, 46190 bytes
+- `contracts/native-profile-v5/vectors.json` from `architecture/native-profile-v5/vectors.json`, sha256 `b630c362b20bfa7b362bb2ee28734a403303a0dc54b2d627c11a332b226333a1`, 630987 bytes
+- `contracts/native-profile-v5/README.md` from `architecture/native-profile-v5/README.md`, sha256 `76b584ca769f0afdd5142fcf3f96e3b5b2d053a172d5713f970dc77594e77692`, 32146 bytes
+- `contracts/native-profile-v1/vectors.json` from `architecture/native-qualification-inputs/vectors.json`, sha256 `cd1be009b721bb596887335184a33ab8e1f24aed8215477b63e28f058110748f`, 212215 bytes
+- `contracts/native-profile-v2/vectors.json` from `architecture/native-profile-v2/vectors.json`, sha256 `6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396`, 481933 bytes
+- `contracts/native-profile-v3/vectors.json` from `architecture/native-profile-v3/vectors.json`, sha256 `14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d`, 560411 bytes
+
+The v5 model is pinned by digest, not copied, and read as specification only where the README is silent, at
+harness-onion `27c54605`; it pins the capture schema by the sha256 of its canonical encoding,
+`5f6703ca38d0919f6446772e8edd75e92609a9a3971b8cb052b53a7e9ab50393`, which the observer checks at load:
+
+- `scripts/native_qualification_v5.py`, sha256 `d9926f4d18c82a5da31b903fea47c42319d29268a63a26171a7e71aa4c2480a5`, 39747 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

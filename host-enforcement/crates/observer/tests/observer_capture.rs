@@ -88,7 +88,6 @@ fn the_round_trip_takes_the_positives_captures() {
         }
         assert_eq!(view.counts(), (14, 0));
         assert_eq!(view.record_digest, derived.pin);
-        assert_eq!(view.declared_host_fields.len(), 7);
         closed(&engine, &host);
     }
 }
