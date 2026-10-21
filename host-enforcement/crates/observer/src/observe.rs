@@ -11,7 +11,8 @@
 //!    spec read fresh, `R` decimal and at least every earlier mark, every other list `Exact` at `R` and answering `R`),
 //!    `/version`, then one `/metrics` scrape (the marker still `S0`, the ADM-4 samples). Each list body passes the
 //!    16 MiB aggregate and the node-count cap before it is parsed (84). Then, in order: `Inputs::new` (86), the
-//!    byte-aware weighted expansion guard (99), `produce_snapshot` and `Closure::check` (87), OR02, OR05 and OR06 (88),
+//!    byte-aware weighted expansion guard (99), `produce_snapshot`, `Closure::check` and (since HE-004-I01a) I06 v4's
+//!    role pin over the same read's ClusterRoles and bindings (87), OR02, OR05 and OR06 (88),
 //!    quota headroom (89), ADM-4 (96, then 90 or 91). The inputs are dropped after the checks; the `Observation` keeps
 //!    `R`, its freshness mark, the ADM-4 record and digest, the headroom (since HE-004-I01a with each unit's quota
 //!    pair) and the dropped non-resource rules.
@@ -71,6 +72,7 @@ use crate::exposition::Exposition;
 use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAPSHOT_BODY_LIMIT};
 use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
+use crate::observer_rbac::{self, RbacLists};
 use crate::operational::{check_or02, check_or05, check_or06, OperationalRefusal};
 use crate::quota::{self, Headroom, QuotaError, QuotaPairs};
 use crate::rbac::{produce_snapshot, ProduceError};
@@ -968,6 +970,24 @@ impl<W: Wire + PeerOps> Epoch<W> {
         };
         if self.closure.check(&produced.snapshot, &namespace).is_err() {
             return Err(self.stop(ObserverExit::Rbac, "the RBAC snapshot check refused"));
+        }
+        let cluster_roles = match inputs.items(Resource::ClusterRoles) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        let cluster_role_bindings = match inputs.items(Resource::ClusterRoleBindings) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        let role_bindings = match inputs.items(Resource::RoleBindings) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        if observer_rbac::check_observer_snapshot(&produced.snapshot,
+                                                  RbacLists { cluster_roles, cluster_role_bindings, role_bindings })
+            .is_err()
+        {
+            return Err(self.stop(ObserverExit::Rbac, "I06 v4's role pin refused"));
         }
         let dropped = produced.dropped_non_resource_rules;
         drop(produced);

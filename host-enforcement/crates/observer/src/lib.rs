@@ -23,6 +23,8 @@
 //! listener (`linux_listen`, Linux only, built only inside `linux_net`'s constructor) with the portable peer types and
 //! operations in `client`, the I01 service (`i01_service`) and its pure request checks (`i01_request`, a logic
 //! module), which the epoch serves from every wait; nothing is ever sent.
+//! Unit U6 adds the role pin (`observer_rbac`, a logic module): I06 v4's RB rules, run on every snapshot right after
+//! the closure check.
 #![forbid(unsafe_code)]
 
 pub mod admission;
@@ -49,6 +51,7 @@ pub mod linux_listen;
 #[cfg(target_os = "linux")]
 pub mod linux_net;
 pub mod observe;
+pub mod observer_rbac;
 pub mod operational;
 pub mod qualification;
 pub mod quota;

@@ -100,7 +100,7 @@ pub const ANSWER: u8 = 84;
 pub const CONSISTENCY: u8 = 85;
 /// B1's `InputError`, `Missing` for a kind served only at another version included.
 pub const INPUTS: u8 = 86;
-/// B1's `ProduceError` or the snapshot check's refusal.
+/// B1's `ProduceError` or the snapshot check's refusal, or I06 v4's RB check (HE-004-I01a's role pin).
 pub const RBAC: u8 = 87;
 /// OR02, OR05, OR06.
 pub const OPERATIONAL: u8 = 88;

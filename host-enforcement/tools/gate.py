@@ -132,7 +132,10 @@ the no-panic list and, through I01Socket, the Debug hazards; the observer names 
 step is called once, there (G-I01-2); the I01 path lives only in linux_listen.rs's constant (G-I01-4); nothing leaves
 I01a: no peer_send, no channel send reachable from the socket files, only the built i01_ sources, naming none of the
 client's words, and PeerOps without a supertrait (G-I01-5); I01Socket is named only in its two files and built once,
-inside LinuxWire::new (G-I01-6).
+inside LinuxWire::new (G-I01-6). Unit U6 registers edge record v8's two I06 v4 rows (50 files); the role pin
+(observer_rbac.rs) is a logic module on the no-panic list, its rule constants match the v4 vectors' objectsPositive,
+and observe.rs calls it once, right after the closure check with only let statements between, before `let dropped`
+and drop(produced) (G-I01-3).
 
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
@@ -213,7 +216,9 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # validators load, its vectors and README, and the native-profile v1, v2 and v3 vectors the history replay reads), 46.
 # HE-004-I01a unit U1 (DESIGN-I01A sections 3 and 12): edge record v8's two seccomp-v5 OBSERVER rows (harness-onion
 # compiled filter programs v3, MET-ENFORCE-036), which the observer's seal embeds from now on; the seccomp-v3 OBSERVER
-# programs stay pinned, held but no longer embedded (Q-P2-3 (a)), 48.
+# programs stay pinned, held but no longer embedded (Q-P2-3 (a)), 48. Unit U6 (DESIGN-I01A section 10, Q-I01A-4 (a)):
+# edge record v8's two I06 v4 rows (harness-onion MET-ENFORCE-039, the backend profile v4's criteria and vectors), read
+# by the tests and by the role pin's constants check, 50.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -268,6 +273,8 @@ CONTRACTS = {
     "contracts/native-profile-v5/vectors.json": "b630c362b20bfa7b362bb2ee28734a403303a0dc54b2d627c11a332b226333a1",
     "contracts/native-profile-v5/README.md": "76b584ca769f0afdd5142fcf3f96e3b5b2d053a172d5713f970dc77594e77692",
     "contracts/native-profile-v1/vectors.json": "cd1be009b721bb596887335184a33ab8e1f24aed8215477b63e28f058110748f",
+    "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
+    "contracts/i06-v4/vectors.json": "27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7",
     "contracts/native-profile-v2/vectors.json": "6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396",
     "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
 }
@@ -970,7 +977,7 @@ D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NA
 # and the role pin (observer_rbac, unit U6) take B1's logic rule with B1's whitelist plus their own paths, each as its
 # unit adds it (I01_LOGIC_BUILT); they reach neither the I01 service, the wire nor D2's modules.
 I01_LOGIC_NAMES = ("i01_request", "observer_rbac")
-I01_LOGIC_BUILT = ("i01_request",)
+I01_LOGIC_BUILT = ("i01_request", "observer_rbac")
 I01_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in I01_LOGIC_BUILT)
 I01_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + tuple(("crate", name) for name in I01_LOGIC_NAMES)
                    + tuple(("self", name) for name in I01_LOGIC_NAMES))
@@ -1014,7 +1021,7 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
 # HE-004-I01a DESIGN-I01A section 12: the I01 listener joins it (unit U3); the I01 service, its request checks and
 # the role pin as their units add them (I01_NO_PANIC_BUILT).
-I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request")
+I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac")
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
     "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
@@ -3611,6 +3618,29 @@ CHANNEL_SEND = re.compile(r"\bchannel::send\b")
 I01_SOCKET = re.compile(r"\bI01Socket\b")
 I01_SOCKET_OPEN = re.compile(r"\bI01Socket\b(?:\s*<\s*>)?(?:\s*\))*(?:\s*>)?(?:\s*::\s*<\s*>)?\s*::\s*open\b")
 SELF_OPEN_CALL = re.compile(r"\bSelf\s*>?(?:\s*::\s*<\s*>)?\s*::\s*open\b")
+# G-I01-3 (unit U6): the role pin's one call in observe.rs, right after the closure check.
+OBSERVER_OBSERVE = "crates/observer/src/observe.rs"
+OBSERVER_RBAC = "crates/observer/src/observer_rbac.rs"
+ROLE_PIN_WORD = re.compile(r"\bcheck_observer_snapshot\b")
+ROLE_PIN_CALL = re.compile(r"\bobserver_rbac::check_observer_snapshot\s*\(")
+CLOSURE_CHECK = re.compile(r"\bself\s*\.\s*closure\s*\.\s*check\s*\(")
+BLOCK_STATEMENT = re.compile(r"(?:if|match|for|while|loop|unsafe)\b|\{")
+STATEMENT_GOES_ON = re.compile(r"\s*(?:else\b|[.?;])")
+LET_STATEMENT = re.compile(r"let\b")
+LET_DROPPED = re.compile(r"let\s+dropped\s*=")
+DROP_PRODUCED = re.compile(r"drop\s*\(\s*produced\s*\)\s*;")
+# The role pin's constants (DESIGN-I01A section 10, Q-I01A-4 (a); review r2 I2-12), read from observer_rbac.rs with
+# literals kept and held to the v4 vectors' objectsPositive.
+I06_V4_VECTORS = "contracts/i06-v4/vectors.json"
+ROLE_PIN_TEXTS = ("RBAC_API_VERSION", "OBSERVER_USER", "ROLE_NAME", "BINDING_NAME")
+ROLE_PIN_PAIRS = ("ROLE_REF", "SUBJECT")
+RUST_TEXT = r'"([^"\\]*)"'
+ROLE_PIN_PAIR = re.compile(r"\(\s*%s\s*,\s*%s\s*\)" % (RUST_TEXT, RUST_TEXT))
+CONTRACT_RULE = re.compile(r"\bContractRule\s*\{([^{}]*)\}")
+CONTRACT_RULE_FIELD = re.compile(r"\b(\w+)\s*:\s*&\s*\[([^\[\]]*)\]")
+RULE_FIELDS = (("api_groups", "apiGroups"), ("resources", "resources"), ("non_resource_urls", "nonResourceURLs"),
+               ("verbs", "verbs"), ("resource_names", "resourceNames"))
+ONLY_SEPARATORS = re.compile(r"[\s,]*")
 
 
 def observer_code(base: Path, rule: str, literals: bool = False) -> dict[str, str]:
@@ -3786,6 +3816,193 @@ def check_observer_i01_socket(base: Path) -> int:
     require(len(calls) == 1 and calls[0][0] == OBSERVER_LINUX_NET and opening + start < calls[0][1] < opening + end,
             "I01Socket::open is called %d times, not exactly once, inside LinuxWire::new (%s)" % (len(calls), rule))
     return len(codes)
+
+
+def block_statements(code: str, inside: int, rule: str) -> list[tuple[int, int]]:
+    """The statements, as (start, end) spans, of the innermost `{ }` block around position `inside` of a source read
+    without comments and with literal contents emptied. A statement ends at its `;` at bracket depth 0; one that starts
+    as a block expression (if, match, for, while, loop, unsafe or a bare block) ends at the `}` that brings it back to
+    depth 0, unless `else`, `.`, `?` or `;` follows."""
+    depth, opening = 0, -1
+    for index in range(inside - 1, -1, -1):
+        char = code[index]
+        if char in ")]}":
+            depth += 1
+        elif char in "([{":
+            if depth == 0 and char == "{":
+                opening = index
+                break
+            depth = max(depth - 1, 0)
+    require(opening >= 0, "no block holds the statement (%s)" % rule)
+    spans, start, depth = [], opening + 1, 0
+    for index in range(opening + 1, len(code)):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            if depth == 0:
+                if code[start:index].strip():
+                    spans.append((start, index))
+                return spans
+            depth -= 1
+            if (depth == 0 and char == "}" and BLOCK_STATEMENT.match(code[start:index + 1].lstrip())
+                    and not STATEMENT_GOES_ON.match(code, index + 1)):
+                spans.append((start, index + 1))
+                start = index + 1
+        elif char == ";" and depth == 0:
+            spans.append((start, index + 1))
+            start = index + 1
+    raise GateError("a block without its closing brace (%s)" % rule)
+
+
+def check_observer_role_pin(base: Path) -> int:
+    """HE-004-I01a G-I01-3 (DESIGN-I01A sections 10 and 12; review r4 I4-5, r5 I5-4): in observe.rs's non-test code,
+    read without comments, with literal contents emptied and the whitespace around `::` removed, check_observer_snapshot
+    is named exactly once, as the call `observer_rbac::check_observer_snapshot(`, and `self.closure.check(` occurs
+    exactly once. Among the statements of the block that holds the closure check (block_statements), the one holding
+    the role pin's call comes later, with only `let` statements between (the three lists), and the next two are
+    `let dropped = ...` and `drop(produced);`, in that order. So I06 v4's RB check judges every snapshot the closure
+    check accepts, before the producer's output is dropped and before OR02, OR05 and OR06, and its 87 comes before
+    their 88. A comment naming Closure::check is no anchor. The number of `let` statements between."""
+    rule = "the role pin's call, G-I01-3"
+    codes = observer_code(base, rule)
+    require(OBSERVER_OBSERVE in codes, "%s is missing (%s)" % (OBSERVER_OBSERVE, rule))
+    code = codes[OBSERVER_OBSERVE]
+    words, calls = list(ROLE_PIN_WORD.finditer(code)), list(ROLE_PIN_CALL.finditer(code))
+    require(len(words) == 1 and len(calls) == 1 and words[0].start() == calls[0].start() + len("observer_rbac::"),
+            "%s does not name check_observer_snapshot exactly once, as the call observer_rbac::check_observer_snapshot( "
+            "(%s)" % (OBSERVER_OBSERVE, rule))
+    closures = list(CLOSURE_CHECK.finditer(code))
+    require(len(closures) == 1, "%s does not hold `self.closure.check(` exactly once (%s)" % (OBSERVER_OBSERVE, rule))
+    spans = block_statements(code, closures[0].start(), rule)
+
+    def holding(position: int) -> int:
+        found = [number for number, (start, end) in enumerate(spans) if start <= position < end]
+        return found[0] if found else -1
+
+    first, pin = holding(closures[0].start()), holding(calls[0].start())
+    require(0 <= first < pin, "the role pin's call is not a later statement of the block that holds the closure check "
+            "(%s)" % rule)
+    between = [code[start:end].strip() for start, end in spans[first + 1:pin]]
+    require(all(LET_STATEMENT.match(text) for text in between), "a statement other than `let` stands between the "
+            "closure check and the role pin's call (%s)" % rule)
+    after = [code[start:end].strip() for start, end in spans[pin + 1:pin + 3]]
+    require(len(after) == 2 and LET_DROPPED.match(after[0]) and DROP_PRODUCED.fullmatch(after[1]),
+            "the role pin's call is not followed by `let dropped = ...` and then `drop(produced);` (%s)" % rule)
+    return len(between)
+
+
+def bracket_end(code: str, opening: int, rule: str) -> int:
+    """The index after the bracket that closes the one at `opening`, in a source read with literals kept (a string
+    literal's brackets do not count)."""
+    depth, index, quoted = 0, opening, False
+    while index < len(code):
+        char = code[index]
+        if quoted:
+            if char == "\\":
+                index += 1
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    raise GateError("%s: a bracket without its closing one (%s)" % (OBSERVER_RBAC, rule))
+
+
+def constant_body(code: str, header: str, rule: str) -> tuple[str, int]:
+    """The text inside the `[ ]` of the one `pub const` item whose header (up to its `= [`) `header` matches, and the
+    length its type declares; the item ends with `];`."""
+    found = list(re.finditer(r"(?m)^[ \t]*pub\s+const\s+" + header + r"\s*=\s*\[", code))
+    require(len(found) == 1, "%s: not exactly one plain `pub const` item %s (%s)"
+            % (OBSERVER_RBAC, header.split("\\")[0], rule))
+    opening = found[0].end() - 1
+    end = bracket_end(code, opening, rule)
+    require(re.match(r"\s*;", code[end:]), "%s: a constant array not ended by `];` (%s)" % (OBSERVER_RBAC, rule))
+    return code[opening + 1:end - 1], int(found[0].group("length"))
+
+
+def rust_texts(items: str, rule: str) -> list[str]:
+    """The plain string literals of a comma-separated list, which holds nothing else."""
+    require(ONLY_SEPARATORS.fullmatch(re.sub(RUST_TEXT, "", items)), "%s: a list of the role pin's constants holds more "
+            "than plain string literals (%s)" % (OBSERVER_RBAC, rule))
+    return re.findall(RUST_TEXT, items)
+
+
+def check_observer_role_constants(base: Path) -> int:
+    """HE-004-I01a DESIGN-I01A section 10 (owner decision Q-I01A-4 (a); review r2 I2-12): the role pin's rule data,
+    compiled into observer_rbac.rs as R10 constants, is the contract's. Read with comments removed and literals kept:
+    RBAC_API_VERSION, OBSERVER_USER, ROLE_NAME and BINDING_NAME are each one plain `pub const NAME: &str = "..";`;
+    ROLE_REF and SUBJECT one `[(&str, &str); N]` array of plain text pairs; OBSERVER_RULES one `[ContractRule; N]` array
+    of ContractRule literals, each with the five list fields once as plain `&[..]` lists of string literals. Against
+    contracts/i06-v4/vectors.json's objectsPositive (registered bytes): the first ClusterRole's rules are exactly the
+    eight, in order, each list as the model reads it (absent or null is empty, no other member); the role's and the
+    binding's names and apiVersion are the four texts' (the observer user is the subject's name); the binding's roleRef
+    is ROLE_REF and its subjects exactly [SUBJECT]. The number of constants checked."""
+    rule = "the role pin's constants, DESIGN-I01A section 10"
+    require((base / OBSERVER_RBAC).is_file(), "%s is missing (%s)" % (OBSERVER_RBAC, rule))
+    require((base / I06_V4_VECTORS).is_file(), "%s is missing (%s)" % (I06_V4_VECTORS, rule))
+    try:
+        code = PATH_SPACE.sub("::", rust_code((base / OBSERVER_RBAC).read_text(encoding="utf-8"), literals=True))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (OBSERVER_RBAC, error, rule)) from None
+    texts = {}
+    for name in ROLE_PIN_TEXTS:
+        found = re.findall(r"(?m)^[ \t]*pub\s+const\s+%s\s*:\s*&\s*str\s*=\s*%s\s*;" % (name, RUST_TEXT), code)
+        require(len(found) == 1, "%s: not one plain `pub const %s: &str` (%s)" % (OBSERVER_RBAC, name, rule))
+        texts[name] = found[0]
+    pairs = {}
+    for name in ROLE_PIN_PAIRS:
+        body, length = constant_body(code, r"%s\s*:\s*\[\s*\(\s*&\s*str\s*,\s*&\s*str\s*\)\s*;\s*(?P<length>\d+)\s*\]"
+                                     % name, rule)
+        found = ROLE_PIN_PAIR.findall(body)
+        require(ONLY_SEPARATORS.fullmatch(ROLE_PIN_PAIR.sub("", body)) and len(found) == length
+                and len({key for key, _ in found}) == length,
+                "%s: %s is not %s distinct plain text pairs (%s)" % (OBSERVER_RBAC, name, length, rule))
+        pairs[name] = dict(found)
+    body, length = constant_body(code, r"OBSERVER_RULES\s*:\s*\[\s*ContractRule\s*;\s*(?P<length>\d+)\s*\]", rule)
+    require(ONLY_SEPARATORS.fullmatch(CONTRACT_RULE.sub("", body)), "%s: OBSERVER_RULES holds more than ContractRule "
+            "literals (%s)" % (OBSERVER_RBAC, rule))
+    rules = []
+    for entry in CONTRACT_RULE.finditer(body):
+        fields = CONTRACT_RULE_FIELD.findall(entry.group(1))
+        require(ONLY_SEPARATORS.fullmatch(CONTRACT_RULE_FIELD.sub("", entry.group(1)))
+                and sorted(field for field, _ in fields) == sorted(field for field, _ in RULE_FIELDS),
+                "%s: a ContractRule of OBSERVER_RULES does not set its five lists once each (%s)" % (OBSERVER_RBAC, rule))
+        lists = {field: rust_texts(items, rule) for field, items in fields}
+        rules.append({key: lists[field] for field, key in RULE_FIELDS})
+    require(len(rules) == length, "%s: OBSERVER_RULES declares %d rules and holds %d (%s)"
+            % (OBSERVER_RBAC, length, len(rules), rule))
+    try:
+        positive = json.loads((base / I06_V4_VECTORS).read_text(encoding="utf-8"))["objectsPositive"]
+        role, binding = positive["clusterRoles"][0], positive["clusterRoleBindings"][0]
+        wanted_rules = role["rules"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise GateError("%s has no readable objectsPositive (%s)" % (I06_V4_VECTORS, rule)) from None
+    require(type(wanted_rules) is list and len(wanted_rules) == 8 == len(rules),
+            "the contract role holds %s rules and OBSERVER_RULES %d, not eight each (%s)"
+            % (len(wanted_rules) if type(wanted_rules) is list else "no", len(rules), rule))
+    for number, (wanted, held) in enumerate(zip(wanted_rules, rules), 1):
+        read = (type(wanted) is dict and set(wanted) <= set(held)
+                and {key: [] if wanted.get(key) is None else wanted[key] for key in held} == held)
+        require(read, "OBSERVER_RULES' rule %d is not the contract role's (%s)" % (number, rule))
+    role_meta, binding_meta = role.get("metadata"), binding.get("metadata")
+    require(type(role_meta) is dict and role_meta.get("name") == texts["ROLE_NAME"]
+            and type(binding_meta) is dict and binding_meta.get("name") == texts["BINDING_NAME"],
+            "ROLE_NAME or BINDING_NAME is not the contract objects' name (%s)" % rule)
+    require(role.get("apiVersion") == binding.get("apiVersion") == texts["RBAC_API_VERSION"],
+            "RBAC_API_VERSION is not the contract objects' apiVersion (%s)" % rule)
+    require(binding.get("roleRef") == pairs["ROLE_REF"] and pairs["ROLE_REF"].get("name") == texts["ROLE_NAME"],
+            "ROLE_REF is not the contract binding's roleRef (%s)" % rule)
+    require(binding.get("subjects") == [pairs["SUBJECT"]] and pairs["SUBJECT"].get("kind") == "User"
+            and pairs["SUBJECT"].get("name") == texts["OBSERVER_USER"],
+            "SUBJECT and OBSERVER_USER are not the contract binding's one subject (%s)" % rule)
+    return len(rules) + len(texts) + len(pairs)
 
 
 # --- HE-004D2: the D2 logic modules' isolation and host-path literal, and their absence from the binary (DESIGN-D2 12) ---
@@ -4611,6 +4828,12 @@ def main() -> int:
         say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "
             "aliased nowhere, and I01Socket::open is called once, inside LinuxWire::new, its qualified forms counted"
             % (check_observer_i01_socket(HE), OBSERVER_LINUX_LISTEN, OBSERVER_LINUX_NET))
+        say("observer role pin (HE-004-I01a, G-I01-3): %s calls observer_rbac::check_observer_snapshot once, right after "
+            "self.closure.check( with %d let statement(s) between, then `let dropped` and drop(produced)"
+            % (OBSERVER_OBSERVE, check_observer_role_pin(HE)))
+        say("observer role pin constants (HE-004-I01a, DESIGN-I01A section 10): %d constants of %s match %s's "
+            "objectsPositive (the eight rules, the names, the apiVersion, the roleRef and the subject)"
+            % (check_observer_role_constants(HE), OBSERVER_RBAC, I06_V4_VECTORS))
         say("native-profile schemas: %s occur %d times in %s, each its definition in %s and its one use in "
             "CaptureSchema::embedded (HE-004D1, G-D1-9; HE-004D2, G-D2-3)"
             % (" and ".join(NATIVE_PROFILE_SCHEMAS), check_native_profile_use(HE), OBSERVER_CRATE, OBSERVER_CONTRACTS))

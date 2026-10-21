@@ -334,12 +334,17 @@ fn role_rule(item: &i05_protocol::json::Value) -> String {
             canonical(field(item, "resources")), canonical(field(item, "verbs")), canonical(field(item, "resourceNames")))
 }
 
-/// RBAC objects whose effective snapshot is the I06 v2 positive (as `observer_round_trip.rs` rebuilds it).
+/// RBAC objects whose effective snapshot is the I06 v2 positive (as `observer_round_trip.rs` rebuilds it), except the
+/// observer's own entry: since HE-004-I01a's role pin (I06 v4's RB05 and RB06) its grants come only from the contract
+/// role and binding, which `default_lists` adds (`observer_grants`).
 pub fn positive_rbac() -> Rbac {
     let snapshot = field(&parse(VECTORS), "snapshotPositive").clone();
     let mut rbac = Rbac::default();
     for (index, subject) in rows(&snapshot, "subjects").iter().enumerate() {
         let (kind, subject_name) = (text(subject, "kind"), text(subject, "name"));
+        if (kind, subject_name) == ("User", "planeon:policy-observer") {
+            continue;
+        }
         if kind == "ServiceAccount" && field(subject, "exists").as_bool() == Some(true) {
             let (namespace, account_name) = subject_name["system:serviceaccount:".len()..].split_once(':').expect("split");
             rbac.accounts.push(service_account(namespace, account_name));

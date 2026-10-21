@@ -1080,11 +1080,16 @@ class ContractTests(unittest.TestCase):
     # HE-004B1 (DESIGN-B section 2): edge record v4's ten HE-004 rows join them (31).
     # HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's four native-profile rows join them (35).
     # HE-004D2 (DESIGN-D2 section 2, G-D2-1): edge record v6's five HE-004D2 rows join them (40), and unit B1's six of edge
-    # record v7 (46). HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 OBSERVER rows (48).
+    # record v7 (46). HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 OBSERVER rows (48);
+    # unit U6 (DESIGN-I01A section 10): its two I06 v4 rows (50).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 48)
+            self.assertEqual(len(gate.CONTRACTS), 50)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/i06-v4/")}, {
+                "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
+                "contracts/i06-v4/vectors.json": "27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/native-profile-")}, {
                 "contracts/native-profile-v4/qualification.schema.json":
@@ -4940,8 +4945,8 @@ class ObserverNativeProfileTests(Tree):
 
     def test_the_tree_passes(self):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
-        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48.
-        self.assertEqual(len(gate.CONTRACTS), 48)
+        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50.
+        self.assertEqual(len(gate.CONTRACTS), 50)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5471,10 +5476,11 @@ class D2ContractCountTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_the_forty_six_files_pass(self):
-        # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48.
-        self.assertEqual(len(gate.CONTRACTS), 48)
+        # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48; unit U6
+        # (section 10): its two I06 v4 files make 50.
+        self.assertEqual(len(gate.CONTRACTS), 50)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 48)
+        self.assertEqual(gate.check_contracts(self.base), 50)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
         for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS:
@@ -5488,14 +5494,14 @@ class D2ContractCountTests(unittest.TestCase):
                 gate.check_contracts(self.base)
             path.write_bytes(data)
         for rel in ("contracts/native-profile-v6/qualification.schema.json", "contracts/native-profile-v5/extra.json",
-                    "contracts/i06-v4/vectors.json"):
+                    "contracts/i06-v5/vectors.json", "contracts/i06-v4/README.md"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 48)
+        self.assertEqual(gate.check_contracts(self.base), 50)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -5525,11 +5531,12 @@ class D2EmbeddedContractTests(Tree):
                     "contracts/native-profile-v5/README.md", "contracts/native-profile-v1/vectors.json",
                     "contracts/native-profile-v2/vectors.json", "contracts/native-profile-v3/vectors.json",
                     "contracts/i06-v3/criteria.json", "contracts/i06-v3/vectors.json", "contracts/i06-v2/README.md",
-                    "contracts/i06-v1/README.md", "contracts/i07-v3/policy-kinds.json"):
+                    "contracts/i06-v1/README.md", "contracts/i07-v3/policy-kinds.json", "contracts/i06-v4/criteria.json",
+                    "contracts/i06-v4/vectors.json"):
             self.assertIn(rel, gate.CONTRACTS)
             text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
             self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text, self.RULE)
-        for rel in ("contracts/native-profile-v6/vectors.json", "contracts/i06-v4/vectors.json"):
+        for rel in ("contracts/native-profile-v6/vectors.json", "contracts/i06-v5/vectors.json"):
             text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
             self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text,
                          "not a registered contract file")
@@ -6435,6 +6442,167 @@ class I01ListenerRuleTests(Tree):
             self.assertGreater(check(gate.HE), 30, check.__name__)
         self.assertEqual(gate.check_observer_wait_point(gate.HE), 3)
         self.assertEqual(gate.check_observer_i01_path(gate.HE), 1)
+
+
+# HE-004-I01a unit U6 (DESIGN-I01A sections 10 and 12): the role pin's call in a small check_snapshot.
+ROLE_PIN_OBSERVE = (
+    "use crate::observer_rbac::{self, RbacLists};\n"
+    "impl Epoch {\n"
+    "    // Closure::check and observer_rbac::check_observer_snapshot( in a comment are no anchors.\n"
+    "    fn check_snapshot(&mut self, inputs: Inputs) -> Result<u8, Stop> {\n"
+    "        let produced = match produce_snapshot(&inputs, &namespace) {\n"
+    "            Ok(produced) => produced,\n"
+    "            Err(_) => return Err(self.stop(ObserverExit::Rbac, \"B1 {refused}\")),\n"
+    "        };\n"
+    "        if self.closure.check(&produced.snapshot, &namespace).is_err() {\n"
+    "            return Err(self.stop(ObserverExit::Rbac, \"the closure check refused\"));\n"
+    "        }\n"
+    "        let cluster_roles = match inputs.items(Resource::ClusterRoles) {\n"
+    "            Ok(items) => items,\n"
+    "            Err(error) => return Err(self.input_exit(&error)),\n"
+    "        };\n"
+    "        let cluster_role_bindings = inputs.items(Resource::ClusterRoleBindings).unwrap_or(&[]);\n"
+    "        let role_bindings = inputs.items(Resource::RoleBindings).unwrap_or(&[]);\n"
+    "        if observer_rbac::check_observer_snapshot(&produced.snapshot,\n"
+    "                                                  RbacLists { cluster_roles, cluster_role_bindings, role_bindings })\n"
+    "            .is_err()\n"
+    "        {\n"
+    "            return Err(self.stop(ObserverExit::Rbac, \"I06 v4's role pin refused\"));\n"
+    "        }\n"
+    "        let dropped = produced.dropped_non_resource_rules;\n"
+    "        drop(produced);\n"
+    "        for check in [check_or02, check_or05, check_or06] {\n"
+    "            check(&inputs)?;\n"
+    "        }\n"
+    "        Ok(dropped)\n"
+    "    }\n"
+    "}\n")
+ROLE_PIN_CALL_TEXT = "        if observer_rbac::check_observer_snapshot(&produced.snapshot,\n"
+ROLE_PIN_LAST_LET = "        let role_bindings = inputs.items(Resource::RoleBindings).unwrap_or(&[]);\n"
+ROLE_PIN_DROPS = "        let dropped = produced.dropped_non_resource_rules;\n        drop(produced);\n"
+
+
+class RolePinCallTests(Tree):
+    """HE-004-I01a G-I01-3 (DESIGN-I01A sections 10 and 12): observe.rs calls observer_rbac::check_observer_snapshot
+    once, in the statement after the closure check's with only `let`s between, followed by `let dropped` and then
+    drop(produced); each departure refuses; then the real observe.rs."""
+
+    TREE = {"crates/observer/src/observe.rs": ROLE_PIN_OBSERVE}
+    RULE = "G-I01-3"
+
+    def test_the_fixture_passes(self):
+        self.assertEqual(gate.OBSERVER_OBSERVE, "crates/observer/src/observe.rs")
+        self.assertEqual(gate.check_observer_role_pin(self.base), 3)
+        # Spacing around `::`, a strict test block's own call and a second block elsewhere pass.
+        good = ROLE_PIN_OBSERVE
+        self.write(gate.OBSERVER_OBSERVE, good.replace("observer_rbac::check_observer_snapshot(&produced",
+                                                       "observer_rbac :: check_observer_snapshot (&produced")
+                   + "#[cfg(test)]\nmod tests {\n    fn t() { observer_rbac::check_observer_snapshot(&s, l); }\n}\n")
+        self.assertEqual(gate.check_observer_role_pin(self.base), 3)
+        # No list let at all is still only lets (none) between.
+        self.write(gate.OBSERVER_OBSERVE, good.replace(ROLE_PIN_LAST_LET, ""))
+        self.assertEqual(gate.check_observer_role_pin(self.base), 2)
+
+    def test_departures_refuse(self):
+        good, rel = ROLE_PIN_OBSERVE, gate.OBSERVER_OBSERVE
+        closure = "        if self.closure.check(&produced.snapshot, &namespace).is_err() {\n"
+        for text in (
+                # The call missing, twice, or spelled as an imported name.
+                good.replace("observer_rbac::check_observer_snapshot(&produced", "observer_rbac::other(&produced"),
+                good + "fn again(s: &Value, l: RbacLists) { let _ = observer_rbac::check_observer_snapshot(s, l); }\n",
+                good.replace("observer_rbac::check_observer_snapshot(&produced", "check_observer_snapshot(&produced")
+                + "use crate::observer_rbac::check_observer_snapshot;\n",
+                good + "fn f() { let g = check_observer_snapshot; }\n",
+                # A statement other than `let` between, or the call before the closure check.
+                good.replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        self.trace(1);\n"),
+                good.replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        if role_bindings.is_empty() {\n            self.note();\n        }\n"),
+                good.replace(closure, "        let early = observer_rbac::check_observer_snapshot(&produced.snapshot, l);\n" + closure)
+                .replace(ROLE_PIN_CALL_TEXT, "        if observer_rbac::other(&produced.snapshot,\n"),
+                # The two drops missing, swapped or not right after the call.
+                good.replace(ROLE_PIN_DROPS, "        drop(produced);\n"),
+                good.replace(ROLE_PIN_DROPS, "        drop(produced);\n        let dropped = 0;\n"),
+                good.replace(ROLE_PIN_DROPS, "        self.trace(2);\n" + ROLE_PIN_DROPS),
+                # The closure check twice, or only in a comment.
+                good + "fn g(&self) -> bool { self.closure.check(&s, &n).is_ok() }\n",
+                good.replace(closure, "        // self.closure.check(&produced.snapshot, &namespace)\n        if false {\n"),
+                # The call in another block than the closure check's.
+                good.replace(closure, "        {\n" + closure).replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        }\n")):
+            self.assertNotEqual(text, good)
+            self.refused(gate.check_observer_role_pin, rel, text, self.RULE)
+        (self.base / rel).unlink()
+        with self.assertRaisesRegex(gate.GateError, "observe.rs is missing .the role pin's call, G-I01-3"):
+            gate.check_observer_role_pin(self.base)
+
+    def test_the_real_observe_rs_passes(self):
+        self.assertEqual(gate.check_observer_role_pin(gate.HE), 3)
+
+
+ROLE_PIN_RBAC_TEXT = (gate.HE / "crates/observer/src/observer_rbac.rs").read_text(encoding="utf-8")
+ROLE_PIN_VECTORS_TEXT = (gate.HE / "contracts/i06-v4/vectors.json").read_text(encoding="utf-8")
+
+
+class RolePinConstantTests(Tree):
+    """HE-004-I01a DESIGN-I01A section 10 (Q-I01A-4 (a)): the role pin's compiled rule data matches the I06 v4 vectors'
+    objectsPositive; a changed rule, name, pair or count refuses, as do constants the check cannot read plainly, and a
+    changed positive."""
+
+    TREE = {"crates/observer/src/observer_rbac.rs": ROLE_PIN_RBAC_TEXT, "contracts/i06-v4/vectors.json": ROLE_PIN_VECTORS_TEXT}
+    RULE = "the role pin's constants"
+
+    def test_the_real_constants_pass(self):
+        self.assertEqual(gate.OBSERVER_RBAC, "crates/observer/src/observer_rbac.rs")
+        self.assertEqual(gate.I06_V4_VECTORS, "contracts/i06-v4/vectors.json")
+        self.assertEqual(gate.check_observer_role_constants(self.base), 14)
+        self.assertEqual(gate.check_observer_role_constants(gate.HE), 14)
+
+    def test_changed_constants_refuse(self):
+        good, rel = ROLE_PIN_RBAC_TEXT, gate.OBSERVER_RBAC
+        last = re.search(r"    ContractRule \{ api_groups: &\[\], resources: &\[\],.*?\},\n", good, re.S).group(0)
+        for old, new in (
+                ('"serviceaccounts", "secrets"]', '"serviceaccounts", "secret"]'),
+                ('"serviceaccounts", "secrets"]', '"serviceaccounts"]'),
+                ('verbs: &["get"]', 'verbs: &["get", "list"]'),
+                ('verbs: &["get"], resource_names: &[]', 'verbs: &["get"], resource_names: &["x"]'),
+                ('resources: &["networkpolicies"], non_resource_urls: &[]',
+                 'resources: &["networkpolicies"], non_resource_urls: &["/metrics"]'),
+                ('api_groups: &["networking.k8s.io"]', 'api_groups: &["networking.k8s.io", ""]'),
+                ('pub const ROLE_NAME: &str = "planeon:policy-observer";', 'pub const ROLE_NAME: &str = "planeon-policy-observer";'),
+                ('pub const BINDING_NAME: &str = "planeon:policy-observer";',
+                 'pub const BINDING_NAME: &str = "planeon:policy-observers";'),
+                ('pub const OBSERVER_USER: &str = "planeon:policy-observer";', 'pub const OBSERVER_USER: &str = "planeon:observer";'),
+                ('pub const RBAC_API_VERSION: &str = "rbac.authorization.k8s.io/v1";',
+                 'pub const RBAC_API_VERSION: &str = "rbac.authorization.k8s.io/v1beta1";'),
+                ('("kind", "ClusterRole")', '("kind", "Role")'),
+                ('("kind", "User")', '("kind", "Group")'),
+                # Forms the check cannot read plainly: a computed text, a constant list, a missing field, an escape.
+                ('pub const ROLE_NAME: &str = "planeon:policy-observer";', 'pub const ROLE_NAME: &str = OBSERVER_USER;'),
+                ('verbs: &["get"]', 'verbs: GET'),
+                (', resource_names: &[] },\n];', ' },\n];'),
+                ('"/version"', '"/vers\\u{69}on"'),
+                ('pub const OBSERVER_RULES: [ContractRule; 8]', 'pub const OBSERVER_RULES: [ContractRule; 9]'),
+                ("pub const SUBJECT: [(&str, &str); 3] =", "pub const SUBJECT: [(&str, &str); 4] =")):
+            self.assertIn(old, good)
+            self.refused(gate.check_observer_role_constants, rel, good.replace(old, new, 1), self.RULE)
+        # Seven rules, declared and held, against the contract's eight; a second definition of a constant.
+        self.refused(gate.check_observer_role_constants, rel,
+                     good.replace(last, "").replace("[ContractRule; 8]", "[ContractRule; 7]"), self.RULE)
+        self.refused(gate.check_observer_role_constants, rel,
+                     good + 'pub const ROLE_NAME: &str = "planeon:policy-observer";\n', self.RULE)
+
+    def test_a_changed_positive_refuses(self):
+        rel = "contracts/i06-v4/vectors.json"
+        vectors = json.loads(ROLE_PIN_VECTORS_TEXT)
+        for change in (lambda positive: positive["clusterRoles"][0]["rules"][0]["verbs"].append("get"),
+                       lambda positive: positive["clusterRoles"][0]["rules"].pop(),
+                       lambda positive: positive["clusterRoles"][0]["metadata"].update(name="other"),
+                       lambda positive: positive["clusterRoleBindings"][0]["subjects"].append(
+                           {"apiGroup": "rbac.authorization.k8s.io", "kind": "User", "name": "x"}),
+                       lambda positive: positive["clusterRoleBindings"][0]["roleRef"].update(apiGroup="")):
+            changed = json.loads(ROLE_PIN_VECTORS_TEXT)
+            change(changed["objectsPositive"])
+            self.assertNotEqual(changed, vectors)
+            self.refused(gate.check_observer_role_constants, rel, json.dumps(changed), self.RULE)
+        self.refused(gate.check_observer_role_constants, rel, "[]", self.RULE)
 
 
 class OutputPrefixTests(unittest.TestCase):

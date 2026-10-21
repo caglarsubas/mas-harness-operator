@@ -236,6 +236,25 @@ rows labelled HE-004-I01 (the edge rule binds bytes, modes and versions, not the
 - `contracts/seccomp-v5/OBSERVER.aarch64.bpf` from `architecture/compiled-filter-programs-v3/programs/OBSERVER.aarch64.bpf`, sha256 `887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184`, 1936 bytes (242 instructions)
 - `contracts/seccomp-v5/OBSERVER.x86_64.bpf` from `architecture/compiled-filter-programs-v3/programs/OBSERVER.x86_64.bpf`, sha256 `a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9`, 2024 bytes (253 instructions)
 
+Unit U6: two of the four I06 v4 rows of the same record v8, labelled HE-004-I01 (the observer's own pin, Q-RBAC-4 (a)),
+status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, provider packet MET-ENFORCE-039 with a null
+`providerCommit`, consumer paths exactly these. Each row's sha256, mode, provider path and consumer path were compared
+with the record before any byte was copied; then each file was copied byte for byte with `git show 29c84b36:<providerPath>`
+and its sha256 and length checked. The criteria are read by the replay for their ids only; the vectors drive the
+139-case replay (`crates/observer/tests/observer_i01_role_pin.rs`) and hold the role pin's compiled constants
+(`crates/observer/src/observer_rbac.rs`) through `tools/gate.py`. The record's other two I06 v4 rows, the role document
+`observer-rbac.json` and the README, are HE-008's (its manifest check, RB00, and the objects it provisions) and are not
+vendored here.
+
+- `contracts/i06-v4/criteria.json` from `architecture/i06-backend-profile-v4/criteria.json`, sha256 `10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a`, 14592 bytes
+- `contracts/i06-v4/vectors.json` from `architecture/i06-backend-profile-v4/vectors.json`, sha256 `27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7`, 150922 bytes
+
+The I06 v4 model is pinned by digest, not copied, and read as specification only where DESIGN-I01A section 10 and the
+vectors are silent (each such point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s HE-004-I01a section), at
+harness-onion `29c84b36`:
+
+- `scripts/i06_backend_profile_v4.py`, sha256 `7f97acfe9060e79c101f264f5bf61610bf421326c689216cbaf41df7e38e6d2a`, 31161 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256
