@@ -1,8 +1,8 @@
 //! The observer seal's portable parts on the build host (HE-004A DESIGN sections 4 and 8): the helpers copied from
 //! effect-gate's seal, run against the same cases as effect-gate's tests/seal.rs (owner decision Q-HE4A-6 (a)), and the
-//! two embedded OBSERVER programs (sha256, length and the pinned instruction counts, and a classic-BPF decode). The
-//! engine's tests run over a fake kernel inside `src/seal.rs`, because the engine is crate-private (D6); the raw calls
-//! wait for T04.
+//! two embedded OBSERVER programs (sha256, length and the pinned instruction counts, and a classic-BPF decode; since
+//! HE-004-I01a the seccomp-v5 programs, DESIGN-I01A section 3). The engine's tests run over a fake kernel inside
+//! `src/seal.rs`, because the engine is crate-private (D6); the raw calls wait for T04.
 
 use i05_protocol::sha256;
 use planeon_observer::seal::{capability_sets, capability_words, filter_length, status_threads, Arch, CapabilitySets,
@@ -63,9 +63,9 @@ fn capability_sets_split_into_two_version_3_words() {
 
 #[test]
 fn the_sock_fprog_length_counts_whole_instructions() {
-    assert_eq!(filter_length(PROGRAM_X86_64), Some(238));
-    assert_eq!(filter_length(PROGRAM_AARCH64), Some(227));
-    assert_eq!((INSTRUCTIONS_X86_64, INSTRUCTIONS_AARCH64), (238, 227));
+    assert_eq!(filter_length(PROGRAM_X86_64), Some(253));
+    assert_eq!(filter_length(PROGRAM_AARCH64), Some(242));
+    assert_eq!((INSTRUCTIONS_X86_64, INSTRUCTIONS_AARCH64), (253, 242));
     assert_eq!(filter_length(&[]), None);
     assert_eq!(filter_length(&[0; 7]), None);
     assert_eq!(filter_length(&[0; 8]), Some(1));
@@ -109,22 +109,22 @@ fn the_threads_line_is_parsed_strictly() {
 #[test]
 fn the_embedded_programs_are_the_published_bytes() {
     for (program, digest, bytes) in [
-        (PROGRAM_X86_64.as_slice(), "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a", 1904),
-        (PROGRAM_AARCH64.as_slice(), "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707", 1816),
+        (PROGRAM_X86_64.as_slice(), "a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9", 2024),
+        (PROGRAM_AARCH64.as_slice(), "887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184", 1936),
     ] {
         assert_eq!(program.len(), bytes);
         assert_eq!(sha256::hex(&sha256::digest(program)), digest);
     }
     assert_eq!(Arch::X86_64.program(), PROGRAM_X86_64.as_slice());
     assert_eq!(Arch::Aarch64.program(), PROGRAM_AARCH64.as_slice());
-    assert_eq!((Arch::X86_64.instructions(), Arch::Aarch64.instructions()), (238, 227));
+    assert_eq!((Arch::X86_64.instructions(), Arch::Aarch64.instructions()), (253, 242));
     let running = if cfg!(target_arch = "x86_64") { Arch::X86_64 } else { Arch::Aarch64 };
     assert_eq!(RUNNING_ARCH, running, "cfg(target_arch) selects the installed program");
 }
 
 #[test]
 fn a_classic_bpf_decode_of_each_program() {
-    for (arch, count, audit) in [(Arch::X86_64, 238, AUDIT_ARCH_X86_64), (Arch::Aarch64, 227, AUDIT_ARCH_AARCH64)] {
+    for (arch, count, audit) in [(Arch::X86_64, 253, AUDIT_ARCH_X86_64), (Arch::Aarch64, 242, AUDIT_ARCH_AARCH64)] {
         let program = decode(arch.program());
         assert_eq!(program.len(), count, "{arch:?}");
         // The architecture check: load seccomp_data.arch, kill unless it is this architecture's.

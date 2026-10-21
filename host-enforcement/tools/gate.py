@@ -121,6 +121,10 @@ type (G-D2-5, the source-level proof that serve cannot reach them); /opt/planeon
 interpreter-tree constant (G-D2-6), whose two root constants join G-D1-5's exceptions (G-D2-9); and planeon-observer's
 symbol table holds no symbol of the four modules on either target (G-D2-7, build-time corroboration).
 
+HE-004-I01a (the observer's I01 listener, custody, request checks, quota pair and role pin; DESIGN-I01A revision 6
+section 12, owner decisions Q-HE4I1-1..13 and Q-I01A-1..9) registers edge record v8's two seccomp-v5 OBSERVER programs
+among the contract files and points OBSERVER_PROGRAMS at them, the v3 ones held but no longer embedded (unit U1, 48).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -198,6 +202,9 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # vectors, criteria and README), read by the tests only, 40 files. HE-004D2 unit B1 (DESIGN-D2 sections 2 and 4, G-D2-1;
 # owner decision Q-HE4D2-3 (a)): edge record v7's six HE-004D2 rows (native-profile v5's schema, which the capture
 # validators load, its vectors and README, and the native-profile v1, v2 and v3 vectors the history replay reads), 46.
+# HE-004-I01a unit U1 (DESIGN-I01A sections 3 and 12): edge record v8's two seccomp-v5 OBSERVER rows (harness-onion
+# compiled filter programs v3, MET-ENFORCE-036), which the observer's seal embeds from now on; the seccomp-v3 OBSERVER
+# programs stay pinned, held but no longer embedded (Q-P2-3 (a)), 48.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -220,6 +227,8 @@ CONTRACTS = {
     "contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf": "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3",
     "contracts/seccomp-v3/OBSERVER.aarch64.bpf": "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707",
     "contracts/seccomp-v3/OBSERVER.x86_64.bpf": "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a",
+    "contracts/seccomp-v5/OBSERVER.aarch64.bpf": "887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184",
+    "contracts/seccomp-v5/OBSERVER.x86_64.bpf": "a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9",
     "contracts/i06-v2/vectors.json": "1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e",
     "contracts/i06-v2/criteria.json": "026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda",
     "contracts/i06-v2/README.md": "553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb",
@@ -543,9 +552,11 @@ WRAPPER_JUSTIFICATIONS = {
                "size (from the auxiliary vector, no system call)",
 }
 # HE-004A DESIGN-A section 6 (D1-10, D2-5): each target's planeon-observer must hold this contract file's bytes exactly
-# once.
-OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.x86_64.bpf",
-                     "aarch64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.aarch64.bpf"}
+# once. HE-004-I01a (DESIGN-I01A sections 3 and 12): the seccomp-v5 programs, which give the sealed observer bind,
+# listen and accept4 for its I01 listener (seal.rs pins their sizes, 2,024 and 1,936 bytes, and their instruction counts,
+# 253 and 242); seal.rs may embed only these two (check_observer_includes).
+OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v5/OBSERVER.x86_64.bpf",
+                     "aarch64-unknown-linux-musl": "contracts/seccomp-v5/OBSERVER.aarch64.bpf"}
 # HE-004C DESIGN-C section 15 (G9, D1-6, D2-8; owner decision Q-HE4C-12 (a)): symbols only the path after the
 # configuration keeps, so the shipped planeon-observer holds the composed client while its key is empty (the compiled
 # key passes core::hint::black_box). A symbol counts by its own path: the mangled name (legacy `_ZN` or v0 `_R`) is read

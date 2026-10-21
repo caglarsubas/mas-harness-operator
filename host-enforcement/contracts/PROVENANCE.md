@@ -219,6 +219,23 @@ harness-onion `27c54605`; it pins the capture schema by the sha256 of its canoni
 
 - `scripts/native_qualification_v5.py`, sha256 `d9926f4d18c82a5da31b903fea47c42319d29268a63a26171a7e71aa4c2480a5`, 39747 bytes
 
+## Compiled OBSERVER programs v5 and I06 v4, the observer's I01 listener and role pin (HE-004-I01a)
+
+Unit U1: the two seccomp-v5 OBSERVER rows edge registry record v8 labels HE-004-I01,
+`architecture/artifact-edges/operator-harness-engineering-v8.json` (sha256
+`623cf10bf19cfba1806f5699007f39c7f6ba38f72d92069548421c4dccd21573`, 33209 bytes, read by exact path at harness-onion
+`29c84b36`, MET-ENFORCE-039's merge), status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, provider
+packet MET-ENFORCE-036 with a null `providerCommit`, consumer paths exactly these. Before any byte was copied, each
+row's sha256, mode, provider path and consumer path were compared with DESIGN-I01A section 3; then each file was copied
+byte for byte with `git show 29c84b36:<providerPath>` and its sha256 and length checked. They are the OBSERVER programs
+of harness-onion's compiled filter programs v3 (seccomp allowlists v5), which add the I01 listener's `bind`, `listen`
+and `accept4` to the OBSERVER row. `crates/observer/src/seal.rs` embeds both and installs the running architecture's;
+the seccomp-v3 OBSERVER programs above stay pinned and are no longer embedded (Q-P2-3 (a)). HE-004-I01a consumes the
+rows labelled HE-004-I01 (the edge rule binds bytes, modes and versions, not the label).
+
+- `contracts/seccomp-v5/OBSERVER.aarch64.bpf` from `architecture/compiled-filter-programs-v3/programs/OBSERVER.aarch64.bpf`, sha256 `887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184`, 1936 bytes (242 instructions)
+- `contracts/seccomp-v5/OBSERVER.x86_64.bpf` from `architecture/compiled-filter-programs-v3/programs/OBSERVER.x86_64.bpf`, sha256 `a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9`, 2024 bytes (253 instructions)
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

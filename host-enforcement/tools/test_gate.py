@@ -1080,11 +1080,11 @@ class ContractTests(unittest.TestCase):
     # HE-004B1 (DESIGN-B section 2): edge record v4's ten HE-004 rows join them (31).
     # HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's four native-profile rows join them (35).
     # HE-004D2 (DESIGN-D2 section 2, G-D2-1): edge record v6's five HE-004D2 rows join them (40), and unit B1's six of edge
-    # record v7 (46).
+    # record v7 (46). HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 OBSERVER rows (48).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 46)
+            self.assertEqual(len(gate.CONTRACTS), 48)
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/native-profile-")}, {
                 "contracts/native-profile-v4/qualification.schema.json":
@@ -1132,6 +1132,10 @@ class ContractTests(unittest.TestCase):
                              "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/OBSERVER.x86_64.bpf"],
                              "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v5/OBSERVER.aarch64.bpf"],
+                             "887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v5/OBSERVER.x86_64.bpf"],
+                             "a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf"],
                              "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf"],
@@ -3175,8 +3179,11 @@ class ObserverBinaryTests(unittest.TestCase):
 
     def test_each_target_names_its_pinned_program(self):
         self.assertEqual(set(gate.OBSERVER_PROGRAMS), set(gate.MACHINE))
-        self.assertEqual(gate.OBSERVER_PROGRAMS["x86_64-unknown-linux-musl"], "contracts/seccomp-v3/OBSERVER.x86_64.bpf")
-        self.assertEqual(gate.OBSERVER_PROGRAMS["aarch64-unknown-linux-musl"], "contracts/seccomp-v3/OBSERVER.aarch64.bpf")
+        # HE-004-I01a (DESIGN-I01A section 3): the seccomp-v5 programs; the v3 ones stay pinned but are no longer embedded.
+        self.assertEqual(gate.OBSERVER_PROGRAMS["x86_64-unknown-linux-musl"], "contracts/seccomp-v5/OBSERVER.x86_64.bpf")
+        self.assertEqual(gate.OBSERVER_PROGRAMS["aarch64-unknown-linux-musl"], "contracts/seccomp-v5/OBSERVER.aarch64.bpf")
+        self.assertIn("contracts/seccomp-v3/OBSERVER.x86_64.bpf", gate.CONTRACTS)
+        self.assertIn("contracts/seccomp-v3/OBSERVER.aarch64.bpf", gate.CONTRACTS)
         self.assertTrue(set(gate.OBSERVER_PROGRAMS.values()) <= set(gate.CONTRACTS))
         self.assertFalse(hasattr(gate, "OBSERVER_WRAPPER_JUSTIFICATIONS"), "no observer wrapper inventory in HE-004A")
 
@@ -3301,8 +3308,8 @@ INCLUDE_TREE = {
     gate.OBSERVER_CONTRACTS: "pub const A: &[u8] = include_bytes!(\"../../../contracts/i06-v1/identity-closure.json\");\n"
                              "pub const B: &str = include_str! ( \"../../../contracts/i06-v2/README.md\" );\n"
                              "// include_bytes!(\"../../../tools/gate.py\") in a comment\n",
-    OBSERVER_SEAL: "pub static X: &[u8; 1904] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf\");\n"
-                   "pub static A: &[u8; 1816] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.aarch64.bpf\");\n",
+    OBSERVER_SEAL: "pub static X: &[u8; 2024] = include_bytes!(\"../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf\");\n"
+                   "pub static A: &[u8; 1936] = include_bytes!(\"../../../contracts/seccomp-v5/OBSERVER.aarch64.bpf\");\n",
 }
 
 
@@ -3338,6 +3345,9 @@ class ObserverIncludeTests(Tree):
                 (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/i06-v2/README.md\");\n",
                  "not an OBSERVER program"),
                 (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf\");\n",
+                 "not an OBSERVER program"),
+                # HE-004-I01a (DESIGN-I01A section 3): the seccomp-v3 OBSERVER programs are pinned but no longer embedded.
+                (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf\");\n",
                  "not an OBSERVER program")):
             self.refused(gate.check_observer_includes, rel, text, message)
         (self.base / gate.OBSERVER_CONTRACTS).unlink()
@@ -4874,7 +4884,8 @@ class ObserverNativeProfileTests(Tree):
 
     def test_the_tree_passes(self):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
-        self.assertEqual(len(gate.CONTRACTS), 46)
+        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48.
+        self.assertEqual(len(gate.CONTRACTS), 48)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5404,9 +5415,10 @@ class D2ContractCountTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_the_forty_six_files_pass(self):
-        self.assertEqual(len(gate.CONTRACTS), 46)
+        # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48.
+        self.assertEqual(len(gate.CONTRACTS), 48)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 46)
+        self.assertEqual(gate.check_contracts(self.base), 48)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
         for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS:
@@ -5427,7 +5439,7 @@ class D2ContractCountTests(unittest.TestCase):
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 46)
+        self.assertEqual(gate.check_contracts(self.base), 48)
 
 
 class D2EmbeddedContractTests(Tree):
