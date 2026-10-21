@@ -11,9 +11,11 @@
 //!    spec read fresh, `R` decimal and at least every earlier mark, every other list `Exact` at `R` and answering `R`),
 //!    `/version`, then one `/metrics` scrape (the marker still `S0`, the ADM-4 samples). Each list body passes the
 //!    16 MiB aggregate and the node-count cap before it is parsed (84). Then, in order: `Inputs::new` (86), the
-//!    byte-aware weighted expansion guard (99), `produce_snapshot` and `Closure::check` (87), OR02, OR05 and OR06 (88),
+//!    byte-aware weighted expansion guard (99), `produce_snapshot`, `Closure::check` and (since HE-004-I01a) I06 v4's
+//!    role pin over the same read's ClusterRoles and bindings (87), OR02, OR05 and OR06 (88),
 //!    quota headroom (89), ADM-4 (96, then 90 or 91). The inputs are dropped after the checks; the `Observation` keeps
-//!    `R`, its freshness mark, the ADM-4 record and digest, the headroom and the dropped non-resource rules.
+//!    `R`, its freshness mark, the ADM-4 record and digest, the headroom (since HE-004-I01a with each unit's quota
+//!    pair) and the dropped non-resource rules.
 //! 3. Watching: one watch per served spec from `R` with bookmarks, used only to detect change or continuity loss. A
 //!    change (or a line over 64 KiB) closes every watch and re-snapshots, no sooner than 1 s after the last snapshot
 //!    started. A stream that ends gets the restart check (a scrape) and is reopened from its last mark; a reopen
@@ -45,6 +47,11 @@
 //! - **Expiry (D1-8, R2-4, R3-6).** The loop wakes at the record's `expiresAt - 3 s` (the engine's wall clock) and
 //!   turns every slot Expired; no set starts after that. [`Epoch::capture_view`] derives Expired at read time in every
 //!   phase, and the first observation of expiry is latched, so a wall clock stepped back cannot revive a capture.
+//!
+//! HE-004-I01a (DESIGN-I01A sections 5 and 14): [`run`] builds the I01 service from the server identity `serve`
+//! passes (`I01Service::new`) and attaches it to the client ([`Epoch::with_peer_service`]), so every wait of every
+//! phase serves I01; a wait that ends because the I01 listener failed persistently ends the epoch with
+//! [`ObserverExit::Listener`] (status 35) instead of the poller's 95.
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -58,13 +65,16 @@ use rustls::ClientConfig;
 
 use crate::admission::{check_loaded_manifest, Adm4Input, Adm4Record, BindingId, MetricSample, ObservationBinding, Verdict};
 use crate::capture::{CaptureCycle, CaptureViewState};
-use crate::client::{Client, Event, Failure, Handle, Kind, Scraped, Wire};
+use crate::client::{Client, Event, Failure, Handle, Kind, PeerOps, PeerService, Scraped, Wire};
 use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
+use crate::enrolled::ServerIdentity;
 use crate::exposition::Exposition;
 use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAPSHOT_BODY_LIMIT};
+use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
+use crate::observer_rbac::{self, RbacLists};
 use crate::operational::{check_or02, check_or05, check_or06, OperationalRefusal};
-use crate::quota::{self, Headroom, QuotaError};
+use crate::quota::{self, Headroom, QuotaError, QuotaPairs};
 use crate::rbac::{produce_snapshot, ProduceError};
 use crate::requests::{self, MarkError, Mode};
 use crate::snapshot::Closure;
@@ -130,6 +140,8 @@ pub enum ObserverExit {
     Clock,
     Stale,
     Expansion,
+    /// HE-004-I01a: the I01 listener failed persistently (twelve faults in a row).
+    Listener,
 }
 
 /// The epoch's settings: production uses `PER_SPEC_PROGRESS` and no trace; the tests flip the fallback and record.
@@ -185,6 +197,8 @@ pub struct Observation {
     pub record: Adm4Record,
     pub digest: String,
     pub headroom: Headroom,
+    /// HE-004-I01a (DESIGN-I01A section 9): per unit, the least-headroom key's `floor(hard)` and capped `ceil(used)`.
+    pub quota: QuotaPairs,
     pub dropped_non_resource_rules: usize,
 }
 
@@ -408,17 +422,21 @@ pub fn expansion_weight(inputs: &Inputs) -> Option<u64> {
     Some(total)
 }
 
-/// The epoch with production settings and the capture engine, run to its exit (`serve`'s last step).
-pub fn run<W: Wire>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, captures: Box<dyn CaptureCycle>)
-                    -> ObserverExit {
-    Epoch::new(wire, config, tls, closure, Settings::production()).with_captures(captures).run()
+/// The epoch with production settings, the capture engine and the I01 service for `server` (HE-004-I01a), run to its
+/// exit (`serve`'s last step).
+pub fn run<W: Wire + PeerOps>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure,
+                              captures: Box<dyn CaptureCycle>, server: ServerIdentity) -> ObserverExit {
+    Epoch::new(wire, config, tls, closure, Settings::production())
+        .with_captures(captures)
+        .with_peer_service(Box::new(I01Service::new(server)))
+        .run()
 }
 
 fn after(now: Instant, by: Duration) -> Instant {
     now.checked_add(by).unwrap_or(now)
 }
 
-impl<W: Wire> Epoch<W> {
+impl<W: Wire + PeerOps> Epoch<W> {
     pub fn new(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, settings: Settings) -> Epoch<W> {
         let client = Client::new(wire, tls, config.address, &config.authority);
         let origin = client.now();
@@ -460,6 +478,12 @@ impl<W: Wire> Epoch<W> {
     /// Attaches the capture engine (HE-004D1): one set per cycle, the drain, the expiry wake.
     pub fn with_captures(mut self, captures: Box<dyn CaptureCycle>) -> Epoch<W> {
         self.captures = Some(captures);
+        self
+    }
+
+    /// Attaches the I01 service (HE-004-I01a): the client's every later wait serves it.
+    pub fn with_peer_service(mut self, service: Box<dyn PeerService>) -> Epoch<W> {
+        self.client.serve_peers(service);
         self
     }
 
@@ -560,7 +584,11 @@ impl<W: Wire> Epoch<W> {
         exit
     }
 
+    /// A failed wait: the I01 listener's persistent failure (35) when the client names it, else the poller's (95).
     fn poll_failed(&mut self) -> ObserverExit {
+        if self.client.listener_failed() {
+            return self.fail(ObserverExit::Listener, "the I01 listener failed persistently");
+        }
         self.fail(ObserverExit::Poll, "the poller failed")
     }
 
@@ -943,6 +971,24 @@ impl<W: Wire> Epoch<W> {
         if self.closure.check(&produced.snapshot, &namespace).is_err() {
             return Err(self.stop(ObserverExit::Rbac, "the RBAC snapshot check refused"));
         }
+        let cluster_roles = match inputs.items(Resource::ClusterRoles) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        let cluster_role_bindings = match inputs.items(Resource::ClusterRoleBindings) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        let role_bindings = match inputs.items(Resource::RoleBindings) {
+            Ok(items) => items,
+            Err(error) => return Err(self.input_exit(&error)),
+        };
+        if observer_rbac::check_observer_snapshot(&produced.snapshot,
+                                                  RbacLists { cluster_roles, cluster_role_bindings, role_bindings })
+            .is_err()
+        {
+            return Err(self.stop(ObserverExit::Rbac, "I06 v4's role pin refused"));
+        }
         let dropped = produced.dropped_non_resource_rules;
         drop(produced);
         for check in [check_or02, check_or05, check_or06] {
@@ -952,12 +998,12 @@ impl<W: Wire> Epoch<W> {
                 Err(_) => return Err(self.stop(ObserverExit::Operational, "an operational rule (OR02, OR05, OR06) refused")),
             }
         }
-        let headroom = match inputs.items(Resource::ResourceQuotas) {
-            Ok(items) => quota::headroom(items, &namespace),
+        let quotas = match inputs.items(Resource::ResourceQuotas) {
+            Ok(items) => quota::quota(items, &namespace),
             Err(error) => return Err(self.input_exit(&error)),
         };
-        let headroom = match headroom {
-            Ok(headroom) => headroom,
+        let quotas = match quotas {
+            Ok(quotas) => quotas,
             Err(QuotaError::Unsettled) => return Err(Stop::Restart(Cause::Unsettled)),
             Err(QuotaError::Refused(why)) => return Err(self.stop(ObserverExit::Quota, why)),
         };
@@ -970,7 +1016,8 @@ impl<W: Wire> Epoch<W> {
             fresh_stamp: stamp,
             record,
             digest,
-            headroom,
+            headroom: quotas.headroom,
+            quota: quotas.pairs,
             dropped_non_resource_rules: dropped,
         })
     }

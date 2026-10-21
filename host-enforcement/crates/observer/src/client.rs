@@ -14,6 +14,15 @@
 //!   stream that sends no byte for 300 s has ended.
 //! - [`Client::poll`] reports each link's events; [`Client::run`] drives one link to its end (the snapshot's sequential
 //!   requests). A `Wire::wait` failure other than an interrupted call is a [`PollError`] (status 95, D1-2).
+//!
+//! HE-004-I01a (DESIGN-I01A sections 4 and 5; MODEL_DEFINED's HE-004-I01a section) adds the I01 side of the transport,
+//! portable like the rest: the peer types ([`PeerId`], [`PeerCreds`], [`ProcIdentity`], [`ExeLink`], [`PeerRecv`],
+//! [`AcceptResult`]), the listener's setup steps ([`ListenerSetup`], [`WireSetup`], which `status.rs` maps on every
+//! target), the [`PeerOps`] operations a wire offers beside [`Wire`] (no send: nothing leaves I01a), the
+//! [`PeerService`] the waits serve, and the listener's fault backoff ([`ListenerBackoff`]). The client's every wait, in
+//! `poll` and `pause`, is the one wire wait inside `Client::wait_serving` (G-I01-2): it watches the service's listener
+//! and peer beside the links, on poller tokens of their own, shortens its timeout to the service's earliest deadline,
+//! routes the links' readiness as before and hands each ready I01 descriptor to the service, one step each.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -21,6 +30,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gate_sys::inet::InetAddress;
+use gate_sys::peer_wire::parse_control;
 use rustls::{ClientConfig, ClientConnection, ProtocolVersion};
 
 use crate::exposition::{Exposition, ExpositionError, ExpositionReader};
@@ -87,6 +97,241 @@ pub struct Ready {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PollError(pub i32);
 
+// ------------------------------------------------------------------------------------------ I01 peers (HE-004-I01a)
+
+/// An accepted I01 peer of the wire: a counter, never reused within the process.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerId(pub u64);
+
+/// What the kernel recorded about an accepted peer at its `connect`: SO_PEERCRED's process number, user and group, and
+/// SO_PEERSEC's label exactly as delivered (its trailing NUL included). The pidfd (SO_PEERPIDFD) stays in the wire.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeerCreds {
+    pub pid: i32,
+    pub uid: u32,
+    pub gid: u32,
+    pub label: Vec<u8>,
+}
+
+/// One read through the peer's kept process directory: `stat`'s start time (field 22, clock ticks since boot), the
+/// whole `cgroup` file and `attr/current` (the process label, its trailing NUL included).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcIdentity {
+    pub start_time: u64,
+    pub cgroup: Vec<u8>,
+    pub label: Vec<u8>,
+}
+
+/// The peer's `exe` link, read through its kept process directory.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExeLink(pub Vec<u8>);
+
+/// One receive on a peer, never waiting.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PeerRecv {
+    /// One datagram of `length` bytes in the buffer, with the one SCM_CREDENTIALS it carried (`pid`, `uid`, `gid`) and
+    /// the one SCM_SECURITY (`security`, exactly as delivered).
+    Data { length: usize, pid: i32, uid: u32, gid: u32, security: Vec<u8> },
+    /// A datagram longer than the buffer (MSG_TRUNC).
+    Truncated,
+    /// Control data outside the one-of-each rule: cut short (MSG_CTRUNC, a passed descriptor among its causes), a
+    /// message missing, repeated, of another level or type, or malformed.
+    Ancillary,
+    /// Nothing queued.
+    WouldBlock,
+    /// The peer closed its side.
+    Eof,
+    /// Any other error, as its errno.
+    Failed(i32),
+}
+
+impl PeerRecv {
+    /// One received datagram as the wire reports it: `length` bytes (`truncated` when it was longer than the buffer) and
+    /// the control bytes up to their returned length (`control_truncated` for MSG_CTRUNC), read by gate-sys's
+    /// `parse_control`: exactly one SCM_CREDENTIALS of the kernel's length and exactly one SCM_SECURITY, nothing else.
+    pub fn datagram(length: usize, truncated: bool, control: &[u8], control_truncated: bool) -> PeerRecv {
+        if truncated {
+            return PeerRecv::Truncated;
+        }
+        match parse_control(control, control_truncated) {
+            Ok(delivered) => PeerRecv::Data {
+                length,
+                pid: delivered.credentials.pid,
+                uid: delivered.credentials.uid,
+                gid: delivered.credentials.gid,
+                security: delivered.security,
+            },
+            Err(_) => PeerRecv::Ancillary,
+        }
+    }
+}
+
+/// One accept on the I01 listener.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AcceptResult {
+    /// A new peer.
+    Peer(PeerId),
+    /// None queued (EAGAIN), or the queued one died (ECONNABORTED).
+    Nothing,
+    /// Any other error, as its errno: a listener fault.
+    Fault(i32),
+}
+
+/// The step of the I01 listener's setup that failed (statuses 31-34, `status::wire_setup`): its socket, address or
+/// socket options (31), `bind` (32), `listen` (33), or its registration with the poller (34). gate-sys's own step type
+/// stays inside the Linux listener file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListenerSetup {
+    Socket,
+    Address,
+    Options,
+    Bind,
+    Listen,
+    Register,
+}
+
+/// Why the Linux wire's constructor failed: the poller, with its errno (status 24), or the I01 listener (31-34).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WireSetup {
+    Poller(i32),
+    Listener(ListenerSetup),
+}
+
+/// The I01 descriptors one wait watches for reading: the listener, and the open session's peer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PeerWatch {
+    pub listener: bool,
+    pub peer: Option<PeerId>,
+}
+
+/// One wake, the links' connections and the I01 descriptors apart (their poller tokens are disjoint).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Woken {
+    /// The connections' readiness.
+    pub conns: Vec<(ConnId, Ready)>,
+    /// The listener's readiness, when it was watched and reported.
+    pub listener: Option<Ready>,
+    /// The watched peer's readiness.
+    pub peers: Vec<(PeerId, Ready)>,
+    /// Adding the listener to the poller, or removing it, failed: a listener fault.
+    pub listener_fault: bool,
+    /// Peers whose watch failed: each one's session closes (never status 95).
+    pub peer_faults: Vec<PeerId>,
+}
+
+/// The I01 operations a wire offers beside [`Wire`] (DESIGN-I01A section 5): `linux_net::LinuxWire` serves them through
+/// its I01 listener, the tests through fakes. No supertrait, and no send operation: nothing leaves I01a.
+pub trait PeerOps {
+    /// One accept: a new peer, nothing queued, or a fault.
+    fn accept_peer(&mut self) -> AcceptResult;
+    /// SO_PEERCRED, SO_PEERSEC and SO_PEERPIDFD (the pidfd kept inside the wire), or the errno.
+    fn peer_creds(&mut self, peer: PeerId) -> Result<PeerCreds, i32>;
+    /// Opens and keeps the peer's process directory by SO_PEERCRED's number; reads nothing.
+    fn peer_proc_open(&mut self, peer: PeerId) -> Result<(), i32>;
+    /// `stat`'s start time, `cgroup` and `attr/current`, read through the kept directory.
+    fn peer_proc_read(&mut self, peer: PeerId) -> Result<ProcIdentity, i32>;
+    /// The `exe` link, read through the kept directory.
+    fn peer_exe(&mut self, peer: PeerId) -> Result<ExeLink, i32>;
+    /// Whether the pidfd's zero-timeout poll shows the process alive (an error counts as an exit).
+    fn peer_alive(&mut self, peer: PeerId) -> bool;
+    /// One receive into `buffer`, with the datagram's control messages.
+    fn peer_recv(&mut self, peer: PeerId, buffer: &mut [u8]) -> PeerRecv;
+    /// Closes the peer and everything kept with it.
+    fn peer_close(&mut self, peer: PeerId);
+}
+
+/// What the I01 service wants of the next wait: the descriptors it watches and its earliest deadline.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PeerPlan {
+    pub watch: PeerWatch,
+    pub deadline: Option<Instant>,
+}
+
+/// One ready I01 descriptor of a wake, as the service receives it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PeerReady {
+    Listener(Ready),
+    /// The listener's add to, or removal from, the poller failed.
+    ListenerFault,
+    Peer(PeerId, Ready),
+    /// The peer's add to the poller failed.
+    PeerFault(PeerId),
+}
+
+/// A step's outcome: served, or the listener failing persistently, which ends the epoch (status 35).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PeerOutcome {
+    Served,
+    ListenerFailed,
+}
+
+/// The I01 service the client's waits serve (`i01_service::I01Service`; DESIGN-I01A section 5). It holds session state
+/// only and is handed the peer operations at each call, so it has no tie to the wire.
+pub trait PeerService {
+    /// The descriptors the next wait watches and the earliest I01 deadline (the idle and outer bounds, the backoff's
+    /// re-add).
+    fn peer_plan(&self, now: Instant) -> PeerPlan;
+    /// One ready I01 descriptor, bounded: one accept, or one request read and its checks, then a close. `wall` is the
+    /// wire's wall second (`None` before the epoch), `now` its monotonic clock.
+    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant, ready: PeerReady) -> PeerOutcome;
+    /// Once per wake, after the steps: the deadlines that have come (a session's bounds and the record's window, the
+    /// backoff's end).
+    fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant);
+}
+
+/// The listener's backoff after a fault (DESIGN-I01A section 4).
+pub const LISTENER_BACKOFF: Duration = Duration::from_secs(5);
+/// The faults in a row that end the epoch (status 35): about 60 s with no accept between them.
+pub const LISTENER_FAULT_LIMIT: u32 = 12;
+
+/// The I01 listener's fault handling (DESIGN-I01A section 4): a fault (an accept error other than EAGAIN or
+/// ECONNABORTED, EPOLLERR or EPOLLHUP on the listener, a failed add or removal) takes the listener out of the wait for
+/// 5 s, and its re-add deadline joins the wait's earliest deadline; the twelfth fault in a row is fatal; an accept
+/// clears the count.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ListenerBackoff {
+    faults: u32,
+    until: Option<Instant>,
+}
+
+impl ListenerBackoff {
+    /// One fault at `now`: `true` when it is the twelfth in a row (fatal); otherwise the listener backs off for 5 s.
+    pub fn fault(&mut self, now: Instant) -> bool {
+        self.faults = self.faults.saturating_add(1);
+        if self.faults >= LISTENER_FAULT_LIMIT {
+            return true;
+        }
+        self.until = Some(after(now, LISTENER_BACKOFF));
+        false
+    }
+
+    /// A successful accept: the count starts again.
+    pub fn accepted(&mut self) {
+        self.faults = 0;
+    }
+
+    /// Ends a backoff whose deadline has come.
+    pub fn settle(&mut self, now: Instant) {
+        if self.until.is_some_and(|at| at <= now) {
+            self.until = None;
+        }
+    }
+
+    /// The re-add deadline while backing off.
+    pub fn until(&self) -> Option<Instant> {
+        self.until
+    }
+
+    /// The faults in a row so far.
+    pub fn faults(&self) -> u32 {
+        self.faults
+    }
+}
+
+/// The error a wait reports when the listener failed persistently: not an OS errno; [`Client::listener_failed`] tells
+/// the epoch, which exits with status 35.
+const LISTENER_FAILED_ERRNO: i32 = -35;
+
 /// The portable transport the client drives (Linux: `linux_net::LinuxWire`; the tests: a fake).
 pub trait Wire {
     /// A non-blocking TCP connection to `address`, or the errno of the failed `socket` or `connect`.
@@ -101,8 +346,9 @@ pub trait Wire {
     fn shutdown_write(&mut self, conn: ConnId) -> bool;
     /// Closes the connection (which leaves the poller with it).
     fn close(&mut self, conn: ConnId);
-    /// Watches exactly `interests` and waits until one is ready or `until` (the monotonic clock) has come.
-    fn wait(&mut self, interests: &[(ConnId, Interest)], until: Instant) -> Result<Vec<(ConnId, Ready)>, PollError>;
+    /// Watches exactly `interests`, and the I01 descriptors `peers` names, and waits until one is ready or `until` (the
+    /// monotonic clock) has come; the I01 readiness and watch failures come back apart from the connections' (HE-004-I01a).
+    fn wait(&mut self, interests: &[(ConnId, Interest)], peers: PeerWatch, until: Instant) -> Result<Woken, PollError>;
     /// The monotonic clock.
     fn now(&self) -> Instant;
     /// The wall clock in whole seconds since the epoch, or `None` before the epoch.
@@ -398,7 +644,8 @@ fn settle(reading: &mut Reading, ended: bool) -> Option<Event> {
     }
 }
 
-/// The apiserver client: the wire, the one TLS configuration, the address and authority, and its open links.
+/// The apiserver client: the wire, the one TLS configuration, the address and authority, and its open links; since
+/// HE-004-I01a also the I01 service its waits serve, when the epoch attaches one, and whether the listener failed.
 pub struct Client<W: Wire> {
     wire: W,
     config: Arc<ClientConfig>,
@@ -407,13 +654,58 @@ pub struct Client<W: Wire> {
     links: BTreeMap<u64, Link>,
     next: u64,
     queued: Vec<(Handle, Event)>,
+    service: Option<Box<dyn PeerService>>,
+    listener_failed: bool,
 }
 
-impl<W: Wire> Client<W> {
+impl<W: Wire + PeerOps> Client<W> {
     /// The client over `wire`, for the apiserver at `address` whose configured literal is `authority`.
     pub fn new(wire: W, config: Arc<ClientConfig>, address: InetAddress, authority: &str) -> Client<W> {
         Client { wire, config, address, authority: authority.to_string(), links: BTreeMap::new(), next: 1,
-                 queued: Vec::new() }
+                 queued: Vec::new(), service: None, listener_failed: false }
+    }
+
+    /// Attaches the I01 service every later wait serves (HE-004-I01a; the epoch's, built from the server identity).
+    pub fn serve_peers(&mut self, service: Box<dyn PeerService>) {
+        self.service = Some(service);
+    }
+
+    /// Whether a wait ended because the I01 listener failed persistently (status 35, not 95).
+    pub fn listener_failed(&self) -> bool {
+        self.listener_failed
+    }
+
+    /// The observer's one wire wait (DESIGN-I01A section 5; G-I01-2): `poll` and `pause` wait only through it. With an
+    /// I01 service attached, the wait also watches the service's listener and peer and ends no later than the
+    /// service's earliest deadline; the connections' readiness goes back to the caller as before; each ready I01
+    /// descriptor is one `serve_peer_step` (the wall second and the monotonic clock passed in, so the tests drive them),
+    /// and the service's due deadlines are served once after them. A fatal listener outcome ends the wait with an error
+    /// that [`Client::listener_failed`] names.
+    fn wait_serving(&mut self, interests: &[(ConnId, Interest)], until: Instant)
+                    -> Result<Vec<(ConnId, Ready)>, PollError> {
+        let now = self.wire.now();
+        let plan = self.service.as_deref().map(|service| service.peer_plan(now));
+        let watch = plan.map(|plan| plan.watch).unwrap_or_default();
+        let wake = plan.and_then(|plan| plan.deadline).map_or(until, |deadline| deadline.min(until));
+        let woken = self.wire.wait(interests, watch, wake)?;
+        let Some(service) = self.service.as_deref_mut() else { return Ok(woken.conns) };
+        let (wall, now) = (self.wire.wall_seconds(), self.wire.now());
+        let mut ready = Vec::new();
+        if woken.listener_fault {
+            ready.push(PeerReady::ListenerFault);
+        } else if let Some(found) = woken.listener {
+            ready.push(PeerReady::Listener(found));
+        }
+        ready.extend(woken.peers.iter().map(|(peer, found)| PeerReady::Peer(*peer, *found)));
+        ready.extend(woken.peer_faults.iter().map(|peer| PeerReady::PeerFault(*peer)));
+        for step in ready {
+            if service.serve_peer_step(&mut self.wire, wall, now, step) == PeerOutcome::ListenerFailed {
+                self.listener_failed = true;
+                return Err(PollError(LISTENER_FAILED_ERRNO));
+            }
+        }
+        service.serve_peer_deadlines(&mut self.wire, wall, now);
+        Ok(woken.conns)
     }
 
     /// The monotonic clock.
@@ -536,7 +828,7 @@ impl<W: Wire> Client<W> {
                 interests.push((conn, wanted));
             }
         }
-        let ready = self.wire.wait(&interests, wake)?;
+        let ready = self.wait_serving(&interests, wake)?;
         let mut events = Vec::new();
         for (conn, readiness) in ready {
             let Some(handle) = self.links.iter().find(|(_, link)| link.conn == Some(conn)).map(|(handle, _)| *handle) else {
@@ -668,10 +960,10 @@ impl<W: Wire> Client<W> {
         }
     }
 
-    /// Waits until `until` with no link watched (the 1 s pauses between attempts).
+    /// Waits until `until` with no link watched (the 1 s pauses between attempts); the I01 service is served meanwhile.
     pub fn pause(&mut self, until: Instant) -> Result<(), PollError> {
         while self.wire.now() < until {
-            self.wire.wait(&[], until)?;
+            self.wait_serving(&[], until)?;
         }
         Ok(())
     }

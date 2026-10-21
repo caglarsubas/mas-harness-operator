@@ -121,6 +121,22 @@ type (G-D2-5, the source-level proof that serve cannot reach them); /opt/planeon
 interpreter-tree constant (G-D2-6), whose two root constants join G-D1-5's exceptions (G-D2-9); and planeon-observer's
 symbol table holds no symbol of the four modules on either target (G-D2-7, build-time corroboration).
 
+HE-004-I01a (the observer's I01 listener, custody, request checks, quota pair and role pin; DESIGN-I01A revision 6
+section 12, owner decisions Q-HE4I1-1..13 and Q-I01A-1..9) registers edge record v8's two seccomp-v5 OBSERVER programs
+among the contract files and points OBSERVER_PROGRAMS at them, the v3 ones held but no longer embedded (unit U1, 48).
+Unit U4: the I01 service and its request checks are exactly the i01_ sources, the checks a logic module
+(I01_LOGIC_PATHS), both on the no-panic list, and serve's wiring has thirteen calls (the server identity after
+Enrolled::new). Unit U3: the observer's I01 listener file joins the socket files, the whole-file pins (with linux_net.rs re-pinned),
+the no-panic list and, through I01Socket, the Debug hazards; the observer names no unlink, remove or rename call
+(G-I01-1); every wire wait is the one inside Client::wait_serving, beside linux_net.rs's poller wait, and the service
+step is called once, there (G-I01-2); the I01 path lives only in linux_listen.rs's constant (G-I01-4); nothing leaves
+I01a: no peer_send, no channel send reachable from the socket files, only the built i01_ sources, naming none of the
+client's words, and PeerOps without a supertrait (G-I01-5); I01Socket is named only in its two files and built once,
+inside LinuxWire::new (G-I01-6). Unit U6 registers edge record v8's two I06 v4 rows (50 files); the role pin
+(observer_rbac.rs) is a logic module on the no-panic list, its rule constants match the v4 vectors' objectsPositive,
+and observe.rs calls it once, right after the closure check with only let statements between, before `let dropped`
+and drop(produced) (G-I01-3).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -198,6 +214,11 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # vectors, criteria and README), read by the tests only, 40 files. HE-004D2 unit B1 (DESIGN-D2 sections 2 and 4, G-D2-1;
 # owner decision Q-HE4D2-3 (a)): edge record v7's six HE-004D2 rows (native-profile v5's schema, which the capture
 # validators load, its vectors and README, and the native-profile v1, v2 and v3 vectors the history replay reads), 46.
+# HE-004-I01a unit U1 (DESIGN-I01A sections 3 and 12): edge record v8's two seccomp-v5 OBSERVER rows (harness-onion
+# compiled filter programs v3, MET-ENFORCE-036), which the observer's seal embeds from now on; the seccomp-v3 OBSERVER
+# programs stay pinned, held but no longer embedded (Q-P2-3 (a)), 48. Unit U6 (DESIGN-I01A section 10, Q-I01A-4 (a)):
+# edge record v8's two I06 v4 rows (harness-onion MET-ENFORCE-039, the backend profile v4's criteria and vectors), read
+# by the tests and by the role pin's constants check, 50.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -220,6 +241,8 @@ CONTRACTS = {
     "contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf": "4e516f1682098c90edd568f8f214d3de01b404a2c144104596fc4e3262f6e7a3",
     "contracts/seccomp-v3/OBSERVER.aarch64.bpf": "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707",
     "contracts/seccomp-v3/OBSERVER.x86_64.bpf": "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a",
+    "contracts/seccomp-v5/OBSERVER.aarch64.bpf": "887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184",
+    "contracts/seccomp-v5/OBSERVER.x86_64.bpf": "a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9",
     "contracts/i06-v2/vectors.json": "1a5e168f0d8fff233f5072b1440e75a633b38e428f87b2893a96e579122a430e",
     "contracts/i06-v2/criteria.json": "026206c57d3025c0f0129b6615e46c83d5a8000ddc3288f000a1fe4570050cda",
     "contracts/i06-v2/README.md": "553880b957586dbfa50eabc4a99d51735eef2a1b0a82641ea51d8e3ea8cf72eb",
@@ -250,6 +273,8 @@ CONTRACTS = {
     "contracts/native-profile-v5/vectors.json": "b630c362b20bfa7b362bb2ee28734a403303a0dc54b2d627c11a332b226333a1",
     "contracts/native-profile-v5/README.md": "76b584ca769f0afdd5142fcf3f96e3b5b2d053a172d5713f970dc77594e77692",
     "contracts/native-profile-v1/vectors.json": "cd1be009b721bb596887335184a33ab8e1f24aed8215477b63e28f058110748f",
+    "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
+    "contracts/i06-v4/vectors.json": "27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7",
     "contracts/native-profile-v2/vectors.json": "6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396",
     "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
 }
@@ -368,7 +393,9 @@ OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEA
 # G5's wiring rule (D1-1): in serve, read without comments and use declarations, the whitespace around `::` removed, each
 # of these calls appears exactly once, in this order. HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): twelve calls, the v2
 # parse with the record's reference in place of the v1 parse, the capture schema, the record's read, the enrolled record
-# and the capture roots joining them.
+# and the capture roots joining them. HE-004-I01a DESIGN-I01A sections 6 and 12: thirteen, the enrolled record's server
+# identity (`enrolled.server_identity(`) right after Enrolled::new and before the record moves into the capture engine
+# (the I01 service's identity, which observe::run takes).
 OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bsigned_config::load\s*\(", "signed_config::load("),
     (r"\bObserverConfig::parse_with_record\s*\(", "ObserverConfig::parse_with_record("),
@@ -376,6 +403,7 @@ OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bcredentials::observer_inputs\s*\(", "credentials::observer_inputs("),
     (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bCaptureSchema::embedded\s*\(", "CaptureSchema::embedded("),
     (r"(?<![\w:])enrolled::load_record\s*\(", "enrolled::load_record("), (r"\bEnrolled::new\s*\(", "Enrolled::new("),
+    (r"(?<![\w:.])enrolled\s*\.\s*server_identity\s*\(", "enrolled.server_identity("),
     (r"\bLinuxWire::new\s*\(", "LinuxWire::new("), (r"\bLinuxCapture::new\s*\(", "LinuxCapture::new("),
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
 # The v1 parse no longer appears in serve (G-D1-8).
@@ -422,7 +450,13 @@ SIGNED_CONFIG_DIR = re.compile(r"(?m)^[ \t]*use\s+gate_sys::Dir\s*;")
 # observer's &Sealed (code review's, as for the gate); every other crates/observer source still refuses gate-sys's socket
 # modules, which is why client.rs's Wire has its own portable types.
 OBSERVER_LINUX_NET = "crates/observer/src/linux_net.rs"
-SOCKET_FILES = ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs", OBSERVER_LINUX_NET)
+# HE-004-I01a DESIGN-I01A sections 4 and 12 (Q-HE4I1-5 (a)): the observer's I01 listener file, the second socket file
+# of the observer, built only inside LinuxWire::new (G-I01-6) and pinned whole (OBSERVER_HOME_PINS). Its pub(crate)
+# API names only client.rs's portable types, Sealed and the data type Watched, so the R1-3 socket-item rule passes
+# unchanged (Q-HE3D-R1 (a)).
+OBSERVER_LINUX_LISTEN = "crates/observer/src/linux_listen.rs"
+SOCKET_FILES = ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs", OBSERVER_LINUX_NET,
+                OBSERVER_LINUX_LISTEN)
 SOCKET_MODULES = ("channel", "tcp")
 SOCKET_TEXT = re.compile(r"\bgate_sys::(?:channel|tcp)\b")
 PUB_USE = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b")
@@ -543,9 +577,11 @@ WRAPPER_JUSTIFICATIONS = {
                "size (from the auxiliary vector, no system call)",
 }
 # HE-004A DESIGN-A section 6 (D1-10, D2-5): each target's planeon-observer must hold this contract file's bytes exactly
-# once.
-OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.x86_64.bpf",
-                     "aarch64-unknown-linux-musl": "contracts/seccomp-v3/OBSERVER.aarch64.bpf"}
+# once. HE-004-I01a (DESIGN-I01A sections 3 and 12): the seccomp-v5 programs, which give the sealed observer bind,
+# listen and accept4 for its I01 listener (seal.rs pins their sizes, 2,024 and 1,936 bytes, and their instruction counts,
+# 253 and 242); seal.rs may embed only these two (check_observer_includes).
+OBSERVER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v5/OBSERVER.x86_64.bpf",
+                     "aarch64-unknown-linux-musl": "contracts/seccomp-v5/OBSERVER.aarch64.bpf"}
 # HE-004C DESIGN-C section 15 (G9, D1-6, D2-8; owner decision Q-HE4C-12 (a)): symbols only the path after the
 # configuration keeps, so the shipped planeon-observer holds the composed client while its key is empty (the compiled
 # key passes core::hint::black_box). A symbol counts by its own path: the mangled name (legacy `_ZN` or v0 `_R`) is read
@@ -730,9 +766,12 @@ OBSERVER_SYS_PINS = {
 # allowed. With the naming rule (each type named in code only in its own file and inside main.rs's serve), no alias or
 # added route to a second construction remains outside these reviewed bytes; serve's own control flow around its one
 # counted construction stays code review's (R5-1).
+# HE-004-I01a DESIGN-I01A section 12 (G-I01-6): the I01 listener file is pinned whole too, and linux_net.rs re-pinned
+# after its I01 changes (the listener's registration, the I01 watch of each wait, PeerOps).
 OBSERVER_HOME_PINS = {
     "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
-    "crates/observer/src/linux_net.rs": "bc9b4f510222874a197b9a2676946cea827c0871e05fc1ea07682a0bd93bf8c9",
+    "crates/observer/src/linux_net.rs": "41a23aa7d6215d5f8194b703da511a8945d7600f1f0d306affb94cd830ac17ac",
+    "crates/observer/src/linux_listen.rs": "d06742932d92eaf05308158d37ce670859f316e1b0fe7a1972b8e4c93be5433b",
 }
 # HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-9, D2-2): Dir::read_link is pub (gate-sys's host tests call it), so among
 # the linked crates' non-test sources, read without comments and with literals kept, the word read_link appears exactly
@@ -822,7 +861,9 @@ DEBUG_HAZARDS = ("File", "Dir", "FileStores", "Conn", "Listener", "Poller", "Pid
                  "LinuxWire",
                  # HE-004D1 DESIGN-D1 section 19 (G-D1-13): observer-sys's handles (its ProcDir shares gate-sys's name,
                  # already listed) and the observer's capture view over them.
-                 "Roots", "CgroupDir", "Opened", "ProgFd", "LinuxCapture")
+                 "Roots", "CgroupDir", "Opened", "ProgFd", "LinuxCapture",
+                 # HE-004-I01a DESIGN-I01A section 12 (G-I01-6, R4-6): the I01 listener and its held peer.
+                 "I01Socket")
 # HE-003B DESIGN section 2.6 (D1-4): the types that hold the server key or rustls's key and configuration objects;
 # derive(Debug) is refused on an item named one of them and on an item whose field types mention one.
 SECRET_TYPES = ("TlsServerInputs", "PrivateKeyDer", "PrivatePkcs8KeyDer", "CertifiedKey", "ServerConfig",
@@ -932,8 +973,16 @@ D2_LOGIC_BUILT = ("record_check", "i06_evidence", "qualification", "composition"
 D2_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in D2_LOGIC_BUILT)
 D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NAMES)
                   + tuple(("self", name) for name in D2_LOGIC_NAMES))
+# HE-004-I01a DESIGN-I01A section 12: the I01 request checks (i01_request, the pure part of the I01 service, unit U4)
+# and the role pin (observer_rbac, unit U6) take B1's logic rule with B1's whitelist plus their own paths, each as its
+# unit adds it (I01_LOGIC_BUILT); they reach neither the I01 service, the wire nor D2's modules.
+I01_LOGIC_NAMES = ("i01_request", "observer_rbac")
+I01_LOGIC_BUILT = ("i01_request", "observer_rbac")
+I01_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in I01_LOGIC_BUILT)
+I01_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + tuple(("crate", name) for name in I01_LOGIC_NAMES)
+                   + tuple(("self", name) for name in I01_LOGIC_NAMES))
 LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
-                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC))
+                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC) + tuple((rel, I01_LOGIC_PATHS) for rel in I01_LOGIC))
 # G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
 D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
 PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
@@ -970,8 +1019,11 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # assert!(..);` at brace depth 0 (evaluated by the compiler, which fails the build instead of panicking), is removed
 # before the scan, and only when its argument holds no `{` or `}` (PR review round 1, R1-1: a block argument can hold an
 # item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
+# HE-004-I01a DESIGN-I01A section 12: the I01 listener joins it (unit U3); the I01 service, its request checks and
+# the role pin as their units add them (I01_NO_PANIC_BUILT).
+I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac")
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
-    "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture"))
+    "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
 CONST_ASSERT = re.compile(r"\bconst\s+_\s*:\s*\(\s*\)\s*=\s*assert\s*!\s*\(")
 OBSERVER_INCLUDE_FORM = re.compile(r'\binclude_(?:bytes|str)\s*!\s*\(\s*"([^"\\]*)"\s*\)')
@@ -1922,7 +1974,8 @@ def check_observer_serve(base: Path) -> int:
     """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
     body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
     call appears exactly once, in that order: load, parse, lifetime, credentials, TLS configuration, wire, embedded closure,
-    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse. HE-004D2 (G-D2-11; HE-004D1
+    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse; HE-004-I01a: thirteen, the
+    server identity after Enrolled::new. HE-004D2 (G-D2-11; HE-004D1
     PR review round 1, R1-5): the two Linux constructors are also counted in their qualified forms (`<LinuxWire>::new`,
     `< LinuxCapture >::new`, and since HE-004D2 PR review round 1, R1-7, `LinuxWire::<>::new`, `<(LinuxWire)>::new` and
     `<LinuxCapture<>>::new`), each exactly once in serve, and serve names each of the two types only once; with neither
@@ -3536,6 +3589,422 @@ def check_native_profile_use(base: Path) -> int:
     return total
 
 
+# --- HE-004-I01a: the observer's I01 listener (DESIGN-I01A rev 6 section 12) ---------------------------------------------
+
+OBSERVER_CLIENT = "crates/observer/src/client.rs"
+# G-I01-1: the observer never removes or renames a path.
+I01_REMOVALS = re.compile(r"\b(?:unlink|remove_file|remove_dir|remove_dir_all|rename|hard_link)\b")
+# G-I01-2: the one wire wait and the one step call.
+WAIT_WORD = re.compile(r"\bwait\b")
+WAIT_DEFINITION = re.compile(r"\bfn\s+wait\b")
+STEP_WORD = re.compile(r"\bserve_peer_step\b")
+STEP_DEFINITION = re.compile(r"\bfn\s+serve_peer_step\b")
+STEP_PATH = re.compile(r"::\s*serve_peer_step\b")
+# G-I01-4: the I01 path, written once as linux_listen.rs's private constant.
+I01_PATH = "/run/planeon/live-proxy/policy-observer.sock"
+I01_SOCKET_NAME = "policy-observer.sock"
+I01_PATH_CONSTANT = re.compile(r'(?m)^[ \t]*const\s+I01_PATH\s*:\s*&\s*str\s*=\s*"%s"\s*;' % re.escape(I01_PATH))
+# G-I01-5: nothing leaves I01a. The i01_ sources as their units add them (U4: the service and its request checks;
+# U3 held none).
+I01_FILES = ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs")
+I01_FILES_BUILT = I01_FILES
+I01_MODULE = re.compile(r"\bmod\s+(i01_\w*)")
+I01_REFUSED_WORDS = re.compile(r"\b(?:Wire|connect|ConnId|Client)\b")
+PEER_SEND = re.compile(r"\bpeer_send\b")
+PEER_OPS_TRAIT = re.compile(r"\btrait\s+PeerOps\b")
+PEER_OPS_HEADER = re.compile(r"\bpub\s+trait\s+PeerOps\s*\{")
+CHANNEL_SEND = re.compile(r"\bchannel::send\b")
+# G-I01-6: I01Socket's two homes and its one construction, in the spellings of a path to `open` (G-D2-11's forms).
+I01_SOCKET = re.compile(r"\bI01Socket\b")
+I01_SOCKET_OPEN = re.compile(r"\bI01Socket\b(?:\s*<\s*>)?(?:\s*\))*(?:\s*>)?(?:\s*::\s*<\s*>)?\s*::\s*open\b")
+SELF_OPEN_CALL = re.compile(r"\bSelf\s*>?(?:\s*::\s*<\s*>)?\s*::\s*open\b")
+# G-I01-3 (unit U6): the role pin's one call in observe.rs, right after the closure check.
+OBSERVER_OBSERVE = "crates/observer/src/observe.rs"
+OBSERVER_RBAC = "crates/observer/src/observer_rbac.rs"
+ROLE_PIN_WORD = re.compile(r"\bcheck_observer_snapshot\b")
+ROLE_PIN_CALL = re.compile(r"\bobserver_rbac::check_observer_snapshot\s*\(")
+CLOSURE_CHECK = re.compile(r"\bself\s*\.\s*closure\s*\.\s*check\s*\(")
+BLOCK_STATEMENT = re.compile(r"(?:if|match|for|while|loop|unsafe)\b|\{")
+STATEMENT_GOES_ON = re.compile(r"\s*(?:else\b|[.?;])")
+LET_STATEMENT = re.compile(r"let\b")
+LET_DROPPED = re.compile(r"let\s+dropped\s*=")
+DROP_PRODUCED = re.compile(r"drop\s*\(\s*produced\s*\)\s*;")
+# The role pin's constants (DESIGN-I01A section 10, Q-I01A-4 (a); review r2 I2-12), read from observer_rbac.rs with
+# literals kept and held to the v4 vectors' objectsPositive.
+I06_V4_VECTORS = "contracts/i06-v4/vectors.json"
+ROLE_PIN_TEXTS = ("RBAC_API_VERSION", "OBSERVER_USER", "ROLE_NAME", "BINDING_NAME")
+ROLE_PIN_PAIRS = ("ROLE_REF", "SUBJECT")
+RUST_TEXT = r'"([^"\\]*)"'
+ROLE_PIN_PAIR = re.compile(r"\(\s*%s\s*,\s*%s\s*\)" % (RUST_TEXT, RUST_TEXT))
+CONTRACT_RULE = re.compile(r"\bContractRule\s*\{([^{}]*)\}")
+CONTRACT_RULE_FIELD = re.compile(r"\b(\w+)\s*:\s*&\s*\[([^\[\]]*)\]")
+RULE_FIELDS = (("api_groups", "apiGroups"), ("resources", "resources"), ("non_resource_urls", "nonResourceURLs"),
+               ("verbs", "verbs"), ("resource_names", "resourceNames"))
+ONLY_SEPARATORS = re.compile(r"[\s,]*")
+
+
+def observer_code(base: Path, rule: str, literals: bool = False) -> dict[str, str]:
+    """crates/observer's non-test sources as the G-I01 rules read them: without comments (literal contents emptied
+    unless `literals`), the whitespace around `::` removed, and strict #[cfg(test)] mod tests blocks blanked in place."""
+    codes = {}
+    for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw, literals=literals))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        for start, end in reversed(cfg_test_blocks(code)):
+            code = code[:start] + " " * (end - start) + code[end:]
+        codes[rel] = code
+    return codes
+
+
+def blank(pattern: re.Pattern, text: str) -> str:
+    """`text` with every match of `pattern` replaced by as many spaces (positions kept)."""
+    return pattern.sub(lambda match: " " * len(match.group(0)), text)
+
+
+def check_observer_never_unlinks(base: Path) -> int:
+    """HE-004-I01a G-I01-1 (DESIGN-I01A sections 4 and 12; review r3 I3-7, r4 I4-7): crates/observer's non-test sources,
+    read without comments (literal contents emptied, strict test blocks aside), name none of unlink, remove_file,
+    remove_dir, remove_dir_all, rename and hard_link. The observer binds its I01 path after the seal and never removes
+    it: the unit's ExecStartPre= clears it as init_t (HS53), and the seccomp-v5 OBSERVER row has no unlink call. Its
+    tests may clean their scratch directories. The number of sources."""
+    rule = "never unlinks, G-I01-1"
+    codes = observer_code(base, rule)
+    for rel, code in codes.items():
+        found = I01_REMOVALS.search(code)
+        require(not found, "%s names %s; the observer never removes or renames a path (%s)"
+                % (rel, found.group(0) if found else "", rule))
+    return len(codes)
+
+
+def check_observer_wait_point(base: Path) -> int:
+    """HE-004-I01a G-I01-2 (DESIGN-I01A sections 5 and 12; review r4 I4-1, r5 I5-5): over crates/observer's non-test
+    sources, read without comments and with the whitespace around `::` removed, every reference to `wait` is counted,
+    called or not and whatever the spacing (`.wait(`, `::wait(`, `W::wait`, `Wire::wait`, `<.. as Wire>::wait`, a
+    bare name), only `fn wait` definitions aside. There are exactly two: the one wire wait, `.wait(` inside client.rs's
+    `fn wait_serving`, and linux_net.rs's `self.poller.wait(` inside its one `fn wait` (LinuxWire's `Wire::wait`).
+    Likewise `serve_peer_step`, its `fn` definitions aside, occurs exactly once, as the method call `.serve_peer_step(`
+    inside `fn wait_serving`; any `::serve_peer_step` path refuses. So every wire wait of the observer serves I01
+    (Q-HE4I1-6 (a)). The number of counted occurrences (three)."""
+    rule = "the single wait point, G-I01-2"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_CLIENT, OBSERVER_LINUX_NET):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    client, net = codes[OBSERVER_CLIENT], codes[OBSERVER_LINUX_NET]
+    serving = body_of(client, re.compile(r"\bfn\s+wait_serving\s*\("), "%s's fn wait_serving (%s)" % (OBSERVER_CLIENT, rule))
+    waiting = body_of(net, re.compile(r"\bfn\s+wait\s*\("), "%s's fn wait (%s)" % (OBSERVER_LINUX_NET, rule))
+    waits, steps = [], []
+    for rel, code in codes.items():
+        waits.extend((rel, found.start()) for found in WAIT_WORD.finditer(blank(WAIT_DEFINITION, code)))
+        kept = blank(STEP_DEFINITION, code)
+        require(not STEP_PATH.search(kept), "%s names a ::serve_peer_step path; the step is called only as the one method "
+                "call in wait_serving (%s)" % (rel, rule))
+        steps.extend((rel, found.start()) for found in STEP_WORD.finditer(kept))
+    sites = dict(waits)
+    client_at, net_at = sites.get(OBSERVER_CLIENT, -1), sites.get(OBSERVER_LINUX_NET, -1)
+    require(len(waits) == 2 and len(sites) == 2, "crates/observer names wait %d times outside its definitions, not once in "
+            "each of %s and %s (%s)" % (len(waits), OBSERVER_CLIENT, OBSERVER_LINUX_NET, rule))
+    require(serving[0] < client_at < serving[1] and re.search(r"\.\s*$", client[:client_at])
+            and re.match(r"wait\s*\(", client[client_at:]),
+            "%s's one wait is not the call `.wait(` inside fn wait_serving (%s)" % (OBSERVER_CLIENT, rule))
+    require(waiting[0] < net_at < waiting[1] and re.search(r"\bself\s*\.\s*poller\s*\.\s*$", net[:net_at])
+            and re.match(r"wait\s*\(", net[net_at:]),
+            "%s's one wait is not `self.poller.wait(` inside its fn wait (%s)" % (OBSERVER_LINUX_NET, rule))
+    require(len(steps) == 1 and steps[0][0] == OBSERVER_CLIENT and serving[0] < steps[0][1] < serving[1]
+            and re.search(r"\.\s*$", client[:steps[0][1]]) and re.match(r"serve_peer_step\s*\(", client[steps[0][1]:]),
+            "serve_peer_step is not called exactly once, as `.serve_peer_step(` inside %s's fn wait_serving (%s)"
+            % (OBSERVER_CLIENT, rule))
+    return len(waits) + len(steps)
+
+
+def check_observer_i01_path(base: Path) -> int:
+    """HE-004-I01a G-I01-4 (DESIGN-I01A sections 4 and 12): in crates/observer's non-test sources, raw text (comments
+    included), the I01 socket's name occurs only in linux_listen.rs, exactly once, inside its line-anchored private
+    constant `const I01_PATH: &str = "/run/planeon/live-proxy/policy-observer.sock";` (HOST_PATHS' binary scan cannot
+    say which source holds a literal). The number of occurrences (one)."""
+    rule = "the I01 path, G-I01-4"
+    found = 0
+    for rel, raw in observer_sources(base, (OBSERVER_CRATE,)):
+        if rel == OBSERVER_LINUX_LISTEN:
+            require(raw.count(I01_SOCKET_NAME) == 1 and len(I01_PATH_CONSTANT.findall(raw)) == 1,
+                    "%s does not hold the I01 path exactly once, as its private constant I01_PATH (%s)" % (rel, rule))
+            found += 1
+        else:
+            require(I01_SOCKET_NAME not in raw, "%s names the I01 socket; only %s does (%s)"
+                    % (rel, OBSERVER_LINUX_LISTEN, rule))
+    require(found == 1, "%s is missing (%s)" % (OBSERVER_LINUX_LISTEN, rule))
+    return found
+
+
+def check_observer_no_send(base: Path) -> int:
+    """HE-004-I01a G-I01-5 (DESIGN-I01A sections 0, 5 and 12; review r2 I2-2, r4 I4-7, r5 I5-3): nothing leaves I01a.
+    Read without comments (literals kept), no crates/observer source spells peer_send. In the two socket files,
+    linux_net.rs and linux_listen.rs, gate-sys's channel send is unreachable (a `Watched::Conn` hands out a `&Conn`):
+    read with source_uses, as the socket-item rule reads them, no use path imports `send` from gate_sys::channel
+    (braced, renamed or not) and none renames the channel module; and no `channel::send` path occurs, with any prefix.
+    The i01_ sources are exactly I01_FILES_BUILT (the I01 service and its request checks: no I01 response,
+    observation or digest module), lib.rs declares exactly those i01_ modules, and they name none of Wire, connect,
+    ConnId and Client. PeerOps is declared once, in client.rs, exactly as `pub trait PeerOps {` (no supertrait). The
+    number of sources."""
+    rule = "nothing leaves I01a, G-I01-5"
+    codes = observer_code(base, rule, literals=True)
+    for rel, code in codes.items():
+        require(not PEER_SEND.search(code), "%s spells peer_send; I01a sends nothing (%s)" % (rel, rule))
+    for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, OBSERVER_CLIENT, OBSERVER_LIB):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+        raw = (base / rel).read_text(encoding="utf-8")
+        for path, rename in source_uses(rel, raw):
+            if path[:2] != ("gate_sys", "channel"):
+                continue
+            require(path[2:] not in ((), ("self",)) or rename is None, "%s renames gate-sys's channel module (%s)" % (rel, rule))
+            require("send" not in path[2:], "%s imports gate-sys's channel send (%s)" % (rel, rule))
+        require(not CHANNEL_SEND.search(PATH_SPACE.sub("::", rust_code(raw))), "%s names gate-sys's channel send (%s)"
+                % (rel, rule))
+    source = base / OBSERVER_CRATE / "src"
+    present = sorted(path.relative_to(base).as_posix() for path in source.glob("i01_*.rs"))
+    require(present == sorted(I01_FILES_BUILT), "the i01_ sources present (%s) are not exactly %s (%s)"
+            % (", ".join(present) or "none", ", ".join(sorted(I01_FILES_BUILT)) or "none", rule))
+    declared = sorted(I01_MODULE.findall(codes[OBSERVER_LIB]))
+    require(declared == sorted(posixpath.basename(rel)[:-3] for rel in I01_FILES_BUILT),
+            "%s declares the i01_ modules %s, not exactly those built (%s)" % (OBSERVER_LIB, declared, rule))
+    for rel in I01_FILES_BUILT:
+        found = I01_REFUSED_WORDS.search(codes[rel])
+        require(not found, "%s names %s; the I01 service is handed only the peer operations (%s)"
+                % (rel, found.group(0) if found else "", rule))
+    traits = [(rel, match.start()) for rel, code in codes.items() for match in PEER_OPS_TRAIT.finditer(code)]
+    header = PEER_OPS_HEADER.search(codes[OBSERVER_CLIENT])
+    require(len(traits) == 1 and traits[0][0] == OBSERVER_CLIENT and header and header.start() < traits[0][1] < header.end(),
+            "PeerOps is not declared once, in %s, exactly as `pub trait PeerOps {` (%s)" % (OBSERVER_CLIENT, rule))
+    return len(codes)
+
+
+def check_observer_i01_socket(base: Path) -> int:
+    """HE-004-I01a G-I01-6 (DESIGN-I01A sections 0, 4 and 12; review r3 I3-1, r4 I4-6): read without comments and with
+    the whitespace around `::` removed, I01Socket is named only in linux_listen.rs (its definition and impls) and
+    linux_net.rs (LinuxWire's private field and constructor); it is renamed with `as` nowhere and named by no `type`
+    item of the crate (each read to its `;` at bracket depth 0, as G-D2-11's rule reads them); I01Socket::open is called
+    exactly once, inside LinuxWire::new, counting its qualified spellings (`<I01Socket>::open`, `I01Socket::<>::open`,
+    `<(I01Socket)>::open`), and neither file calls `Self::open`. Both files are pinned whole (OBSERVER_HOME_PINS) and
+    I01Socket is a Debug hazard (DEBUG_HAZARDS). The number of sources."""
+    rule = "the I01 socket, G-I01-6"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    calls = []
+    for rel, code in codes.items():
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s)" % (rel, rule)) from None
+        require(not re.search(r"\bI01Socket\s+as\b|\bas\s+I01Socket\b", code)
+                and not any(I01_SOCKET.search(text) for text in type_items),
+                "%s renames or aliases I01Socket (%s)" % (rel, rule))
+        if rel not in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+            require(not I01_SOCKET.search(code), "%s names I01Socket; only %s and %s do (%s)"
+                    % (rel, OBSERVER_LINUX_LISTEN, OBSERVER_LINUX_NET, rule))
+            continue
+        require(not SELF_OPEN_CALL.search(code), "%s calls Self::open, a second route to the listener (%s)" % (rel, rule))
+        calls.extend((rel, found.start()) for found in I01_SOCKET_OPEN.finditer(code))
+    net = codes[OBSERVER_LINUX_NET]
+    impls = list(re.finditer(r"\bimpl\s+LinuxWire\s*\{", net))
+    require(len(impls) == 1, "%s does not hold exactly one `impl LinuxWire {` (%s)" % (OBSERVER_LINUX_NET, rule))
+    opening = impls[0].end() - 1
+    start, end = body_of(net[opening:block_end(net, opening)], re.compile(r"\bfn\s+new\s*\("),
+                         "%s's LinuxWire::new (%s)" % (OBSERVER_LINUX_NET, rule))
+    require(len(calls) == 1 and calls[0][0] == OBSERVER_LINUX_NET and opening + start < calls[0][1] < opening + end,
+            "I01Socket::open is called %d times, not exactly once, inside LinuxWire::new (%s)" % (len(calls), rule))
+    return len(codes)
+
+
+def block_statements(code: str, inside: int, rule: str) -> list[tuple[int, int]]:
+    """The statements, as (start, end) spans, of the innermost `{ }` block around position `inside` of a source read
+    without comments and with literal contents emptied. A statement ends at its `;` at bracket depth 0; one that starts
+    as a block expression (if, match, for, while, loop, unsafe or a bare block) ends at the `}` that brings it back to
+    depth 0, unless `else`, `.`, `?` or `;` follows."""
+    depth, opening = 0, -1
+    for index in range(inside - 1, -1, -1):
+        char = code[index]
+        if char in ")]}":
+            depth += 1
+        elif char in "([{":
+            if depth == 0 and char == "{":
+                opening = index
+                break
+            depth = max(depth - 1, 0)
+    require(opening >= 0, "no block holds the statement (%s)" % rule)
+    spans, start, depth = [], opening + 1, 0
+    for index in range(opening + 1, len(code)):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            if depth == 0:
+                if code[start:index].strip():
+                    spans.append((start, index))
+                return spans
+            depth -= 1
+            if (depth == 0 and char == "}" and BLOCK_STATEMENT.match(code[start:index + 1].lstrip())
+                    and not STATEMENT_GOES_ON.match(code, index + 1)):
+                spans.append((start, index + 1))
+                start = index + 1
+        elif char == ";" and depth == 0:
+            spans.append((start, index + 1))
+            start = index + 1
+    raise GateError("a block without its closing brace (%s)" % rule)
+
+
+def check_observer_role_pin(base: Path) -> int:
+    """HE-004-I01a G-I01-3 (DESIGN-I01A sections 10 and 12; review r4 I4-5, r5 I5-4): in observe.rs's non-test code,
+    read without comments, with literal contents emptied and the whitespace around `::` removed, check_observer_snapshot
+    is named exactly once, as the call `observer_rbac::check_observer_snapshot(`, and `self.closure.check(` occurs
+    exactly once. Among the statements of the block that holds the closure check (block_statements), the one holding
+    the role pin's call comes later, with only `let` statements between (the three lists), and the next two are
+    `let dropped = ...` and `drop(produced);`, in that order. So I06 v4's RB check judges every snapshot the closure
+    check accepts, before the producer's output is dropped and before OR02, OR05 and OR06, and its 87 comes before
+    their 88. A comment naming Closure::check is no anchor. The number of `let` statements between."""
+    rule = "the role pin's call, G-I01-3"
+    codes = observer_code(base, rule)
+    require(OBSERVER_OBSERVE in codes, "%s is missing (%s)" % (OBSERVER_OBSERVE, rule))
+    code = codes[OBSERVER_OBSERVE]
+    words, calls = list(ROLE_PIN_WORD.finditer(code)), list(ROLE_PIN_CALL.finditer(code))
+    require(len(words) == 1 and len(calls) == 1 and words[0].start() == calls[0].start() + len("observer_rbac::"),
+            "%s does not name check_observer_snapshot exactly once, as the call observer_rbac::check_observer_snapshot( "
+            "(%s)" % (OBSERVER_OBSERVE, rule))
+    closures = list(CLOSURE_CHECK.finditer(code))
+    require(len(closures) == 1, "%s does not hold `self.closure.check(` exactly once (%s)" % (OBSERVER_OBSERVE, rule))
+    spans = block_statements(code, closures[0].start(), rule)
+
+    def holding(position: int) -> int:
+        found = [number for number, (start, end) in enumerate(spans) if start <= position < end]
+        return found[0] if found else -1
+
+    first, pin = holding(closures[0].start()), holding(calls[0].start())
+    require(0 <= first < pin, "the role pin's call is not a later statement of the block that holds the closure check "
+            "(%s)" % rule)
+    between = [code[start:end].strip() for start, end in spans[first + 1:pin]]
+    require(all(LET_STATEMENT.match(text) for text in between), "a statement other than `let` stands between the "
+            "closure check and the role pin's call (%s)" % rule)
+    after = [code[start:end].strip() for start, end in spans[pin + 1:pin + 3]]
+    require(len(after) == 2 and LET_DROPPED.match(after[0]) and DROP_PRODUCED.fullmatch(after[1]),
+            "the role pin's call is not followed by `let dropped = ...` and then `drop(produced);` (%s)" % rule)
+    return len(between)
+
+
+def literal_bracket_end(code: str, opening: int, rule: str) -> int:
+    """The index after the bracket that closes the one at `opening`, in a source read with literals kept (a string
+    literal's brackets do not count)."""
+    depth, index, quoted = 0, opening, False
+    while index < len(code):
+        char = code[index]
+        if quoted:
+            if char == "\\":
+                index += 1
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+        index += 1
+    raise GateError("%s: a bracket without its closing one (%s)" % (OBSERVER_RBAC, rule))
+
+
+def constant_body(code: str, header: str, rule: str) -> tuple[str, int]:
+    """The text inside the `[ ]` of the one `pub const` item whose header (up to its `= [`) `header` matches, and the
+    length its type declares; the item ends with `];`."""
+    found = list(re.finditer(r"(?m)^[ \t]*pub\s+const\s+" + header + r"\s*=\s*\[", code))
+    require(len(found) == 1, "%s: not exactly one plain `pub const` item %s (%s)"
+            % (OBSERVER_RBAC, header.split("\\")[0], rule))
+    opening = found[0].end() - 1
+    end = literal_bracket_end(code, opening, rule)
+    require(re.match(r"\s*;", code[end:]), "%s: a constant array not ended by `];` (%s)" % (OBSERVER_RBAC, rule))
+    return code[opening + 1:end - 1], int(found[0].group("length"))
+
+
+def rust_texts(items: str, rule: str) -> list[str]:
+    """The plain string literals of a comma-separated list, which holds nothing else."""
+    require(ONLY_SEPARATORS.fullmatch(re.sub(RUST_TEXT, "", items)), "%s: a list of the role pin's constants holds more "
+            "than plain string literals (%s)" % (OBSERVER_RBAC, rule))
+    return re.findall(RUST_TEXT, items)
+
+
+def check_observer_role_constants(base: Path) -> int:
+    """HE-004-I01a DESIGN-I01A section 10 (owner decision Q-I01A-4 (a); review r2 I2-12): the role pin's rule data,
+    compiled into observer_rbac.rs as R10 constants, is the contract's. Read with comments removed and literals kept:
+    RBAC_API_VERSION, OBSERVER_USER, ROLE_NAME and BINDING_NAME are each one plain `pub const NAME: &str = "..";`;
+    ROLE_REF and SUBJECT one `[(&str, &str); N]` array of plain text pairs; OBSERVER_RULES one `[ContractRule; N]` array
+    of ContractRule literals, each with the five list fields once as plain `&[..]` lists of string literals. Against
+    contracts/i06-v4/vectors.json's objectsPositive (registered bytes): the first ClusterRole's rules are exactly the
+    eight, in order, each list as the model reads it (absent or null is empty, no other member); the role's and the
+    binding's names and apiVersion are the four texts' (the observer user is the subject's name); the binding's roleRef
+    is ROLE_REF and its subjects exactly [SUBJECT]. The number of constants checked."""
+    rule = "the role pin's constants, DESIGN-I01A section 10"
+    require((base / OBSERVER_RBAC).is_file(), "%s is missing (%s)" % (OBSERVER_RBAC, rule))
+    require((base / I06_V4_VECTORS).is_file(), "%s is missing (%s)" % (I06_V4_VECTORS, rule))
+    try:
+        code = PATH_SPACE.sub("::", rust_code((base / OBSERVER_RBAC).read_text(encoding="utf-8"), literals=True))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (OBSERVER_RBAC, error, rule)) from None
+    texts = {}
+    for name in ROLE_PIN_TEXTS:
+        found = re.findall(r"(?m)^[ \t]*pub\s+const\s+%s\s*:\s*&\s*str\s*=\s*%s\s*;" % (name, RUST_TEXT), code)
+        require(len(found) == 1, "%s: not one plain `pub const %s: &str` (%s)" % (OBSERVER_RBAC, name, rule))
+        texts[name] = found[0]
+    pairs = {}
+    for name in ROLE_PIN_PAIRS:
+        body, length = constant_body(code, r"%s\s*:\s*\[\s*\(\s*&\s*str\s*,\s*&\s*str\s*\)\s*;\s*(?P<length>\d+)\s*\]"
+                                     % name, rule)
+        found = ROLE_PIN_PAIR.findall(body)
+        require(ONLY_SEPARATORS.fullmatch(ROLE_PIN_PAIR.sub("", body)) and len(found) == length
+                and len({key for key, _ in found}) == length,
+                "%s: %s is not %s distinct plain text pairs (%s)" % (OBSERVER_RBAC, name, length, rule))
+        pairs[name] = dict(found)
+    body, length = constant_body(code, r"OBSERVER_RULES\s*:\s*\[\s*ContractRule\s*;\s*(?P<length>\d+)\s*\]", rule)
+    require(ONLY_SEPARATORS.fullmatch(CONTRACT_RULE.sub("", body)), "%s: OBSERVER_RULES holds more than ContractRule "
+            "literals (%s)" % (OBSERVER_RBAC, rule))
+    rules = []
+    for entry in CONTRACT_RULE.finditer(body):
+        fields = CONTRACT_RULE_FIELD.findall(entry.group(1))
+        require(ONLY_SEPARATORS.fullmatch(CONTRACT_RULE_FIELD.sub("", entry.group(1)))
+                and sorted(field for field, _ in fields) == sorted(field for field, _ in RULE_FIELDS),
+                "%s: a ContractRule of OBSERVER_RULES does not set its five lists once each (%s)" % (OBSERVER_RBAC, rule))
+        lists = {field: rust_texts(items, rule) for field, items in fields}
+        rules.append({key: lists[field] for field, key in RULE_FIELDS})
+    require(len(rules) == length, "%s: OBSERVER_RULES declares %d rules and holds %d (%s)"
+            % (OBSERVER_RBAC, length, len(rules), rule))
+    try:
+        positive = json.loads((base / I06_V4_VECTORS).read_text(encoding="utf-8"))["objectsPositive"]
+        role, binding = positive["clusterRoles"][0], positive["clusterRoleBindings"][0]
+        wanted_rules = role["rules"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise GateError("%s has no readable objectsPositive (%s)" % (I06_V4_VECTORS, rule)) from None
+    require(type(wanted_rules) is list and len(wanted_rules) == 8 == len(rules),
+            "the contract role holds %s rules and OBSERVER_RULES %d, not eight each (%s)"
+            % (len(wanted_rules) if type(wanted_rules) is list else "no", len(rules), rule))
+    for number, (wanted, held) in enumerate(zip(wanted_rules, rules), 1):
+        read = (type(wanted) is dict and set(wanted) <= set(held)
+                and {key: [] if wanted.get(key) is None else wanted[key] for key in held} == held)
+        require(read, "OBSERVER_RULES' rule %d is not the contract role's (%s)" % (number, rule))
+    role_meta, binding_meta = role.get("metadata"), binding.get("metadata")
+    require(type(role_meta) is dict and role_meta.get("name") == texts["ROLE_NAME"]
+            and type(binding_meta) is dict and binding_meta.get("name") == texts["BINDING_NAME"],
+            "ROLE_NAME or BINDING_NAME is not the contract objects' name (%s)" % rule)
+    require(role.get("apiVersion") == binding.get("apiVersion") == texts["RBAC_API_VERSION"],
+            "RBAC_API_VERSION is not the contract objects' apiVersion (%s)" % rule)
+    require(binding.get("roleRef") == pairs["ROLE_REF"] and pairs["ROLE_REF"].get("name") == texts["ROLE_NAME"],
+            "ROLE_REF is not the contract binding's roleRef (%s)" % rule)
+    require(binding.get("subjects") == [pairs["SUBJECT"]] and pairs["SUBJECT"].get("kind") == "User"
+            and pairs["SUBJECT"].get("name") == texts["OBSERVER_USER"],
+            "SUBJECT and OBSERVER_USER are not the contract binding's one subject (%s)" % rule)
+    return len(rules) + len(texts) + len(pairs)
+
+
 # --- HE-004D2: the D2 logic modules' isolation and host-path literal, and their absence from the binary (DESIGN-D2 12) ---
 
 def check_observer_d2_isolation(base: Path) -> int:
@@ -4279,11 +4748,13 @@ def main() -> int:
                ", ".join(name.split(" ")[0] for _, name in OBSERVER_POST_SEAL_FORBIDDEN), " and ".join(OBSERVER_POST_SEAL_CRATES),
                I05_JSON))
         say("observer logic: %d modules of %s (%s; HE-004D1, G-D1-10: %s, whose whitelist adds i05_protocol::schema and "
-            "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules) name only the whitelisted "
+            "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules; HE-004-I01a: %s, whose "
+            "whitelist adds the I01 logic modules) name only the whitelisted "
             "path roots %s, no super:: or foreign self:: path, glob, renaming import, HashMap, HashSet, RandomState or "
             "include macro, and no panicking macro or call outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
             % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES), ", ".join(D1_LOGIC_NAMES),
-               ", ".join(D2_LOGIC_BUILT), ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
+               ", ".join(D2_LOGIC_BUILT), ", ".join(I01_LOGIC_BUILT),
+               ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
         say("observer D2 isolation: the D2 modules present are %s; outside them the module names occur only as lib.rs's "
             "pub mod lines, and none of the %d type names they define occurs in another %s source; every D2 impl is "
             "`impl <its own type> {` and no D2 file re-exports another item (HE-004D2, G-D2-5)"
@@ -4342,6 +4813,27 @@ def main() -> int:
             % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
         say("constructor home pins: %d files match their pinned sha256 (%s) (HE-004D2, owner decision Q-D2-END)"
             % (check_observer_home_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_HOME_PINS.items())))
+        say("observer never unlinks (HE-004-I01a, G-I01-1): %d sources of %s name no unlink, remove_file, remove_dir, "
+            "remove_dir_all, rename or hard_link outside strict test blocks" % (check_observer_never_unlinks(HE), OBSERVER_CRATE))
+        say("observer wait point (HE-004-I01a, G-I01-2): %d counted occurrences: wait once as the one wire wait inside "
+            "%s's fn wait_serving and once as %s's self.poller.wait( inside its fn wait, and serve_peer_step once, as the "
+            "method call inside wait_serving; no ::serve_peer_step path"
+            % (check_observer_wait_point(HE), OBSERVER_CLIENT, OBSERVER_LINUX_NET))
+        say("observer I01 path (HE-004-I01a, G-I01-4): %s occurs %d time(s) in %s, only as %s's private constant I01_PATH"
+            % (I01_PATH, check_observer_i01_path(HE), OBSERVER_CRATE, OBSERVER_LINUX_LISTEN))
+        say("observer sends nothing (HE-004-I01a, G-I01-5): %d sources; no peer_send; %s and %s neither import nor name "
+            "gate-sys's channel send nor rename the channel module; the i01_ sources are exactly %s, naming none of Wire, "
+            "connect, ConnId and Client; PeerOps is declared once, as `pub trait PeerOps {`"
+            % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
+        say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "
+            "aliased nowhere, and I01Socket::open is called once, inside LinuxWire::new, its qualified forms counted"
+            % (check_observer_i01_socket(HE), OBSERVER_LINUX_LISTEN, OBSERVER_LINUX_NET))
+        say("observer role pin (HE-004-I01a, G-I01-3): %s calls observer_rbac::check_observer_snapshot once, right after "
+            "self.closure.check( with %d let statement(s) between, then `let dropped` and drop(produced)"
+            % (OBSERVER_OBSERVE, check_observer_role_pin(HE)))
+        say("observer role pin constants (HE-004-I01a, DESIGN-I01A section 10): %d constants of %s match %s's "
+            "objectsPositive (the eight rules, the names, the apiVersion, the roleRef and the subject)"
+            % (check_observer_role_constants(HE), OBSERVER_RBAC, I06_V4_VECTORS))
         say("native-profile schemas: %s occur %d times in %s, each its definition in %s and its one use in "
             "CaptureSchema::embedded (HE-004D1, G-D1-9; HE-004D2, G-D2-3)"
             % (" and ".join(NATIVE_PROFILE_SCHEMAS), check_native_profile_use(HE), OBSERVER_CRATE, OBSERVER_CONTRACTS))

@@ -16,7 +16,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gate_sys::inet::{InetAddress, IpLiteral};
-use planeon_observer::client::{ConnId, Connecting, Interest, PollError, Ready, Transfer, Wire};
+use planeon_observer::client::{AcceptResult, ConnId, Connecting, ExeLink, Interest, PeerCreds, PeerId, PeerOps, PeerRecv,
+                               PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, Woken};
 use planeon_observer::config::{CredentialFiles, FileRef, ObserverConfig};
 use planeon_observer::credentials::ObserverIdentity;
 use planeon_observer::inputs::Resource;
@@ -333,12 +334,17 @@ fn role_rule(item: &i05_protocol::json::Value) -> String {
             canonical(field(item, "resources")), canonical(field(item, "verbs")), canonical(field(item, "resourceNames")))
 }
 
-/// RBAC objects whose effective snapshot is the I06 v2 positive (as `observer_round_trip.rs` rebuilds it).
+/// RBAC objects whose effective snapshot is the I06 v2 positive (as `observer_round_trip.rs` rebuilds it), except the
+/// observer's own entry: since HE-004-I01a's role pin (I06 v4's RB05 and RB06) its grants come only from the contract
+/// role and binding, which `default_lists` adds (`observer_grants`).
 pub fn positive_rbac() -> Rbac {
     let snapshot = field(&parse(VECTORS), "snapshotPositive").clone();
     let mut rbac = Rbac::default();
     for (index, subject) in rows(&snapshot, "subjects").iter().enumerate() {
         let (kind, subject_name) = (text(subject, "kind"), text(subject, "name"));
+        if (kind, subject_name) == ("User", "planeon:policy-observer") {
+            continue;
+        }
         if kind == "ServiceAccount" && field(subject, "exists").as_bool() == Some(true) {
             let (namespace, account_name) = subject_name["system:serviceaccount:".len()..].split_once(':').expect("split");
             rbac.accounts.push(service_account(namespace, account_name));
@@ -1024,7 +1030,7 @@ impl Wire for FakeWire {
         lab.api.streams.retain(|stream| stream.conn != conn.0);
     }
 
-    fn wait(&mut self, interests: &[(ConnId, Interest)], until: Instant) -> Result<Vec<(ConnId, Ready)>, PollError> {
+    fn wait(&mut self, interests: &[(ConnId, Interest)], _peers: PeerWatch, until: Instant) -> Result<Woken, PollError> {
         let mut lab = self.0.borrow_mut();
         if lab.poll_fail_at.is_some_and(|at| lab.elapsed >= at) {
             return Err(PollError(9));
@@ -1042,12 +1048,12 @@ impl Wire for FakeWire {
         };
         let found = ready(&lab);
         if !found.is_empty() {
-            return Ok(found);
+            return Ok(Woken { conns: found, ..Woken::default() });
         }
         let target = until.saturating_duration_since(lab.base).min(lab.next_event()).max(lab.elapsed);
         lab.elapsed = target;
         lab.run_due();
-        Ok(ready(&lab))
+        Ok(Woken { conns: ready(&lab), ..Woken::default() })
     }
 
     fn now(&self) -> Instant {
@@ -1062,6 +1068,40 @@ impl Wire for FakeWire {
         let seconds = wall_start() as i64 + lab.elapsed.as_secs() as i64 + lab.wall_shift;
         u64::try_from(seconds).ok()
     }
+}
+
+/// HE-004-I01a: the apiserver rig has no I01 peer (no epoch built here attaches the I01 service); the I01 tests script
+/// their own peers.
+impl PeerOps for FakeWire {
+    fn accept_peer(&mut self) -> AcceptResult {
+        AcceptResult::Nothing
+    }
+
+    fn peer_creds(&mut self, _peer: PeerId) -> Result<PeerCreds, i32> {
+        Err(9)
+    }
+
+    fn peer_proc_open(&mut self, _peer: PeerId) -> Result<(), i32> {
+        Err(9)
+    }
+
+    fn peer_proc_read(&mut self, _peer: PeerId) -> Result<ProcIdentity, i32> {
+        Err(9)
+    }
+
+    fn peer_exe(&mut self, _peer: PeerId) -> Result<ExeLink, i32> {
+        Err(9)
+    }
+
+    fn peer_alive(&mut self, _peer: PeerId) -> bool {
+        false
+    }
+
+    fn peer_recv(&mut self, _peer: PeerId, _buffer: &mut [u8]) -> PeerRecv {
+        PeerRecv::Failed(9)
+    }
+
+    fn peer_close(&mut self, _peer: PeerId) {}
 }
 
 // ------------------------------------------------------------------------------------------ the rig

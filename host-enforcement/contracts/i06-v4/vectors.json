@@ -1,0 +1,8185 @@
+{
+ "evidenceClass": "DATA_CHECK_ONLY",
+ "kubernetesBaseline": "v1.37.1",
+ "qualificationNamespace": "unit-namespace",
+ "inputs": {
+  "v3Vectors": {
+   "path": "architecture/i06-backend-profile-v3/vectors.json",
+   "sha256": "4752b648abdd82d21ea622a1b26c721143577478c0a2491204e0d584c1d6f081"
+  },
+  "v3Criteria": {
+   "path": "architecture/i06-backend-profile-v3/criteria.json",
+   "sha256": "752533c57b5f93e4c4158a9c17b52eb88d236a3632ab0b66b669e8f8041f57c7"
+  },
+  "criteria": {
+   "path": "architecture/i06-backend-profile-v4/criteria.json",
+   "sha256": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a"
+  },
+  "observerRbac": {
+   "path": "architecture/i06-backend-profile-v4/observer-rbac.json",
+   "sha256": "71305d7f7ab231e01b33b4de43f3a49efa37f6e1fb463b98b076e9b216e266d8"
+  },
+  "i07Vectors": {
+   "path": "architecture/i07-policy-write-v3/vectors.json",
+   "sha256": "c4c24c5ff15618aa2f0fe0f016011359bc4316220c6e40d5168f9ee24b6f736d"
+  },
+  "inventory": {
+   "path": "architecture/i06-backend-profile/writer-inventory.json",
+   "sha256": "8e6b3b7565cfc93a61162b84d740cffb2871eb66ab85e8c4e80ac813f1af3077"
+  },
+  "closure": {
+   "path": "architecture/i06-backend-profile/identity-closure.json",
+   "sha256": "0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb"
+  },
+  "bootstrap": {
+   "path": "architecture/i06-backend-profile/upstream-bootstrap-rbac-v1.37.1.json",
+   "sha256": "7529c2a713af2fb90163175924c264d95f4242d7e0c26b1452c77febb13ed50e"
+  }
+ },
+ "evidence": {
+  "model": "scripts/i06_backend_profile_v3.py",
+  "function": "check_evidence",
+  "replayed": false
+ },
+ "v3SnapshotCases": {
+  "accepted": 5,
+  "negative": 38
+ },
+ "snapshotPositive": {
+  "schemaVersion": "planeon.internal.i06-rbac-snapshot/v1",
+  "subjects": [
+   {
+    "kind": "Group",
+    "name": "system:authenticated",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "authorization.k8s.io"
+      ],
+      "resources": [
+       "selfsubjectaccessreviews",
+       "selfsubjectrulesreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authentication.k8s.io"
+      ],
+      "resources": [
+       "selfsubjectreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "Group",
+    "name": "system:masters",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "*"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "Group",
+    "name": "system:monitoring",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/metrics"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "Group",
+    "name": "system:serviceaccounts",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "clustertrustbundles"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "Group",
+    "name": "system:unauthenticated",
+    "exists": true,
+    "effectiveRules": []
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:attachdetach-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims",
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "volumeattachments"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csidrivers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csinodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:bootstrap-signer",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-public"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [
+       "cluster-info"
+      ],
+      "scope": "kube-public"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "kube-public"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:certificate-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "certificatesigningrequests"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "certificatesigningrequests/approval",
+       "certificatesigningrequests/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "signers"
+      ],
+      "verbs": [
+       "approve"
+      ],
+      "resourceNames": [
+       "kubernetes.io/kube-apiserver-client-kubelet"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "signers"
+      ],
+      "verbs": [
+       "sign"
+      ],
+      "resourceNames": [
+       "kubernetes.io/kube-apiserver-client",
+       "kubernetes.io/kube-apiserver-client-kubelet",
+       "kubernetes.io/kubelet-serving",
+       "kubernetes.io/legacy-unknown"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authorization.k8s.io"
+      ],
+      "resources": [
+       "subjectaccessreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:cloud-provider",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:clusterrole-aggregation-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "clusterroles"
+      ],
+      "verbs": [
+       "escalate",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:cronjob-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "cronjobs"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "jobs"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "cronjobs/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "cronjobs/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "delete",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:daemon-set-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "daemonsets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "daemonsets/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "daemonsets/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "list",
+       "patch",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/binding"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "controllerrevisions"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:deployment-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "deployments"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "deployments/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "deployments/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:device-taint-eviction-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceslices"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "deviceclasses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "devicetaintrules/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "devicetaintrules"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:disruption-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "deployments"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "replicationcontrollers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "policy"
+      ],
+      "resources": [
+       "poddisruptionbudgets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "statefulsets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "policy"
+      ],
+      "resources": [
+       "poddisruptionbudgets/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*/scale"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:endpoint-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods",
+       "services"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints/restricted"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:endpointslice-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes",
+       "pods",
+       "services"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "services/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "discovery.k8s.io"
+      ],
+      "resources": [
+       "endpointslices"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:endpointslicemirroring-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints",
+       "services"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "services/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "discovery.k8s.io"
+      ],
+      "resources": [
+       "endpointslices"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:ephemeral-volume-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:expand-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:generic-garbage-collector",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:horizontal-pod-autoscaler",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "autoscaling"
+      ],
+      "resources": [
+       "horizontalpodautoscalers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "autoscaling"
+      ],
+      "resources": [
+       "horizontalpodautoscalers/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*/scale"
+      ],
+      "verbs": [
+       "get",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "metrics.k8s.io"
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "custom.metrics.k8s.io"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "external.metrics.k8s.io"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:job-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "jobs"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "jobs/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "jobs/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "list",
+       "patch",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:kube-apiserver-serving-clustertrustbundle-publisher",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "signers"
+      ],
+      "verbs": [
+       "attest"
+      ],
+      "resourceNames": [
+       "kubernetes.io/kube-apiserver-serving"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "clustertrustbundles"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:kube-controller-manager",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:kube-dns",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints",
+       "services"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:kube-scheduler",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:leader-election-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:legacy-service-account-token-cleaner",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [
+       "kube-apiserver-legacy-service-account-token-tracking"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "delete",
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:namespace-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "namespaces"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "namespaces/finalize",
+       "namespaces/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "delete",
+       "deletecollection",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:node-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:persistent-volume-binder",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "storageclasses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:pod-garbage-collector",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "delete",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:podcertificaterequestcleaner",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "podcertificaterequests"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:pv-protection-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:pvc-protection-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:replicaset-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "list",
+       "patch",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:replication-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "replicationcontrollers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "replicationcontrollers/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "replicationcontrollers/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "list",
+       "patch",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:resource-claim-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims",
+       "resourceclaims/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims/binding"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:resourcequota-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "resourcequotas/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:root-ca-cert-publisher",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "create",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:route-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/status"
+      ],
+      "verbs": [
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:selinux-warning-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csidrivers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:service-account-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "serviceaccounts"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:service-cidrs-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "servicecidrs"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "servicecidrs/finalizers"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "servicecidrs/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "ipaddresses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:service-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "services"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "services/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:statefulset-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "statefulsets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "statefulsets/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "statefulsets/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "controllerrevisions"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "delete",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:storage-version-migrator-controller",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "list",
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apiextensions.k8s.io"
+      ],
+      "resources": [
+       "customresourcedefinitions"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apiextensions.k8s.io"
+      ],
+      "resources": [
+       "customresourcedefinitions/status"
+      ],
+      "verbs": [
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storagemigration.k8s.io"
+      ],
+      "resources": [
+       "storageversionmigrations/status"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:token-cleaner",
+    "exists": false,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:ttl-after-finished-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "batch"
+      ],
+      "resources": [
+       "jobs"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:ttl-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:validatingadmissionpolicy-status-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "admissionregistration.k8s.io"
+      ],
+      "resources": [
+       "validatingadmissionpolicies"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "admissionregistration.k8s.io"
+      ],
+      "resources": [
+       "validatingadmissionpolicies/status"
+      ],
+      "verbs": [
+       "get",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "ServiceAccount",
+    "name": "system:serviceaccount:kube-system:volumeattributesclass-protection-controller",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "volumeattributesclasses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "planeon:apiserver-kubelet-client",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "proxy"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/log",
+       "nodes/metrics",
+       "nodes/proxy",
+       "nodes/stats"
+      ],
+      "verbs": [
+       "*"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes/configz",
+       "nodes/healthz",
+       "nodes/pods"
+      ],
+      "verbs": [
+       "*"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "planeon:effect-gate",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods",
+       "configmaps",
+       "services"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "watch",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "planeon:netpol-agent",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "networkpolicies"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods",
+       "namespaces"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "planeon:policy-observer",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "limitranges",
+       "namespaces",
+       "resourcequotas",
+       "serviceaccounts",
+       "secrets"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "networkpolicies"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "roles",
+       "rolebindings",
+       "clusterroles",
+       "clusterrolebindings"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "admissionregistration.k8s.io"
+      ],
+      "resources": [
+       "validatingwebhookconfigurations",
+       "mutatingwebhookconfigurations",
+       "mutatingadmissionpolicies",
+       "mutatingadmissionpolicybindings",
+       "validatingadmissionpolicies",
+       "validatingadmissionpolicybindings"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apiregistration.k8s.io"
+      ],
+      "resources": [
+       "apiservices"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apiextensions.k8s.io"
+      ],
+      "resources": [
+       "customresourcedefinitions"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "certificatesigningrequests"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "planeon:policy-writer",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "roles",
+       "rolebindings"
+      ],
+      "verbs": [
+       "create",
+       "update",
+       "patch",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "resourcequotas",
+       "limitranges",
+       "serviceaccounts"
+      ],
+      "verbs": [
+       "create",
+       "update",
+       "patch",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "networkpolicies"
+      ],
+      "verbs": [
+       "create",
+       "update",
+       "patch",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "namespaces"
+      ],
+      "verbs": [
+       "get",
+       "update",
+       "patch"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     },
+     {
+      "apiGroups": [
+       "admissionregistration.k8s.io"
+      ],
+      "resources": [
+       "validatingadmissionpolicies",
+       "validatingadmissionpolicybindings"
+      ],
+      "verbs": [
+       "create",
+       "update",
+       "patch",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "roles"
+      ],
+      "verbs": [
+       "escalate",
+       "bind"
+      ],
+      "resourceNames": [
+       "planeon-gate-effect",
+       "planeon-policy-observer"
+      ],
+      "scope": "unit-namespace"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "system:kube-controller-manager",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "get",
+       "update"
+      ],
+      "resourceNames": [
+       "kube-controller-manager"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets",
+       "serviceaccounts"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps",
+       "namespaces",
+       "secrets",
+       "serviceaccounts"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets",
+       "serviceaccounts"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authentication.k8s.io"
+      ],
+      "resources": [
+       "tokenreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authorization.k8s.io"
+      ],
+      "resources": [
+       "subjectaccessreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "serviceaccounts/token"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [
+       "extension-apiserver-authentication"
+      ],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "system:kube-proxy",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "endpoints",
+       "services"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "servicecidrs"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "discovery.k8s.io"
+      ],
+      "resources": [
+       "endpointslices"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    ]
+   },
+   {
+    "kind": "User",
+    "name": "system:kube-scheduler",
+    "exists": true,
+    "effectiveRules": [
+     {
+      "apiGroups": [
+       "",
+       "events.k8s.io"
+      ],
+      "resources": [
+       "events"
+      ],
+      "verbs": [
+       "create",
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [
+       "kube-scheduler"
+      ],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "delete",
+       "deletecollection",
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "delete",
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "bindings",
+       "pods/binding"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/status"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "replicationcontrollers",
+       "services"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps",
+       "extensions"
+      ],
+      "resources": [
+       "replicasets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "apps"
+      ],
+      "resources": [
+       "statefulsets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "policy"
+      ],
+      "resources": [
+       "poddisruptionbudgets"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims",
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authentication.k8s.io"
+      ],
+      "resources": [
+       "tokenreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "authorization.k8s.io"
+      ],
+      "resources": [
+       "subjectaccessreviews"
+      ],
+      "verbs": [
+       "create"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csinodes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "volumeattachments"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "namespaces"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csidrivers"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "csistoragecapacities"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "deviceclasses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims/status"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/finalizers"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceslices"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims"
+      ],
+      "verbs": [
+       "create",
+       "delete"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "devicetaintrules"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "resource.k8s.io"
+      ],
+      "resources": [
+       "resourceclaims/binding"
+      ],
+      "verbs": [
+       "patch",
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumes"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       "storage.k8s.io"
+      ],
+      "resources": [
+       "storageclasses"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "persistentvolumeclaims"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "patch",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     },
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "get",
+       "list",
+       "watch"
+      ],
+      "resourceNames": [
+       "extension-apiserver-authentication"
+      ],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leases"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     },
+     {
+      "apiGroups": [
+       "coordination.k8s.io"
+      ],
+      "resources": [
+       "leasecandidates"
+      ],
+      "verbs": [
+       "create",
+       "get",
+       "list",
+       "update",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "kube-system"
+     }
+    ]
+   }
+  ]
+ },
+ "objectsPositive": {
+  "clusterRoles": [
+   {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "ClusterRole",
+    "metadata": {
+     "name": "planeon:policy-observer"
+    },
+    "rules": [
+     {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "limitranges",
+       "namespaces",
+       "resourcequotas",
+       "serviceaccounts",
+       "secrets"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "networking.k8s.io"
+      ],
+      "resources": [
+       "networkpolicies"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "roles",
+       "rolebindings",
+       "clusterroles",
+       "clusterrolebindings"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "admissionregistration.k8s.io"
+      ],
+      "resources": [
+       "validatingwebhookconfigurations",
+       "mutatingwebhookconfigurations",
+       "mutatingadmissionpolicies",
+       "mutatingadmissionpolicybindings",
+       "validatingadmissionpolicies",
+       "validatingadmissionpolicybindings"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "apiregistration.k8s.io"
+      ],
+      "resources": [
+       "apiservices"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "apiextensions.k8s.io"
+      ],
+      "resources": [
+       "customresourcedefinitions"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "apiGroups": [
+       "certificates.k8s.io"
+      ],
+      "resources": [
+       "certificatesigningrequests"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     },
+     {
+      "nonResourceURLs": [
+       "/metrics",
+       "/readyz/poststarthook/rbac/bootstrap-roles",
+       "/version",
+       "/apis/admissionregistration.k8s.io",
+       "/apis/admissionregistration.k8s.io/*"
+      ],
+      "verbs": [
+       "get"
+      ]
+     }
+    ]
+   }
+  ],
+  "clusterRoleBindings": [
+   {
+    "apiVersion": "rbac.authorization.k8s.io/v1",
+    "kind": "ClusterRoleBinding",
+    "metadata": {
+     "name": "planeon:policy-observer"
+    },
+    "roleRef": {
+     "apiGroup": "rbac.authorization.k8s.io",
+     "kind": "ClusterRole",
+     "name": "planeon:policy-observer"
+    },
+    "subjects": [
+     {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "User",
+      "name": "planeon:policy-observer"
+     }
+    ]
+   }
+  ],
+  "roleBindings": []
+ },
+ "documentNegative": [
+  {
+   "id": "D01",
+   "intent": "a later document version",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "schemaVersion"
+     ],
+     "value": "planeon.internal.i06-observer-rbac/v2"
+    }
+   ],
+   "refusal": "RB00 observer RBAC document version"
+  },
+  {
+   "id": "D02",
+   "intent": "another Kubernetes baseline",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "kubernetesBaseline"
+     ],
+     "value": "v1.37.2"
+    }
+   ],
+   "refusal": "RB00 observer RBAC document version"
+  },
+  {
+   "id": "D03",
+   "intent": "an extra member",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "notes"
+     ],
+     "value": "x"
+    }
+   ],
+   "refusal": "RB00 closed observer RBAC document"
+  },
+  {
+   "id": "D04",
+   "intent": "the certificate given an O (system:monitoring), which would widen the observer by a group",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "identity",
+      "certificateOrganizations"
+     ],
+     "value": [
+      "system:monitoring"
+     ]
+    }
+   ],
+   "refusal": "RB00 the observer RBAC document's identity differs from the model's"
+  },
+  {
+   "id": "D05",
+   "intent": "the binding listed before the role",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "objects"
+     ],
+     "value": [
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRoleBinding",
+       "metadata": {
+        "name": "planeon:policy-observer"
+       },
+       "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "planeon:policy-observer"
+       },
+       "subjects": [
+        {
+         "apiGroup": "rbac.authorization.k8s.io",
+         "kind": "User",
+         "name": "planeon:policy-observer"
+        }
+       ]
+      },
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRole",
+       "metadata": {
+        "name": "planeon:policy-observer"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "limitranges",
+          "namespaces",
+          "resourcequotas",
+          "serviceaccounts",
+          "secrets"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "networking.k8s.io"
+         ],
+         "resources": [
+          "networkpolicies"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "rbac.authorization.k8s.io"
+         ],
+         "resources": [
+          "roles",
+          "rolebindings",
+          "clusterroles",
+          "clusterrolebindings"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "admissionregistration.k8s.io"
+         ],
+         "resources": [
+          "validatingwebhookconfigurations",
+          "mutatingwebhookconfigurations",
+          "mutatingadmissionpolicies",
+          "mutatingadmissionpolicybindings",
+          "validatingadmissionpolicies",
+          "validatingadmissionpolicybindings"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "apiregistration.k8s.io"
+         ],
+         "resources": [
+          "apiservices"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "apiextensions.k8s.io"
+         ],
+         "resources": [
+          "customresourcedefinitions"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "certificates.k8s.io"
+         ],
+         "resources": [
+          "certificatesigningrequests"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "nonResourceURLs": [
+          "/metrics",
+          "/readyz/poststarthook/rbac/bootstrap-roles",
+          "/version",
+          "/apis/admissionregistration.k8s.io",
+          "/apis/admissionregistration.k8s.io/*"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "refusal": "RB00 the observer RBAC document's objects differ from the model's ClusterRole and binding"
+  },
+  {
+   "id": "D06",
+   "intent": "get added to the role's first rule",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "objects",
+      0,
+      "rules",
+      0,
+      "verbs"
+     ],
+     "value": "get"
+    }
+   ],
+   "refusal": "RB00 the observer RBAC document's objects differ from the model's ClusterRole and binding"
+  },
+  {
+   "id": "D07",
+   "intent": "the residual's text edited",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "residuals",
+      0,
+      "text"
+     ],
+     "value": "no residual"
+    }
+   ],
+   "refusal": "RB00 the observer RBAC document's residuals differ from the model's"
+  }
+ ],
+ "objectsAccepted": [
+  {
+   "id": "OA01",
+   "intent": "the live form: list items without kind and apiVersion, with the apiserver's metadata (uid, resourceVersion, creationTimestamp, managedFields)",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "kind"
+     ]
+    },
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "apiVersion"
+     ]
+    },
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "kind"
+     ]
+    },
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "apiVersion"
+     ]
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "uid"
+     ],
+     "value": "22222222-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "resourceVersion"
+     ],
+     "value": "17"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "creationTimestamp"
+     ],
+     "value": "2026-10-19T00:00:00Z"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "managedFields"
+     ],
+     "value": [
+      {
+       "manager": "enrollment",
+       "operation": "Update"
+      }
+     ]
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "metadata",
+      "uid"
+     ],
+     "value": "22222222-aaaa-4bbb-8ccc-000000000001"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "metadata",
+      "resourceVersion"
+     ],
+     "value": "17"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "metadata",
+      "creationTimestamp"
+     ],
+     "value": "2026-10-19T00:00:00Z"
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "metadata",
+      "managedFields"
+     ],
+     "value": [
+      {
+       "manager": "enrollment",
+       "operation": "Update"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "OA02",
+   "intent": "the live lists with unrelated objects around the contract's: a stock role and its binding to Group system:authenticated listed first, and the effect gate's RoleBinding",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": [
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRole",
+       "metadata": {
+        "name": "system:basic-user"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          "authorization.k8s.io"
+         ],
+         "resources": [
+          "selfsubjectaccessreviews",
+          "selfsubjectrulesreviews"
+         ],
+         "verbs": [
+          "create"
+         ]
+        }
+       ]
+      },
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRole",
+       "metadata": {
+        "name": "planeon:policy-observer"
+       },
+       "rules": [
+        {
+         "apiGroups": [
+          ""
+         ],
+         "resources": [
+          "limitranges",
+          "namespaces",
+          "resourcequotas",
+          "serviceaccounts",
+          "secrets"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "networking.k8s.io"
+         ],
+         "resources": [
+          "networkpolicies"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "rbac.authorization.k8s.io"
+         ],
+         "resources": [
+          "roles",
+          "rolebindings",
+          "clusterroles",
+          "clusterrolebindings"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "admissionregistration.k8s.io"
+         ],
+         "resources": [
+          "validatingwebhookconfigurations",
+          "mutatingwebhookconfigurations",
+          "mutatingadmissionpolicies",
+          "mutatingadmissionpolicybindings",
+          "validatingadmissionpolicies",
+          "validatingadmissionpolicybindings"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "apiregistration.k8s.io"
+         ],
+         "resources": [
+          "apiservices"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "apiextensions.k8s.io"
+         ],
+         "resources": [
+          "customresourcedefinitions"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "apiGroups": [
+          "certificates.k8s.io"
+         ],
+         "resources": [
+          "certificatesigningrequests"
+         ],
+         "verbs": [
+          "list",
+          "watch"
+         ]
+        },
+        {
+         "nonResourceURLs": [
+          "/metrics",
+          "/readyz/poststarthook/rbac/bootstrap-roles",
+          "/version",
+          "/apis/admissionregistration.k8s.io",
+          "/apis/admissionregistration.k8s.io/*"
+         ],
+         "verbs": [
+          "get"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": [
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRoleBinding",
+       "metadata": {
+        "name": "system:basic-user"
+       },
+       "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:basic-user"
+       },
+       "subjects": [
+        {
+         "apiGroup": "rbac.authorization.k8s.io",
+         "kind": "Group",
+         "name": "system:authenticated"
+        }
+       ]
+      },
+      {
+       "apiVersion": "rbac.authorization.k8s.io/v1",
+       "kind": "ClusterRoleBinding",
+       "metadata": {
+        "name": "planeon:policy-observer"
+       },
+       "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "planeon:policy-observer"
+       },
+       "subjects": [
+        {
+         "apiGroup": "rbac.authorization.k8s.io",
+         "kind": "User",
+         "name": "planeon:policy-observer"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "planeon-gate-effect",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-gate-effect"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:effect-gate"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "OA03",
+   "intent": "a RoleBinding naming Group planeon:policy-observer: the certificate has no O, so the group does not reach the user (RB06 matches User subjects)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "group-only",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-gate-effect"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Group",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "OA04",
+   "intent": "absent, null and empty rule lists read alike (R10's producer reads them so, R99)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "resourceNames"
+     ],
+     "value": []
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "nonResourceURLs"
+     ],
+     "value": null
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "apiGroups"
+     ],
+     "value": []
+    },
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "resources"
+     ],
+     "value": null
+    }
+   ]
+  },
+  {
+   "id": "OA05",
+   "intent": "aggregated ClusterRoles that cannot select the unlabeled observer role: stock-style matchLabels, an Exists and an In expression, and an empty selector list",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "view-like"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchLabels": {
+          "rbac.authorization.k8s.io/aggregate-to-view": "true"
+         }
+        }
+       ]
+      },
+      "rules": []
+     }
+    },
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "exists-agg"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchExpressions": [
+          {
+           "key": "team",
+           "operator": "Exists"
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "in-agg"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchExpressions": [
+          {
+           "key": "team",
+           "operator": "In",
+           "values": [
+            "a"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "empty-agg"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": []
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "OA06",
+   "intent": "a RoleBinding of a namespaced Role that happens to share the ClusterRole's name (RB07 is about the ClusterRole)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "same-name-role",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:effect-gate"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "objectsNegative": [
+  {
+   "id": "ON01",
+   "intent": "extra verb: get on rule 1 (get secrets in every namespace)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "verbs"
+     ],
+     "value": "get"
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: verbs"
+  },
+  {
+   "id": "ON02",
+   "intent": "a broad get: get on every resource of every group (reaches nodes/proxy and pods/exec)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "get"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON03",
+   "intent": "extra resource: configmaps in rule 1",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "resources"
+     ],
+     "value": "configmaps"
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: resources"
+  },
+  {
+   "id": "ON04",
+   "intent": "extra resource: list and watch on pods",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON05",
+   "intent": "wildcard resource: rule 4 as I06 v3's observer fixture has it (admission *)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      3,
+      "resources"
+     ],
+     "value": [
+      "*"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 4 differs from the contract: resources"
+  },
+  {
+   "id": "ON06",
+   "intent": "wildcard verb on rule 1",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "verbs"
+     ],
+     "value": [
+      "*"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: verbs"
+  },
+  {
+   "id": "ON07",
+   "intent": "wildcard apiGroup on rule 1",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "apiGroups"
+     ],
+     "value": [
+      "*"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: apiGroups"
+  },
+  {
+   "id": "ON08",
+   "intent": "wildcard non-resource URL *",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "nonResourceURLs"
+     ],
+     "value": [
+      "*"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: nonResourceURLs"
+  },
+  {
+   "id": "ON09",
+   "intent": "wildcard non-resource URL /*",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "nonResourceURLs"
+     ],
+     "value": "/*"
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: nonResourceURLs"
+  },
+  {
+   "id": "ON10",
+   "intent": "wider pattern /apis/*",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "nonResourceURLs"
+     ],
+     "value": "/apis/*"
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: nonResourceURLs"
+  },
+  {
+   "id": "ON11",
+   "intent": "escalation: escalate and bind on clusterroles",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "clusterroles"
+      ],
+      "verbs": [
+       "escalate",
+       "bind"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON12",
+   "intent": "escalation: impersonate users",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "users"
+      ],
+      "verbs": [
+       "impersonate"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON13",
+   "intent": "escalation: create serviceaccounts/token",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "serviceaccounts/token"
+      ],
+      "verbs": [
+       "create"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON14",
+   "intent": "escalation: get pods/exec",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/exec"
+      ],
+      "verbs": [
+       "get"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON15",
+   "intent": "escalation: proxy on nodes",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "nodes"
+      ],
+      "verbs": [
+       "proxy"
+      ]
+     }
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 9 rules, the contract 8"
+  },
+  {
+   "id": "ON16",
+   "intent": "missing grant: watch dropped from rule 1 (the OR05 and policy-kind watches would be refused)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "verbs"
+     ],
+     "value": [
+      "list"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: verbs"
+  },
+  {
+   "id": "ON17",
+   "intent": "missing grant: rule 7 (certificatesigningrequests) dropped",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      6
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 7 rules, the contract 8"
+  },
+  {
+   "id": "ON18",
+   "intent": "missing grant: /metrics dropped (ADM-4 and OR01 would be refused)",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "nonResourceURLs",
+      0
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: nonResourceURLs"
+  },
+  {
+   "id": "ON19",
+   "intent": "missing grant: OR07's /readyz hook dropped",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "nonResourceURLs",
+      1
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: nonResourceURLs"
+  },
+  {
+   "id": "ON20",
+   "intent": "a narrower rule is refused too (exact, not a bound): resourceNames on rule 1",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "resourceNames"
+     ],
+     "value": [
+      "x"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: resourceNames"
+  },
+  {
+   "id": "ON21",
+   "intent": "a rule holding resources beside non-resource URLs (R99 refuses it as Malformed)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      7,
+      "resources"
+     ],
+     "value": [
+      "pods"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 8 differs from the contract: resources"
+  },
+  {
+   "id": "ON22",
+   "intent": "an unknown rule member",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules",
+      0,
+      "scope"
+     ],
+     "value": "CLUSTER"
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 holds an unknown member: scope"
+  },
+  {
+   "id": "ON23",
+   "intent": "rules 1 and 2 in the other order",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ],
+     "value": [
+      {
+       "apiGroups": [
+        "networking.k8s.io"
+       ],
+       "resources": [
+        "networkpolicies"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        ""
+       ],
+       "resources": [
+        "limitranges",
+        "namespaces",
+        "resourcequotas",
+        "serviceaccounts",
+        "secrets"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        "rbac.authorization.k8s.io"
+       ],
+       "resources": [
+        "roles",
+        "rolebindings",
+        "clusterroles",
+        "clusterrolebindings"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        "admissionregistration.k8s.io"
+       ],
+       "resources": [
+        "validatingwebhookconfigurations",
+        "mutatingwebhookconfigurations",
+        "mutatingadmissionpolicies",
+        "mutatingadmissionpolicybindings",
+        "validatingadmissionpolicies",
+        "validatingadmissionpolicybindings"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        "apiregistration.k8s.io"
+       ],
+       "resources": [
+        "apiservices"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        "apiextensions.k8s.io"
+       ],
+       "resources": [
+        "customresourcedefinitions"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "apiGroups": [
+        "certificates.k8s.io"
+       ],
+       "resources": [
+        "certificatesigningrequests"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ]
+      },
+      {
+       "nonResourceURLs": [
+        "/metrics",
+        "/readyz/poststarthook/rbac/bootstrap-roles",
+        "/version",
+        "/apis/admissionregistration.k8s.io",
+        "/apis/admissionregistration.k8s.io/*"
+       ],
+       "verbs": [
+        "get"
+       ]
+      }
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole's rule 1 differs from the contract: apiGroups"
+  },
+  {
+   "id": "ON24",
+   "intent": "rules absent",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoles",
+      0,
+      "rules"
+     ]
+    }
+   ],
+   "refusal": "RB02 the observer ClusterRole holds 0 rules, the contract 8"
+  },
+  {
+   "id": "ON25",
+   "intent": "an aggregationRule key, even with empty selectors",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "aggregationRule"
+     ],
+     "value": {}
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole has an aggregationRule"
+  },
+  {
+   "id": "ON26",
+   "intent": "an ownerReference (the garbage collector could delete the role, OR02)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "ownerReferences"
+     ],
+     "value": [
+      {
+       "apiVersion": "v1",
+       "kind": "Namespace",
+       "name": "x",
+       "uid": "y"
+      }
+     ]
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole's metadata holds ownerReferences"
+  },
+  {
+   "id": "ON27",
+   "intent": "labels on the role",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "labels"
+     ],
+     "value": {
+      "a": "b"
+     }
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole's metadata holds labels"
+  },
+  {
+   "id": "ON28",
+   "intent": "the last-applied annotation of a client-side apply",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "annotations"
+     ],
+     "value": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{}"
+     }
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole's metadata holds annotations"
+  },
+  {
+   "id": "ON29",
+   "intent": "the role renamed (planeon-policy-observer, the writer's Role name)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "name"
+     ],
+     "value": "planeon-policy-observer"
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole is missing or repeated"
+  },
+  {
+   "id": "ON30",
+   "intent": "the role listed twice",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "planeon:policy-observer"
+      },
+      "rules": [
+       {
+        "apiGroups": [
+         ""
+        ],
+        "resources": [
+         "limitranges",
+         "namespaces",
+         "resourcequotas",
+         "serviceaccounts",
+         "secrets"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "networking.k8s.io"
+        ],
+        "resources": [
+         "networkpolicies"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "rbac.authorization.k8s.io"
+        ],
+        "resources": [
+         "roles",
+         "rolebindings",
+         "clusterroles",
+         "clusterrolebindings"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "admissionregistration.k8s.io"
+        ],
+        "resources": [
+         "validatingwebhookconfigurations",
+         "mutatingwebhookconfigurations",
+         "mutatingadmissionpolicies",
+         "mutatingadmissionpolicybindings",
+         "validatingadmissionpolicies",
+         "validatingadmissionpolicybindings"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "apiregistration.k8s.io"
+        ],
+        "resources": [
+         "apiservices"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "apiextensions.k8s.io"
+        ],
+        "resources": [
+         "customresourcedefinitions"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "apiGroups": [
+         "certificates.k8s.io"
+        ],
+        "resources": [
+         "certificatesigningrequests"
+        ],
+        "verbs": [
+         "list",
+         "watch"
+        ]
+       },
+       {
+        "nonResourceURLs": [
+         "/metrics",
+         "/readyz/poststarthook/rbac/bootstrap-roles",
+         "/version",
+         "/apis/admissionregistration.k8s.io",
+         "/apis/admissionregistration.k8s.io/*"
+        ],
+        "verbs": [
+         "get"
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole is missing or repeated"
+  },
+  {
+   "id": "ON31",
+   "intent": "kind Role on the role object",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "kind"
+     ],
+     "value": "Role"
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole's kind or apiVersion differs"
+  },
+  {
+   "id": "ON32",
+   "intent": "an unknown member on the role",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "spec"
+     ],
+     "value": {}
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole holds an unknown member: spec"
+  },
+  {
+   "id": "ON33",
+   "intent": "the object lists not closed: roleBindings missing",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "roleBindings"
+     ]
+    }
+   ],
+   "refusal": "RB01 closed RBAC object lists"
+  },
+  {
+   "id": "ON34",
+   "intent": "roleRef kind Role",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "roleRef",
+      "kind"
+     ],
+     "value": "Role"
+    }
+   ],
+   "refusal": "RB03 the observer ClusterRoleBinding's roleRef is not the observer ClusterRole"
+  },
+  {
+   "id": "ON35",
+   "intent": "roleRef to another role (stock view)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "roleRef",
+      "name"
+     ],
+     "value": "view"
+    }
+   ],
+   "refusal": "RB03 the observer ClusterRoleBinding's roleRef is not the observer ClusterRole"
+  },
+  {
+   "id": "ON36",
+   "intent": "roleRef apiGroup missing",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "roleRef",
+      "apiGroup"
+     ]
+    }
+   ],
+   "refusal": "RB03 the observer ClusterRoleBinding's roleRef is not the observer ClusterRole"
+  },
+  {
+   "id": "ON37",
+   "intent": "the ClusterRoleBinding replaced by a RoleBinding of the ClusterRole (namespace scope only)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": []
+    },
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "planeon:policy-observer",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB03 the observer ClusterRoleBinding is missing or repeated"
+  },
+  {
+   "id": "ON38",
+   "intent": "labels on the binding",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "metadata",
+      "labels"
+     ],
+     "value": {
+      "a": "b"
+     }
+    }
+   ],
+   "refusal": "RB03 the observer ClusterRoleBinding's metadata holds labels"
+  },
+  {
+   "id": "ON39",
+   "intent": "subject Group planeon:policy-observer",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects",
+      0,
+      "kind"
+     ],
+     "value": "Group"
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON40",
+   "intent": "subject a ServiceAccount",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects"
+     ],
+     "value": [
+      {
+       "kind": "ServiceAccount",
+       "name": "policy-observer",
+       "namespace": "kube-system"
+      }
+     ]
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON41",
+   "intent": "subject User planeon:policy-writer",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects",
+      0,
+      "name"
+     ],
+     "value": "planeon:policy-writer"
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON42",
+   "intent": "a second subject: Group system:authenticated",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects"
+     ],
+     "value": {
+      "apiGroup": "rbac.authorization.k8s.io",
+      "kind": "Group",
+      "name": "system:authenticated"
+     }
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON43",
+   "intent": "the subject's apiGroup missing",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects",
+      0,
+      "apiGroup"
+     ]
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON44",
+   "intent": "subjects absent",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "clusterRoleBindings",
+      0,
+      "subjects"
+     ]
+    }
+   ],
+   "refusal": "RB04 the observer ClusterRoleBinding's subjects are not exactly User planeon:policy-observer"
+  },
+  {
+   "id": "ON45",
+   "intent": "I07 v3's K22: the writer's RoleBinding to Role planeon-policy-observer for the observer",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "planeon-rolebinding",
+       "namespace": "planeon-qual"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: RoleBinding/planeon-qual/planeon-rolebinding",
+   "fromI07": "K22"
+  },
+  {
+   "id": "ON46",
+   "intent": "I07 v3's K23: the same binding as an update, with server metadata",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "planeon-rolebinding",
+       "namespace": "planeon-qual",
+       "resourceVersion": "41",
+       "uid": "11111111-aaaa-4bbb-8ccc-000000000001"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: RoleBinding/planeon-qual/planeon-rolebinding",
+   "fromI07": "K23"
+  },
+  {
+   "id": "ON47",
+   "intent": "a ClusterRoleBinding of stock view naming the observer",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "observer-view"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "view"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: ClusterRoleBinding/observer-view"
+  },
+  {
+   "id": "ON48",
+   "intent": "a binding of a role holding only nonResourceURLs [\"*\"]: the snapshot cannot carry it, only RB06 sees it",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "all-urls"
+      },
+      "rules": [
+       {
+        "nonResourceURLs": [
+         "*"
+        ],
+        "verbs": [
+         "get"
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "all-urls"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "all-urls"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: ClusterRoleBinding/all-urls"
+  },
+  {
+   "id": "ON49",
+   "intent": "the observer added as a second subject of the stock basic-user binding",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "system:basic-user"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "system:basic-user"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Group",
+        "name": "system:authenticated"
+       },
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: ClusterRoleBinding/system:basic-user"
+  },
+  {
+   "id": "ON50",
+   "intent": "another binding naming the observer without an apiGroup (RBAC matches kind and name)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "no-group",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-gate-effect"
+      },
+      "subjects": [
+       {
+        "kind": "User",
+        "name": "planeon:policy-observer"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB06 a binding other than the contract's names the observer: RoleBinding/unit-namespace/no-group"
+  },
+  {
+   "id": "ON51",
+   "intent": "a binding whose subjects are not a list",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "bad",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "Role",
+       "name": "planeon-gate-effect"
+      },
+      "subjects": "planeon:policy-observer"
+     }
+    }
+   ],
+   "refusal": "RB06 a binding's subjects are malformed: RoleBinding/unit-namespace/bad"
+  },
+  {
+   "id": "ON52",
+   "intent": "a second ClusterRoleBinding of the observer ClusterRole, to Group system:authenticated (every authenticated user would list secrets)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "observer-for-all"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Group",
+        "name": "system:authenticated"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB07 a binding other than the contract's references the observer ClusterRole: ClusterRoleBinding/observer-for-all"
+  },
+  {
+   "id": "ON53",
+   "intent": "a second ClusterRoleBinding of the observer ClusterRole, to the effect gate",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "observer-for-gate"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:effect-gate"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB07 a binding other than the contract's references the observer ClusterRole: ClusterRoleBinding/observer-for-gate"
+  },
+  {
+   "id": "ON54",
+   "intent": "a RoleBinding in the qualification namespace referencing the observer ClusterRole, for a service account",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "observer-in-ns",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "apiGroup": "rbac.authorization.k8s.io",
+       "kind": "ClusterRole",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "kind": "ServiceAccount",
+        "name": "default",
+        "namespace": "unit-namespace"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB07 a binding other than the contract's references the observer ClusterRole: RoleBinding/unit-namespace/observer-in-ns"
+  },
+  {
+   "id": "ON55",
+   "intent": "a RoleBinding referencing the observer ClusterRole without a roleRef apiGroup (kind and name match)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "roleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+       "name": "observer-no-group",
+       "namespace": "unit-namespace"
+      },
+      "roleRef": {
+       "kind": "ClusterRole",
+       "name": "planeon:policy-observer"
+      },
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:effect-gate"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB07 a binding other than the contract's references the observer ClusterRole: RoleBinding/unit-namespace/observer-no-group"
+  },
+  {
+   "id": "ON56",
+   "intent": "an aggregated ClusterRole with an empty selector (selects every ClusterRole, the observer's included)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "aggregate-all"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {}
+       ]
+      },
+      "rules": []
+     }
+    }
+   ],
+   "refusal": "RB07 an aggregated ClusterRole selects the observer ClusterRole: ClusterRole/aggregate-all"
+  },
+  {
+   "id": "ON57",
+   "intent": "an aggregated ClusterRole selecting roles without a label (DoesNotExist matches the unlabeled role)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "aggregate-unlabeled"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchExpressions": [
+          {
+           "key": "tier",
+           "operator": "DoesNotExist"
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "refusal": "RB07 an aggregated ClusterRole selects the observer ClusterRole: ClusterRole/aggregate-unlabeled"
+  },
+  {
+   "id": "ON58",
+   "intent": "an aggregated ClusterRole with a NotIn expression (matches the unlabeled role)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "aggregate-notin"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchLabels": {
+          "rbac.authorization.k8s.io/aggregate-to-view": "true"
+         }
+        },
+        {
+         "matchExpressions": [
+          {
+           "key": "tier",
+           "operator": "NotIn",
+           "values": [
+            "x"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "refusal": "RB07 an aggregated ClusterRole selects the observer ClusterRole: ClusterRole/aggregate-notin"
+  },
+  {
+   "id": "ON59",
+   "intent": "an aggregated ClusterRole whose selector cannot be read (an unknown operator): refused, fail closed",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoles"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+       "name": "aggregate-odd"
+      },
+      "aggregationRule": {
+       "clusterRoleSelectors": [
+        {
+         "matchExpressions": [
+          {
+           "key": "tier",
+           "operator": "Gt",
+           "values": [
+            "1"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "refusal": "RB07 an aggregationRule selector is malformed: ClusterRole/aggregate-odd"
+  },
+  {
+   "id": "ON60",
+   "intent": "a binding whose roleRef is not an object",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "clusterRoleBindings"
+     ],
+     "value": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+       "name": "odd-ref"
+      },
+      "roleRef": "planeon:policy-observer",
+      "subjects": [
+       {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "User",
+        "name": "planeon:effect-gate"
+       }
+      ]
+     }
+    }
+   ],
+   "refusal": "RB07 a binding's roleRef is malformed: ClusterRoleBinding/odd-ref"
+  },
+  {
+   "id": "ON61",
+   "intent": "finalizers on the role (contract review round 1, R1-5 (d))",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "clusterRoles",
+      0,
+      "metadata",
+      "finalizers"
+     ],
+     "value": [
+      "example.com/hold"
+     ]
+    }
+   ],
+   "refusal": "RB01 the observer ClusterRole's metadata holds finalizers"
+  }
+ ],
+ "snapshotAccepted": [
+  {
+   "id": "SA01",
+   "intent": "another subject's extra read does not touch the pin: the effect gate gains get secrets in the qualification namespace (not policy-relevant, so v3 accepts it too)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:effect-gate"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     }
+    }
+   ],
+   "v3Result": null
+  },
+  {
+   "id": "SA02",
+   "intent": "a Group named planeon:policy-observer is not the observer (no O in its certificate)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects"
+     ],
+     "value": {
+      "kind": "Group",
+      "name": "planeon:policy-observer",
+      "exists": true,
+      "effectiveRules": [
+       {
+        "apiGroups": [
+         ""
+        ],
+        "resources": [
+         "secrets"
+        ],
+        "verbs": [
+         "list"
+        ],
+        "resourceNames": [],
+        "scope": "CLUSTER"
+       }
+      ]
+     }
+    }
+   ],
+   "v3Result": null
+  }
+ ],
+ "snapshotNegative": [
+  {
+   "id": "SN01",
+   "intent": "extra get secrets at cluster scope",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN02",
+   "intent": "every verb on secrets at cluster scope",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "*"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN03",
+   "intent": "list and watch on every resource of every group",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN04",
+   "intent": "get configmaps in the qualification namespace: the effect of a writer RoleBinding such as I07 v3's K22",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "configmaps"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     }
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN05",
+   "intent": "rule 7 (certificatesigningrequests) missing",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      6
+     ]
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN06",
+   "intent": "the observer absent from the snapshot (not bound)",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      }
+     ]
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer is absent from the RBAC snapshot"
+  },
+  {
+   "id": "SN07",
+   "intent": "the observer listed with no rules (its rules all non-resource)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": []
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN08",
+   "intent": "rule 1 duplicated (bound twice)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "limitranges",
+       "namespaces",
+       "resourcequotas",
+       "serviceaccounts",
+       "secrets"
+      ],
+      "verbs": [
+       "list",
+       "watch"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN09",
+   "intent": "rules 1 and 2 in the other order",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": [
+      {
+       "apiGroups": [
+        "networking.k8s.io"
+       ],
+       "resources": [
+        "networkpolicies"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        ""
+       ],
+       "resources": [
+        "limitranges",
+        "namespaces",
+        "resourcequotas",
+        "serviceaccounts",
+        "secrets"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        "rbac.authorization.k8s.io"
+       ],
+       "resources": [
+        "roles",
+        "rolebindings",
+        "clusterroles",
+        "clusterrolebindings"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        "admissionregistration.k8s.io"
+       ],
+       "resources": [
+        "validatingwebhookconfigurations",
+        "mutatingwebhookconfigurations",
+        "mutatingadmissionpolicies",
+        "mutatingadmissionpolicybindings",
+        "validatingadmissionpolicies",
+        "validatingadmissionpolicybindings"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        "apiregistration.k8s.io"
+       ],
+       "resources": [
+        "apiservices"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        "apiextensions.k8s.io"
+       ],
+       "resources": [
+        "customresourcedefinitions"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      },
+      {
+       "apiGroups": [
+        "certificates.k8s.io"
+       ],
+       "resources": [
+        "certificatesigningrequests"
+       ],
+       "verbs": [
+        "list",
+        "watch"
+       ],
+       "resourceNames": [],
+       "scope": "CLUSTER"
+      }
+     ]
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN10",
+   "intent": "rule 1 narrowed by resourceNames (exact, not a bound)",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      0,
+      "resourceNames"
+     ],
+     "value": [
+      "x"
+     ]
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN11",
+   "intent": "the role reached through a RoleBinding in the qualification namespace instead of the ClusterRoleBinding",
+   "ops": [
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      0,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      1,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      2,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      3,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      4,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      5,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    },
+    {
+     "op": "set",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules",
+      6,
+      "scope"
+     ],
+     "value": "unit-namespace"
+    }
+   ],
+   "v3Result": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "SN12",
+   "intent": "escalate on clusterroles: v3's IC03 refuses first, unchanged",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "clusterroles"
+      ],
+      "verbs": [
+       "escalate"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL escalate rbac.authorization.k8s.io/clusterroles at CLUSTER",
+   "refusal": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL escalate rbac.authorization.k8s.io/clusterroles at CLUSTER"
+  },
+  {
+   "id": "SN13",
+   "intent": "get pods/exec: v3's IC03 refuses first, unchanged",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "pods/exec"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL get /pods/exec at CLUSTER",
+   "refusal": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL get /pods/exec at CLUSTER"
+  },
+  {
+   "id": "SN14",
+   "intent": "get on every resource: v3's IC03 refuses first (it reaches the kubelet subresources)",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       "*"
+      ],
+      "resources": [
+       "*"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL get /nodes/checkpoint at CLUSTER",
+   "refusal": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL get /nodes/checkpoint at CLUSTER"
+  }
+ ],
+ "crossVersion": [
+  {
+   "id": "XR01",
+   "intent": "I06 v3's snapshot positive (its observer has get, list and watch, admission *, and no secrets, apiservices, customresourcedefinitions or certificatesigningrequests)",
+   "base": "v3",
+   "ops": [],
+   "v3Result": null,
+   "v4Result": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "XR02",
+   "intent": "I06 v4's snapshot positive",
+   "base": "v4",
+   "ops": [],
+   "v3Result": null,
+   "v4Result": null
+  },
+  {
+   "id": "XR03",
+   "intent": "v4's positive with get secrets at cluster scope",
+   "base": "v4",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "get"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "v4Result": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "XR04",
+   "intent": "v4's positive with every verb on secrets",
+   "base": "v4",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       ""
+      ],
+      "resources": [
+       "secrets"
+      ],
+      "verbs": [
+       "*"
+      ],
+      "resourceNames": [],
+      "scope": "CLUSTER"
+     }
+    }
+   ],
+   "v3Result": null,
+   "v4Result": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "XR05",
+   "intent": "v4's positive without the observer",
+   "base": "v4",
+   "ops": [
+    {
+     "op": "delete",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      }
+     ]
+    }
+   ],
+   "v3Result": null,
+   "v4Result": "RB05 the observer is absent from the RBAC snapshot"
+  },
+  {
+   "id": "XR06",
+   "intent": "v4's positive with v3's S06 (the observer with a write): v3's refusal in both",
+   "base": "v4",
+   "ops": [
+    {
+     "op": "append",
+     "path": [
+      "subjects",
+      {
+       "kind": "User",
+       "name": "planeon:policy-observer"
+      },
+      "effectiveRules"
+     ],
+     "value": {
+      "apiGroups": [
+       "rbac.authorization.k8s.io"
+      ],
+      "resources": [
+       "roles"
+      ],
+      "verbs": [
+       "update"
+      ],
+      "resourceNames": [],
+      "scope": "unit-namespace"
+     }
+    }
+   ],
+   "v3Result": "IC03 grant beyond the closure entry: planeon:policy-observer POLICY_WRITE update rbac.authorization.k8s.io/roles at unit-namespace",
+   "v4Result": "IC03 grant beyond the closure entry: planeon:policy-observer POLICY_WRITE update rbac.authorization.k8s.io/roles at unit-namespace"
+  }
+ ],
+ "composed": [
+  {
+   "id": "CO01",
+   "intent": "both positives: the observer accepts its snapshot",
+   "snapshotCase": null,
+   "objectsCase": null,
+   "refusal": null
+  },
+  {
+   "id": "CO02",
+   "intent": "an exact snapshot from lists that bind a role holding only nonResourceURLs [\"*\"] to the observer (the producer drops non-resource rules, so only the lists show it)",
+   "snapshotCase": null,
+   "objectsCase": "ON48",
+   "refusal": "RB06 a binding other than the contract's names the observer: ClusterRoleBinding/all-urls"
+  },
+  {
+   "id": "CO03",
+   "intent": "an exact snapshot from lists holding an unbound aggregated ClusterRole with an empty selector (the producer lists no subject for it, so only the lists show it)",
+   "snapshotCase": null,
+   "objectsCase": "ON56",
+   "refusal": "RB07 an aggregated ClusterRole selects the observer ClusterRole: ClusterRole/aggregate-all"
+  },
+  {
+   "id": "CO04",
+   "intent": "a snapshot giving the observer get secrets, from lists that are exact",
+   "snapshotCase": "SN01",
+   "objectsCase": null,
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "CO05",
+   "intent": "both wrong: the snapshot's refusal comes first",
+   "snapshotCase": "SN01",
+   "objectsCase": "ON48",
+   "refusal": "RB05 the observer's effective rules are not exactly the observer ClusterRole's resource rules"
+  },
+  {
+   "id": "CO06",
+   "intent": "an escalation in the snapshot: v3's IC03 comes first",
+   "snapshotCase": "SN12",
+   "objectsCase": "ON52",
+   "refusal": "IC03 grant beyond the closure entry: planeon:policy-observer SPECIAL escalate rbac.authorization.k8s.io/clusterroles at CLUSTER"
+  },
+  {
+   "id": "CO07",
+   "intent": "another subject's extra read and an aggregate that cannot select the role: accepted",
+   "snapshotCase": "SA01",
+   "objectsCase": "OA05",
+   "refusal": null
+  }
+ ]
+}

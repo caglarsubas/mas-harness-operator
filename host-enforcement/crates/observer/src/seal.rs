@@ -59,18 +59,20 @@ const PR_CAP_AMBIENT_IS_SET: c_ulong = 1;
 /// The core limit the seal sets and reads back, `[soft, hard]`.
 const NO_CORE: [u64; 2] = [0, 0];
 
-/// The published OBSERVER programs (harness-onion MET-ENFORCE-025, seccomp allowlists v3, unchanged in v4; vendored
-/// byte-identically under `host-enforcement/contracts/seccomp-v3/` and pinned by `tools/gate.py`, HE-004A): the kernel's
-/// `struct sock_filter` arrays, 8 bytes per instruction. The array types pin each file's length at compile time; both
-/// are compiled in on every target and [`RUNNING_ARCH`] selects the one installed.
-pub static PROGRAM_X86_64: &[u8; 1904] = include_bytes!("../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf");
-pub static PROGRAM_AARCH64: &[u8; 1816] = include_bytes!("../../../contracts/seccomp-v3/OBSERVER.aarch64.bpf");
+/// The published OBSERVER programs: the kernel's `struct sock_filter` arrays, 8 bytes per instruction. The array types
+/// pin each file's length at compile time; both are compiled in on every target and [`RUNNING_ARCH`] selects the one
+/// installed. HE-004-I01a (DESIGN-I01A section 3) embeds the seccomp-v5 programs (harness-onion compiled filter programs
+/// v3, MET-ENFORCE-036; edge record v8's two rows, vendored byte-identically under `host-enforcement/contracts/seccomp-v5/`
+/// and pinned by `tools/gate.py`), which add the I01 listener's `bind`, `listen` and `accept4` to the OBSERVER row. The
+/// seccomp-v3 programs HE-004A embedded stay vendored and pinned, no longer embedded (Q-P2-3 (a)).
+pub static PROGRAM_X86_64: &[u8; 2024] = include_bytes!("../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf");
+pub static PROGRAM_AARCH64: &[u8; 1936] = include_bytes!("../../../contracts/seccomp-v5/OBSERVER.aarch64.bpf");
 
-/// The programs' instruction counts (seccomp allowlists v4 `programLengths`: 238 and 227).
-pub const INSTRUCTIONS_X86_64: u16 = 238;
-pub const INSTRUCTIONS_AARCH64: u16 = 227;
-const _: () = assert!(INSTRUCTIONS_X86_64 as usize * INSTRUCTION_BYTES == 1904);
-const _: () = assert!(INSTRUCTIONS_AARCH64 as usize * INSTRUCTION_BYTES == 1816);
+/// The programs' instruction counts (seccomp-v5: 253 and 242).
+pub const INSTRUCTIONS_X86_64: u16 = 253;
+pub const INSTRUCTIONS_AARCH64: u16 = 242;
+const _: () = assert!(INSTRUCTIONS_X86_64 as usize * INSTRUCTION_BYTES == 2024);
+const _: () = assert!(INSTRUCTIONS_AARCH64 as usize * INSTRUCTION_BYTES == 1936);
 
 /// The two architectures the observer is built for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1016,8 +1018,8 @@ mod tests {
             assert_eq!(fake.calls.len(), 87 + 47 + 88, "{arch:?}");
         }
         assert_eq!(KEPT, 1 << 12 | 1 << 39);
-        assert_eq!(plan(Arch::X86_64).expect("plan"), Plan { arch: Arch::X86_64, length: 238 });
-        assert_eq!(plan(Arch::Aarch64).expect("plan"), Plan { arch: Arch::Aarch64, length: 227 });
+        assert_eq!(plan(Arch::X86_64).expect("plan"), Plan { arch: Arch::X86_64, length: 253 });
+        assert_eq!(plan(Arch::Aarch64).expect("plan"), Plan { arch: Arch::Aarch64, length: 242 });
     }
 
     #[test]
@@ -1028,7 +1030,7 @@ mod tests {
         assert_eq!([kernel.effective, kernel.permitted, kernel.bounding], [KEPT; 3]);
         assert_eq!([kernel.inheritable, kernel.ambient], [0, 0]);
         assert!(kernel.no_new_privs && kernel.core == [0, 0] && kernel.filter.is_none());
-        assert_eq!(plan, Plan { arch: Arch::X86_64, length: 238 });
+        assert_eq!(plan, Plan { arch: Arch::X86_64, length: 253 });
         assert_eq!(fake.calls.len(), START_READS + STAGE1_WRITES);
         assert_eq!(fake.calls.last(), Some(&Call::Prctl(39, [0, 0, 0, 0])), "stage 1 ends with the nnp read-back");
     }

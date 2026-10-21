@@ -2208,3 +2208,129 @@ R136-R147.
 > - Q-NPE-10: NATIVE-PROFILE-V5.
 
 The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-004-I01a: the observer's I01 listener, custody, request checks, quota pair and role pin (`client`, `linux_listen`, `linux_net`, `i01_service`, `i01_request`, `observer_rbac`, `enrolled`, `quota`, `observe`, `status`; gate-sys `listen_seqpacket_plain`; `contracts/seccomp-v5/`, `contracts/i06-v4/`)
+
+The packet (DESIGN-I01A revision 6, sha256 `2d976d19…`; owner decisions Q-HE4I1-1..13 and Q-I01A-1..9, "Accept all",
+recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`, 2026-10-21) gives the observer its I01 listener and
+everything that judges a peer and a request, and sends nothing: every request closes at the binding gate, which has no
+binding until HE-008. Units U1-U6 also re-seal the observer with seccomp v5, keep a quota pair beside the headroom and
+pin the observer's own role with I06 v4 on every snapshot. U7 (the `PV` replay) waits for edge v9. Four contract files
+are copied byte for byte from edge record v8 (provenance in `contracts/PROVENANCE.md`). The I06 v4 model,
+`scripts/i06_backend_profile_v4.py` (`7f97acfe…`, harness-onion `29c84b36`, "I4M"), is pinned by digest and read as
+specification only. planeon-gate, planeon-broker, planeon-containment and planeon-writer are byte-identical;
+observer-sys, i05-protocol, effect-gate's sources, gate-tls, `crates/gate`, B1's five logic modules and the D2 modules
+are unchanged, and so are the D1 modules except `enrolled.rs`, which gains `server_identity()` (R152). Its rules are
+R148-R160.
+
+### Points taken from the pinned model (I06 v4; the design and the vectors are silent)
+
+| # | Point | Model |
+|---|---|---|
+| P1 | The acceptance order: v3's IC00-IC05 on the snapshot, then RB05 on it, then RB01-RB04, RB06 and RB07 on the three lists of the same read | I4M `:248-277` |
+| P2 | RB01's list reading: an object with exactly the three lists; every item an object whose metadata is an object with a plain-text name (all three lists read before the role is looked up) | I4M `:143-148`, `:188-193` |
+| P3 | The shape reading shared by RB01 and RB03: unknown members (sorted, comma-joined) before `kind`/`apiVersion` (each checked only when present) before metadata beyond the name and the five server fields | I4M `:151-157` |
+| P4 | RB02's reading: an absent or null `rules` is none; the count first; then rule by rule, its own reading (object, no unknown member, each list absent, null or an array of strings) and its five lists compared in the order apiGroups, resources, nonResourceURLs, verbs, resourceNames | I4M `:160-171`, `:203-212` |
+| P5 | RB06 and RB07 walk the ClusterRoleBindings (the contract's skipped) and then the RoleBindings; per binding the subjects' reading, the observer named, the roleRef's reading, the contract role referenced; a RoleBinding's place carries its namespace only when that is a string | I4M `:220-236` |
+| P6 | The aggregation reading: a null rule or a missing or null selector list is none; a selector matches an unlabelled object when it has no labels and every expression is NotIn or DoesNotExist; an unreadable selector refuses before a later one is read | I4M `:174-186`, `:237-246` |
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R148 | Scope. The observer listens on `/run/planeon/live-proxy/policy-observer.sock`, authenticates each peer, reads and checks each request, and closes every session: nothing is ever sent (`PeerOps` has no send; G-I01-5). New statuses 31-35 only (§14); every other I01 condition closes a session. Contracts: 50 (U1's two seccomp-v5 programs, U6's I06 v4 criteria and vectors) | DESIGN-I01A §0, §1, §14 |
+| R149 | The listener. gate-sys `listen_seqpacket_plain` is `listen_seqpacket` without the sockcreate guard (the observer's socket is labelled by its own domain); no new foreign symbol. `I01Socket` (Linux, `linux_listen.rs`, pinned whole) is opened only inside `LinuxWire::new(&Sealed)` after the poller (24), its setup refusals mapped by one function to 31 (socket, address, options), 32 (bind), 33 (listen) and 34 (register). The observer never unlinks or renames a path (G-I01-1); a stale path makes `bind` refuse (32) until `ExecStartPre=` clears it as `init_t` | DESIGN-I01A §4; Q-HE4I1-5 (a) |
+| R150 | The one wait. Every wire wait is `Client::wait_serving`'s (G-I01-2): it watches the service's plan (the listener only while no session is open and no backoff runs; else the session's peer), shortens the timeout to the plan's deadline, calls `serve_peer_step` once per ready I01 descriptor and `serve_peer_deadlines` once per wake. The service is attached to the client (`Option<Box<dyn PeerService>>`) and is handed the peer operations per call. One session at a time; the kernel backlog holds one more. I01 is not served during a capture set or a snapshot's CPU-bound tail | DESIGN-I01A §5; Q-HE4I1-6, Q-I01A-5 (a) |
+| R151 | Listener faults: an accept error other than EAGAIN or ECONNABORTED, EPOLLERR or EPOLLHUP on the listener, or a failed re-add or removal. A fault takes the listener out of the wait for 5 s (the re-add is a deadline of the wait); an accept clears the count; the twelfth fault in a row ends the wait, the client names it, and the epoch exits 35 instead of the poller's 95. HE-008 must pair any `Restart=` with a start-rate limit | DESIGN-I01A §4, §14 |
+| R152 | Custody, at accept, in HS43's order: SO_PEERCRED's uid and gid equal the record's SERVER row and SO_PEERSEC matches its `processLabel` (gate-sys `label_matches`, kernel bytes with their NUL); the pidfd is kept; `/proc/<pid>` is opened and kept, reading nothing; the pidfd is alive; through the kept directory, `stat`'s start time (the session's reference), `cgroup` equal to the line `0::/<cgroup_rel>\n` (gate-sys `same_lines`) and `attr/current` matching the record's label; an OBSERVED server's `exe` equal to `interpreterPath` exactly, and no `exe` read at all for a LABEL_BOUND one. Each message: SCM_CREDENTIALS the same pid, uid and gid, SCM_SECURITY byte-equal to SO_PEERSEC, exactly one of each control message (gate-sys `parse_control`), no truncation and no passed descriptor. Before and after each read the pidfd is alive and the start time, cgroup and label are unchanged. Every failure closes the session; none raises a status | DESIGN-I01A §6; Q-HE4I1-11, -12 (a) |
+| R153 | The window. The clock is the wall second the client passes from `Wire::wall_seconds`; the interval is `[validFrom, expiresAt - 3 s)` (the capture engine's margin). Checked at accept and before each read: before `validFrom` the session closes with no latch; from `expiresAt - 3 s` any session is cut and the service stays closed until restart (a clock stepped back does not reopen it); no clock (`None`) closes without a latch. An open session is cut at the next read or deadline call, within the 2 s idle bound | DESIGN-I01A §6 |
+| R154 | Not re-checked, and why: the listener's inode (no primitive; each peer is authenticated per connection, and only `init_t` can in practice unlink the path); the executable per message (SERVER's filter denies `execve` and `execveat`); the v1 inode-or-digest duty (path equality plus enrollment's fs-verity, the HS43 writer precedent) | DESIGN-I01A §6 |
+| R155 | The request, in order (`i01_request`, a logic module): framing (one datagram of 1-16,384 bytes, not cut short; printable ASCII; one strict JSON value; depth at most 16 with the root at 0; no float; integers within 2^53 - 1; decoded strings printable ASCII; the bytes equal to their canonical encoding), the schema (exactly the seven members of `policy-observation-request/v1`, each in its form, `sequence` 1 to 2^53 - 1), the chain (a session's first request is sequence 1 after the all-zero digest; since nothing is answered, no later request can pass), then the binding gate, which refuses while no binding exists (I01a: always). Sessions: 2 s idle from the accept, 900 s outer. The refusal texts are R10's | DESIGN-I01A §7, §8; Q-I01A-3 (a) |
+| R156 | The quota pair (`quota::quota`): per unit, the covering key with the least headroom (ties by the quota object's name, then the key's name), recorded as `floor(hard)` and `min(ceil(used), floor(hard))` in the unit's scale, so the pair never overstates the headroom and never shows `used > hard`; the chosen key's recorded values above 2^53 - 1 refuse the snapshot (89, "a recorded quota figure is above 2^53-1"), an unchosen key is never bound-checked; kept in `Observation.quota` beside `headroom` | DESIGN-I01A §9 |
+| R157 | The role pin (`observer_rbac`, a logic module): in `check_snapshot`, right after `Closure::check` with only the three list bindings between and before `let dropped` and `drop(produced)` (G-I01-3), so before OR02, OR05 and OR06; a refusal is status 87 ("I06 v4's role pin refused"). The rule data is compiled in (the eight rules, the role and binding names, the API version, the roleRef, the one User subject, the five server metadata fields) and held to the vectors' `objectsPositive` by `tools/gate.py`. Pinned refusals are the vectors' texts; R10's words for the two no vector pins: "RB02 the observer ClusterRole's rules member is no array" and "RB02 the observer ClusterRole's rule N is not an object of text lists". Python's `==` on a constant text is an exact string match; the model's `_same` against the constants is exact JSON equality; `str.strip()` is R10's copy of CPython 3.12's whitespace; a lone surrogate in a name shows as U+FFFD in a refusal. RB05 on a snapshot `Closure::check` would refuse (unreachable in `observe.rs`) answers "absent" | DESIGN-I01A §10; Q-RBAC-4, Q-HE4I1-9, Q-I01A-4 (a) |
+| R158 | Residuals (accepted). R116's "no way out" premise ends: a compromised observer now has a path to `planeon_server_t` (SELinux `connectto`, that domain only), although I01a sends nothing on it. A LABEL_BOUND server's executable is not checked (Q-HE4I1-11 (b), keeping the server without CAP_NET_BIND_SERVICE, is carried to HE-008 and T04). Per-connection containment rests on the cgroup line and the label; the cgroup's inode, limits, members, seccomp mode, `no_new_privs` and capabilities come from the last capture set (up to one cycle old). The pidfd and start time pin a process, not an identity. The Secret residual stays accepted; HE-008 seals an SC12 audit policy that flags an observer Secret request outside the two field-selected metadata forms, and T04 reads it (an audit event cannot see `Accept`); the `system:authenticated` limit is I06 v4's, carried to T04 | DESIGN-I01A §6, §11; Q-HE4I1-8, -13 (a) |
+| R159 | Gate rules (`tools/gate.py`): 50 contracts; `OBSERVER_PROGRAMS` on seccomp v5; `linux_listen.rs` among the socket files and the whole-file pins (`linux_net.rs` re-pinned); `I01Socket` a Debug hazard; the no-panic list adds `linux_listen`, `i01_service`, `i01_request` and `observer_rbac`; `i01_request` and `observer_rbac` take B1's logic rule (`I01_LOGIC_PATHS`); `serve`'s wiring has thirteen calls (`enrolled.server_identity()` after `Enrolled::new`); G-I01-1 (no unlink, remove or rename spelling), G-I01-2 (the one wire wait and the one step call), G-I01-3 (the role pin's one call and its place), G-I01-4 (the I01 path only in `linux_listen.rs`'s constant), G-I01-5 (nothing leaves I01a), G-I01-6 (`I01Socket`'s two homes and one construction), and the role pin's constants against `objectsPositive`; each reported | DESIGN-I01A §12 |
+| R160 | Tests (§15): `observer_status_i01`, `observer_i01_wait`, `observer_i01_request`, `observer_i01_service` (custody with a fake `PeerOps` and kernel-shaped labels), `observer_i01_quota`, `observer_i01_role_pin` (the 139-case I06 v4 replay: 96 of v4's own and v3's 43 snapshot cases on the v4 positive; the frozen inputs and constants; R10's texts; the rig's 87) and gate-sys's Linux-only `listen_plain`. Earlier test files change only where the design reaches them: the seal digests and counts, the fake wire's new `wait` and `PeerOps`, the quota edge of R156, and the rig's RBAC fixture (the observer's grants are now the contract role's alone) | DESIGN-I01A §15 |
+
+### Points settled at build (inside DESIGN-I01A's intent)
+
+- **The service's attachment (R150):** owned by the client (`serve_peers`) rather than lent per call; it still holds
+  session state only. Deadlines are a second method, so `serve_peer_step` is spelled once and called once per ready
+  descriptor.
+- **Status 35's path (R151):** a listener failure reaches the epoch as a poll error that the client names
+  (`listener_failed()`), read before the 95 mapping; a failed removal of the listener is a fault too, and any watch
+  fault makes that wait zero-timeout.
+- **The server identity (R152):** `Enrolled::server_identity()` refuses through `status::capture_setup` (27) for a row a
+  schema-valid record cannot lack, so no new status.
+- **The binding (R155):** never a service field; the gate is exercised with a test binding through `i01_request`
+  directly. The idle bound runs from the accept only, since every first request closes the session.
+- **The quota edge (R156):** HE-004C's `tests/observer_quota.rs` passed a pods hard of 2^53 + 2 whose headroom was
+  exactly 2^53 - 1; under the chosen key's bound it now refuses with R156's text, and a hard of 2^53 - 1 passes beside it.
+- **The role pin's object form (R157):** `object_lists` reads the vectors' (and HE-008's manifest's) three-list object;
+  `observe.rs` passes the read's own lists, so that reading cannot refuse there. The composed replay reads the object
+  form after the closure check and before RB05; no composed case has an unreadable form.
+- **The rig's RBAC fixture (R160):** `tests/c_support`'s `positive_rbac` leaves out the observer's I06 v2 entry, so its
+  grants come only from the contract role and binding the rig already adds; otherwise RB05 and RB06 refuse the rig's
+  read.
+- **G-I01-2 (R159):** every `wait` word counts, definitions aside (stricter than the call forms alone).
+- **`ListenerSetup::Socket` (R149):** it also stands for gate-sys's two sockcreate steps, which the plain listener never
+  reaches, so 31 covers every socket-stage refusal.
+- **The quota tie-break (R156):** a quota object without a name sorts as the empty name.
+- **`listen_plain` (R160), a departure from §15:** the test cannot accept a real peer, since a SEQPACKET client needs a raw
+  `socket` call, which no test may hold; it binds, listens, sees no queued peer and EADDRINUSE on a second bind. It is
+  Linux-only, and every run so far (the build host's `cargo test`, the sim and the verifier) is on macOS, where it holds
+  0 tests: the plain listener's bind, listen and EADDRINUSE behaviour has run nowhere yet. Both are carried to T04.
+
+### Evidence
+
+The heavy checkpoints ran in order under HOLD_CARGO sequencing, each on the lane monitor's word, on macOS:
+- `cargo test`: 724 passed, 0 failed, in 109 test binaries. The new binaries: `observer_status_i01` 2,
+  `observer_i01_wait` 7, `observer_i01_request` 4, `observer_i01_service` 11, `observer_i01_quota` 3,
+  `observer_i01_role_pin` 9, and `listen_plain` 0 (Linux-only; see the settled points).
+- Both musl release builds: rc 0.
+- `gate.py`: the first run failed its self-test with 27 errors, all from one cause: U6's literal-aware bracket helper was
+  a second module-level `bracket_end`, which replaced D1's two-argument helper. It was renamed `literal_bracket_end`
+  (two lines; no other name is bound twice). After that: "he-gate: passed", self-test 332 OK, 50 contract files,
+  G-I01-1..6 (G-I01-3 with 3 `let`s), the role constants (14), G-D1-16 and G-D2-7 on both targets.
+- The sim (`./ci/verify-offline.sh` over the packet): rc 0, nine argv, the zero-bill scan passing, tracked files
+  unchanged. planeon-gate, planeon-broker, planeon-containment and planeon-writer and their SBOMs are byte-identical to
+  HE-004D2's; planeon-observer changes, by the I01a code and the seccomp-v5 programs.
+- The 8-word span check against the three model files: shared spans only inside contract text (the vectors' pinned
+  refusal texts and the rule data), byte-exact.
+
+At build only `python3 -I -B` text checks ran: the contract digests and sizes, the seal constants and the BPF decode shape, the gate-sys foreign
+symbols, independent mirrors of G-I01-1..6 and of the constants check over the real sources, the serve wiring order,
+a python model of the request checks (56 cases), the quota choice, a python reading of `observer_rbac.rs` over the
+vectors (67 object cases, 65 snapshot cases after the vectors' v3 results, 7 composed), the 8-word span check and the
+privacy scan.
+
+### Code and audit
+
+- `crates/observer/src/`: `linux_listen.rs`, `i01_service.rs`, `i01_request.rs` and `observer_rbac.rs` are new;
+  `client.rs`, `linux_net.rs`, `status.rs`, `observe.rs`, `main.rs`, `lib.rs`, `enrolled.rs`, `quota.rs` and `seal.rs`
+  change. gate-sys gains `listen_seqpacket_plain` in `channel.rs`. No new crate, no manifest or lock change, no
+  `vendor/`, `licenses/` or `ci/` change.
+- `contracts/` (four files and PROVENANCE's section), `tools/gate.py`, `tools/test_gate.py` (R159) and this section.
+
+### Carried
+
+- **I01b:** the response side (the answer, `observedAt` and the clock rules), generation equality across a reservation
+  (HE-008's signed generation), the snapshot and scrape rate and the probe slot shared with per-request reads, the
+  reuse window from the read's stamp, whether the latest SERVER capture slot feeds availability, and the idle bound's
+  renewal on a request's receipt.
+- **I01 successor or HE-008:** capturer authentication; per-request capture freshness and retention across cycles; the
+  ADM-4 origin through I01 custody; the unavailable variant.
+- **HE-008:** the binding (signed config successor); `Restart=` with a start-rate limit (status 35); `ExecStartPre=` clearing
+  the socket path as `init_t`; `UMask=0177`; the I06 v4 role document and manifest check (RB00), whose
+  objects carry no annotations; the SC12 audit policy; Q-HE4I1-11 (b).
+- **W03 / T04:** the type transition labelling `policy-observer.sock` (without it `bind` refuses, 32); T04's checks of
+  the residuals above, of the listener accepting a real peer, and a Linux run of `listen_plain` (bind, listen,
+  EADDRINUSE), which no macOS run reaches.
+- **The next re-pin or gate revision (PR review round 1's notes):** G-I01-5 and `check_socket_items` do not follow a crate
+  alias (`use gate_sys as gs`), which only the two socket files' whole-file pins close today; the rules' textual limits
+  (a split or escaped path literal, `serve_peer_deadlines` unpinned, no `unlinkat`/`renameat` words, a condition such as
+  `cfg!(debug_assertions)` around the role pin's call); nothing pins that `serve` maps the wire's setup errors through
+  `status::wire_setup` (31-34); the no-panic report line does not name the four I01 sources (its count, 25, is right).
+- **What stays code review's:** every index guarded and every arithmetic step checked; the custody order inside
+  `serve_peer_step`'s control flow beyond what the fake `PeerOps` records; `I01Socket`'s methods matching their
+  `PeerOps` operations one to one.

@@ -499,6 +499,27 @@ pub fn listen_seqpacket(path: &str, context: &[u8]) -> Result<Listener, ListenEr
     Ok(Listener { fd })
 }
 
+/// An AF_UNIX SOCK_SEQPACKET listener at `path` with no socket context (HE-004-I01a, DESIGN-I01A section 4):
+/// [`listen_seqpacket`] without the sockcreate guard, for a role whose listening socket keeps its own domain's label
+/// (the observer's I01 listener: its OBSERVER filter kills the read-write open of `attr/sockcreate`, and its domain may
+/// not set a creation context). The socket is made non-blocking and close-on-exec, SO_PASSCRED and SO_PASSSEC are set
+/// (accepted sockets inherit both), and the socket binds and listens with a backlog of one. A path that exists fails
+/// `bind` (EADDRINUSE): the caller never unlinks. It names only foreign symbols this module already declares, and a
+/// failure is reported at its step (never `SockCreate` or `SockCreateClear`).
+pub fn listen_seqpacket_plain(path: &str) -> Result<Listener, ListenError> {
+    let (address, length) = socket_address(path).map_err(at(ListenStep::Address))?;
+    // SAFETY: socket takes three integers and reads or writes no memory.
+    let created = owned(unsafe { socket(AF_UNIX, SOCK_SEQPACKET | SOCK_NONBLOCK | SOCK_CLOEXEC, 0) });
+    let fd = created.map_err(at(ListenStep::Socket))?;
+    enable(&fd, SO_PASSCRED).map_err(at(ListenStep::PassCred))?;
+    enable(&fd, SO_PASSSEC).map_err(at(ListenStep::PassSec))?;
+    // SAFETY: `address` is a live `sockaddr_un` that bind reads and does not write; `length` is at most its size.
+    checked(unsafe { bind(fd.as_raw_fd(), &address, length) }).map_err(at(ListenStep::Bind))?;
+    // SAFETY: listen takes two integers and reads or writes no memory.
+    checked(unsafe { listen(fd.as_raw_fd(), 1) }).map_err(at(ListenStep::Listen))?;
+    Ok(Listener { fd })
+}
+
 /// One `accept4(fd, NULL, NULL, SOCK_NONBLOCK|SOCK_CLOEXEC)` through `syscall`: a connection, or `None` when none is
 /// queued (EAGAIN) or the queued one died (ECONNABORTED). EINTR retries; any other error is returned.
 pub fn accept(listener: &Listener) -> io::Result<Option<Conn>> {

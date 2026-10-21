@@ -24,6 +24,12 @@
 //! window (29): `validFrom` and `expiresAt` canonical UTC with `validFrom < expiresAt`, and `expiresAt` after the wall
 //! clock at start (an enrollment already over is a setup fault; a `validFrom` in the future is not, and captures wait
 //! for it). An unusable wall clock is 97, as for the configuration's lifetime.
+//!
+//! HE-004-I01a (DESIGN-I01A section 6; owner decisions Q-HE4I1-11 (a) and Q-I01A-8): [`Enrolled::server_identity`],
+//! which `serve` calls once, right after `Enrolled::new` and before the record moves into the capture engine, gives
+//! the I01 service what every peer must match: the SERVER row's uid, gid, `processLabel` and `interpreterPath`, the
+//! SERVER read target's cgroup part and capture class (OBSERVED or LABEL_BOUND, `capture_check::capture_class`), and
+//! the record's window. The record holds no pid. A row the schema-valid record cannot lack is a form refusal (27).
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -193,6 +199,29 @@ pub struct BackendTarget {
     pub cgroup_path: String,
     pub cgroup_rel: String,
     pub executable: String,
+}
+
+/// The I01 server's evidence class, from its capture class: an OBSERVED server's `exe` must equal its
+/// `interpreterPath`; a LABEL_BOUND one (its recorded capabilities hold CAP_NET_BIND_SERVICE) gets no `exe` read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ServerClass {
+    Observed,
+    LabelBound,
+}
+
+/// What every I01 peer must match (HE-004-I01a): the record's SERVER row and read target, and the record's window in
+/// seconds since the epoch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServerIdentity {
+    pub uid: u32,
+    pub gid: u32,
+    pub process_label: String,
+    /// The SERVER cgroup's part under the cgroup2 root.
+    pub cgroup_rel: String,
+    pub class: ServerClass,
+    pub interpreter: String,
+    pub valid_from: u64,
+    pub expires_at: u64,
 }
 
 /// The checked record and its typed read targets.
@@ -390,5 +419,24 @@ impl Enrolled {
             valid_from,
             expires_at,
         })
+    }
+
+    /// The I01 server's identity (HE-004-I01a): see the module documentation; a form refusal (27) for a row the
+    /// schema-valid record cannot lack.
+    pub fn server_identity(&self) -> Result<ServerIdentity, SetupError> {
+        let form = SetupError::RecordForm;
+        let row = at(self.record.value(), &["roles", "SERVER"]).ok_or(form("the SERVER row"))?;
+        let target = self.roles.iter().find(|target| target.role == "SERVER").ok_or(form("the SERVER row"))?;
+        let id = |key: &str| number_at(row, &[key]).and_then(|number| u32::try_from(number).ok());
+        let (Some(uid), Some(gid)) = (id("uid"), id("gid")) else { return Err(form("the SERVER uid or gid")) };
+        let class = match target.class {
+            "OBSERVED" => ServerClass::Observed,
+            "LABEL_BOUND" => ServerClass::LabelBound,
+            _ => return Err(form("the SERVER capture class")),
+        };
+        let process_label = text_at(row, &["processLabel"]).ok_or(form("the SERVER label"))?.to_string();
+        let interpreter = text_at(row, &["interpreterPath"]).ok_or(form("the SERVER interpreter"))?.to_string();
+        Ok(ServerIdentity { uid, gid, process_label, cgroup_rel: target.cgroup_rel.clone(), class, interpreter,
+                            valid_from: self.valid_from, expires_at: self.expires_at })
     }
 }

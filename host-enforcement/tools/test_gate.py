@@ -1080,11 +1080,16 @@ class ContractTests(unittest.TestCase):
     # HE-004B1 (DESIGN-B section 2): edge record v4's ten HE-004 rows join them (31).
     # HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's four native-profile rows join them (35).
     # HE-004D2 (DESIGN-D2 section 2, G-D2-1): edge record v6's five HE-004D2 rows join them (40), and unit B1's six of edge
-    # record v7 (46).
+    # record v7 (46). HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 OBSERVER rows (48);
+    # unit U6 (DESIGN-I01A section 10): its two I06 v4 rows (50).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 46)
+            self.assertEqual(len(gate.CONTRACTS), 50)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/i06-v4/")}, {
+                "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
+                "contracts/i06-v4/vectors.json": "27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/native-profile-")}, {
                 "contracts/native-profile-v4/qualification.schema.json":
@@ -1132,6 +1137,10 @@ class ContractTests(unittest.TestCase):
                              "d31c841042de456bb784e8412f61429be7700aea2ffa508af2637283ebcb3707")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/OBSERVER.x86_64.bpf"],
                              "e793aae5ad04a7c82a67d3f102b837064e645a585b83ace0586169a1746eb25a")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v5/OBSERVER.aarch64.bpf"],
+                             "887bf07824d7c1e6ec6db991473935d31500e0c78fac345058972a0f777ad184")
+            self.assertEqual(gate.CONTRACTS["contracts/seccomp-v5/OBSERVER.x86_64.bpf"],
+                             "a20d2a956393b3af72799eaad5fa2c4a3cd82f38bf3842c0dea7c42012e525b9")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.aarch64.bpf"],
                              "0ccbd7d090212fe52d366a2d68515670de40557cbc6fd07531653b404bb7105a")
             self.assertEqual(gate.CONTRACTS["contracts/seccomp-v3/EFFECT_GATE.x86_64.bpf"],
@@ -1959,6 +1968,12 @@ class SealOrderTests(Tree):
         self.assertIn("signed_config::load", gate.check_seal_order(self.base))
 
 
+# HE-004-I01a (DESIGN-I01A section 4): the observer's I01 listener file, the second observer socket file: gate-sys's
+# listener and peer in private fields, a pub(crate) API naming only the data type Watched among gate-sys's items.
+OBSERVER_LINUX_LISTEN_TEXT = ("use gate_sys::channel::{self, ListenStep};\n"
+                              "pub(crate) struct I01Socket { listener: channel::Listener, held: Option<channel::Conn> }\n"
+                              "pub(crate) fn watched(s: &I01Socket) -> channel::Watched<'_> { channel::Watched::Listener(&s.listener) }\n"
+                              "fn step(s: ListenStep) -> u8 { 0 }\n")
 # HE-004C (G4): the observer's socket module, mapping gate-sys's socket items into client.rs's portable types.
 OBSERVER_LINUX_NET_TEXT = ("use gate_sys::channel;\nuse gate_sys::tcp::{self, TcpConn};\n"
                            "pub struct LinuxWire { poller: channel::Poller, conns: Vec<TcpConn> }\n"
@@ -1971,7 +1986,9 @@ SOCKET_TREE = {**LINKED_TREE,
                "crates/gate-sys/src/tcp.rs": "use crate::channel::Watched;\npub fn listen_tcp() {}\n",
                "crates/gate-tls/src/credentials.rs": "use gate_sys::Dir;\nuse gate_sys::{FileMode, inet::InetAddress};\n",
                # HE-004C (G4): the observer's socket module.
-               gate.OBSERVER_LINUX_NET: OBSERVER_LINUX_NET_TEXT}
+               gate.OBSERVER_LINUX_NET: OBSERVER_LINUX_NET_TEXT,
+               # HE-004-I01a: its I01 listener file.
+               gate.OBSERVER_LINUX_LISTEN: OBSERVER_LINUX_LISTEN_TEXT}
 
 
 class SocketModuleTests(Tree):
@@ -1982,7 +1999,7 @@ class SocketModuleTests(Tree):
     TREE = SOCKET_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
 
     def test_the_bypass_forms_refuse(self):
         message = "socket-module check"
@@ -2000,7 +2017,7 @@ class SocketModuleTests(Tree):
                      SOCKET_TREE["crates/effect-gate/src/linux_os.rs"] + "pub(crate) use gate_sys::channel::Conn;\n", "re-exports")
         # A comment or a literal is not a path.
         self.write("crates/gate-tls/src/upstream.rs", "// gate_sys::tcp\nconst A: &str = \"gate_sys::channel\";\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_threads_refuse_in_every_linked_crate(self):
         for rel in ("crates/gate-sys/src/channel.rs", "crates/i05-protocol/src/json.rs", gate.GATE_MAIN,
@@ -2010,7 +2027,7 @@ class SocketModuleTests(Tree):
                              "names std::thread or thread::")
         self.write("crates/effect-gate/src/linux_os.rs", SOCKET_TREE["crates/effect-gate/src/linux_os.rs"]
                    + "// one thread::\nconst T: &str = \"thread-self\";\nfn threads() {}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
 
 
 class SocketItemTests(Tree):
@@ -2028,8 +2045,8 @@ class SocketItemTests(Tree):
                                                   "pub fn new(_s: &Sealed) -> Result<u8, SetupError> { z() }\n"}
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
-        self.assertEqual(gate.check_macros(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_macros(self.base), 17)
 
     def test_pub_items_naming_socket_items_refuse(self):
         message = "pub item naming gate-sys's socket items"
@@ -2072,7 +2089,7 @@ class SocketItemTests(Tree):
         self.write(os_rs, base + "pub struct Held { poller: Poller, pub n: u8, pub e: ListenError, f: fn() }\n"
                    "pub type Shared = Rc<RefCell<u8>>;\npub const BACKLOG: u16 = 16;\nstruct Unit;\n"
                    "pub struct Pair(u8, Poller);\nfn private() -> fn() { f }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
 
     def test_fn_traits_fn_pointers_and_pub_enum_variants_refuse(self):
         # HE-003D PR review round 2 confirmation, N1 (HE-003A2 DESIGN section 6, Q-A2-9 (a), D1-3, D2-1).
@@ -2136,10 +2153,10 @@ class SocketItemTests(Tree):
             "fn port_request(&self, request: impl FnOnce(&Poller, Watched<'_>) -> io::Result<()>) -> bool { r() }\n"
             "struct Hidden { f: Box<dyn Fn()>, g: fn() }\n")
         self.write(net_rs, self.TREE[net_rs] + "enum Stream {\n    Listener(TcpListener),\n    Conn(TcpConn),\n}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
         # Comments are not code; the reader refuses an enum it cannot read.
         self.write(os_rs, self.TREE[os_rs] + "// pub enum Leak { P(Poller) }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
         self.refused(gate.check_socket_modules, os_rs, self.TREE[os_rs] + "pub enum Broken { A(u8)\n", "cannot read")
 
     def test_macros_refuse_in_every_linked_crate(self):
@@ -2155,7 +2172,7 @@ class SocketItemTests(Tree):
         # Comments, literals and the tests are not definitions.
         self.write("crates/effect-gate/src/substrate.rs", "// no macro_rules here\nconst S: &str = \"macro_rules! m\";\n")
         self.write("crates/effect-gate/tests/m.rs", "macro_rules! m { () => {} }\n")
-        self.assertEqual(gate.check_macros(self.base), 17)
+        self.assertEqual(gate.check_macros(self.base), 18)
 
 
 class StructAngleTests(Tree):
@@ -2221,7 +2238,7 @@ class StructAngleTests(Tree):
                      "pub struct S<T = [u8; N >> 1]> { a: T, pub p: Poller }"):
             self.refused(gate.check_socket_modules, os_rs, base + text + "\n", "pub field naming gate-sys's socket items")
         self.write(os_rs, base + "pub struct S<T> where T: Copy;\npub struct Q<T = [u8; N >> 1]> { a: T, p: Poller }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
 
     def test_an_unreadable_struct_or_a_field_default_refuses(self):
         os_rs = "crates/effect-gate/src/linux_os.rs"
@@ -2909,6 +2926,10 @@ fn serve(sealed: &Sealed) -> u8 {
         Err(error) => return status::capture_setup(&error),
     };
     drop(record_schema);
+    let server = match enrolled.server_identity() {
+        Ok(server) => server,
+        Err(error) => return status::capture_setup(&error),
+    };
     let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };
     let capture = match LinuxCapture::new(sealed) {
         Ok(capture) => capture,
@@ -2916,15 +2937,16 @@ fn serve(sealed: &Sealed) -> u8 {
     };
     let Ok(closure) = Closure::embedded() else { return status::CLOSURE };
     let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));
-    status::observation(&observe::run(wire, config, tls, closure, captures))
+    status::observation(&observe::run(wire, config, tls, closure, captures, server))
 }
 """
 OBSERVER_SEAL = "crates/observer/src/seal.rs"
 OBSERVER_TREE = {**FOREIGN_TREE, gate.OBSERVER_MAIN: GOOD_OBSERVER_MAIN,
                  "crates/effect-gate/src/linux_os.rs": SOCKET_TREE["crates/effect-gate/src/linux_os.rs"],
                  "crates/effect-gate/src/linux_net.rs": SOCKET_TREE["crates/effect-gate/src/linux_net.rs"],
-                 # HE-004C (G4): the observer's socket module.
+                 # HE-004C (G4): the observer's socket module; HE-004-I01a: its I01 listener file.
                  gate.OBSERVER_LINUX_NET: OBSERVER_LINUX_NET_TEXT,
+                 gate.OBSERVER_LINUX_LISTEN: OBSERVER_LINUX_LISTEN_TEXT,
                  gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod seal;\npub mod status;\n",
                  OBSERVER_SEAL: "use std::io;\npub fn seal_stage1() -> io::Result<()> { Ok(()) }\n",
                  "crates/observer/src/status.rs": "pub const NOT_YET_SERVING: u8 = 10;\n",
@@ -3042,13 +3064,14 @@ class ObserverLinkedCrateTests(Tree):
         self.assertEqual(gate.SCANNED_CRATES, gate.LINKED_CRATES + ("crates/observer", "crates/observer-sys"))
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
                                                        "crates/observer-sys"))
-        # 13 sources of the gate's linked crates, 5 of the observer's (HE-004C: its socket module) and 2 of observer-sys's
-        # (HE-004D1).
+        # 13 sources of the gate's linked crates, 6 of the observer's (HE-004C: its socket module; HE-004-I01a: its I01
+        # listener file) and 2 of observer-sys's (HE-004D1).
         for check in (gate.check_linked_sources, gate.check_foreign_items, gate.check_debug_derives, gate.check_socket_modules,
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
-            self.assertEqual(check(self.base), 20, check.__name__)
-        # HE-004B1: the observer's (5 with HE-004C's socket module) and i05-protocol's 2; HE-004D1: observer-sys's 2.
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+            self.assertEqual(check(self.base), 21, check.__name__)
+        # HE-004B1: the observer's (5 with HE-004C's socket module, 6 with HE-004-I01a's listener file) and i05-protocol's
+        # 2; HE-004D1: observer-sys's 2.
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         self.assertEqual(gate.check_post_seal_sources(self.base), 13, "the gate's post-seal crates do not include the observer")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_LIB], "#![forbid(unsafe_code)]")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_MAIN], "#![forbid(unsafe_code)]")
@@ -3078,7 +3101,7 @@ class ObserverLinkedCrateTests(Tree):
 
     def test_the_observer_exit_import_once_in_main(self):
         main = gate.OBSERVER_MAIN
-        self.assertEqual(gate.check_linked_sources(self.base), 20)
+        self.assertEqual(gate.check_linked_sources(self.base), 21)
         for text in (GOOD_OBSERVER_MAIN + "use std::process::ExitCode;\n",
                      GOOD_OBSERVER_MAIN + "fn f() { std::process::exit(1); }\n",
                      GOOD_OBSERVER_MAIN + "fn f() { let _ = std::env::args_os(); }\n"):
@@ -3114,11 +3137,11 @@ class ObserverLinkedCrateTests(Tree):
         self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                    + "fn f(d: &Dir) { let _ = d.file(n, FileMode::Existing); let _ = d.sync(); }\n")
         self.write(OBSERVER_SEAL, seal + "fn f(blocked: bool, clocks: u8) -> bool { let synced = blocked; synced }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         # R1-1: a module path segment, comments and literals pass; drop() is not the Drop trait.
         self.write(OBSERVER_SEAL, seal + "use std::sync::atomic::AtomicU8;\n// Dir::sync, File::lock and impl Drop are refused\n"
                    "fn g(x: u8) -> &'static str { drop(x); \"file lock sync Drop\" }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         for rel in list(OBSERVER_TREE):
             if rel.startswith("crates/observer/"):
                 (self.base / rel).unlink()
@@ -3132,9 +3155,9 @@ class ObserverLinkedCrateTests(Tree):
         json_rs = self.TREE[gate.I05_JSON]
         drop = "impl Drop for Value {\n    fn drop(&mut self) { let mut pending = Vec::new(); pending.clear(); }\n}\n"
         self.write(gate.I05_JSON, json_rs + drop)
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         self.write(gate.I05_JSON, json_rs + "impl  Drop\n    for Value { fn drop(&mut self) {} }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         message = "names .* .observer post-seal check"
         for rel, text in ((gate.I05_JSON, json_rs + drop + drop),
                           (gate.I05_JSON, json_rs + "impl Drop for Doc { fn drop(&mut self) {} }\n"),
@@ -3149,7 +3172,7 @@ class ObserverLinkedCrateTests(Tree):
             self.refused(gate.check_observer_post_seal, rel, text, message)
         # Comments and literals pass; gate-sys's own definitions stay outside (OBSERVER_TREE's openat.rs).
         self.write(gate.I05_JSON, json_rs + "// impl Drop for Doc, file, lock and sync in a comment\nconst T: &str = \"Drop file\";\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
 
 
 class ObserverBinaryTests(unittest.TestCase):
@@ -3175,8 +3198,11 @@ class ObserverBinaryTests(unittest.TestCase):
 
     def test_each_target_names_its_pinned_program(self):
         self.assertEqual(set(gate.OBSERVER_PROGRAMS), set(gate.MACHINE))
-        self.assertEqual(gate.OBSERVER_PROGRAMS["x86_64-unknown-linux-musl"], "contracts/seccomp-v3/OBSERVER.x86_64.bpf")
-        self.assertEqual(gate.OBSERVER_PROGRAMS["aarch64-unknown-linux-musl"], "contracts/seccomp-v3/OBSERVER.aarch64.bpf")
+        # HE-004-I01a (DESIGN-I01A section 3): the seccomp-v5 programs; the v3 ones stay pinned but are no longer embedded.
+        self.assertEqual(gate.OBSERVER_PROGRAMS["x86_64-unknown-linux-musl"], "contracts/seccomp-v5/OBSERVER.x86_64.bpf")
+        self.assertEqual(gate.OBSERVER_PROGRAMS["aarch64-unknown-linux-musl"], "contracts/seccomp-v5/OBSERVER.aarch64.bpf")
+        self.assertIn("contracts/seccomp-v3/OBSERVER.x86_64.bpf", gate.CONTRACTS)
+        self.assertIn("contracts/seccomp-v3/OBSERVER.aarch64.bpf", gate.CONTRACTS)
         self.assertTrue(set(gate.OBSERVER_PROGRAMS.values()) <= set(gate.CONTRACTS))
         self.assertFalse(hasattr(gate, "OBSERVER_WRAPPER_JUSTIFICATIONS"), "no observer wrapper inventory in HE-004A")
 
@@ -3210,9 +3236,12 @@ LOGIC_TREE = {
                                           "pub fn hex(b: &[u8]) -> String { i05_protocol::sha256::hex(b) }\n",
     # HE-004D2 (G-D2-4): every D2 logic module built so far.
     **{rel: "use crate::capture_check::Refusal;\nuse crate::kernel_text;\npub fn d() -> u8 { 0 }\n" for rel in gate.D2_LOGIC},
+    # HE-004-I01a: the I01 logic modules built so far (the request checks; the role pin from unit U6).
+    **{rel: "use i05_protocol::json::Value;\nuse crate::snapshot;\npub fn i(v: &Value) -> bool { v.is_null() }\n"
+       for rel in gate.I01_LOGIC},
 }
-# HE-004D2 (G-D2-4): the logic modules, B1's five, D1's three and the D2 modules built so far.
-LOGIC_COUNT = 8 + len(gate.D2_LOGIC_BUILT)
+# HE-004D2 (G-D2-4): the logic modules, B1's five, D1's three and the D2 modules built so far; HE-004-I01a's.
+LOGIC_COUNT = 8 + len(gate.D2_LOGIC_BUILT) + len(gate.I01_LOGIC_BUILT)
 
 
 class ObserverLogicTests(Tree):
@@ -3301,8 +3330,8 @@ INCLUDE_TREE = {
     gate.OBSERVER_CONTRACTS: "pub const A: &[u8] = include_bytes!(\"../../../contracts/i06-v1/identity-closure.json\");\n"
                              "pub const B: &str = include_str! ( \"../../../contracts/i06-v2/README.md\" );\n"
                              "// include_bytes!(\"../../../tools/gate.py\") in a comment\n",
-    OBSERVER_SEAL: "pub static X: &[u8; 1904] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf\");\n"
-                   "pub static A: &[u8; 1816] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.aarch64.bpf\");\n",
+    OBSERVER_SEAL: "pub static X: &[u8; 2024] = include_bytes!(\"../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf\");\n"
+                   "pub static A: &[u8; 1936] = include_bytes!(\"../../../contracts/seccomp-v5/OBSERVER.aarch64.bpf\");\n",
 }
 
 
@@ -3338,6 +3367,9 @@ class ObserverIncludeTests(Tree):
                 (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/i06-v2/README.md\");\n",
                  "not an OBSERVER program"),
                 (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/seccomp-v4/EFFECT_GATE.x86_64.bpf\");\n",
+                 "not an OBSERVER program"),
+                # HE-004-I01a (DESIGN-I01A section 3): the seccomp-v3 OBSERVER programs are pinned but no longer embedded.
+                (OBSERVER_SEAL, self.TREE[OBSERVER_SEAL] + "pub static C: &[u8] = include_bytes!(\"../../../contracts/seccomp-v3/OBSERVER.x86_64.bpf\");\n",
                  "not an OBSERVER program")):
             self.refused(gate.check_observer_includes, rel, text, message)
         (self.base / gate.OBSERVER_CONTRACTS).unlink()
@@ -3947,7 +3979,10 @@ class ObserverSocketModuleTests(Tree):
     def test_the_observer_socket_module_passes(self):
         self.assertIn(gate.OBSERVER_LINUX_NET, gate.SOCKET_FILES)
         self.assertEqual(gate.OBSERVER_LINUX_NET, "crates/observer/src/linux_net.rs")
-        self.assertEqual(gate.check_socket_modules(self.base), 16)
+        # HE-004-I01a (DESIGN-I01A section 4): the I01 listener file is the observer's second socket file.
+        self.assertIn(gate.OBSERVER_LINUX_LISTEN, gate.SOCKET_FILES)
+        self.assertEqual(gate.OBSERVER_LINUX_LISTEN, "crates/observer/src/linux_listen.rs")
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
 
     def test_every_other_observer_source_refuses_the_socket_modules(self):
         for rel in ("crates/observer/src/client.rs", "crates/observer/src/observe.rs", gate.OBSERVER_MAIN,
@@ -3972,8 +4007,24 @@ class ObserverSocketModuleTests(Tree):
         with self.assertRaisesRegex(gate.GateError, "crates/observer/src/linux_net.rs is missing .socket-module check"):
             gate.check_socket_modules(self.base)
 
+    def test_the_listener_file_hands_out_only_the_watched_view(self):
+        # HE-004-I01a (DESIGN-I01A section 4, review r3 I3-1): I01Socket's pub(crate) API names gate-sys's Watched and
+        # nothing else of its socket modules; the R1-3 rule reads the listener file as it reads linux_net.rs.
+        rel = gate.OBSERVER_LINUX_LISTEN
+        for text, message in (("pub(crate) fn raw(s: &I01Socket) -> &channel::Listener { x() }", "pub item naming gate-sys's socket items"),
+                              ("pub(crate) fn step(e: &ListenError) -> ListenStep { x() }", "pub item naming gate-sys's socket items"),
+                              ("pub(crate) use gate_sys::channel::Conn;", "re-exports"),
+                              ("pub(crate) struct Leak { pub(crate) conn: channel::Conn }", "pub field naming gate-sys's socket items"),
+                              ("type Held = channel::Conn;", "private type alias")):
+            self.refused(gate.check_socket_modules, rel, OBSERVER_LINUX_LISTEN_TEXT + text + "\n", message)
+        self.write(rel, OBSERVER_LINUX_LISTEN_TEXT + "pub(crate) fn peer(s: &I01Socket) -> Option<channel::Watched<'_>> { None }\n")
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        (self.base / rel).unlink()
+        with self.assertRaisesRegex(gate.GateError, "crates/observer/src/linux_listen.rs is missing .socket-module check"):
+            gate.check_socket_modules(self.base)
 
-# HE-004D1 (G-D1-8): twelve steps, one call each.
+
+# HE-004D1 (G-D1-8): twelve steps, one call each; HE-004-I01a: thirteen, the server identity after Enrolled::new.
 SERVE_STEPS = (
     "    let document = match signed_config::load() {\n        Ok(document) => document,\n"
     "        Err(error) => return status::config_load(&error),\n    };\n",
@@ -3987,12 +4038,14 @@ SERVE_STEPS = (
     "        Err(error) => return status::capture_setup(&error),\n    };\n",
     "    let enrolled = match Enrolled::new(record, &record_schema, utc::wall_seconds()) {\n        Ok(enrolled) => enrolled,\n"
     "        Err(error) => return status::capture_setup(&error),\n    };\n    drop(record_schema);\n",
+    "    let server = match enrolled.server_identity() {\n        Ok(server) => server,\n"
+    "        Err(error) => return status::capture_setup(&error),\n    };\n",
     "    let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };\n",
     "    let capture = match LinuxCapture::new(sealed) {\n        Ok(capture) => capture,\n"
     "        Err(error) => return status::capture_setup(&error),\n    };\n",
     "    let Ok(closure) = Closure::embedded() else { return status::CLOSURE };\n",
     "    let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));\n"
-    "    status::observation(&observe::run(wire, config, tls, closure, captures))\n",
+    "    status::observation(&observe::run(wire, config, tls, closure, captures, server))\n",
 )
 
 
@@ -4006,18 +4059,19 @@ class ObserverServeTests(Tree):
 
     def test_the_wiring_passes(self):
         self.assertEqual("".join(SERVE_STEPS) in GOOD_OBSERVER_MAIN, True)
-        self.assertEqual(gate.check_observer_serve(self.base), 12)
+        self.assertEqual(gate.check_observer_serve(self.base), 13)
         self.assertEqual([name for _, name in gate.OBSERVER_WIRING],
                          ["signed_config::load(", "ObserverConfig::parse_with_record(", "config::check_lifetime(",
                           "credentials::observer_inputs(", "client_config(", "CaptureSchema::embedded(",
-                          "enrolled::load_record(", "Enrolled::new(", "LinuxWire::new(", "LinuxCapture::new(",
+                          "enrolled::load_record(", "Enrolled::new(", "enrolled.server_identity(", "LinuxWire::new(",
+                          "LinuxCapture::new(",
                           "Closure::embedded(", "observe::run("])
         # Spaced paths, comments naming the calls and the in-body use declarations are read through.
         spaced = (GOOD_OBSERVER_MAIN.replace("signed_config::load()", "signed_config :: load ()")
                   .replace("Closure::embedded()", "Closure ::embedded ( )")
                   .replace("    use planeon_observer::utc;\n", "    use planeon_observer::utc;\n    // observe::run( again in a comment\n"))
         self.write(gate.OBSERVER_MAIN, spaced)
-        self.assertEqual(gate.check_observer_serve(self.base), 12)
+        self.assertEqual(gate.check_observer_serve(self.base), 13)
 
     def test_each_call_missing_refuses(self):
         body = "".join(SERVE_STEPS)
@@ -4042,6 +4096,17 @@ class ObserverServeTests(Tree):
             steps.insert(index, SERVE_STEPS[index])
             self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(body, "".join(steps)),
                          "serve does not call %s exactly once" % re.escape(name))
+
+    def test_the_server_identity_is_the_thirteenth_call(self):
+        # HE-004-I01a (DESIGN-I01A sections 6 and 12): enrolled.server_identity() right after Enrolled::new, before the
+        # record moves into the capture engine; another receiver or a path spelling is not the call.
+        step = "    let server = match enrolled.server_identity() {\n"
+        for text in (GOOD_OBSERVER_MAIN.replace(step, "    let server = match record.server_identity() {\n"),
+                     GOOD_OBSERVER_MAIN.replace(step, "    let server = match Enrolled::server_identity(&enrolled) {\n"),
+                     GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ") + "    let _again = enrolled.server_identity();\n")):
+            self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text, "enrolled.server_identity. exactly once|in this order")
+        self.write(gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ")))
+        self.assertEqual(gate.check_observer_serve(self.base), 13)
 
     def test_bypass_forms_refuse(self):
         for old, new in (("observe::run(", "planeon_observer::observe::run("), ("client_config(identity", "tls::client_config(identity"),
@@ -4139,6 +4204,10 @@ class ContractsPinTests(Tree):
             gate.check_observer_contracts_module(self.base)
 
 
+# HE-004C's 13 modules, main.rs and status.rs, D1's three and observer-sys's three; HE-004-I01a's as their units add them.
+NO_PANIC_COUNT = 21 + len(gate.I01_NO_PANIC_BUILT)
+
+
 class ObserverNoPanicTests(Tree):
     """HE-004C DESIGN-C section 15 (G8, D1-14 (c)): the no-panic tripwire covers every HE-004C module and the changed
     main.rs and status.rs: no panicking macro or call outside strict #[cfg(test)] mod tests blocks; each file required."""
@@ -4148,7 +4217,7 @@ class ObserverNoPanicTests(Tree):
 
     def test_the_tree_passes(self):
         self.assertEqual(len(gate.OBSERVER_C_MODULES), 13)
-        self.assertEqual(gate.check_observer_no_panic(self.base), 21)
+        self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
 
     def test_each_source_is_required(self):
         for rel in gate.OBSERVER_NO_PANIC:
@@ -4169,7 +4238,7 @@ class ObserverNoPanicTests(Tree):
             self.refused(gate.check_observer_no_panic, rel, good + "#[cfg(test)] mod tests {\n    fn t() { panic!(); }\n}\n",
                          "observer no-panic tripwire")
             self.write(rel, good + "#[cfg(test)]\nmod tests {\n    fn t() { assert_eq!(1, 1); Some(1).unwrap(); }\n}\n")
-            self.assertEqual(gate.check_observer_no_panic(self.base), 21)
+            self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
             self.write(rel, good)
 
 
@@ -4245,7 +4314,9 @@ class ObserverDebugTests(Tree):
         for text, hazard in (("#[derive(Debug)]\nstruct S { identity: ObserverIdentity }", "ObserverIdentity"),
                              ("#[derive(Debug)]\nenum E { K(ObserverKeyBytes) }", "ObserverKeyBytes"),
                              ("#[derive(Debug)]\nstruct S { opened: Option<ObserverCredential> }", "ObserverCredential"),
-                             ("#[derive(Debug)]\nstruct Epoch { client: Client<LinuxWire> }", "LinuxWire")):
+                             ("#[derive(Debug)]\nstruct Epoch { client: Client<LinuxWire> }", "LinuxWire"),
+                             # HE-004-I01a (G-I01-6, R4-6): the I01 listener with its held peer.
+                             ("#[derive(Debug)]\nstruct Held { socket: Option<I01Socket> }", "I01Socket")):
             self.refused(gate.check_debug_derives, rel, text + "\n", "mention %s .Debug check" % hazard)
 
 
@@ -4874,7 +4945,8 @@ class ObserverNativeProfileTests(Tree):
 
     def test_the_tree_passes(self):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
-        self.assertEqual(len(gate.CONTRACTS), 46)
+        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50.
+        self.assertEqual(len(gate.CONTRACTS), 50)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -4933,7 +5005,7 @@ class ObserverD1NoPanicTests(Tree):
             for rel in gate.OBSERVER_NO_PANIC + gate.OBSERVER_SYS_NO_PANIC}
 
     def test_each_new_source_refuses_a_panic(self):
-        self.assertEqual(gate.check_observer_no_panic(self.base), 21)
+        self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
         for rel in ("crates/observer/src/enrolled.rs", CAPTURE_RS, LINUX_CAPTURE) + gate.OBSERVER_SYS_NO_PANIC:
             for text in ("fn g(x: Option<u8>) -> u8 { x.unwrap() }", "fn g(x: Option<u8>) -> u8 { x.expect(\"y\") }",
                          "fn g() { panic!(\"x\"); }", "fn g() { assert!(true); }"):
@@ -4947,7 +5019,7 @@ class ObserverD1NoPanicTests(Tree):
         good = self.TREE[KERNEL]
         self.write(KERNEL, good + "const _: () = assert!(A & 0x400643 == 0);\nconst _: () =\n    assert!(f(B) == (1, 2));\n"
                    "const _ : ( ) = assert ! ( size_of::<u64>() == 8 ) ;\n")
-        self.assertEqual(gate.check_observer_no_panic(self.base), 21)
+        self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
         for text in ("fn g() { const _: () = assert!(true); }", "const _: () = { assert!(true) };",
                      "const X: () = assert!(true);", "static _S: () = assert!(true);", "fn g() { debug_assert!(true); }"):
             self.refused(gate.check_observer_no_panic, KERNEL, good + text + "\n", "observer no-panic tripwire")
@@ -5115,7 +5187,7 @@ class ObserverSysConstAssertBraceTests(Tree):
         good = self.TREE[KERNEL]
         self.write(KERNEL, good + "const _: () = assert!(DIR_FLAGS & 0x400643 == 0);\n"
                    "const _: () = assert!(size_of::<u64>() == 8 && offset_of!(Info, id) == 4);\n")
-        self.assertEqual(gate.check_observer_no_panic(self.base), 21)
+        self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
         self.assertEqual(len(gate.const_asserts("const _: () = assert!(A == 0);\nconst _: () = assert!({ true });\n")), 1)
         for rel, text in (
                 (KERNEL, "const _: () = assert!({ impl Roots { pub fn probe(&self) -> u8 { panic!(\"x\") } } true });"),
@@ -5404,9 +5476,11 @@ class D2ContractCountTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_the_forty_six_files_pass(self):
-        self.assertEqual(len(gate.CONTRACTS), 46)
+        # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48; unit U6
+        # (section 10): its two I06 v4 files make 50.
+        self.assertEqual(len(gate.CONTRACTS), 50)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 46)
+        self.assertEqual(gate.check_contracts(self.base), 50)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
         for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS:
@@ -5420,14 +5494,14 @@ class D2ContractCountTests(unittest.TestCase):
                 gate.check_contracts(self.base)
             path.write_bytes(data)
         for rel in ("contracts/native-profile-v6/qualification.schema.json", "contracts/native-profile-v5/extra.json",
-                    "contracts/i06-v4/vectors.json"):
+                    "contracts/i06-v5/vectors.json", "contracts/i06-v4/README.md"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 46)
+        self.assertEqual(gate.check_contracts(self.base), 50)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -5457,11 +5531,12 @@ class D2EmbeddedContractTests(Tree):
                     "contracts/native-profile-v5/README.md", "contracts/native-profile-v1/vectors.json",
                     "contracts/native-profile-v2/vectors.json", "contracts/native-profile-v3/vectors.json",
                     "contracts/i06-v3/criteria.json", "contracts/i06-v3/vectors.json", "contracts/i06-v2/README.md",
-                    "contracts/i06-v1/README.md", "contracts/i07-v3/policy-kinds.json"):
+                    "contracts/i06-v1/README.md", "contracts/i07-v3/policy-kinds.json", "contracts/i06-v4/criteria.json",
+                    "contracts/i06-v4/vectors.json"):
             self.assertIn(rel, gate.CONTRACTS)
             text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
             self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text, self.RULE)
-        for rel in ("contracts/native-profile-v6/vectors.json", "contracts/i06-v4/vectors.json"):
+        for rel in ("contracts/native-profile-v6/vectors.json", "contracts/i06-v5/vectors.json"):
             text = NATIVE_CONTRACTS + "pub const OTHER: &[u8] = include_bytes!(\"../../../%s\");\n" % rel
             self.refused(gate.check_observer_contracts_module, gate.OBSERVER_CONTRACTS, text,
                          "not a registered contract file")
@@ -5522,14 +5597,17 @@ class D2ConstructorHomePinTests(Tree):
         self.write_bytes(rel, self.real[rel])
 
     def test_the_real_files_pass(self):
+        # HE-004-I01a (G-I01-6): linux_listen.rs joins the pins and linux_net.rs is re-pinned.
         self.assertEqual(gate.OBSERVER_HOME_PINS, {
             "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
-            "crates/observer/src/linux_net.rs": "bc9b4f510222874a197b9a2676946cea827c0871e05fc1ea07682a0bd93bf8c9"})
-        self.assertEqual(gate.check_observer_home_pins(self.base), 2)
+            "crates/observer/src/linux_net.rs": "41a23aa7d6215d5f8194b703da511a8945d7600f1f0d306affb94cd830ac17ac",
+            "crates/observer/src/linux_listen.rs": "d06742932d92eaf05308158d37ce670859f316e1b0fe7a1972b8e4c93be5433b"})
+        self.assertEqual(gate.check_observer_home_pins(self.base), 3)
 
     def test_each_file_refuses_a_change_missing_or_a_symlink(self):
         for rel, alias in (("crates/observer/src/linux_net.rs", b"pub type W<T: Into<[u8; 1]> = LinuxWire> = T;\n"),
-                           ("crates/observer/src/linux_capture.rs", b"pub struct H<T = LinuxCapture>(T);\n")):
+                           ("crates/observer/src/linux_capture.rs", b"pub struct H<T = LinuxCapture>(T);\n"),
+                           ("crates/observer/src/linux_listen.rs", b"pub(crate) struct H<T = I01Socket>(T);\n")):
             data = self.real[rel]
             middle = len(data) // 2
             self.refuses(rel, data[:middle] + bytes([data[middle] ^ 1]) + data[middle + 1:])
@@ -5545,7 +5623,7 @@ class D2ConstructorHomePinTests(Tree):
                 gate.check_observer_home_pins(self.base)
             (self.base / rel).unlink()
             self.write_bytes(rel, data)
-        self.assertEqual(gate.check_observer_home_pins(self.base), 2)
+        self.assertEqual(gate.check_observer_home_pins(self.base), 3)
 
 
 class D2ObserverSysPinTests(Tree):
@@ -5624,7 +5702,7 @@ class D2QualifiedConstructorTests(Tree):
 
     def test_the_fixture_passes(self):
         self.assertEqual([name for _, name in gate.QUALIFIED_CONSTRUCTORS], ["LinuxWire", "LinuxCapture"])
-        self.assertEqual(gate.check_observer_serve(self.base), 12)
+        self.assertEqual(gate.check_observer_serve(self.base), 13)
         self.assertEqual(gate.check_observer_capture_callers(self.base), 4)
 
     def test_a_second_qualified_construction_in_serve_refuses(self):
@@ -6174,6 +6252,357 @@ class D2TokenTests(Tree):
                 self.write(rel, kept)
             else:
                 (self.base / rel).unlink()
+
+
+# --- HE-004-I01a (DESIGN-I01A rev 6 section 12): the observer's I01 listener --------------------------------------------
+
+I01_CLIENT_TEXT = ("//! The transport (a comment may name self.wire.wait(, W::wait, peer_send and Wire::wait).\n"
+                   "pub trait PeerOps {\n    fn accept_peer(&mut self) -> u8;\n}\n"
+                   "pub trait PeerService {\n    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps) -> u8;\n}\n"
+                   "pub struct Client<W: Wire> { wire: W, service: Option<Box<dyn PeerService>> }\n"
+                   "impl<W: Wire + PeerOps> Client<W> {\n"
+                   "    fn wait_serving(&mut self, until: u8) -> u8 {\n"
+                   "        let woken = self.wire.wait(&[], until);\n"
+                   "        if let Some(service) = self.service.as_deref_mut() {\n"
+                   "            service.serve_peer_step(&mut self.wire);\n"
+                   "        }\n"
+                   "        woken\n"
+                   "    }\n"
+                   "    pub fn pause(&mut self) -> u8 {\n        self.wait_serving(1)\n    }\n"
+                   "}\n")
+I01_NET_TEXT = ("use gate_sys::channel;\nuse crate::linux_listen::I01Socket;\n"
+                "pub struct LinuxWire { poller: channel::Poller, i01: I01Socket }\n"
+                "impl LinuxWire {\n"
+                "    pub fn new(sealed: &Sealed) -> Result<LinuxWire, u8> {\n"
+                "        let i01 = I01Socket::open(sealed).map_err(|_| 31)?;\n"
+                "        Ok(LinuxWire { poller: poller(), i01 })\n"
+                "    }\n"
+                "}\n"
+                "impl Wire for LinuxWire {\n"
+                "    fn wait(&mut self) -> u8 {\n"
+                "        self.poller.wait(0, &mut ready);\n"
+                "        0\n"
+                "    }\n"
+                "    fn send(&mut self, conn: u8) -> u8 {\n        self.conns.get(&conn).send(b)\n    }\n"
+                "}\n")
+I01_LISTEN_TEXT = ("use gate_sys::channel::{self, ListenStep};\n"
+                   "const I01_PATH: &str = \"/run/planeon/live-proxy/policy-observer.sock\";\n"
+                   "pub(crate) struct I01Socket { listener: channel::Listener }\n"
+                   "impl I01Socket {\n"
+                   "    pub(crate) fn open(_sealed: &Sealed) -> Result<I01Socket, u8> {\n"
+                   "        channel::listen_seqpacket_plain(I01_PATH).map(|listener| I01Socket { listener }).map_err(|_| 31)\n"
+                   "    }\n"
+                   "}\n")
+I01_OBSERVE = "crates/observer/src/observe.rs"
+I01_TREE = {gate.OBSERVER_CLIENT: I01_CLIENT_TEXT, gate.OBSERVER_LINUX_NET: I01_NET_TEXT,
+            gate.OBSERVER_LINUX_LISTEN: I01_LISTEN_TEXT,
+            gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod client;\npub mod i01_request;\npub mod i01_service;\n"
+                              "pub mod linux_listen;\npub mod linux_net;\n",
+            I01_OBSERVE: "pub fn run() -> u8 { 0 }\n",
+            # Unit U4: the two i01_ sources.
+            gate.I01_FILES[0]: "use crate::client::{PeerOps, PeerService};\npub struct I01Service;\n",
+            gate.I01_FILES[1]: "pub fn check(bytes: &[u8]) -> bool { bytes.is_empty() }\n"}
+
+
+class I01ListenerRuleTests(Tree):
+    """HE-004-I01a G-I01-1, -2, -4, -5 and -6 (DESIGN-I01A section 12) over a small observer tree: the fixture passes and
+    each departure refuses; then the five rules over the real sources."""
+
+    TREE = I01_TREE
+
+    def test_the_fixture_passes(self):
+        self.assertEqual(gate.I01_PATH, "/run/planeon/live-proxy/policy-observer.sock")
+        self.assertEqual(gate.I01_FILES, ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs"))
+        self.assertEqual(gate.check_observer_never_unlinks(self.base), 7)
+        self.assertEqual(gate.check_observer_wait_point(self.base), 3)
+        self.assertEqual(gate.check_observer_i01_path(self.base), 1)
+        self.assertEqual(gate.check_observer_no_send(self.base), 7)
+        self.assertEqual(gate.check_observer_i01_socket(self.base), 7)
+
+    def test_g_i01_1_no_path_is_removed_or_renamed(self):
+        good = self.TREE[I01_OBSERVE]
+        for text in ("fn f(d: &Dir) { d.unlink(n); }", "fn f() { let _ = remove_file(p); }", "fn f() { remove_dir(p); }",
+                     "fn f() { remove_dir_all(p); }", "fn f() { rename(a, b); }", "fn f() { hard_link(a, b); }",
+                     "use x::unlink;"):
+            self.refused(gate.check_observer_never_unlinks, I01_OBSERVE, good + text + "\n", "G-I01-1")
+        # Comments, literals and a strict test block pass.
+        self.write(I01_OBSERVE, good + "// unlink and rename in a comment\nconst T: &str = \"remove_file\";\n"
+                   "#[cfg(test)]\nmod tests {\n    fn t() { remove_dir_all(p); }\n}\n")
+        self.assertEqual(gate.check_observer_never_unlinks(self.base), 7)
+
+    def test_g_i01_2_one_wire_wait_and_one_step(self):
+        client, net = gate.OBSERVER_CLIENT, gate.OBSERVER_LINUX_NET
+        good = self.TREE[client]
+        anchor = "    pub fn pause(&mut self) -> u8 {\n        self.wait_serving(1)\n    }\n"
+        for extra in ("    fn other(&mut self) -> u8 { self.wire.wait(&[], 2) }\n",
+                      "    fn other(&mut self) -> u8 { W::wait(&mut self.wire, &[], 2) }\n",
+                      "    fn other(&mut self) -> u8 { Wire :: wait(&mut self.wire, &[], 2) }\n",
+                      "    fn other(&mut self) -> u8 { <W as Wire>::wait(&mut self.wire, &[], 2) }\n",
+                      "    fn other(&mut self) -> u8 { let f = W::wait; f(&mut self.wire, &[], 2) }\n",
+                      "    fn other(&mut self) -> u8 { self.wire . wait (&[], 2) }\n",
+                      "    fn other(&mut self, s: &mut S) { s.serve_peer_step(&mut self.wire); }\n",
+                      "    fn other(&mut self, s: &mut S) { PeerService::serve_peer_step(s, &mut self.wire); }\n",
+                      "    fn other(&mut self, s: &mut S) { <S as PeerService>::serve_peer_step(s, &mut self.wire); }\n",
+                      "    fn other(&mut self) { let _f = S::serve_peer_step; }\n"):
+            self.refused(gate.check_observer_wait_point, client, good.replace(anchor, anchor + extra), "G-I01-2")
+        # The wire wait moved out of wait_serving, the step called twice, a wait in another file, the poller's wait
+        # replaced.
+        moved = good.replace("        let woken = self.wire.wait(&[], until);\n", "        let woken = until;\n").replace(
+            anchor, anchor + "    fn other(&mut self) -> u8 { self.wire.wait(&[], 2) }\n")
+        self.refused(gate.check_observer_wait_point, client, moved, "G-I01-2")
+        step = "            service.serve_peer_step(&mut self.wire);\n"
+        self.refused(gate.check_observer_wait_point, client, good.replace(step, step + step), "G-I01-2")
+        self.refused(gate.check_observer_wait_point, I01_OBSERVE,
+                     self.TREE[I01_OBSERVE] + "fn f<W: Wire>(w: &mut W) { w.wait(&[], 1); }\n", "G-I01-2")
+        self.refused(gate.check_observer_wait_point, net,
+                     self.TREE[net].replace("self.poller.wait(0, &mut ready)", "self.other.wait(0, &mut ready)"), "G-I01-2")
+        # A strict test block passes.
+        self.write(client, good + "#[cfg(test)]\nmod tests {\n    fn t(w: &mut W) { w.wait(&[], 1); }\n}\n")
+        self.assertEqual(gate.check_observer_wait_point(self.base), 3)
+
+    def test_g_i01_4_the_path_lives_only_in_the_listener_file(self):
+        listen = gate.OBSERVER_LINUX_LISTEN
+        good = self.TREE[listen]
+        other = self.TREE[I01_OBSERVE]
+        for rel, text in ((I01_OBSERVE, other + "// /run/planeon/live-proxy/policy-observer.sock\n"),
+                          (I01_OBSERVE, other + "const P: &str = \"policy-observer.sock\";\n"),
+                          (listen, good + "// policy-observer.sock again\n"),
+                          (listen, good.replace("const I01_PATH", "pub const I01_PATH")),
+                          (listen, good.replace("\"/run/planeon/live-proxy/policy-observer.sock\"",
+                                                "concat!(\"/run/planeon/live-proxy/\", \"policy-observer.sock\")"))):
+            self.refused(gate.check_observer_i01_path, rel, text, "G-I01-4")
+        (self.base / listen).unlink()
+        with self.assertRaisesRegex(gate.GateError, "linux_listen.rs is missing .the I01 path, G-I01-4"):
+            gate.check_observer_i01_path(self.base)
+
+    def test_g_i01_5_nothing_leaves_i01a(self):
+        net, listen, client, lib = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN, gate.OBSERVER_CLIENT, gate.OBSERVER_LIB
+        self.refused(gate.check_observer_no_send, I01_OBSERVE,
+                     self.TREE[I01_OBSERVE] + "fn f(o: &mut dyn PeerOps) { o.peer_send(1, b); }\n", "G-I01-5")
+        for rel in (net, listen):
+            for text in ("use gate_sys::channel::send;", "use gate_sys::channel::{Conn, send};",
+                         "use gate_sys::channel::send as s;", "use gate_sys::channel as ch;", "use gate_sys::{channel as ch};",
+                         "use gate_sys::channel::{self as ch};", "fn f(c: &Conn) { let _ = channel::send(c, b); }",
+                         "fn f(c: &Conn) { let _ = gate_sys :: channel :: send(c, b); }",
+                         "fn f(c: &Conn) { let _ = ::gate_sys::channel::send(c, b); }"):
+                self.refused(gate.check_observer_no_send, rel, self.TREE[rel] + text + "\n", "G-I01-5")
+        # PeerOps: exactly `pub trait PeerOps {`, once, in client.rs.
+        good = self.TREE[client]
+        for text in (good.replace("pub trait PeerOps {", "pub trait PeerOps: Wire {"),
+                     good.replace("pub trait PeerOps {", "pub trait PeerOps where Self: Wire {"),
+                     good.replace("pub trait PeerOps {", "pub(crate) trait PeerOps {"),
+                     good + "pub trait PeerOps {\n}\n"):
+            self.refused(gate.check_observer_no_send, client, text, "G-I01-5")
+        self.refused(gate.check_observer_no_send, I01_OBSERVE, self.TREE[I01_OBSERVE] + "trait PeerOps {}\n", "G-I01-5")
+        # The i01_ sources: exactly the two built ones (unit U4), declared in lib.rs, naming none of Wire, connect, ConnId
+        # and Client; no response, observation or digest module; and none before their unit builds them.
+        service, request = gate.I01_FILES
+        self.assertEqual(gate.I01_FILES_BUILT, gate.I01_FILES)
+        for word in ("Wire", "connect", "ConnId", "Client"):
+            self.refused(gate.check_observer_no_send, service, self.TREE[service] + "fn f(w: &dyn %s) {}\n" % word, "G-I01-5")
+            self.refused(gate.check_observer_no_send, request, self.TREE[request] + "fn %s() {}\n" % word, "G-I01-5")
+        for rel in ("crates/observer/src/i01_response.rs", "crates/observer/src/i01_digest.rs",
+                    "crates/observer/src/i01_observation.rs"):
+            self.refused(gate.check_observer_no_send, rel, "pub fn answer() {}\n", "G-I01-5")
+        self.refused(gate.check_observer_no_send, lib, self.TREE[lib] + "mod i01_observation;\n", "G-I01-5")
+        self.refused(gate.check_observer_no_send, lib, self.TREE[lib].replace("pub mod i01_request;\n", ""), "G-I01-5")
+        (self.base / request).unlink()
+        with self.assertRaisesRegex(gate.GateError, "G-I01-5"):
+            gate.check_observer_no_send(self.base)
+        self.write(request, self.TREE[request])
+        with mock.patch.object(gate, "I01_FILES_BUILT", ()):
+            with self.assertRaisesRegex(gate.GateError, "the i01_ sources present .* are not exactly none"):
+                gate.check_observer_no_send(self.base)
+        self.assertEqual(gate.check_observer_no_send(self.base), 7)
+
+    def test_g_i01_6_the_socket_s_homes_and_its_one_construction(self):
+        net, listen = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN
+        call = "        let i01 = I01Socket::open(sealed).map_err(|_| 31)?;\n"
+        good = self.TREE[net]
+        for text in (good + "fn again(s: &Sealed) { let _ = I01Socket::open(s); }\n",
+                     good.replace(call, call + "        let _again = <I01Socket>::open(sealed);\n"),
+                     good.replace(call, call + "        let _again = I01Socket::<>::open(sealed);\n"),
+                     good.replace(call, call + "        let _again = <(I01Socket)>::open(sealed);\n"),
+                     good.replace(call, call + "        let _again = I01Socket :: open(sealed);\n"),
+                     good.replace(call, "        let i01 = make(sealed)?;\n"),
+                     good + "pub type Socket = I01Socket;\n",
+                     good.replace("use crate::linux_listen::I01Socket;", "use crate::linux_listen::I01Socket as Socket;")):
+            self.refused(gate.check_observer_i01_socket, net, text, "G-I01-6")
+        for text in (self.TREE[listen] + "impl I01Socket {\n    fn reopen(s: &Sealed) -> Result<Self, u8> { Self::open(s) }\n}\n",
+                     self.TREE[listen] + "pub(crate) type Socket<T = I01Socket> = T;\n"):
+            self.refused(gate.check_observer_i01_socket, listen, text, "G-I01-6")
+        for text in ("fn f(s: &crate::linux_listen::I01Socket) {}\n", "pub struct H<T = I01Socket>(T);\n"):
+            self.refused(gate.check_observer_i01_socket, I01_OBSERVE, self.TREE[I01_OBSERVE] + text, "G-I01-6")
+        self.assertIn("I01Socket", gate.DEBUG_HAZARDS)
+        self.assertEqual(gate.check_observer_i01_socket(self.base), 7)
+
+    def test_the_real_sources_pass(self):
+        # Over the observer's real sources (as built): the five rules hold.
+        for check in (gate.check_observer_never_unlinks, gate.check_observer_no_send, gate.check_observer_i01_socket):
+            self.assertGreater(check(gate.HE), 30, check.__name__)
+        self.assertEqual(gate.check_observer_wait_point(gate.HE), 3)
+        self.assertEqual(gate.check_observer_i01_path(gate.HE), 1)
+
+
+# HE-004-I01a unit U6 (DESIGN-I01A sections 10 and 12): the role pin's call in a small check_snapshot.
+ROLE_PIN_OBSERVE = (
+    "use crate::observer_rbac::{self, RbacLists};\n"
+    "impl Epoch {\n"
+    "    // Closure::check and observer_rbac::check_observer_snapshot( in a comment are no anchors.\n"
+    "    fn check_snapshot(&mut self, inputs: Inputs) -> Result<u8, Stop> {\n"
+    "        let produced = match produce_snapshot(&inputs, &namespace) {\n"
+    "            Ok(produced) => produced,\n"
+    "            Err(_) => return Err(self.stop(ObserverExit::Rbac, \"B1 {refused}\")),\n"
+    "        };\n"
+    "        if self.closure.check(&produced.snapshot, &namespace).is_err() {\n"
+    "            return Err(self.stop(ObserverExit::Rbac, \"the closure check refused\"));\n"
+    "        }\n"
+    "        let cluster_roles = match inputs.items(Resource::ClusterRoles) {\n"
+    "            Ok(items) => items,\n"
+    "            Err(error) => return Err(self.input_exit(&error)),\n"
+    "        };\n"
+    "        let cluster_role_bindings = inputs.items(Resource::ClusterRoleBindings).unwrap_or(&[]);\n"
+    "        let role_bindings = inputs.items(Resource::RoleBindings).unwrap_or(&[]);\n"
+    "        if observer_rbac::check_observer_snapshot(&produced.snapshot,\n"
+    "                                                  RbacLists { cluster_roles, cluster_role_bindings, role_bindings })\n"
+    "            .is_err()\n"
+    "        {\n"
+    "            return Err(self.stop(ObserverExit::Rbac, \"I06 v4's role pin refused\"));\n"
+    "        }\n"
+    "        let dropped = produced.dropped_non_resource_rules;\n"
+    "        drop(produced);\n"
+    "        for check in [check_or02, check_or05, check_or06] {\n"
+    "            check(&inputs)?;\n"
+    "        }\n"
+    "        Ok(dropped)\n"
+    "    }\n"
+    "}\n")
+ROLE_PIN_CALL_TEXT = "        if observer_rbac::check_observer_snapshot(&produced.snapshot,\n"
+ROLE_PIN_LAST_LET = "        let role_bindings = inputs.items(Resource::RoleBindings).unwrap_or(&[]);\n"
+ROLE_PIN_DROPS = "        let dropped = produced.dropped_non_resource_rules;\n        drop(produced);\n"
+
+
+class RolePinCallTests(Tree):
+    """HE-004-I01a G-I01-3 (DESIGN-I01A sections 10 and 12): observe.rs calls observer_rbac::check_observer_snapshot
+    once, in the statement after the closure check's with only `let`s between, followed by `let dropped` and then
+    drop(produced); each departure refuses; then the real observe.rs."""
+
+    TREE = {"crates/observer/src/observe.rs": ROLE_PIN_OBSERVE}
+    RULE = "G-I01-3"
+
+    def test_the_fixture_passes(self):
+        self.assertEqual(gate.OBSERVER_OBSERVE, "crates/observer/src/observe.rs")
+        self.assertEqual(gate.check_observer_role_pin(self.base), 3)
+        # Spacing around `::`, a strict test block's own call and a second block elsewhere pass.
+        good = ROLE_PIN_OBSERVE
+        self.write(gate.OBSERVER_OBSERVE, good.replace("observer_rbac::check_observer_snapshot(&produced",
+                                                       "observer_rbac :: check_observer_snapshot (&produced")
+                   + "#[cfg(test)]\nmod tests {\n    fn t() { observer_rbac::check_observer_snapshot(&s, l); }\n}\n")
+        self.assertEqual(gate.check_observer_role_pin(self.base), 3)
+        # No list let at all is still only lets (none) between.
+        self.write(gate.OBSERVER_OBSERVE, good.replace(ROLE_PIN_LAST_LET, ""))
+        self.assertEqual(gate.check_observer_role_pin(self.base), 2)
+
+    def test_departures_refuse(self):
+        good, rel = ROLE_PIN_OBSERVE, gate.OBSERVER_OBSERVE
+        closure = "        if self.closure.check(&produced.snapshot, &namespace).is_err() {\n"
+        for text in (
+                # The call missing, twice, or spelled as an imported name.
+                good.replace("observer_rbac::check_observer_snapshot(&produced", "observer_rbac::other(&produced"),
+                good + "fn again(s: &Value, l: RbacLists) { let _ = observer_rbac::check_observer_snapshot(s, l); }\n",
+                good.replace("observer_rbac::check_observer_snapshot(&produced", "check_observer_snapshot(&produced")
+                + "use crate::observer_rbac::check_observer_snapshot;\n",
+                good + "fn f() { let g = check_observer_snapshot; }\n",
+                # A statement other than `let` between, or the call before the closure check.
+                good.replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        self.trace(1);\n"),
+                good.replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        if role_bindings.is_empty() {\n            self.note();\n        }\n"),
+                good.replace(closure, "        let early = observer_rbac::check_observer_snapshot(&produced.snapshot, l);\n" + closure)
+                .replace(ROLE_PIN_CALL_TEXT, "        if observer_rbac::other(&produced.snapshot,\n"),
+                # The two drops missing, swapped or not right after the call.
+                good.replace(ROLE_PIN_DROPS, "        drop(produced);\n"),
+                good.replace(ROLE_PIN_DROPS, "        drop(produced);\n        let dropped = 0;\n"),
+                good.replace(ROLE_PIN_DROPS, "        self.trace(2);\n" + ROLE_PIN_DROPS),
+                # The closure check twice, or only in a comment.
+                good + "fn g(&self) -> bool { self.closure.check(&s, &n).is_ok() }\n",
+                good.replace(closure, "        // self.closure.check(&produced.snapshot, &namespace)\n        if false {\n"),
+                # The call in another block than the closure check's.
+                good.replace(closure, "        {\n" + closure).replace(ROLE_PIN_LAST_LET, ROLE_PIN_LAST_LET + "        }\n")):
+            self.assertNotEqual(text, good)
+            self.refused(gate.check_observer_role_pin, rel, text, self.RULE)
+        (self.base / rel).unlink()
+        with self.assertRaisesRegex(gate.GateError, "observe.rs is missing .the role pin's call, G-I01-3"):
+            gate.check_observer_role_pin(self.base)
+
+    def test_the_real_observe_rs_passes(self):
+        self.assertEqual(gate.check_observer_role_pin(gate.HE), 3)
+
+
+ROLE_PIN_RBAC_TEXT = (gate.HE / "crates/observer/src/observer_rbac.rs").read_text(encoding="utf-8")
+ROLE_PIN_VECTORS_TEXT = (gate.HE / "contracts/i06-v4/vectors.json").read_text(encoding="utf-8")
+
+
+class RolePinConstantTests(Tree):
+    """HE-004-I01a DESIGN-I01A section 10 (Q-I01A-4 (a)): the role pin's compiled rule data matches the I06 v4 vectors'
+    objectsPositive; a changed rule, name, pair or count refuses, as do constants the check cannot read plainly, and a
+    changed positive."""
+
+    TREE = {"crates/observer/src/observer_rbac.rs": ROLE_PIN_RBAC_TEXT, "contracts/i06-v4/vectors.json": ROLE_PIN_VECTORS_TEXT}
+    RULE = "the role pin's constants"
+
+    def test_the_real_constants_pass(self):
+        self.assertEqual(gate.OBSERVER_RBAC, "crates/observer/src/observer_rbac.rs")
+        self.assertEqual(gate.I06_V4_VECTORS, "contracts/i06-v4/vectors.json")
+        self.assertEqual(gate.check_observer_role_constants(self.base), 14)
+        self.assertEqual(gate.check_observer_role_constants(gate.HE), 14)
+
+    def test_changed_constants_refuse(self):
+        good, rel = ROLE_PIN_RBAC_TEXT, gate.OBSERVER_RBAC
+        last = re.search(r"    ContractRule \{ api_groups: &\[\], resources: &\[\],.*?\},\n", good, re.S).group(0)
+        for old, new in (
+                ('"serviceaccounts", "secrets"]', '"serviceaccounts", "secret"]'),
+                ('"serviceaccounts", "secrets"]', '"serviceaccounts"]'),
+                ('verbs: &["get"]', 'verbs: &["get", "list"]'),
+                ('verbs: &["get"], resource_names: &[]', 'verbs: &["get"], resource_names: &["x"]'),
+                ('resources: &["networkpolicies"], non_resource_urls: &[]',
+                 'resources: &["networkpolicies"], non_resource_urls: &["/metrics"]'),
+                ('api_groups: &["networking.k8s.io"]', 'api_groups: &["networking.k8s.io", ""]'),
+                ('pub const ROLE_NAME: &str = "planeon:policy-observer";', 'pub const ROLE_NAME: &str = "planeon-policy-observer";'),
+                ('pub const BINDING_NAME: &str = "planeon:policy-observer";',
+                 'pub const BINDING_NAME: &str = "planeon:policy-observers";'),
+                ('pub const OBSERVER_USER: &str = "planeon:policy-observer";', 'pub const OBSERVER_USER: &str = "planeon:observer";'),
+                ('pub const RBAC_API_VERSION: &str = "rbac.authorization.k8s.io/v1";',
+                 'pub const RBAC_API_VERSION: &str = "rbac.authorization.k8s.io/v1beta1";'),
+                ('("kind", "ClusterRole")', '("kind", "Role")'),
+                ('("kind", "User")', '("kind", "Group")'),
+                # Forms the check cannot read plainly: a computed text, a constant list, a missing field, an escape.
+                ('pub const ROLE_NAME: &str = "planeon:policy-observer";', 'pub const ROLE_NAME: &str = OBSERVER_USER;'),
+                ('verbs: &["get"]', 'verbs: GET'),
+                (', resource_names: &[] },\n];', ' },\n];'),
+                ('"/version"', '"/vers\\u{69}on"'),
+                ('pub const OBSERVER_RULES: [ContractRule; 8]', 'pub const OBSERVER_RULES: [ContractRule; 9]'),
+                ("pub const SUBJECT: [(&str, &str); 3] =", "pub const SUBJECT: [(&str, &str); 4] =")):
+            self.assertIn(old, good)
+            self.refused(gate.check_observer_role_constants, rel, good.replace(old, new, 1), self.RULE)
+        # Seven rules, declared and held, against the contract's eight; a second definition of a constant.
+        self.refused(gate.check_observer_role_constants, rel,
+                     good.replace(last, "").replace("[ContractRule; 8]", "[ContractRule; 7]"), self.RULE)
+        self.refused(gate.check_observer_role_constants, rel,
+                     good + 'pub const ROLE_NAME: &str = "planeon:policy-observer";\n', self.RULE)
+
+    def test_a_changed_positive_refuses(self):
+        rel = "contracts/i06-v4/vectors.json"
+        vectors = json.loads(ROLE_PIN_VECTORS_TEXT)
+        for change in (lambda positive: positive["clusterRoles"][0]["rules"][0]["verbs"].append("get"),
+                       lambda positive: positive["clusterRoles"][0]["rules"].pop(),
+                       lambda positive: positive["clusterRoles"][0]["metadata"].update(name="other"),
+                       lambda positive: positive["clusterRoleBindings"][0]["subjects"].append(
+                           {"apiGroup": "rbac.authorization.k8s.io", "kind": "User", "name": "x"}),
+                       lambda positive: positive["clusterRoleBindings"][0]["roleRef"].update(apiGroup="")):
+            changed = json.loads(ROLE_PIN_VECTORS_TEXT)
+            change(changed["objectsPositive"])
+            self.assertNotEqual(changed, vectors)
+            self.refused(gate.check_observer_role_constants, rel, json.dumps(changed), self.RULE)
+        self.refused(gate.check_observer_role_constants, rel, "[]", self.RULE)
 
 
 class OutputPrefixTests(unittest.TestCase):

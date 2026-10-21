@@ -18,6 +18,12 @@
 //! the TLS configuration (21), the embedded capture schema (25), the record's read (26, 27), the enrolled record (27,
 //! 28, 29), the Linux wire (24), the capture roots, whose constructor `LinuxCapture::new` takes `&Sealed` (30), the
 //! embedded closure (22) and the epoch with the capture engine (80-99).
+//!
+//! HE-004-I01a (DESIGN-I01A sections 4, 6 and 12) gives `serve` a thirteenth call: the enrolled record's server
+//! identity (`enrolled.server_identity()`, 27 for a missing SERVER row), right after `Enrolled::new` and before the
+//! record moves into the capture engine; the epoch builds the I01 service from it. The Linux wire's constructor also
+//! opens and registers the I01 listener, so its refusal maps through `status::wire_setup` (24 for the poller, 31-34
+//! for the listener).
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;
@@ -84,12 +90,19 @@ fn serve(sealed: &Sealed) -> u8 {
         Err(error) => return status::capture_setup(&error),
     };
     drop(record_schema);
-    let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };
+    let server = match enrolled.server_identity() {
+        Ok(server) => server,
+        Err(error) => return status::capture_setup(&error),
+    };
+    let wire = match LinuxWire::new(sealed) {
+        Ok(wire) => wire,
+        Err(error) => return status::wire_setup(&error),
+    };
     let capture = match LinuxCapture::new(sealed) {
         Ok(capture) => capture,
         Err(error) => return status::capture_setup(&error),
     };
     let Ok(closure) = Closure::embedded() else { return status::CLOSURE };
     let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));
-    status::observation(&observe::run(wire, config, tls, closure, captures))
+    status::observation(&observe::run(wire, config, tls, closure, captures, server))
 }

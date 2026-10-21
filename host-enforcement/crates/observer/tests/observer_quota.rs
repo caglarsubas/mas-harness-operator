@@ -120,6 +120,11 @@ fn the_headroom_is_the_minimum_over_the_covering_keys() {
     // A figure above 2^53 - 1 refuses.
     let huge = six.replace("\"10\"", "\"9007199254740999\"");
     assert_eq!(headroom(&items(&[settled("h", &huge, &used)]), NAMESPACE), Err(QuotaError::Refused("a headroom figure is above 2^53-1")));
+    // HE-004-I01a (DESIGN-I01A section 9, review r4 I4-3): the chosen key's recorded floor(hard) is held to 2^53 - 1 as
+    // well, so this edge, whose headroom alone fits, now refuses; a chosen hard of exactly 2^53 - 1 passes.
     let edge = six.replace("\"10\"", &format!("\"{}\"", MAX_FIGURE + 3));
-    assert_eq!(headroom(&items(&[settled("e", &edge, &used)]), NAMESPACE).map(|figures| figures.pods), Ok(MAX_FIGURE));
+    assert_eq!(headroom(&items(&[settled("e", &edge, &used)]), NAMESPACE),
+               Err(QuotaError::Refused("a recorded quota figure is above 2^53-1")));
+    let top = six.replace("\"10\"", &format!("\"{}\"", MAX_FIGURE));
+    assert_eq!(headroom(&items(&[settled("t", &top, &used)]), NAMESPACE).map(|figures| figures.pods), Ok(MAX_FIGURE - 3));
 }

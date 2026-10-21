@@ -12,7 +12,14 @@
 //! statuses in a third table, `CAPTURE_SETUP` (25-30): the embedded schema (25), the record's read (26), form (27),
 //! read-path preconditions (28) and window (29), and the capture roots (30), mapped by `capture_setup`, one exhaustive
 //! match. 31-39 stay free. A capture's own failure is never a status: it is a slot of the view.
+//!
+//! HE-004-I01a (DESIGN-I01A sections 4 and 14) adds the I01 listener's statuses in a fourth table, `LISTENER` (31-35):
+//! at setup its socket, address or options (31), `bind` (32), `listen` (33) and its registration with the poller (34),
+//! mapped with the poller's 24 by `wire_setup`, one exhaustive match over `client::WireSetup`; at run time the listener
+//! failing persistently (35: twelve faults in a row), an epoch exit. One list everywhere: 31, 32, 33, 34 and 35; 36-39
+//! stay free. No other I01 condition exits: sessions close, and the listener backs off.
 
+use crate::client::{ListenerSetup, WireSetup};
 use crate::config::LifetimeError;
 use crate::enrolled::SetupError;
 use crate::observe::ObserverExit;
@@ -75,7 +82,7 @@ pub const CREDENTIALS: u8 = 20;
 pub const TLS_SETUP: u8 = 21;
 /// `Closure::embedded()` refused at setup.
 pub const CLOSURE: u8 = 22;
-/// `LinuxWire::new` (the poller).
+/// `LinuxWire::new`'s poller.
 pub const SOCKETS: u8 = 24;
 /// OR07 not reached in 300 s (the last answer not 401/403), or the hook absent (404).
 pub const READYZ: u8 = 80;
@@ -93,7 +100,7 @@ pub const ANSWER: u8 = 84;
 pub const CONSISTENCY: u8 = 85;
 /// B1's `InputError`, `Missing` for a kind served only at another version included.
 pub const INPUTS: u8 = 86;
-/// B1's `ProduceError` or the snapshot check's refusal.
+/// B1's `ProduceError` or the snapshot check's refusal, or I06 v4's RB check (HE-004-I01a's role pin).
 pub const RBAC: u8 = 87;
 /// OR02, OR05, OR06.
 pub const OPERATIONAL: u8 = 88;
@@ -142,6 +149,32 @@ pub const CAPTURE_ROOTS: u8 = 30;
 
 /// The capture setup's statuses, in table order (HE-004D1).
 pub const CAPTURE_SETUP: [u8; 6] = [CAPTURE_SCHEMA, RECORD_READ, RECORD_FORM, RECORD_TARGETS, RECORD_WINDOW, CAPTURE_ROOTS];
+
+/// The I01 listener's socket, address or options (HE-004-I01a).
+pub const LISTENER_SOCKET: u8 = 31;
+/// Its `bind` (an existing path among the causes: the observer never unlinks).
+pub const LISTENER_BIND: u8 = 32;
+/// Its `listen`.
+pub const LISTENER_LISTEN: u8 = 33;
+/// Its registration with the poller.
+pub const LISTENER_REGISTER: u8 = 34;
+/// The listener failing persistently at run time: twelve faults in a row, about 60 s without an accept.
+pub const LISTENER_FAILED: u8 = 35;
+
+/// The I01 listener's statuses, in table order (HE-004-I01a).
+pub const LISTENER: [u8; 5] = [LISTENER_SOCKET, LISTENER_BIND, LISTENER_LISTEN, LISTENER_REGISTER, LISTENER_FAILED];
+
+/// The status of `LinuxWire::new`'s refusal: 24 for the poller, 31-34 for the I01 listener's step (one exhaustive
+/// match, so a new step fails the build).
+pub fn wire_setup(error: &WireSetup) -> u8 {
+    match error {
+        WireSetup::Poller(_) => SOCKETS,
+        WireSetup::Listener(ListenerSetup::Socket | ListenerSetup::Address | ListenerSetup::Options) => LISTENER_SOCKET,
+        WireSetup::Listener(ListenerSetup::Bind) => LISTENER_BIND,
+        WireSetup::Listener(ListenerSetup::Listen) => LISTENER_LISTEN,
+        WireSetup::Listener(ListenerSetup::Register) => LISTENER_REGISTER,
+    }
+}
 
 /// The status of a capture setup refusal: one exhaustive match (an unusable wall clock stays 97, as for the
 /// configuration's lifetime).
@@ -196,5 +229,6 @@ pub fn observation(exit: &ObserverExit) -> u8 {
         ObserverExit::Clock => CLOCK,
         ObserverExit::Stale => STALE,
         ObserverExit::Expansion => EXPANSION,
+        ObserverExit::Listener => LISTENER_FAILED,
     }
 }
