@@ -124,7 +124,9 @@ symbol table holds no symbol of the four modules on either target (G-D2-7, build
 HE-004-I01a (the observer's I01 listener, custody, request checks, quota pair and role pin; DESIGN-I01A revision 6
 section 12, owner decisions Q-HE4I1-1..13 and Q-I01A-1..9) registers edge record v8's two seccomp-v5 OBSERVER programs
 among the contract files and points OBSERVER_PROGRAMS at them, the v3 ones held but no longer embedded (unit U1, 48).
-Unit U3: the observer's I01 listener file joins the socket files, the whole-file pins (with linux_net.rs re-pinned),
+Unit U4: the I01 service and its request checks are exactly the i01_ sources, the checks a logic module
+(I01_LOGIC_PATHS), both on the no-panic list, and serve's wiring has thirteen calls (the server identity after
+Enrolled::new). Unit U3: the observer's I01 listener file joins the socket files, the whole-file pins (with linux_net.rs re-pinned),
 the no-panic list and, through I01Socket, the Debug hazards; the observer names no unlink, remove or rename call
 (G-I01-1); every wire wait is the one inside Client::wait_serving, beside linux_net.rs's poller wait, and the service
 step is called once, there (G-I01-2); the I01 path lives only in linux_listen.rs's constant (G-I01-4); nothing leaves
@@ -384,7 +386,9 @@ OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEA
 # G5's wiring rule (D1-1): in serve, read without comments and use declarations, the whitespace around `::` removed, each
 # of these calls appears exactly once, in this order. HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): twelve calls, the v2
 # parse with the record's reference in place of the v1 parse, the capture schema, the record's read, the enrolled record
-# and the capture roots joining them.
+# and the capture roots joining them. HE-004-I01a DESIGN-I01A sections 6 and 12: thirteen, the enrolled record's server
+# identity (`enrolled.server_identity(`) right after Enrolled::new and before the record moves into the capture engine
+# (the I01 service's identity, which observe::run takes).
 OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bsigned_config::load\s*\(", "signed_config::load("),
     (r"\bObserverConfig::parse_with_record\s*\(", "ObserverConfig::parse_with_record("),
@@ -392,6 +396,7 @@ OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bcredentials::observer_inputs\s*\(", "credentials::observer_inputs("),
     (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bCaptureSchema::embedded\s*\(", "CaptureSchema::embedded("),
     (r"(?<![\w:])enrolled::load_record\s*\(", "enrolled::load_record("), (r"\bEnrolled::new\s*\(", "Enrolled::new("),
+    (r"(?<![\w:.])enrolled\s*\.\s*server_identity\s*\(", "enrolled.server_identity("),
     (r"\bLinuxWire::new\s*\(", "LinuxWire::new("), (r"\bLinuxCapture::new\s*\(", "LinuxCapture::new("),
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
 # The v1 parse no longer appears in serve (G-D1-8).
@@ -961,8 +966,16 @@ D2_LOGIC_BUILT = ("record_check", "i06_evidence", "qualification", "composition"
 D2_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in D2_LOGIC_BUILT)
 D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NAMES)
                   + tuple(("self", name) for name in D2_LOGIC_NAMES))
+# HE-004-I01a DESIGN-I01A section 12: the I01 request checks (i01_request, the pure part of the I01 service, unit U4)
+# and the role pin (observer_rbac, unit U6) take B1's logic rule with B1's whitelist plus their own paths, each as its
+# unit adds it (I01_LOGIC_BUILT); they reach neither the I01 service, the wire nor D2's modules.
+I01_LOGIC_NAMES = ("i01_request", "observer_rbac")
+I01_LOGIC_BUILT = ("i01_request",)
+I01_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in I01_LOGIC_BUILT)
+I01_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + tuple(("crate", name) for name in I01_LOGIC_NAMES)
+                   + tuple(("self", name) for name in I01_LOGIC_NAMES))
 LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
-                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC))
+                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC) + tuple((rel, I01_LOGIC_PATHS) for rel in I01_LOGIC))
 # G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
 D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
 PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
@@ -1001,7 +1014,7 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
 # HE-004-I01a DESIGN-I01A section 12: the I01 listener joins it (unit U3); the I01 service, its request checks and
 # the role pin as their units add them (I01_NO_PANIC_BUILT).
-I01_NO_PANIC_BUILT = ("linux_listen",)
+I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request")
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
     "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
@@ -1954,7 +1967,8 @@ def check_observer_serve(base: Path) -> int:
     """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
     body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
     call appears exactly once, in that order: load, parse, lifetime, credentials, TLS configuration, wire, embedded closure,
-    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse. HE-004D2 (G-D2-11; HE-004D1
+    epoch. HE-004D1 (G-D1-8): the twelve calls of DESIGN-D1 section 17.3, and no v1 parse; HE-004-I01a: thirteen, the
+    server identity after Enrolled::new. HE-004D2 (G-D2-11; HE-004D1
     PR review round 1, R1-5): the two Linux constructors are also counted in their qualified forms (`<LinuxWire>::new`,
     `< LinuxCapture >::new`, and since HE-004D2 PR review round 1, R1-7, `LinuxWire::<>::new`, `<(LinuxWire)>::new` and
     `<LinuxCapture<>>::new`), each exactly once in serve, and serve names each of the two types only once; with neither
@@ -3583,9 +3597,10 @@ STEP_PATH = re.compile(r"::\s*serve_peer_step\b")
 I01_PATH = "/run/planeon/live-proxy/policy-observer.sock"
 I01_SOCKET_NAME = "policy-observer.sock"
 I01_PATH_CONSTANT = re.compile(r'(?m)^[ \t]*const\s+I01_PATH\s*:\s*&\s*str\s*=\s*"%s"\s*;' % re.escape(I01_PATH))
-# G-I01-5: nothing leaves I01a. The i01_ sources as their units add them (U4: the service and its request checks).
+# G-I01-5: nothing leaves I01a. The i01_ sources as their units add them (U4: the service and its request checks;
+# U3 held none).
 I01_FILES = ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs")
-I01_FILES_BUILT: tuple = ()
+I01_FILES_BUILT = I01_FILES
 I01_MODULE = re.compile(r"\bmod\s+(i01_\w*)")
 I01_REFUSED_WORDS = re.compile(r"\b(?:Wire|connect|ConnId|Client)\b")
 PEER_SEND = re.compile(r"\bpeer_send\b")
@@ -4516,11 +4531,13 @@ def main() -> int:
                ", ".join(name.split(" ")[0] for _, name in OBSERVER_POST_SEAL_FORBIDDEN), " and ".join(OBSERVER_POST_SEAL_CRATES),
                I05_JSON))
         say("observer logic: %d modules of %s (%s; HE-004D1, G-D1-10: %s, whose whitelist adds i05_protocol::schema and "
-            "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules) name only the whitelisted "
+            "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules; HE-004-I01a: %s, whose "
+            "whitelist adds the I01 logic modules) name only the whitelisted "
             "path roots %s, no super:: or foreign self:: path, glob, renaming import, HashMap, HashSet, RandomState or "
             "include macro, and no panicking macro or call outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
             % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES), ", ".join(D1_LOGIC_NAMES),
-               ", ".join(D2_LOGIC_BUILT), ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
+               ", ".join(D2_LOGIC_BUILT), ", ".join(I01_LOGIC_BUILT),
+               ", ".join("::".join(prefix) for prefix in OBSERVER_LOGIC_PATHS)))
         say("observer D2 isolation: the D2 modules present are %s; outside them the module names occur only as lib.rs's "
             "pub mod lines, and none of the %d type names they define occurs in another %s source; every D2 impl is "
             "`impl <its own type> {` and no D2 file re-exports another item (HE-004D2, G-D2-5)"

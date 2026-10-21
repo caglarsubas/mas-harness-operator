@@ -21,7 +21,8 @@
 //!
 //! HE-004-I01a (DESIGN-I01A revision 6; owner decisions Q-HE4I1-1..13 and Q-I01A-1..9) adds the observer's I01
 //! listener (`linux_listen`, Linux only, built only inside `linux_net`'s constructor) with the portable peer types and
-//! operations in `client`.
+//! operations in `client`, the I01 service (`i01_service`) and its pure request checks (`i01_request`, a logic
+//! module), which the epoch serves from every wait; nothing is ever sent.
 #![forbid(unsafe_code)]
 
 pub mod admission;
@@ -36,6 +37,8 @@ pub mod credentials;
 pub mod enrolled;
 pub mod exposition;
 pub mod http;
+pub mod i01_request;
+pub mod i01_service;
 pub mod i06_evidence;
 pub mod inputs;
 pub mod kernel_text;

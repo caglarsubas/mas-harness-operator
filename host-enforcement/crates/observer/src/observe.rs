@@ -46,9 +46,10 @@
 //!   turns every slot Expired; no set starts after that. [`Epoch::capture_view`] derives Expired at read time in every
 //!   phase, and the first observation of expiry is latched, so a wall clock stepped back cannot revive a capture.
 //!
-//! HE-004-I01a (DESIGN-I01A sections 5 and 14): the client's every wait serves the I01 service when one is attached,
-//! and a wait that ends because the I01 listener failed persistently ends the epoch with [`ObserverExit::Listener`]
-//! (status 35) instead of the poller's 95.
+//! HE-004-I01a (DESIGN-I01A sections 5 and 14): [`run`] builds the I01 service from the server identity `serve`
+//! passes (`I01Service::new`) and attaches it to the client ([`Epoch::with_peer_service`]), so every wait of every
+//! phase serves I01; a wait that ends because the I01 listener failed persistently ends the epoch with
+//! [`ObserverExit::Listener`] (status 35) instead of the poller's 95.
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -62,10 +63,12 @@ use rustls::ClientConfig;
 
 use crate::admission::{check_loaded_manifest, Adm4Input, Adm4Record, BindingId, MetricSample, ObservationBinding, Verdict};
 use crate::capture::{CaptureCycle, CaptureViewState};
-use crate::client::{Client, Event, Failure, Handle, Kind, PeerOps, Scraped, Wire};
+use crate::client::{Client, Event, Failure, Handle, Kind, PeerOps, PeerService, Scraped, Wire};
 use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
+use crate::enrolled::ServerIdentity;
 use crate::exposition::Exposition;
 use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAPSHOT_BODY_LIMIT};
+use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use crate::operational::{check_or02, check_or05, check_or06, OperationalRefusal};
 use crate::quota::{self, Headroom, QuotaError};
@@ -414,10 +417,14 @@ pub fn expansion_weight(inputs: &Inputs) -> Option<u64> {
     Some(total)
 }
 
-/// The epoch with production settings and the capture engine, run to its exit (`serve`'s last step).
+/// The epoch with production settings, the capture engine and the I01 service for `server` (HE-004-I01a), run to its
+/// exit (`serve`'s last step).
 pub fn run<W: Wire + PeerOps>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure,
-                              captures: Box<dyn CaptureCycle>) -> ObserverExit {
-    Epoch::new(wire, config, tls, closure, Settings::production()).with_captures(captures).run()
+                              captures: Box<dyn CaptureCycle>, server: ServerIdentity) -> ObserverExit {
+    Epoch::new(wire, config, tls, closure, Settings::production())
+        .with_captures(captures)
+        .with_peer_service(Box::new(I01Service::new(server)))
+        .run()
 }
 
 fn after(now: Instant, by: Duration) -> Instant {
@@ -466,6 +473,12 @@ impl<W: Wire + PeerOps> Epoch<W> {
     /// Attaches the capture engine (HE-004D1): one set per cycle, the drain, the expiry wake.
     pub fn with_captures(mut self, captures: Box<dyn CaptureCycle>) -> Epoch<W> {
         self.captures = Some(captures);
+        self
+    }
+
+    /// Attaches the I01 service (HE-004-I01a): the client's every later wait serves it.
+    pub fn with_peer_service(mut self, service: Box<dyn PeerService>) -> Epoch<W> {
+        self.client.serve_peers(service);
         self
     }
 

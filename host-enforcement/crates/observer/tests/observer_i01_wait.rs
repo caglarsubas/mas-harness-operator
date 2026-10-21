@@ -5,6 +5,8 @@
 //! a fatal listener step ends the wait, which the client names. Then the listener's backoff (5 s, the twelfth fault in
 //! a row fatal, an accept clearing the count) and the datagram's control rule (exactly one SCM_CREDENTIALS and one
 //! SCM_SECURITY; a passed descriptor, a missing or repeated message, another level or a cut-short buffer refused).
+//! Unit U4: the HE-004C rig's healthy epoch with the I01 service attached (as `observe::run` attaches it) and no peer
+//! ends as without it.
 
 mod b1_rbac_support;
 mod b1_support;
@@ -15,11 +17,14 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use c_support::{observer_tls, shared_pki};
+use c_support::{observer_tls, shared_pki, Rig};
 use gate_sys::inet::{InetAddress, IpLiteral};
 use planeon_observer::client::{AcceptResult, Client, ConnId, Connecting, ExeLink, Interest, ListenerBackoff, PeerCreds, PeerId,
                                PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService, PeerWatch, PollError,
                                ProcIdentity, Ready, Transfer, Wire, Woken, LISTENER_BACKOFF, LISTENER_FAULT_LIMIT};
+use planeon_observer::enrolled::{ServerClass, ServerIdentity};
+use planeon_observer::i01_service::I01Service;
+use planeon_observer::observe::ObserverExit;
 
 const ADDRESS: InetAddress = InetAddress { ip: IpLiteral::V4([127, 0, 0, 1]), port: 6443 };
 
@@ -316,4 +321,16 @@ fn a_datagram_carries_exactly_one_credentials_and_one_security_message() {
                            (good[..20].to_vec(), false)] {
         assert_eq!(PeerRecv::datagram(40, false, &control, cut), PeerRecv::Ancillary, "{control:?} {cut}");
     }
+}
+
+#[test]
+fn a_healthy_epoch_with_the_i01_service_and_no_peer_ends_as_without_it() {
+    let server = ServerIdentity { uid: 0, gid: 0, process_label: "system_u:system_r:planeon_server_t:s0".to_string(),
+                                  cgroup_rel: "planeon.slice/planeon-proxy-server.service".to_string(),
+                                  class: ServerClass::Observed, interpreter: "/opt/planeon/python/3.12.14/bin/python3.12".to_string(),
+                                  valid_from: 0, expires_at: u64::MAX / 2 };
+    let rig = Rig::new();
+    let mut epoch = rig.epoch().with_peer_service(Box::new(I01Service::new(server)));
+    assert_eq!(epoch.run(), ObserverExit::ConfigExpired);
+    assert!(!epoch.client().listener_failed());
 }
