@@ -15,12 +15,20 @@
 //! `1n` or above 2^63 base units refuses; counts must be whole; the six figures lie in 0 to 2^53-1. Every refusal is
 //! status 89. Requests versus limits (whether `limits.*` keys must also bound the resource units) is a W03 distribution
 //! check item; `limits.*` keys are still held to step 2.
+//!
+//! HE-004-I01a (DESIGN-I01A section 9; MODEL_DEFINED's HE-004-I01a section) keeps, per unit, the quota pair I01 will
+//! publish beside the headroom ([`quota`]): the covering key with the least headroom is chosen, a tie going to the key
+//! whose quota object's name sorts first, then to the key's own name; its pair is `floor(hard)` and
+//! `min(ceil(used), floor(hard))` in the unit's scale, so `hard - used` equals the recorded headroom (never more) and
+//! `used` never exceeds `hard`. Both recorded values must be at most 2^53 - 1, I01's integer bound, or the snapshot
+//! refuses (89); a covering key that is not chosen is held only to steps 1 and 2. Rounding alone raises no new refusal:
+//! step 2 still compares the exact values.
 
 use std::collections::BTreeMap;
 
 use i05_protocol::json::{Object, Value};
 
-use crate::inputs::object_namespace;
+use crate::inputs::{object_name, object_namespace};
 
 /// One base unit at the 10^-9 scale.
 pub const NANO: i128 = 1_000_000_000;
@@ -59,6 +67,31 @@ pub struct Headroom {
     pub cpu_millis: u64,
     pub memory_bytes: u64,
     pub ephemeral_storage_bytes: u64,
+}
+
+/// One unit's recorded pair (HE-004-I01a): the chosen key's `floor(hard)` and `min(ceil(used), floor(hard))`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Pair {
+    pub hard: u64,
+    pub used: u64,
+}
+
+/// The six units' recorded pairs, in `UNITS` order.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct QuotaPairs {
+    pub pods: Pair,
+    pub config_maps: Pair,
+    pub services: Pair,
+    pub cpu_millis: Pair,
+    pub memory_bytes: Pair,
+    pub ephemeral_storage_bytes: Pair,
+}
+
+/// The headroom and the recorded pairs of one snapshot's quotas.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Quota {
+    pub headroom: Headroom,
+    pub pairs: QuotaPairs,
 }
 
 /// Why the quotas refuse.
@@ -175,20 +208,25 @@ fn ceil_in(value: i128, divisor: i128) -> i128 {
 
 /// The headroom of the quotas in `namespace` among the ResourceQuotas list's items (see the module documentation).
 pub fn headroom(items: &[Value], namespace: &str) -> Result<Headroom, QuotaError> {
+    quota(items, namespace).map(|found| found.headroom)
+}
+
+/// The headroom and, per unit, the chosen key's recorded pair (see the module documentation).
+pub fn quota(items: &[Value], namespace: &str) -> Result<Quota, QuotaError> {
     let mut quotas = Vec::new();
     for item in items.iter().filter(|item| object_namespace(item) == Some(namespace)) {
         let spec_hard = quantities(item.get("spec"), "hard")?;
         let status = item.get("status");
         let hard = quantities(status, "hard")?;
         let used = quantities(status, "used")?;
-        quotas.push((spec_hard, hard, used));
+        quotas.push((object_name(item).unwrap_or_default(), spec_hard, hard, used));
     }
     // 1. Settled.
-    if quotas.iter().any(|(spec_hard, hard, _)| spec_hard != hard) {
+    if quotas.iter().any(|(_, spec_hard, hard, _)| spec_hard != hard) {
         return Err(QuotaError::Unsettled);
     }
     // 2. used <= hard for every key, exactly.
-    for (_, hard, used) in &quotas {
+    for (_, _, hard, used) in &quotas {
         for (key, limit) in hard {
             match used.get(key) {
                 Some(amount) if amount <= limit => {}
@@ -197,32 +235,46 @@ pub fn headroom(items: &[Value], namespace: &str) -> Result<Headroom, QuotaError
             }
         }
     }
-    // 3 and 4. Each unit bounded, and its headroom.
+    // 3 and 4. Each unit bounded, its headroom, and (HE-004-I01a) the least-headroom key's pair.
     let mut figures = [0u64; 6];
-    for (slot, (_, scale, keys)) in figures.iter_mut().zip(UNITS.iter()) {
-        let mut best: Option<i128> = None;
-        for (_, hard, used) in &quotas {
+    let mut pairs = [Pair::default(); 6];
+    for ((slot, pair), (_, scale, keys)) in figures.iter_mut().zip(pairs.iter_mut()).zip(UNITS.iter()) {
+        // The least room so far, with its quota's name, its key, and its floor(hard) and ceil(used) in the unit.
+        let mut best: Option<(i128, &str, &str, i128, i128)> = None;
+        for (name, _, hard, used) in &quotas {
             for key in keys {
                 let (Some(limit), Some(amount)) = (hard.get(*key), used.get(*key)) else { continue };
-                let room = match scale {
+                let (floor, ceil) = match scale {
                     Scale::Count => {
                         if limit % NANO != 0 || amount % NANO != 0 {
                             return Err(QuotaError::Refused("a count quota holds a fraction"));
                         }
-                        limit / NANO - amount / NANO
+                        (limit / NANO, amount / NANO)
                     }
-                    Scale::Millis => floor_in(*limit, NANO / 1_000) - ceil_in(*amount, NANO / 1_000),
-                    Scale::Base => floor_in(*limit, NANO) - ceil_in(*amount, NANO),
+                    Scale::Millis => (floor_in(*limit, NANO / 1_000), ceil_in(*amount, NANO / 1_000)),
+                    Scale::Base => (floor_in(*limit, NANO), ceil_in(*amount, NANO)),
                 };
-                let room = room.max(0);
-                best = Some(best.map_or(room, |current| current.min(room)));
+                let room = (floor - ceil).max(0);
+                let earlier = best.is_some_and(|(least, chosen, chosen_key, _, _)| (least, chosen, chosen_key) <= (room, *name, *key));
+                if !earlier {
+                    best = Some((room, *name, *key, floor, ceil));
+                }
             }
         }
-        let Some(room) = best else { return Err(QuotaError::Refused("a unit of I01 is bounded by no quota key")) };
+        let Some((room, _, _, floor, ceil)) = best else { return Err(QuotaError::Refused("a unit of I01 is bounded by no quota key")) };
         *slot = u64::try_from(room).ok().filter(|figure| *figure <= MAX_FIGURE).ok_or(QuotaError::Refused(
             "a headroom figure is above 2^53-1",
         ))?;
+        let recorded = |value: i128| {
+            u64::try_from(value).ok().filter(|figure| *figure <= MAX_FIGURE).ok_or(QuotaError::Refused(
+                "a recorded quota figure is above 2^53-1",
+            ))
+        };
+        *pair = Pair { hard: recorded(floor)?, used: recorded(ceil.min(floor))? };
     }
     let [pods, config_maps, services, cpu_millis, memory_bytes, ephemeral_storage_bytes] = figures;
-    Ok(Headroom { pods, config_maps, services, cpu_millis, memory_bytes, ephemeral_storage_bytes })
+    let headroom = Headroom { pods, config_maps, services, cpu_millis, memory_bytes, ephemeral_storage_bytes };
+    let [pods, config_maps, services, cpu_millis, memory_bytes, ephemeral_storage_bytes] = pairs;
+    let pairs = QuotaPairs { pods, config_maps, services, cpu_millis, memory_bytes, ephemeral_storage_bytes };
+    Ok(Quota { headroom, pairs })
 }

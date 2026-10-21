@@ -13,7 +13,8 @@
 //!    16 MiB aggregate and the node-count cap before it is parsed (84). Then, in order: `Inputs::new` (86), the
 //!    byte-aware weighted expansion guard (99), `produce_snapshot` and `Closure::check` (87), OR02, OR05 and OR06 (88),
 //!    quota headroom (89), ADM-4 (96, then 90 or 91). The inputs are dropped after the checks; the `Observation` keeps
-//!    `R`, its freshness mark, the ADM-4 record and digest, the headroom and the dropped non-resource rules.
+//!    `R`, its freshness mark, the ADM-4 record and digest, the headroom (since HE-004-I01a with each unit's quota
+//!    pair) and the dropped non-resource rules.
 //! 3. Watching: one watch per served spec from `R` with bookmarks, used only to detect change or continuity loss. A
 //!    change (or a line over 64 KiB) closes every watch and re-snapshots, no sooner than 1 s after the last snapshot
 //!    started. A stream that ends gets the restart check (a scrape) and is reopened from its last mark; a reopen
@@ -71,7 +72,7 @@ use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAP
 use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use crate::operational::{check_or02, check_or05, check_or06, OperationalRefusal};
-use crate::quota::{self, Headroom, QuotaError};
+use crate::quota::{self, Headroom, QuotaError, QuotaPairs};
 use crate::rbac::{produce_snapshot, ProduceError};
 use crate::requests::{self, MarkError, Mode};
 use crate::snapshot::Closure;
@@ -194,6 +195,8 @@ pub struct Observation {
     pub record: Adm4Record,
     pub digest: String,
     pub headroom: Headroom,
+    /// HE-004-I01a (DESIGN-I01A section 9): per unit, the least-headroom key's `floor(hard)` and capped `ceil(used)`.
+    pub quota: QuotaPairs,
     pub dropped_non_resource_rules: usize,
 }
 
@@ -975,12 +978,12 @@ impl<W: Wire + PeerOps> Epoch<W> {
                 Err(_) => return Err(self.stop(ObserverExit::Operational, "an operational rule (OR02, OR05, OR06) refused")),
             }
         }
-        let headroom = match inputs.items(Resource::ResourceQuotas) {
-            Ok(items) => quota::headroom(items, &namespace),
+        let quotas = match inputs.items(Resource::ResourceQuotas) {
+            Ok(items) => quota::quota(items, &namespace),
             Err(error) => return Err(self.input_exit(&error)),
         };
-        let headroom = match headroom {
-            Ok(headroom) => headroom,
+        let quotas = match quotas {
+            Ok(quotas) => quotas,
             Err(QuotaError::Unsettled) => return Err(Stop::Restart(Cause::Unsettled)),
             Err(QuotaError::Refused(why)) => return Err(self.stop(ObserverExit::Quota, why)),
         };
@@ -993,7 +996,8 @@ impl<W: Wire + PeerOps> Epoch<W> {
             fresh_stamp: stamp,
             record,
             digest,
-            headroom,
+            headroom: quotas.headroom,
+            quota: quotas.pairs,
             dropped_non_resource_rules: dropped,
         })
     }
