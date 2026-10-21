@@ -18,6 +18,10 @@
 //! HE-004D2 (DESIGN-D2 rev 2; owner decisions Q-HE4D2-1..11, all (a)) adds pure logic modules, the R10 ports of the
 //! qualification and I06 evidence checks and their fixture composition. Nothing here or in `serve` names them
 //! (`tools/gate.py`, G-D2-5), so none is reachable from the binary's `main`; only the host tests call them.
+//!
+//! HE-004-I01a (DESIGN-I01A revision 6; owner decisions Q-HE4I1-1..13 and Q-I01A-1..9) adds the observer's I01
+//! listener (`linux_listen`, Linux only, built only inside `linux_net`'s constructor) with the portable peer types and
+//! operations in `client`.
 #![forbid(unsafe_code)]
 
 pub mod admission;
@@ -37,6 +41,8 @@ pub mod inputs;
 pub mod kernel_text;
 #[cfg(target_os = "linux")]
 pub mod linux_capture;
+#[cfg(target_os = "linux")]
+pub mod linux_listen;
 #[cfg(target_os = "linux")]
 pub mod linux_net;
 pub mod observe;

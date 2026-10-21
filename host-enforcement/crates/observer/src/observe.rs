@@ -45,6 +45,10 @@
 //! - **Expiry (D1-8, R2-4, R3-6).** The loop wakes at the record's `expiresAt - 3 s` (the engine's wall clock) and
 //!   turns every slot Expired; no set starts after that. [`Epoch::capture_view`] derives Expired at read time in every
 //!   phase, and the first observation of expiry is latched, so a wall clock stepped back cannot revive a capture.
+//!
+//! HE-004-I01a (DESIGN-I01A sections 5 and 14): the client's every wait serves the I01 service when one is attached,
+//! and a wait that ends because the I01 listener failed persistently ends the epoch with [`ObserverExit::Listener`]
+//! (status 35) instead of the poller's 95.
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -58,7 +62,7 @@ use rustls::ClientConfig;
 
 use crate::admission::{check_loaded_manifest, Adm4Input, Adm4Record, BindingId, MetricSample, ObservationBinding, Verdict};
 use crate::capture::{CaptureCycle, CaptureViewState};
-use crate::client::{Client, Event, Failure, Handle, Kind, Scraped, Wire};
+use crate::client::{Client, Event, Failure, Handle, Kind, PeerOps, Scraped, Wire};
 use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
 use crate::exposition::Exposition;
 use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAPSHOT_BODY_LIMIT};
@@ -130,6 +134,8 @@ pub enum ObserverExit {
     Clock,
     Stale,
     Expansion,
+    /// HE-004-I01a: the I01 listener failed persistently (twelve faults in a row).
+    Listener,
 }
 
 /// The epoch's settings: production uses `PER_SPEC_PROGRESS` and no trace; the tests flip the fallback and record.
@@ -409,8 +415,8 @@ pub fn expansion_weight(inputs: &Inputs) -> Option<u64> {
 }
 
 /// The epoch with production settings and the capture engine, run to its exit (`serve`'s last step).
-pub fn run<W: Wire>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, captures: Box<dyn CaptureCycle>)
-                    -> ObserverExit {
+pub fn run<W: Wire + PeerOps>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure,
+                              captures: Box<dyn CaptureCycle>) -> ObserverExit {
     Epoch::new(wire, config, tls, closure, Settings::production()).with_captures(captures).run()
 }
 
@@ -418,7 +424,7 @@ fn after(now: Instant, by: Duration) -> Instant {
     now.checked_add(by).unwrap_or(now)
 }
 
-impl<W: Wire> Epoch<W> {
+impl<W: Wire + PeerOps> Epoch<W> {
     pub fn new(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, settings: Settings) -> Epoch<W> {
         let client = Client::new(wire, tls, config.address, &config.authority);
         let origin = client.now();
@@ -560,7 +566,11 @@ impl<W: Wire> Epoch<W> {
         exit
     }
 
+    /// A failed wait: the I01 listener's persistent failure (35) when the client names it, else the poller's (95).
     fn poll_failed(&mut self) -> ObserverExit {
+        if self.client.listener_failed() {
+            return self.fail(ObserverExit::Listener, "the I01 listener failed persistently");
+        }
         self.fail(ObserverExit::Poll, "the poller failed")
     }
 

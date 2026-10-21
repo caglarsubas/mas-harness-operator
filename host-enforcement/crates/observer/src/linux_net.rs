@@ -11,6 +11,16 @@
 //! interests of each wait are applied with `epoll_ctl` add or modify; a registered connection that the wait does not
 //! name is set to no interest. An `epoll_ctl` or `epoll_pwait` failure other than an interrupted wait is a
 //! `PollError` (status 95). gate-sys types appear only in private fields.
+//!
+//! HE-004-I01a (DESIGN-I01A sections 4 and 5; MODEL_DEFINED's HE-004-I01a section): the constructor also opens the I01
+//! listener (`linux_listen::I01Socket`, kept in a private field) and registers it, so its error is `client::WireSetup`
+//! (24 for the poller, 31-34 for the listener). `LinuxWire` implements `client::PeerOps` by handing each operation to
+//! that listener. Each wait also applies the I01 watch it is given, on tokens disjoint from the connections' (the
+//! listener's `u64::MAX`, a peer's its number with the top bit set; connection numbers count from 1 and never reach
+//! it): the listener is added when wanted and removed when not (a failure is a listener fault, reported in `Woken`,
+//! never status 95), the session's peer is added (a failure is that peer's), and a watch failure makes that wait a
+//! zero-timeout one, so the fault is handled at once. The I01 readiness comes back apart from the connections'.
+//! The seccomp-v5 OBSERVER row allows the listener's `bind`, `listen` and `accept4`.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -20,16 +30,25 @@ use gate_sys::channel;
 use gate_sys::inet::InetAddress;
 use gate_sys::tcp;
 
-use crate::client::{ConnId, Connecting, Interest, PollError, Ready, Transfer, Wire, NO_CONNECTION};
+use crate::client::{AcceptResult, ConnId, Connecting, ExeLink, Interest, ListenerSetup, PeerCreds, PeerId, PeerOps,
+                    PeerRecv, PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, WireSetup, Woken, NO_CONNECTION};
+use crate::linux_listen::I01Socket;
 use crate::seal::Sealed;
 use crate::utc;
 
-/// The observer's Linux transport: the poller and the open connections.
+/// The I01 listener's poller token, and the bit that marks a peer's (disjoint from the connections' numbers).
+const LISTENER_TOKEN: u64 = u64::MAX;
+const PEER_TOKEN: u64 = 1 << 63;
+
+/// The observer's Linux transport: the poller, the open connections and the I01 listener.
 pub struct LinuxWire {
     poller: channel::Poller,
     conns: BTreeMap<u64, tcp::TcpConn>,
     registered: BTreeMap<u64, Interest>,
     next: u64,
+    i01: I01Socket,
+    listener_watched: bool,
+    peer_watched: Option<PeerId>,
 }
 
 fn errno(error: &io::Error) -> i32 {
@@ -53,10 +72,17 @@ fn timeout_ms(now: Instant, until: Instant) -> i32 {
 }
 
 impl LinuxWire {
-    /// The wire, after the seal: its poller (`epoll_create1`), or the errno of the failed call (status 24).
-    pub fn new(_sealed: &Sealed) -> Result<LinuxWire, i32> {
-        let poller = channel::Poller::new().map_err(|error| errno(&error))?;
-        Ok(LinuxWire { poller, conns: BTreeMap::new(), registered: BTreeMap::new(), next: 1 })
+    /// The wire, after the seal: its poller (`epoll_create1`; status 24), then the I01 listener (31-33) and its
+    /// registration with the poller (34).
+    pub fn new(sealed: &Sealed) -> Result<LinuxWire, WireSetup> {
+        let poller = channel::Poller::new().map_err(|error| WireSetup::Poller(errno(&error)))?;
+        let i01 = I01Socket::open(sealed).map_err(WireSetup::Listener)?;
+        let readable = channel::Interest { readable: true, writable: false };
+        poller
+            .add(i01.watched_listener(), LISTENER_TOKEN, readable)
+            .map_err(|_| WireSetup::Listener(ListenerSetup::Register))?;
+        Ok(LinuxWire { poller, conns: BTreeMap::new(), registered: BTreeMap::new(), next: 1, i01, listener_watched: true,
+                       peer_watched: None })
     }
 
     fn watch(&mut self, number: u64, wanted: Interest) -> Result<(), PollError> {
@@ -70,6 +96,36 @@ impl LinuxWire {
         result.map_err(|error| PollError(errno(&error)))?;
         self.registered.insert(number, wanted);
         Ok(())
+    }
+
+    /// The I01 watch a wait is given, applied before it: the listener added or removed as `peers` says (a failure is a
+    /// listener fault; a failed removal counts the listener as removed, so a later add that finds it fails again), the
+    /// session's peer added (a failure is that peer's fault) and a peer no longer named removed when still held.
+    fn watch_i01(&mut self, peers: PeerWatch, woken: &mut Woken) {
+        let readable = channel::Interest { readable: true, writable: false };
+        if peers.listener != self.listener_watched {
+            let result = if peers.listener {
+                self.poller.add(self.i01.watched_listener(), LISTENER_TOKEN, readable)
+            } else {
+                self.poller.delete(self.i01.watched_listener())
+            };
+            self.listener_watched = peers.listener && result.is_ok();
+            woken.listener_fault = result.is_err();
+        }
+        if peers.peer != self.peer_watched {
+            if let Some(old) = self.peer_watched.take() {
+                if let Some(watched) = self.i01.watched_peer(old) {
+                    let _removed_or_closed_later = self.poller.delete(watched);
+                }
+            }
+            if let Some(peer) = peers.peer {
+                let added = self.i01.watched_peer(peer).map(|watched| self.poller.add(watched, PEER_TOKEN | peer.0, readable));
+                match added {
+                    Some(Ok(())) => self.peer_watched = Some(peer),
+                    _ => woken.peer_faults.push(peer),
+                }
+            }
+        }
     }
 }
 
@@ -116,7 +172,7 @@ impl Wire for LinuxWire {
         self.conns.remove(&conn.0);
     }
 
-    fn wait(&mut self, interests: &[(ConnId, Interest)], until: Instant) -> Result<Vec<(ConnId, Ready)>, PollError> {
+    fn wait(&mut self, interests: &[(ConnId, Interest)], peers: PeerWatch, until: Instant) -> Result<Woken, PollError> {
         for (conn, wanted) in interests {
             self.watch(conn.0, *wanted)?;
         }
@@ -131,15 +187,28 @@ impl Wire for LinuxWire {
         for number in quiet {
             self.watch(number, Interest { readable: false, writable: false })?;
         }
+        let mut woken = Woken::default();
+        self.watch_i01(peers, &mut woken);
+        let now = Instant::now();
+        let until = if woken.listener_fault || !woken.peer_faults.is_empty() { now } else { until };
         let mut ready = Vec::new();
-        self.poller.wait(timeout_ms(Instant::now(), until), &mut ready).map_err(|error| PollError(errno(&error)))?;
-        Ok(ready
-            .into_iter()
-            .map(|(token, found)| {
-                (ConnId(token), Ready { readable: found.readable, writable: found.writable, error: found.error,
-                                        hangup: found.hangup })
-            })
-            .collect())
+        self.poller.wait(timeout_ms(now, until), &mut ready).map_err(|error| PollError(errno(&error)))?;
+        for (token, found) in ready {
+            let found = Ready { readable: found.readable, writable: found.writable, error: found.error, hangup: found.hangup };
+            if token == LISTENER_TOKEN {
+                if self.listener_watched {
+                    woken.listener = Some(found);
+                }
+            } else if token & PEER_TOKEN != 0 {
+                let peer = PeerId(token & !PEER_TOKEN);
+                if self.peer_watched == Some(peer) {
+                    woken.peers.push((peer, found));
+                }
+            } else {
+                woken.conns.push((ConnId(token), found));
+            }
+        }
+        Ok(woken)
     }
 
     fn now(&self) -> Instant {
@@ -148,5 +217,42 @@ impl Wire for LinuxWire {
 
     fn wall_seconds(&self) -> Option<u64> {
         utc::wall_seconds()
+    }
+}
+
+impl PeerOps for LinuxWire {
+    fn accept_peer(&mut self) -> AcceptResult {
+        self.i01.accept()
+    }
+
+    fn peer_creds(&mut self, peer: PeerId) -> Result<PeerCreds, i32> {
+        self.i01.creds(peer)
+    }
+
+    fn peer_proc_open(&mut self, peer: PeerId) -> Result<(), i32> {
+        self.i01.proc_open(peer)
+    }
+
+    fn peer_proc_read(&mut self, peer: PeerId) -> Result<ProcIdentity, i32> {
+        self.i01.proc_read(peer)
+    }
+
+    fn peer_exe(&mut self, peer: PeerId) -> Result<ExeLink, i32> {
+        self.i01.exe(peer)
+    }
+
+    fn peer_alive(&mut self, peer: PeerId) -> bool {
+        self.i01.alive(peer)
+    }
+
+    fn peer_recv(&mut self, peer: PeerId, buffer: &mut [u8]) -> PeerRecv {
+        self.i01.recv(peer, buffer)
+    }
+
+    fn peer_close(&mut self, peer: PeerId) {
+        if self.peer_watched == Some(peer) {
+            self.peer_watched = None;
+        }
+        self.i01.close(peer);
     }
 }
