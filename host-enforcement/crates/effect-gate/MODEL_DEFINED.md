@@ -2265,7 +2265,8 @@ R148-R160.
 - **The binding (R155):** never a service field; the gate is exercised with a test binding through `i01_request`
   directly. The idle bound runs from the accept only, since every first request closes the session.
 - **The quota edge (R156):** HE-004C's `tests/observer_quota.rs` passed a pods hard of 2^53 + 2 whose headroom was
-  exactly 2^53 - 1; under the chosen key's bound it now refuses with R156's text, and a hard of 2^53 - 1 passes beside it.
+  exactly 2^53 - 1; under the chosen key's bound it now refuses with R156's text, and a hard of 2^53 - 1 passes beside
+  it.
 - **The role pin's object form (R157):** `object_lists` reads the vectors' (and HE-008's manifest's) three-list object;
   `observe.rs` passes the read's own lists, so that reading cannot refuse there. The composed replay reads the object
   form after the closure check and before RB05; no composed case has an unreadable form.
@@ -2276,10 +2277,11 @@ R148-R160.
 - **`ListenerSetup::Socket` (R149):** it also stands for gate-sys's two sockcreate steps, which the plain listener never
   reaches, so 31 covers every socket-stage refusal.
 - **The quota tie-break (R156):** a quota object without a name sorts as the empty name.
-- **`listen_plain` (R160), a departure from §15:** the test cannot accept a real peer, since a SEQPACKET client needs a raw
-  `socket` call, which no test may hold; it binds, listens, sees no queued peer and EADDRINUSE on a second bind. It is
-  Linux-only, and every run so far (the build host's `cargo test`, the sim and the verifier) is on macOS, where it holds
-  0 tests: the plain listener's bind, listen and EADDRINUSE behaviour has run nowhere yet. Both are carried to T04.
+- **`listen_plain` (R160), a departure from §15:** the test cannot accept a real peer, since a SEQPACKET client needs a
+  raw `socket` call, which no test may hold; it binds, listens, sees no queued peer and EADDRINUSE on a second bind. It
+  is Linux-only, and every run so far (the build host's `cargo test`, the sim and the verifier) is on macOS, where it
+  holds 0 tests: the plain listener's bind, listen and EADDRINUSE behaviour has run nowhere yet. Both are carried to
+  T04.
 
 ### Evidence
 
@@ -2288,8 +2290,8 @@ The heavy checkpoints ran in order under HOLD_CARGO sequencing, each on the lane
   `observer_i01_wait` 7, `observer_i01_request` 4, `observer_i01_service` 11, `observer_i01_quota` 3,
   `observer_i01_role_pin` 9, and `listen_plain` 0 (Linux-only; see the settled points).
 - Both musl release builds: rc 0.
-- `gate.py`: the first run failed its self-test with 27 errors, all from one cause: U6's literal-aware bracket helper was
-  a second module-level `bracket_end`, which replaced D1's two-argument helper. It was renamed `literal_bracket_end`
+- `gate.py`: the first run failed its self-test with 27 errors, all from one cause: U6's literal-aware bracket helper
+  was a second module-level `bracket_end`, which replaced D1's two-argument helper. It was renamed `literal_bracket_end`
   (two lines; no other name is bound twice). After that: "he-gate: passed", self-test 332 OK, 50 contract files,
   G-I01-1..6 (G-I01-3 with 3 `let`s), the role constants (14), G-D1-16 and G-D2-7 on both targets.
 - The sim (`./ci/verify-offline.sh` over the packet): rc 0, nine argv, the zero-bill scan passing, tracked files
@@ -2298,11 +2300,11 @@ The heavy checkpoints ran in order under HOLD_CARGO sequencing, each on the lane
 - The 8-word span check against the three model files: shared spans only inside contract text (the vectors' pinned
   refusal texts and the rule data), byte-exact.
 
-At build only `python3 -I -B` text checks ran: the contract digests and sizes, the seal constants and the BPF decode shape, the gate-sys foreign
-symbols, independent mirrors of G-I01-1..6 and of the constants check over the real sources, the serve wiring order,
-a python model of the request checks (56 cases), the quota choice, a python reading of `observer_rbac.rs` over the
-vectors (67 object cases, 65 snapshot cases after the vectors' v3 results, 7 composed), the 8-word span check and the
-privacy scan.
+At build only `python3 -I -B` text checks ran: the contract digests and sizes, the seal constants and the BPF decode
+shape, the gate-sys foreign symbols, independent mirrors of G-I01-1..6 and of the constants check over the real sources,
+the serve wiring order, a python model of the request checks (56 cases), the quota choice, a python reading of
+`observer_rbac.rs` over the vectors (67 object cases, 65 snapshot cases after the vectors' v3 results, 7 composed), the
+8-word span check and the privacy scan.
 
 ### Code and audit
 
@@ -2320,17 +2322,126 @@ privacy scan.
   renewal on a request's receipt.
 - **I01 successor or HE-008:** capturer authentication; per-request capture freshness and retention across cycles; the
   ADM-4 origin through I01 custody; the unavailable variant.
-- **HE-008:** the binding (signed config successor); `Restart=` with a start-rate limit (status 35); `ExecStartPre=` clearing
-  the socket path as `init_t`; `UMask=0177`; the I06 v4 role document and manifest check (RB00), whose
-  objects carry no annotations; the SC12 audit policy; Q-HE4I1-11 (b).
+- **HE-008:** the binding (signed config successor); `Restart=` with a start-rate limit (status 35); `ExecStartPre=`
+  clearing the socket path as `init_t`; `UMask=0177`; the I06 v4 role document and manifest check (RB00), whose objects
+  carry no annotations; the SC12 audit policy; Q-HE4I1-11 (b).
 - **W03 / T04:** the type transition labelling `policy-observer.sock` (without it `bind` refuses, 32); T04's checks of
   the residuals above, of the listener accepting a real peer, and a Linux run of `listen_plain` (bind, listen,
   EADDRINUSE), which no macOS run reaches.
-- **The next re-pin or gate revision (PR review round 1's notes):** G-I01-5 and `check_socket_items` do not follow a crate
-  alias (`use gate_sys as gs`), which only the two socket files' whole-file pins close today; the rules' textual limits
-  (a split or escaped path literal, `serve_peer_deadlines` unpinned, no `unlinkat`/`renameat` words, a condition such as
-  `cfg!(debug_assertions)` around the role pin's call); nothing pins that `serve` maps the wire's setup errors through
-  `status::wire_setup` (31-34); the no-panic report line does not name the four I01 sources (its count, 25, is right).
+- **The next re-pin or gate revision (PR review round 1's notes):** G-I01-5 and `check_socket_items` do not follow a
+  crate alias (`use gate_sys as gs`), which only the two socket files' whole-file pins close today; the rules' textual
+  limits (a split or escaped path literal, `serve_peer_deadlines` unpinned, no `unlinkat`/`renameat` words, a condition
+  such as `cfg!(debug_assertions)` around the role pin's call); nothing pins that `serve` maps the wire's setup errors
+  through `status::wire_setup` (31-34); the no-panic report line does not name the four I01 sources (its count, 25, is
+  right).
 - **What stays code review's:** every index guarded and every arithmetic step checked; the custody order inside
   `serve_peer_step`'s control flow beyond what the fake `PeerOps` records; `I01Socket`'s methods matching their
   `PeerOps` operations one to one.
+
+## HE-004-I01A2: the I01 wire's request replay and four of HE-004-I01A's review notes (`contracts/i01-v1/`; `tests/observer_i01_pv_replay.rs`; `tools/gate.py`)
+
+The packet is HE-004-I01a's unit U7 (DESIGN-I01A revision 6, sha256 `2d976d19…`, sections 3, 7 and 15; owner
+decisions Q-HE4I1-10 (a) and Q-I01A-1; the lane monitor's Q-U7-1..3 (a) under owner delegation, 2026-10-22, recorded
+in the operator's `tools/w03/he004/OWNER_DECISIONS.md`). It vendors the I01 wire's channel schema (`CS`) and vectors
+(`PV`), which edge record v9 registers (harness-onion MET-ENFORCE-040), and replays `PV`'s request cases against
+HE-004-I01A's request checks; with it come the cheap notes of HE-004-I01A's PR review rounds 1 and 2: R1-3, R1-5, R1-6
+and R2-N5. No source under `crates/` changes: one test file is new, and `tools/gate.py`, `tools/test_gate.py`,
+`contracts/` and this file change. Every binary, planeon-observer included, is expected byte-identical to
+HE-004-I01A's. The validators `scripts/validate_policy_observation.py` (`ed0008be…`, "VPO") and
+`scripts/validate_proxy_contract.py` (`13019446…`, "VPC") at harness-onion `6835a6ed` are pinned by digest and read as
+specification only. Its rules are R161-R166.
+
+### Points taken from the pinned validators (the design and the vectors are silent)
+
+| # | Point | Validator |
+|---|---|---|
+| P1 | The binding a request names: its `bindingDigest` is `sha256:` and the SHA-256 of the binding document's canonical encoding, and its `runNonce` is the binding scope's `runNonce`. The replay's test binding is built from `PV`'s positive binding document this way | VPO `:110-111` |
+| P2 | The canonical encoding: sorted keys, `,` and `:` separators and no whitespace, non-ASCII text unescaped (`ensure_ascii=False`), no non-finite number. R10's is i05-protocol's encoder, and the replay holds the two equal on the positive's binding document (the digest P1 names) | VPC `:29-30` |
+| P3 | The request's own bounds beside the schema: its canonical encoding at most 16,384 bytes, depth at most 16 with the root at 0 (a member name counted one level below its object), integers within 2^53 - 1 in magnitude, only data values, and every text and member name printable ASCII. These are R155's framing rules, and on these bounds neither side is stricter for any request (an object at depth 16 with a member refuses on both); R10 also holds the bytes to their canonical encoding, which the validator, reading decoded values, does not see | VPO `:60-71`, `:87`; VPC `:104-114` |
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R161 | Scope. `contracts/i01-v1/channel.schema.json` (41,771 bytes) and `vectors.json` (14,486 bytes) are edge record v9's rows 67 and 68, byte for byte, mode 100644, at providerCommit `108e6195`, copied with `git show 6835a6ed:<providerPath>`; contracts: 52. `docs/alpha-2/POLICY_OBSERVATION_READINESS.md` is cited, not vendored (Q-EV9-1b (a)). Both files are read by the tests only: nothing in `crates/observer/src/` embeds them, and the I01 request checks (R155) are unchanged | DESIGN-I01A §3, §7; Q-HE4I1-10 (a), Q-I01A-1 |
+| R162 | The replay (`observer_i01_pv_replay`, at unit level). The vendored bytes are the rows' sha256 and sizes, and `PV` holds 27 negatives: 5 on the request, 17 on the observation, 5 on the binding. `CS`'s `$defs.request` is the definition `i01_request` implements: exactly the seven members, `additionalProperties` false, the two constants, the three text forms and lengths, `sequence` from 1 to 2^53 - 1. The positive's request, encoded canonically, passes framing, the schema, a fresh session's chain and the binding gate with the test binding, and closes at the gate without one. Each request negative refuses at its own step, compared exactly: negative 1 (operation) at the schema, "another operation"; negatives 2 (`runNonce`) and 3 (`bindingDigest`) pass framing, the schema and the chain and refuse only at the gate, where a binding naming the changed member would pass them; negatives 4 (sequence 2) and 5 (a previous digest other than zero) at the chain, "a session's first request is sequence 1 after the zero digest", with the gate alone passing them. The whole check gives the same refusal with the test binding and without one. The positive's request in the vectors file's member order, with whitespace or with a line end refuses at framing (canonical form, printable bytes) | DESIGN-I01A §7, §15; review r2 I2-8, r3 I3-11 |
+| R163 | The test binding's reach. `test_binding` is a function of the test binary only (`#[cfg(test)]` in `tests/observer_i01_pv_replay.rs`): it builds an `I01Binding` from `PV`'s positive binding document (P1, P2). Nothing in `crates/observer/src/` builds an `I01Binding`; the I01 service passes no binding (`i01_service.rs` calls `check_request(.., None)`) and `ObserverConfig` has no binding member, so through `serve` every request still closes at the gate (Q-I01A-3 (a)). `i01_request.rs` stays a child-free logic module (no test module is added to it) | DESIGN-I01A §7, §8; owner safety rule (2026-10-21) |
+| R164 | Not replayed: `PV`'s 17 observation and 5 binding negatives, and the positive's observation and binding as documents. They also read the proxy profile, harness-onion `architecture/proxy-contract-inputs/vectors.json`, which no edge record registers (edge record v9's replay-scope note), and the observation side is I01b's. R10's own framing negatives (§15) were all built by HE-004-I01A: `observer_i01_request` (size, bytes, strict JSON, depth, floats, integers, decoded text, the non-canonical encodings, extra and missing members), `observer_i01_wait` (a datagram over 16,384 bytes cut short, other ancillary data, a passed descriptor) and `observer_i01_service` (each receive outcome closing the session); none is added | DESIGN-I01A §15; Q-EV9-1b (a) |
+| R165 | Gate rules (`tools/gate.py`). Contracts: 52. R1-3: `resolved_uses` follows a source's own aliases (a rename of gate_sys itself, plain or braced, and a module or item bound under it, in chains); G-I01-5 reads the two observer socket files' use paths through it, so an import of `send` and a rename of the channel module through a crate alias refuse as their direct forms do, a `name::send` path through a name bound to the channel module refuses as `channel::send` does, and the two files hold no rename or glob of gate_sys and no `extern crate`; the socket-item rule (`check_socket_items`, all four socket files) reads its imports through `resolved_uses` and a gate_sys rename's qualified paths as gate_sys's. R1-5: `serve`'s wire construction is exactly `let wire = match LinuxWire::new(sealed) { Ok(wire) => wire, Err(error) => return status::wire_setup(&error), };` (`WIRE_SETUP_MATCH`), so its refusal keeps 24 and 31-34. R1-6: the no-panic rule's docstring and report line name the four I01 sources (`I01_NO_PANIC_BUILT`); its count is unchanged (25). Each reported | HE-004-I01A PR review r1 R1-3, R1-5, R1-6; Q-U7-2 (a) |
+| R166 | Tests: the new binary `observer_i01_pv_replay` (5 tests). Self-tests: the contract table, D2's count and its missing, changed and unregistered files cover the two I01 files (52; the readiness document refuses if held); `test_g_i01_5_the_alias_forms_refuse` (the reviewer's probe and 17 kin, in both observer socket files), `test_items_through_a_crate_or_module_alias_refuse` (7 forms and a glob, in all four socket files) and `test_the_wire_s_refusal_maps_through_wire_setup` (7 departures and a spaced form); `GOOD_OBSERVER_MAIN` and `SERVE_STEPS` follow `main.rs`'s `match` form (R1-5). No earlier test binary changes | DESIGN-I01A §15 |
+
+### Points settled at build (inside DESIGN-I01A's intent)
+
+- **The test binding's source (R163):** it is built from the binding document rather than copied from the request, so
+  the replay also checks that i05-protocol's canonical encoding is the one `PV` was written with (P2); the digest is
+  `sha256:e10d89fd…`.
+- **"Each negative's own refusal" (R162):** `PV` writes no refusal text, so each negative is held to the step and R10
+  text of the request rule it changes, and to that step alone (the steps before it pass).
+- **The validator's order (P1, R162):** VPO checks the request's binding, then the response's echo of the request, then
+  the initial chain. Negatives 4 and 5 change only the request, so VPO's first failing check for them is the echo, while
+  R10, which answers nothing in I01a, refuses them at the chain, the rule they target; both refuse. R10 runs its chain
+  before the binding gate (DESIGN-I01A §0 item 2); no vector breaks both, so the order between the two is not replayed.
+- **`#[cfg(test)]` (R163):** every `tests/` binary is built with `cfg(test)`, so the attribute only marks the test
+  binding as test code; `i01_request.rs` has no test module because its logic rule keeps it child-free.
+- **R1-3's form (R165):** both of the reviewer's options are taken for the observer's two socket files (aliases
+  followed, and a gate_sys rename refused); effect-gate's two socket files keep their reading, with aliases followed and
+  no new refusal, as no rule there named the alias forms. The real files hold no alias, so every count is unchanged.
+- **R1-5's check (R165):** the optional textual check is added; it reads the whole `match` statement, so another status,
+  another variable name or a changed arm refuses.
+- **R2-N5:** six prose lines of the HE-004-I01a section were over 120 columns; they are reflowed with their words
+  unchanged. Table rows and headings are not wrapped.
+
+### Evidence
+
+The heavy checkpoint (on the lane monitor's word, 2026-10-22, each step through `heavy.zsh`):
+- `cargo test`: 110 binaries, 729 tests passing, 0 failing (HE-004-I01A: 109 and 724); `observer_i01_pv_replay` adds 5,
+  and every earlier binary's count is unchanged.
+- Both musl release builds pass. planeon-gate, planeon-broker, planeon-containment, planeon-writer and
+  planeon-observer are byte-identical to HE-004-I01A's (binaries, symbols and SBOMs), as no crate source changed.
+- `gate.py`: `he-gate: passed`, with 52 contract files matching the registered harness-onion bytes. Its self-test runs
+  335 tests, all passing (HE-004-I01A's 332 and the three above).
+- The sim: run on the packet head before the PR review (the lane monitor's word).
+- The 8-word span check against VPO and VPC at `6835a6ed`, contract text excluded: 7 files, 7,517 words, no shared span.
+
+At build only `python3 -I -B` text checks ran: the two files' sha256, sizes and modes against edge record v9's rows;
+the binding document's canonical digest with the validators' encoding (`e10d89fd…`, the positive's `bindingDigest`); a
+python model of the request checks over `PV`'s six request cases (the positive passing with the test binding and each
+negative at the step R162 names); `CS`'s request definition against `i01_request`'s constants; `gate.py` and
+`test_gate.py` parsed (335 test methods, no name bound twice); the new `WIRE_SETUP_MATCH` pattern on `main.rs`, the old
+`let Ok(wire) = .. else` form and a spaced form, and `resolved_uses` and `gate_sys_aliases` on hand-made use paths; line
+widths and the privacy scan.
+
+### Code and audit
+
+- `contracts/i01-v1/` (two files) and PROVENANCE's section; `crates/observer/tests/observer_i01_pv_replay.rs` (new);
+  `tools/gate.py` and `tools/test_gate.py` (R165, R166); this section and the HE-004-I01a section's reflow. No source
+  under `crates/`, no manifest or lock, no `vendor/`, `licenses/` or `ci/` change.
+
+### Carried
+
+- **HE-004-I01A's other review notes (Q-U7-2 (a)):** R1-4, the G-I01 rules' textual limits (a split or escaped path
+  literal outside `linux_listen.rs`, a struct-literal `I01Socket` inside it, a type alias of `ConnId` or `Client` in
+  `lib.rs` and a response module not named `i01_*`, `serve_peer_deadlines`' call sites, no `unlinkat`/`renameat`
+  words, an `if false && ..` or `cfg!(debug_assertions)` condition around the role pin's call); R2-N2, the
+  `listen_plain` point's "the verifier" among the runs so far; R2-N3, the operator's `BUILD-I01A.md` against
+  MODEL_DEFINED; R2-N4, HE-004-I01A's evidence naming no commit.
+- **A later edge record:** the binding and observation replays, which need `architecture/proxy-contract-inputs/` (the
+  profile) registered first.
+- **I01b, HE-008, W03 / T04:** unchanged from the HE-004-I01a section.
+- **What stays code review's:** that no non-test source builds an `I01Binding` (no gate rule pins it; `i01_service.rs`
+  passes `None`); aliases reached through another module (`crate::`, `super::` paths) are not followed, and stay closed
+  by the socket-module rule, which refuses a gate_sys rename and any path to the socket modules outside the socket
+  files, and by the socket files re-exporting nothing.
+
+### Owner decisions (verbatim as relayed, 2026-10-22)
+
+> [lane monitor] U7, monitor under owner delegation 2026-10-22, all (a):
+> - Q-U7-1 (a): **HE-004-I01A2**, branch codex/he-004-i01a2-pv-replay.
+> - Q-U7-2 (a): U7 as designed, plus the cheap NOTEs:
+>   - R1-3, hardening G-I01 against the alias form, with self-tests;
+>   - R1-5 and R1-6 docstrings;
+>   - R2-N5 wraps.
+>   R1-4 and R2-N2..N4 stay carried.
+> - Q-U7-3 (a): the worktree on R10 main 12939ef3 via the standing ref-only R10 fetch from your own R10 worktree (log it). Write the build brief now, as light work.
+
+The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.

@@ -1,0 +1,449 @@
+{
+  "evidenceClass": "UNIT_VERIFICATION_ONLY",
+  "nativeAcceptance": false,
+  "positive": {
+    "binding": {
+      "schemaVersion": "planeon.internal.policy-observation-binding/v1",
+      "profileDigest": "sha256:fc569e17cf8bc82b2d2f4e0244134549e4f3d9e885e8b339c1256eca1a840164",
+      "scope": {
+        "tenantId": "unit-tenant",
+        "environmentId": "unit-environment",
+        "runNonce": "unit-nonce",
+        "capacityNonce": "unit-capacity-nonce",
+        "endpointId": "unit-proxy",
+        "namespace": "unit-namespace",
+        "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+        "validFrom": "2026-09-08T00:00:00Z",
+        "expiresAt": "2026-09-08T00:10:00Z"
+      },
+      "observer": {
+        "executableDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "namespace": {
+        "name": "unit-namespace",
+        "uid": "unit-namespace-uid"
+      },
+      "projections": {
+        "admissionPolicy": {
+          "apiVersion": "admissionregistration.k8s.io/v1",
+          "kind": "ValidatingAdmissionPolicy",
+          "name": "admissionpolicy",
+          "namespace": null,
+          "uid": "unit-admissionpolicy-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "resourceQuota": {
+          "apiVersion": "v1",
+          "kind": "ResourceQuota",
+          "name": "unit-quota",
+          "namespace": "unit-namespace",
+          "uid": "unit-quota-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "limitRange": {
+          "apiVersion": "v1",
+          "kind": "LimitRange",
+          "name": "unit-limits",
+          "namespace": "unit-namespace",
+          "uid": "unit-limit-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "serviceAccount": {
+          "apiVersion": "v1",
+          "kind": "ServiceAccount",
+          "name": "campaign",
+          "namespace": "unit-namespace",
+          "uid": "unit-service-account-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "rbac": {
+          "apiVersion": "planeon.internal/v1",
+          "kind": "EffectiveRbac",
+          "name": "rbac",
+          "namespace": "unit-namespace",
+          "uid": "unit-rbac-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "networkPolicy": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "NetworkPolicy",
+          "name": "networkpolicy",
+          "namespace": "unit-namespace",
+          "uid": "unit-networkpolicy-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "mutationBroker": {
+          "apiVersion": "planeon.internal/v1",
+          "kind": "MutationBroker",
+          "name": "mutationbroker",
+          "namespace": "unit-namespace",
+          "uid": "unit-mutationbroker-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "enforcementPins": {
+        "admissionFenceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "rbacClosureDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "networkEnforcementDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "hostPreflightDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    "request": {
+      "schemaVersion": "planeon.internal.policy-observation-request/v1",
+      "operation": "OBSERVE_POLICY",
+      "bindingDigest": "sha256:e10d89fd6bec18db91e3802886429267dd01e5abf15ce387469eec9341640750",
+      "runNonce": "unit-nonce",
+      "challenge": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sequence": 1,
+      "previousObservationDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "observation": {
+      "schemaVersion": "planeon.internal.policy-observation/v1",
+      "bindingDigest": "sha256:e10d89fd6bec18db91e3802886429267dd01e5abf15ce387469eec9341640750",
+      "runNonce": "unit-nonce",
+      "challenge": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sequence": 1,
+      "previousObservationDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "observerBootId": "12345678-1234-1234-1234-123456789abc",
+      "generation": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observedAt": "2026-09-08T00:00:01Z",
+      "expiresAt": "2026-09-08T00:00:05Z",
+      "namespace": {
+        "name": "unit-namespace",
+        "uid": "unit-namespace-uid",
+        "resourceVersion": "100"
+      },
+      "projections": {
+        "admissionPolicy": {
+          "apiVersion": "admissionregistration.k8s.io/v1",
+          "kind": "ValidatingAdmissionPolicy",
+          "name": "admissionpolicy",
+          "namespace": null,
+          "uid": "unit-admissionpolicy-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "resourceQuota": {
+          "apiVersion": "v1",
+          "kind": "ResourceQuota",
+          "name": "unit-quota",
+          "namespace": "unit-namespace",
+          "uid": "unit-quota-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "limitRange": {
+          "apiVersion": "v1",
+          "kind": "LimitRange",
+          "name": "unit-limits",
+          "namespace": "unit-namespace",
+          "uid": "unit-limit-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "serviceAccount": {
+          "apiVersion": "v1",
+          "kind": "ServiceAccount",
+          "name": "campaign",
+          "namespace": "unit-namespace",
+          "uid": "unit-service-account-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "rbac": {
+          "apiVersion": "planeon.internal/v1",
+          "kind": "EffectiveRbac",
+          "name": "rbac",
+          "namespace": "unit-namespace",
+          "uid": "unit-rbac-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "networkPolicy": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "NetworkPolicy",
+          "name": "networkpolicy",
+          "namespace": "unit-namespace",
+          "uid": "unit-networkpolicy-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        },
+        "mutationBroker": {
+          "apiVersion": "planeon.internal/v1",
+          "kind": "MutationBroker",
+          "name": "mutationbroker",
+          "namespace": "unit-namespace",
+          "uid": "unit-mutationbroker-uid",
+          "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceVersion": "100"
+        }
+      },
+      "quota": {
+        "hard": {
+          "pods": 1,
+          "configMaps": 2,
+          "services": 1,
+          "cpuMillis": 100,
+          "memoryBytes": 1048576,
+          "ephemeralStorageBytes": 1048576
+        },
+        "used": {
+          "pods": 0,
+          "configMaps": 0,
+          "services": 0,
+          "cpuMillis": 0,
+          "memoryBytes": 0,
+          "ephemeralStorageBytes": 0
+        }
+      },
+      "enforcement": {
+        "policyGeneration": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "admissionFenceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "rbacClosureDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "networkEnforcementDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "hostPreflightDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    "now": "2026-09-08T00:00:02Z",
+    "previous": null
+  },
+  "negative": [
+    {
+      "label": "negative-1-request-operation",
+      "document": "request",
+      "path": [
+        "operation"
+      ],
+      "value": "EXECUTE"
+    },
+    {
+      "label": "negative-2-request-runNonce",
+      "document": "request",
+      "path": [
+        "runNonce"
+      ],
+      "value": "other-run"
+    },
+    {
+      "label": "negative-3-request-bindingDigest",
+      "document": "request",
+      "path": [
+        "bindingDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "negative-4-request-sequence",
+      "document": "request",
+      "path": [
+        "sequence"
+      ],
+      "value": 2
+    },
+    {
+      "label": "negative-5-request-previousObservationDigest",
+      "document": "request",
+      "path": [
+        "previousObservationDigest"
+      ],
+      "value": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "label": "negative-6-observation-challenge",
+      "document": "observation",
+      "path": [
+        "challenge"
+      ],
+      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "label": "negative-7-observation-runNonce",
+      "document": "observation",
+      "path": [
+        "runNonce"
+      ],
+      "value": "other-run"
+    },
+    {
+      "label": "negative-8-observation-bindingDigest",
+      "document": "observation",
+      "path": [
+        "bindingDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "negative-9-observation-sequence",
+      "document": "observation",
+      "path": [
+        "sequence"
+      ],
+      "value": 2
+    },
+    {
+      "label": "negative-10-observation-previousObservationDigest",
+      "document": "observation",
+      "path": [
+        "previousObservationDigest"
+      ],
+      "value": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "label": "negative-11-observation-observedAt",
+      "document": "observation",
+      "path": [
+        "observedAt"
+      ],
+      "value": "2026-09-08T00:00:03Z"
+    },
+    {
+      "label": "negative-12-observation-expiresAt",
+      "document": "observation",
+      "path": [
+        "expiresAt"
+      ],
+      "value": "2026-09-08T00:00:02Z"
+    },
+    {
+      "label": "negative-13-observation-expiresAt",
+      "document": "observation",
+      "path": [
+        "expiresAt"
+      ],
+      "value": "2026-09-08T00:00:07Z"
+    },
+    {
+      "label": "negative-14-observation-namespace.uid",
+      "document": "observation",
+      "path": [
+        "namespace",
+        "uid"
+      ],
+      "value": "other-uid"
+    },
+    {
+      "label": "negative-15-observation-projections.resourceQuota.projectionDigest",
+      "document": "observation",
+      "path": [
+        "projections",
+        "resourceQuota",
+        "projectionDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "negative-16-observation-projections.rbac.uid",
+      "document": "observation",
+      "path": [
+        "projections",
+        "rbac",
+        "uid"
+      ],
+      "value": "other"
+    },
+    {
+      "label": "negative-17-observation-quota.used.configMaps",
+      "document": "observation",
+      "path": [
+        "quota",
+        "used",
+        "configMaps"
+      ],
+      "value": 3
+    },
+    {
+      "label": "negative-18-observation-quota.hard.configMaps",
+      "document": "observation",
+      "path": [
+        "quota",
+        "hard",
+        "configMaps"
+      ],
+      "value": 0
+    },
+    {
+      "label": "negative-19-observation-quota.used.cpuMillis",
+      "document": "observation",
+      "path": [
+        "quota",
+        "used",
+        "cpuMillis"
+      ],
+      "value": true
+    },
+    {
+      "label": "negative-20-observation-quota.hard.cpuMillis",
+      "document": "observation",
+      "path": [
+        "quota",
+        "hard",
+        "cpuMillis"
+      ],
+      "value": 9007199254740992
+    },
+    {
+      "label": "negative-21-observation-enforcement.policyGeneration",
+      "document": "observation",
+      "path": [
+        "enforcement",
+        "policyGeneration"
+      ],
+      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "label": "negative-22-observation-enforcement.hostPreflightDigest",
+      "document": "observation",
+      "path": [
+        "enforcement",
+        "hostPreflightDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "negative-23-binding-scope.tenantId",
+      "document": "binding",
+      "path": [
+        "scope",
+        "tenantId"
+      ],
+      "value": "other-tenant"
+    },
+    {
+      "label": "negative-24-binding-profileDigest",
+      "document": "binding",
+      "path": [
+        "profileDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "negative-25-binding-namespace.uid",
+      "document": "binding",
+      "path": [
+        "namespace",
+        "uid"
+      ],
+      "value": "other"
+    },
+    {
+      "label": "negative-26-binding-projections.serviceAccount.uid",
+      "document": "binding",
+      "path": [
+        "projections",
+        "serviceAccount",
+        "uid"
+      ],
+      "value": "other"
+    },
+    {
+      "label": "negative-27-binding-scope.namespace",
+      "document": "binding",
+      "path": [
+        "scope",
+        "namespace"
+      ],
+      "value": "other"
+    }
+  ]
+}

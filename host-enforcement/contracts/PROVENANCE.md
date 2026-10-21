@@ -255,6 +255,35 @@ harness-onion `29c84b36`:
 
 - `scripts/i06_backend_profile_v4.py`, sha256 `7f97acfe9060e79c101f264f5bf61610bf421326c689216cbaf41df7e38e6d2a`, 31161 bytes
 
+## The I01 wire's channel schema and vectors, the observer's request replay (HE-004-I01A2)
+
+HE-004-I01a's unit U7 (DESIGN-I01A sections 3, 7 and 15; owner decisions Q-HE4I1-10 (a), Q-I01A-1 and Q-U7-1..3 (a)):
+the two rows edge registry record v9 adds, rows 67 and 68 of
+`architecture/artifact-edges/operator-harness-engineering-v9.json` (sha256
+`197f30e4e1e0be1dcacd71f1095c91e2333fe9d6ea05b8194578160e471605d7`, 35124 bytes; harness-onion MET-ENFORCE-040, PR #210,
+read by exact path from its adopted bytes before that PR merged), labelled HE-004-I01, status REGISTERED_BEFORE_USE,
+relation BYTE_IDENTICAL, mode 100644, `providerCommit` `108e61953d522106db7c8de65ee19120a952853b` (each file's last
+change, already on harness-onion main, so no provider packet), consumer paths exactly these. Before any byte was
+copied, each row's sha256, size, mode, provider path and consumer path were compared with the build brief; then each
+file was copied byte for byte with `git show 6835a6ed:<providerPath>` (harness-onion
+`6835a6edf7137ba11d4aed4b93c02be4c8694369`, whose bytes of both files are the rows' sha256) and its sha256, length and
+mode checked. The vectors drive U7's replay of their request cases, and the schema's request definition is held to
+`crates/observer/src/i01_request.rs`'s constants, in `crates/observer/tests/observer_i01_pv_replay.rs`. The vectors'
+binding and observation cases also read `architecture/proxy-contract-inputs/vectors.json`, which no edge record
+registers, so they are not replayed (edge record v9's replay-scope note).
+
+- `contracts/i01-v1/channel.schema.json` from `architecture/policy-observation-inputs/channel.schema.json`, sha256 `fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e`, 41771 bytes
+- `contracts/i01-v1/vectors.json` from `architecture/policy-observation-inputs/vectors.json`, sha256 `1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124`, 14486 bytes
+
+Not vendored: `docs/alpha-2/POLICY_OBSERVATION_READINESS.md` (sha256 `65778040…`), which MET-REPAIR-010 pins beside
+the two files and which states the wire's rules, is deliberately unregistered: a specification document that R10 reads
+and cites but does not copy (Q-EV9-1b (a)). The validators are pinned by digest, not copied, and read as specification
+only where DESIGN-I01A and the vectors are silent (each such point is listed in `crates/effect-gate/MODEL_DEFINED.md`'s
+HE-004-I01A2 section), at harness-onion `6835a6ed`:
+
+- `scripts/validate_policy_observation.py`, sha256 `ed0008be32c75b4b03a74e6361d84b2b2e9a830f19f8d1ae5a00dbf1792c5a44`, 12952 bytes
+- `scripts/validate_proxy_contract.py`, sha256 `130194464c6271e8033cda32f166fa07d0dac774f2c48510da28093a3b9ab77e`, 16007 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256
