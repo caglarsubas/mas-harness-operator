@@ -3892,7 +3892,7 @@ def check_observer_role_pin(base: Path) -> int:
     return len(between)
 
 
-def bracket_end(code: str, opening: int, rule: str) -> int:
+def literal_bracket_end(code: str, opening: int, rule: str) -> int:
     """The index after the bracket that closes the one at `opening`, in a source read with literals kept (a string
     literal's brackets do not count)."""
     depth, index, quoted = 0, opening, False
@@ -3922,7 +3922,7 @@ def constant_body(code: str, header: str, rule: str) -> tuple[str, int]:
     require(len(found) == 1, "%s: not exactly one plain `pub const` item %s (%s)"
             % (OBSERVER_RBAC, header.split("\\")[0], rule))
     opening = found[0].end() - 1
-    end = bracket_end(code, opening, rule)
+    end = literal_bracket_end(code, opening, rule)
     require(re.match(r"\s*;", code[end:]), "%s: a constant array not ended by `];` (%s)" % (OBSERVER_RBAC, rule))
     return code[opening + 1:end - 1], int(found[0].group("length"))
 
