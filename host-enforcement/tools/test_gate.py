@@ -1081,11 +1081,16 @@ class ContractTests(unittest.TestCase):
     # HE-004D1 (DESIGN-D1 section 2, G-D1-9): edge record v5's four native-profile rows join them (35).
     # HE-004D2 (DESIGN-D2 section 2, G-D2-1): edge record v6's five HE-004D2 rows join them (40), and unit B1's six of edge
     # record v7 (46). HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 OBSERVER rows (48);
-    # unit U6 (DESIGN-I01A section 10): its two I06 v4 rows (50).
+    # unit U6 (DESIGN-I01A section 10): its two I06 v4 rows (50). HE-004-I01A2, unit U7 (DESIGN-I01A sections 3 and 7):
+    # edge record v9's two I01 wire rows (52).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 50)
+            self.assertEqual(len(gate.CONTRACTS), 52)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/i01-v1/")}, {
+                "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
+                "contracts/i01-v1/vectors.json": "1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/i06-v4/")}, {
                 "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
@@ -2069,6 +2074,29 @@ class SocketItemTests(Tree):
             self.refused(gate.check_socket_modules, os_rs, text, message)
         self.refused(gate.check_socket_modules, os_rs, "use gate_sys::channel::*;\n", "glob of gate-sys's socket module")
 
+    def test_items_through_a_crate_or_module_alias_refuse(self):
+        # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3): the use paths are read with the source's aliases followed,
+        # so a socket item imported or named through a rename of gate_sys or of a socket module refuses in a pub item as
+        # its direct form does, in every socket file (effect-gate's two and the observer's two).
+        message = "pub item naming gate-sys's socket items"
+        for rel in ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs", gate.OBSERVER_LINUX_NET,
+                    gate.OBSERVER_LINUX_LISTEN):
+            for text in ("use gate_sys as gs;\nuse gs::channel::{Conn};\npub fn f() -> Conn { x() }\n",
+                         "use gate_sys::{self as gs};\nuse gs::{channel::{Poller as P}};\npub type Wire = P;\n",
+                         "use gate_sys as gs;\npub fn f() -> gs::channel::Poller { x() }\n",
+                         "use gate_sys as gs;\npub fn f() -> gs :: tcp :: TcpConn { x() }\n",
+                         "use gate_sys as gs;\nuse gs::channel as c;\nuse c::PidFd;\npub static S: Option<PidFd> = None;\n",
+                         "use gate_sys as gs;\nuse gs::tcp::{self as t};\npub fn f() -> t::TcpConn { x() }\n",
+                         "use gate_sys as g1;\nuse g1 as g2;\nuse g2::channel::Conn;\npub struct Leak { pub c: Conn }\n"):
+                self.refused(gate.check_socket_modules, rel, text, message + "|pub field naming")
+            self.refused(gate.check_socket_modules, rel, "use gate_sys as gs;\nuse gs::channel::*;\n",
+                         "glob of gate-sys's socket module")
+        # A private use through an alias, and the data types through one, pass in effect-gate's files.
+        os_rs = "crates/effect-gate/src/linux_os.rs"
+        self.write(os_rs, "use gate_sys as gs;\nuse gs::channel::{ListenError, Poller};\nfn private(p: Poller) {}\n"
+                   "pub fn new(_s: &Sealed) -> Result<u8, ListenError> { z() }\n")
+        self.assertEqual(gate.check_socket_modules(self.base), 17)
+
     def test_aliases_fields_and_fn_pointers_refuse(self):
         # PR review round 2, R2-1 (the reviewer's Q6, Q7, Q9, Q15 and their kin).
         os_rs = "crates/effect-gate/src/linux_os.rs"
@@ -2930,7 +2958,10 @@ fn serve(sealed: &Sealed) -> u8 {
         Ok(server) => server,
         Err(error) => return status::capture_setup(&error),
     };
-    let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };
+    let wire = match LinuxWire::new(sealed) {
+        Ok(wire) => wire,
+        Err(error) => return status::wire_setup(&error),
+    };
     let capture = match LinuxCapture::new(sealed) {
         Ok(capture) => capture,
         Err(error) => return status::capture_setup(&error),
@@ -4040,7 +4071,9 @@ SERVE_STEPS = (
     "        Err(error) => return status::capture_setup(&error),\n    };\n    drop(record_schema);\n",
     "    let server = match enrolled.server_identity() {\n        Ok(server) => server,\n"
     "        Err(error) => return status::capture_setup(&error),\n    };\n",
-    "    let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };\n",
+    # HE-004-I01A2 (R1-5): main.rs's form, the wire's refusal mapped through status::wire_setup (24, 31-34).
+    "    let wire = match LinuxWire::new(sealed) {\n        Ok(wire) => wire,\n"
+    "        Err(error) => return status::wire_setup(&error),\n    };\n",
     "    let capture = match LinuxCapture::new(sealed) {\n        Ok(capture) => capture,\n"
     "        Err(error) => return status::capture_setup(&error),\n    };\n",
     "    let Ok(closure) = Closure::embedded() else { return status::CLOSURE };\n",
@@ -4106,6 +4139,28 @@ class ObserverServeTests(Tree):
                      GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ") + "    let _again = enrolled.server_identity();\n")):
             self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text, "enrolled.server_identity. exactly once|in this order")
         self.write(gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ")))
+        self.assertEqual(gate.check_observer_serve(self.base), 13)
+
+    def test_the_wire_s_refusal_maps_through_wire_setup(self):
+        # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-5): main.rs's match maps LinuxWire::new's refusal through
+        # status::wire_setup (24, 31-34); one status for every setup refusal, another mapping or a lost arm refuses.
+        good = SERVE_STEPS[9]
+        self.assertIn("status::wire_setup(&error)", good)
+        self.assertEqual(GOOD_OBSERVER_MAIN.count(good), 1)
+        self.assertEqual(len(gate.WIRE_SETUP_MATCH.findall(GOOD_OBSERVER_MAIN)), 1)
+        for new in ("    let Ok(wire) = LinuxWire::new(sealed) else { return status::SOCKETS };\n",
+                    good.replace("return status::wire_setup(&error)", "return status::SOCKETS"),
+                    good.replace("status::wire_setup(&error)", "status::capture_setup(&error)"),
+                    good.replace("status::wire_setup(&error)", "status::wire_setup(&other)"),
+                    good.replace("Err(error) => return", "_ => return"),
+                    good.replace("Ok(wire) => wire,", "Ok(wire) => { early(); wire }"),
+                    good.replace("let wire = match", "let other = match")):
+            self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(good, new),
+                         "map LinuxWire::new's refusal exactly once|exactly once|in this order")
+        # Spacing, comments and a final arm without its comma are read through.
+        spaced = ("    let wire = match LinuxWire :: new ( sealed ) { // the wire\n        Ok ( wire ) => wire,\n"
+                  "        Err(error) => return status :: wire_setup ( & error )\n    };\n")
+        self.write(gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(good, spaced))
         self.assertEqual(gate.check_observer_serve(self.base), 13)
 
     def test_bypass_forms_refuse(self):
@@ -4945,8 +5000,9 @@ class ObserverNativeProfileTests(Tree):
 
     def test_the_tree_passes(self):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
-        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50.
-        self.assertEqual(len(gate.CONTRACTS), 50)
+        # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50; unit U7's
+        # two I01 wire files (HE-004-I01A2, edge record v9) 52.
+        self.assertEqual(len(gate.CONTRACTS), 52)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5458,11 +5514,15 @@ D2_V6_CONTRACTS = ("contracts/native-profile-v1/qualification.schema.json", "con
 D2_V7_CONTRACTS = ("contracts/native-profile-v5/qualification.schema.json", "contracts/native-profile-v5/vectors.json",
                    "contracts/native-profile-v5/README.md", "contracts/native-profile-v1/vectors.json",
                    "contracts/native-profile-v2/vectors.json", "contracts/native-profile-v3/vectors.json")
+# HE-004-I01A2, HE-004-I01a's unit U7 (DESIGN-I01A sections 3 and 7): edge record v9's two I01 wire rows.
+I01_V9_CONTRACTS = ("contracts/i01-v1/channel.schema.json", "contracts/i01-v1/vectors.json")
 
 
 class D2ContractCountTests(unittest.TestCase):
     """HE-004D2 G-D2-1: edge record v6's five HE-004D2 rows and edge record v7's six make 46 registered files; over a copy
-    of the real contracts/ tree, a missing one of the eleven, a changed one, and an unregistered file refuse."""
+    of the real contracts/ tree, a missing one of the eleven, a changed one, and an unregistered file refuse. HE-004-I01A2:
+    edge record v9's two I01 wire rows are checked the same way (52 files), and the readiness document, which edge record
+    v9 leaves unregistered (Q-EV9-1b (a)), refuses if held."""
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -5477,13 +5537,14 @@ class D2ContractCountTests(unittest.TestCase):
 
     def test_the_forty_six_files_pass(self):
         # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48; unit U6
-        # (section 10): its two I06 v4 files make 50.
-        self.assertEqual(len(gate.CONTRACTS), 50)
-        self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 50)
+        # (section 10): its two I06 v4 files make 50; unit U7 (HE-004-I01A2, sections 3 and 7): edge record v9's two
+        # I01 wire files make 52.
+        self.assertEqual(len(gate.CONTRACTS), 52)
+        self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 52)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
-        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS:
+        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS:
             path = self.base / rel
             data = path.read_bytes()
             path.unlink()
@@ -5494,14 +5555,16 @@ class D2ContractCountTests(unittest.TestCase):
                 gate.check_contracts(self.base)
             path.write_bytes(data)
         for rel in ("contracts/native-profile-v6/qualification.schema.json", "contracts/native-profile-v5/extra.json",
-                    "contracts/i06-v5/vectors.json", "contracts/i06-v4/README.md"):
+                    "contracts/i06-v5/vectors.json", "contracts/i06-v4/README.md",
+                    # HE-004-I01A2: the unregistered readiness document, and a proxy-contract input no record registers.
+                    "contracts/i01-v1/POLICY_OBSERVATION_READINESS.md", "contracts/i01-v1/proxy-contract-vectors.json"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 50)
+        self.assertEqual(gate.check_contracts(self.base), 52)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -6413,6 +6476,44 @@ class I01ListenerRuleTests(Tree):
         with mock.patch.object(gate, "I01_FILES_BUILT", ()):
             with self.assertRaisesRegex(gate.GateError, "the i01_ sources present .* are not exactly none"):
                 gate.check_observer_no_send(self.base)
+        self.assertEqual(gate.check_observer_no_send(self.base), 7)
+
+    def test_g_i01_5_the_alias_forms_refuse(self):
+        # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): the reviewer's probe and its kin, in both socket
+        # files: each import of send or rename of the channel module through a crate alias, braced or not, refuses as
+        # its direct form does, and so does a crate alias, a glob of gate_sys or an extern crate by itself.
+        net, listen = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN
+        call = "fn f(x: &Conn) { let _ = c::send(x, b); }"
+        for rel in (net, listen):
+            for text, message in (
+                    ("use gate_sys as gs;\nuse gs::channel::{send};\nfn f(x: &Conn) { let _ = send(x, b); }",
+                     "imports gate-sys's channel send"),                                       # the reviewer's probe
+                    ("use gate_sys as gs;\nuse gs::channel::send;", "imports gate-sys's channel send"),
+                    ("use gate_sys as gs;\nuse gs::channel::{Conn, send as s};", "imports gate-sys's channel send"),
+                    ("use gate_sys::{self as gs};\nuse gs::{channel::{send}};", "imports gate-sys's channel send"),
+                    ("use gate_sys as gs;\nuse self::gs::channel::send;", "imports gate-sys's channel send"),
+                    ("use gate_sys as gs;\nuse gs::channel;\nuse channel::send;", "imports gate-sys's channel send"),
+                    ("use gate_sys as g1;\nuse g1 as g2;\nuse g2::channel::send;", "imports gate-sys's channel send"),
+                    ("use gate_sys as gs;\nuse gs::channel as c;\n" + call, "channel send through c"),
+                    ("use gate_sys::channel as c;\n" + call, "channel send through c"),
+                    ("use gate_sys as gs;\nuse gs::{channel::{self as c}};\n" + call, "channel send through c"),
+                    ("use gate_sys as gs;\nuse gs::channel as c;", "renames gate-sys's channel module"),
+                    ("use gate_sys as gs;\nuse gs::{channel as c};", "renames gate-sys's channel module"),
+                    ("use gate_sys as gs;\nfn f(x: &Conn) { let _ = gs::channel::send(x, b); }",
+                     "names gate-sys's channel send"),
+                    ("use gate_sys as gs;", "renames gate_sys"),
+                    ("use gate_sys::{self as gs};", "renames gate_sys"),
+                    ("use ::gate_sys as gs;", "renames gate_sys"),
+                    ("use gate_sys::*;", "imports a glob of gate_sys"),
+                    ("extern crate gate_sys as gs;", "declares an extern crate")):
+                self.refused(gate.check_observer_no_send, rel, self.TREE[rel] + text + "\n", message + ".*G-I01-5")
+        # The aliases the real files hold are unchanged: plain `channel` and `{self, ListenStep}` imports pass.
+        self.assertEqual(gate.resolved_uses([(("gate_sys", "channel", "self"), None), (("gate_sys", "channel", "ListenStep"), None)]),
+                         [(("gate_sys", "channel", "self"), None), (("gate_sys", "channel", "ListenStep"), None)])
+        self.assertEqual(gate.resolved_uses([(("gate_sys",), "gs"), (("gs", "channel"), "c"), (("c", "send"), None)]),
+                         [(("gate_sys",), "gs"), (("gate_sys", "channel"), "c"), (("gate_sys", "channel", "send"), None)])
+        self.assertEqual(gate.gate_sys_aliases([(("gate_sys",), "gs"), (("gate_sys", "self"), "g2"), (("gate_sys", "tcp"), "t")]),
+                         {"gs", "g2"})
         self.assertEqual(gate.check_observer_no_send(self.base), 7)
 
     def test_g_i01_6_the_socket_s_homes_and_its_one_construction(self):

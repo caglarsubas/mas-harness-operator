@@ -137,6 +137,13 @@ inside LinuxWire::new (G-I01-6). Unit U6 registers edge record v8's two I06 v4 r
 and observe.rs calls it once, right after the closure check with only let statements between, before `let dropped`
 and drop(produced) (G-I01-3).
 
+HE-004-I01A2 (HE-004-I01a's unit U7; DESIGN-I01A revision 6 sections 3, 7 and 15, owner decisions Q-HE4I1-10 (a),
+Q-I01A-1 and Q-U7-1..3 (a)) registers edge record v9's two I01 wire rows, the channel schema and the vectors the
+request replay reads (52 files). With it, three of HE-004-I01a's PR review round 1 notes: G-I01-5 and the socket-item
+rule follow a source's own aliases of gate_sys and of its socket modules (resolved_uses), and G-I01-5 refuses a rename
+or glob of gate_sys and an extern crate in the observer's two socket files (R1-3); serve's wire construction is the one
+match mapping its refusal through status::wire_setup (R1-5); the no-panic rule names the four I01 sources (R1-6).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -218,7 +225,9 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # compiled filter programs v3, MET-ENFORCE-036), which the observer's seal embeds from now on; the seccomp-v3 OBSERVER
 # programs stay pinned, held but no longer embedded (Q-P2-3 (a)), 48. Unit U6 (DESIGN-I01A section 10, Q-I01A-4 (a)):
 # edge record v8's two I06 v4 rows (harness-onion MET-ENFORCE-039, the backend profile v4's criteria and vectors), read
-# by the tests and by the role pin's constants check, 50.
+# by the tests and by the role pin's constants check, 50. HE-004-I01A2, HE-004-I01a's unit U7 (DESIGN-I01A sections 3 and
+# 7, Q-HE4I1-10 (a), Q-I01A-1): edge record v9's two rows (harness-onion MET-ENFORCE-040, the I01 wire's channel schema
+# and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -277,6 +286,8 @@ CONTRACTS = {
     "contracts/i06-v4/vectors.json": "27aba3bf7296a08b90adef1663d6498fda9ae98499707d0c0950aa6c4ba14eb7",
     "contracts/native-profile-v2/vectors.json": "6d58d1f36b7bce5739b94dd89512d358b96878c70e1de7cf8f399050b881b396",
     "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
+    "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
+    "contracts/i01-v1/vectors.json": "1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124",
 }
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
@@ -408,6 +419,12 @@ OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
 # The v1 parse no longer appears in serve (G-D1-8).
 OBSERVER_V1_PARSE = re.compile(r"\bObserverConfig::parse\s*\(")
+# HE-004-I01A2 (HE-004-I01a PR review round 1, R1-5): serve maps LinuxWire::new's refusal through status::wire_setup (24
+# for the poller, 31-34 for the I01 listener's steps) in exactly this match, so a return to one status for every setup
+# refusal refuses (read without comments, the whitespace around `::` removed, any other spacing allowed).
+WIRE_SETUP_MATCH = re.compile(r"\blet\s+wire\s*=\s*match\s+LinuxWire::new\s*\(\s*sealed\s*\)\s*\{\s*Ok\s*\(\s*wire\s*\)\s*"
+                              r"=>\s*wire\s*,\s*Err\s*\(\s*error\s*\)\s*=>\s*return\s+status::wire_setup\s*\(\s*&\s*"
+                              r"error\s*\)\s*,?\s*\}\s*;")
 # HE-004D2 (G-D2-11; HE-004D1 PR review round 1, R1-5): the two Linux constructors in the spellings of a path to `new`:
 # `LinuxWire::new`, `<LinuxWire>::new`, `< LinuxCapture >::new`, and (HE-004D2 PR review round 1, R1-7) empty generic
 # arguments and a parenthesised type, `LinuxWire::<>::new`, `<(LinuxWire)>::new`, `<LinuxCapture<>>::new`, spaces allowed.
@@ -1693,6 +1710,36 @@ def source_uses(rel: str, raw: str) -> list[tuple[tuple[str, ...], str | None]]:
         raise GateError("%s: %s (linked-source tripwire)" % (rel, error)) from None
 
 
+def resolved_uses(uses: list[tuple[tuple[str, ...], str | None]]) -> list[tuple[tuple[str, ...], str | None]]:
+    """HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): a source's use paths (source_uses) with the
+    source's own aliases followed. A name one of its use paths binds under gate_sys (a rename of gate_sys itself, as
+    `use gate_sys as gs;` or `use gate_sys::{self as gs};`, or the last segment or rename of a path below it, as
+    `use gs::channel as c;` once gs is known) stands for that gate_sys path: a path starting with it (after a leading
+    `self`) is read as the gate_sys path and its remaining segments, again until nothing changes, so a chain of aliases
+    resolves. Each path keeps its rename; globs bind nothing."""
+    paths = [(path[1:] if path[:1] == ("self",) and len(path) > 1 else path, rename) for path, rename in uses]
+    for _ in range(len(paths) + 1):
+        bound = {}
+        for path, rename in paths:
+            if path[:1] != ("gate_sys",) or path[-1] == "*":
+                continue
+            target = path[:-1] if path[-1] == "self" else path
+            name = rename or target[-1]
+            if name != "gate_sys":
+                bound[name] = target
+        resolved = [(bound[path[0]] + path[1:], rename) if path and path[0] in bound else (path, rename)
+                    for path, rename in paths]
+        if resolved == paths:
+            break
+        paths = resolved
+    return paths
+
+
+def gate_sys_aliases(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
+    """HE-004-I01A2 (R1-3): the names resolved use paths (resolved_uses) bind to gate_sys itself."""
+    return {rename for path, rename in uses if rename is not None and path in (("gate_sys",), ("gate_sys", "self"))}
+
+
 def std_names(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
     """`std` and every name the given use paths bind from a std path: the rename, the last segment, or the module
     before a `self` (renames and globs of std are refused by the linked-source checks themselves)."""
@@ -1985,7 +2032,10 @@ def check_observer_serve(base: Path) -> int:
     added associated fn, trait impl, alias, default or projection gives another route (R2-2, R3-1, R4-2); the pinned
     bytes hold no constructor call besides each type's own `fn new`. The rules are textual: serve's own control flow
     around its one counted construction (a loop, or a closure or iterator calling it more than once) is not read and
-    stays code review's (R5-1), as what any other called function does in turn. The number of calls."""
+    stays code review's (R5-1), as what any other called function does in turn. HE-004-I01A2 (HE-004-I01a PR review
+    round 1, R1-5): the wire's construction is exactly once WIRE_SETUP_MATCH, `let wire = match LinuxWire::new(sealed)
+    { Ok(wire) => wire, Err(error) => return status::wire_setup(&error), };`, so its refusal keeps the statuses 24 and
+    31-34. The number of calls."""
     rel = OBSERVER_MAIN
     require((base / rel).is_file(), "%s is missing (observer wiring order)" % rel)
     try:
@@ -2010,6 +2060,9 @@ def check_observer_serve(base: Path) -> int:
                 "forms (observer wiring order, G-D2-11)" % name)
         require(len(re.findall(r"\b%s\b" % name, body)) == 1, "serve names %s other than once, in its one construction "
                 "(observer wiring order, G-D2-11, R1-7)" % name)
+    require(len(WIRE_SETUP_MATCH.findall(body)) == 1, "serve does not map LinuxWire::new's refusal exactly once as `let "
+            "wire = match LinuxWire::new(sealed) { Ok(wire) => wire, Err(error) => return status::wire_setup(&error), };` "
+            "(observer wiring order, HE-004-I01A2, R1-5)")
     return len(OBSERVER_WIRING)
 
 
@@ -2068,10 +2121,12 @@ def const_asserts(code: str) -> list[tuple[int, int]]:
 
 def check_observer_no_panic(base: Path) -> int:
     """HE-004C DESIGN-C section 15 (G8, D1-14 (c)): each of OBSERVER_NO_PANIC (the HE-004C modules, main.rs and
-    status.rs; HE-004D1, G-D1-11: enrolled.rs, capture.rs and linux_capture.rs) exists and, read with comments removed,
-    literal contents emptied and the whitespace around `::` removed, names no panicking macro or call (PANICS) outside
-    strict #[cfg(test)] mod tests blocks. HE-004D1: observer-sys's three sources (OBSERVER_SYS_NO_PANIC) too, after
-    their item-level compile-time asserts are removed (const_asserts). The number of sources."""
+    status.rs; HE-004D1, G-D1-11: enrolled.rs, capture.rs and linux_capture.rs; HE-004-I01a, I01_NO_PANIC_BUILT: the
+    four I01 sources linux_listen.rs, i01_service.rs, i01_request.rs and observer_rbac.rs, named here since HE-004-I01A2,
+    R1-6) exists and, read with comments removed, literal contents emptied and the whitespace around `::` removed, names
+    no panicking macro or call (PANICS) outside strict #[cfg(test)] mod tests blocks. HE-004D1: observer-sys's three
+    sources (OBSERVER_SYS_NO_PANIC) too, after their item-level compile-time asserts are removed (const_asserts). The
+    number of sources."""
     for rel in OBSERVER_NO_PANIC + OBSERVER_SYS_NO_PANIC:
         require((base / rel).is_file(), "%s is missing (observer no-panic tripwire)" % rel)
     for rel in OBSERVER_NO_PANIC + OBSERVER_SYS_NO_PANIC:
@@ -2822,9 +2877,14 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
     R2-1: no private type alias, no pub const or static of a fn-pointer type, and no pub struct field whose type names
     such an item or is a fn pointer. HE-003A2 (N1): no pub type alias, pub const or static type or pub struct field of
     a fn-pointer or Fn-trait type, and no variant of a pub enum whose field types name such an item or are a fn pointer
-    or an Fn-trait type. A text tripwire over names: a wrapper type or a pub fn's body stays code review's."""
+    or an Fn-trait type. A text tripwire over names: a wrapper type or a pub fn's body stays code review's. HE-004-I01A2
+    (HE-004-I01a PR review round 1, R1-3): the use paths are read with the source's aliases followed (resolved_uses), so
+    an import through a rename of gate_sys (`use gate_sys as gs; use gs::channel::{Conn};`) or of a socket module
+    (`use gs::channel as c; use c::Conn;`) binds its items as the direct form does, and a gate_sys rename's qualified
+    paths (`gs::channel::Conn`) are read as gate_sys's."""
     modules, items = set(), {}
-    for path, rename in source_uses(rel, raw):
+    uses = resolved_uses(source_uses(rel, raw))
+    for path, rename in uses:
         if len(path) < 2 or path[0] != "gate_sys" or path[1] not in SOCKET_MODULES:
             continue
         require(path[-1] != "*", "%s imports a glob of gate-sys's socket module (socket-module check)" % rel)
@@ -2832,8 +2892,12 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
             modules.add(rename or path[1])
         else:
             items[rename or path[-1]] = path[-1]
+    crates = gate_sys_aliases(uses)
+
     def hazards(text: str) -> list[str]:
         named = set(re.findall(r"\bgate_sys::(?:channel|tcp)::(\w+)", text))
+        for alias in crates:
+            named |= set(re.findall(r"(?<!::)\b%s::(?:channel|tcp)::(\w+)" % re.escape(alias), text))
         for module in modules:
             named |= set(re.findall(r"(?<!::)\b%s::(\w+)" % re.escape(module), text))
         named |= {original for binding, original in items.items() if re.search(r"(?<!::)\b%s\b" % re.escape(binding), text)}
@@ -3614,6 +3678,8 @@ PEER_SEND = re.compile(r"\bpeer_send\b")
 PEER_OPS_TRAIT = re.compile(r"\btrait\s+PeerOps\b")
 PEER_OPS_HEADER = re.compile(r"\bpub\s+trait\s+PeerOps\s*\{")
 CHANNEL_SEND = re.compile(r"\bchannel::send\b")
+# HE-004-I01A2 (R1-3): `extern crate gate_sys as gs;` is a crate alias no use declaration shows.
+EXTERN_CRATE = re.compile(r"\bextern\s+crate\b")
 # G-I01-6: I01Socket's two homes and its one construction, in the spellings of a path to `open` (G-D2-11's forms).
 I01_SOCKET = re.compile(r"\bI01Socket\b")
 I01_SOCKET_OPEN = re.compile(r"\bI01Socket\b(?:\s*<\s*>)?(?:\s*\))*(?:\s*>)?(?:\s*::\s*<\s*>)?\s*::\s*open\b")
@@ -3745,8 +3811,13 @@ def check_observer_no_send(base: Path) -> int:
     (braced, renamed or not) and none renames the channel module; and no `channel::send` path occurs, with any prefix.
     The i01_ sources are exactly I01_FILES_BUILT (the I01 service and its request checks: no I01 response,
     observation or digest module), lib.rs declares exactly those i01_ modules, and they name none of Wire, connect,
-    ConnId and Client. PeerOps is declared once, in client.rs, exactly as `pub trait PeerOps {` (no supertrait). The
-    number of sources."""
+    ConnId and Client. PeerOps is declared once, in client.rs, exactly as `pub trait PeerOps {` (no supertrait).
+    HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): in the two socket files the use paths are read with
+    the source's aliases followed (resolved_uses), so `use gate_sys as gs; use gs::channel::{send};` imports send and
+    `use gs::channel as c;` renames the channel module, braced or not, and both refuse; a `name::send` path through any
+    name bound to the channel module refuses as `channel::send` does; and, so that every route to the channel module is
+    spelled through gate_sys, neither file renames gate_sys (`use gate_sys as ..`, `use gate_sys::{self as ..}`), imports
+    a glob of it or declares an extern crate. The number of sources."""
     rule = "nothing leaves I01a, G-I01-5"
     codes = observer_code(base, rule, literals=True)
     for rel, code in codes.items():
@@ -3755,13 +3826,20 @@ def check_observer_no_send(base: Path) -> int:
         require(rel in codes, "%s is missing (%s)" % (rel, rule))
     for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
         raw = (base / rel).read_text(encoding="utf-8")
-        for path, rename in source_uses(rel, raw):
-            if path[:2] != ("gate_sys", "channel"):
-                continue
-            require(path[2:] not in ((), ("self",)) or rename is None, "%s renames gate-sys's channel module (%s)" % (rel, rule))
+        code = PATH_SPACE.sub("::", rust_code(raw))
+        uses = resolved_uses(source_uses(rel, raw))
+        channel_uses = [(path, rename) for path, rename in uses if path[:2] == ("gate_sys", "channel")]
+        for path, _ in channel_uses:
             require("send" not in path[2:], "%s imports gate-sys's channel send (%s)" % (rel, rule))
-        require(not CHANNEL_SEND.search(PATH_SPACE.sub("::", rust_code(raw))), "%s names gate-sys's channel send (%s)"
-                % (rel, rule))
+        require(not CHANNEL_SEND.search(code), "%s names gate-sys's channel send (%s)" % (rel, rule))
+        for name in sorted({rename for path, rename in channel_uses if rename and path[2:] in ((), ("self",))}):
+            require(not re.search(r"(?<![\w:])%s::send\b" % re.escape(name), code),
+                    "%s names gate-sys's channel send through %s (%s)" % (rel, name, rule))
+        for path, rename in channel_uses:
+            require(path[2:] not in ((), ("self",)) or rename is None, "%s renames gate-sys's channel module (%s)" % (rel, rule))
+        require(not gate_sys_aliases(uses), "%s renames gate_sys (%s)" % (rel, rule))
+        require(("gate_sys", "*") not in {path for path, _ in uses}, "%s imports a glob of gate_sys (%s)" % (rel, rule))
+        require(not EXTERN_CRATE.search(code), "%s declares an extern crate (%s)" % (rel, rule))
     source = base / OBSERVER_CRATE / "src"
     present = sorted(path.relative_to(base).as_posix() for path in source.glob("i01_*.rs"))
     require(present == sorted(I01_FILES_BUILT), "the i01_ sources present (%s) are not exactly %s (%s)"
@@ -4707,7 +4785,8 @@ def main() -> int:
             "name through the stage-2 statement" % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
         say("observer wiring order: serve calls %d steps each exactly once, in this order: %s, and not the v1 parse "
             "(HE-004C, G5; HE-004D1, G-D1-8); LinuxWire and LinuxCapture are constructed exactly once each, their "
-            "qualified forms counted (HE-004D2, G-D2-11)"
+            "qualified forms counted (HE-004D2, G-D2-11); the wire's refusal maps through status::wire_setup "
+            "(HE-004-I01A2, R1-5)"
             % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
         say("socket modules: %d linked sources reach gate-sys's channel and tcp modules only from %s (which re-export "
             "nothing and name those modules' items in no pub type, const, static or fn signature, pub field or pub enum "
@@ -4779,8 +4858,10 @@ def main() -> int:
             "pin, and nothing else (HE-004C, R1-3); it embeds only %s (HE-004D2, G-D2-2)"
             % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE), ", ".join(OBSERVER_EMBEDDED_CONTRACTS)))
         say("observer no-panic: %d sources (the HE-004C modules, main.rs, status.rs, enrolled.rs, capture.rs and "
-            "linux_capture.rs, and observer-sys's three after their item-level compile-time asserts) name no panicking "
-            "macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; HE-004D1, G-D1-11)" % check_observer_no_panic(HE))
+            "linux_capture.rs, HE-004-I01a's %s, and observer-sys's three after their item-level compile-time asserts) "
+            "name no panicking macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; HE-004D1, G-D1-11; "
+            "HE-004-I01a, I01_NO_PANIC_BUILT)"
+            % (check_observer_no_panic(HE), ", ".join("%s.rs" % name for name in I01_NO_PANIC_BUILT)))
         say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
             "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
             "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "
@@ -4822,8 +4903,9 @@ def main() -> int:
         say("observer I01 path (HE-004-I01a, G-I01-4): %s occurs %d time(s) in %s, only as %s's private constant I01_PATH"
             % (I01_PATH, check_observer_i01_path(HE), OBSERVER_CRATE, OBSERVER_LINUX_LISTEN))
         say("observer sends nothing (HE-004-I01a, G-I01-5): %d sources; no peer_send; %s and %s neither import nor name "
-            "gate-sys's channel send nor rename the channel module; the i01_ sources are exactly %s, naming none of Wire, "
-            "connect, ConnId and Client; PeerOps is declared once, as `pub trait PeerOps {`"
+            "gate-sys's channel send nor rename the channel module, their aliases followed, and neither renames or globs "
+            "gate_sys nor declares an extern crate (HE-004-I01A2, R1-3); the i01_ sources are exactly %s, naming none of "
+            "Wire, connect, ConnId and Client; PeerOps is declared once, as `pub trait PeerOps {`"
             % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
         say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "
             "aliased nowhere, and I01Socket::open is called once, inside LinuxWire::new, its qualified forms counted"
