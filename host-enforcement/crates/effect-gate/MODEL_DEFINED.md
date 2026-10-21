@@ -2219,8 +2219,9 @@ pin the observer's own role with I06 v4 on every snapshot. U7 (the `PV` replay) 
 are copied byte for byte from edge record v8 (provenance in `contracts/PROVENANCE.md`). The I06 v4 model,
 `scripts/i06_backend_profile_v4.py` (`7f97acfe…`, harness-onion `29c84b36`, "I4M"), is pinned by digest and read as
 specification only. planeon-gate, planeon-broker, planeon-containment and planeon-writer are byte-identical;
-observer-sys, i05-protocol, effect-gate's sources, gate-tls, `crates/gate`, B1's five logic modules and the D1 and D2
-modules are unchanged. Its rules are R148-R160.
+observer-sys, i05-protocol, effect-gate's sources, gate-tls, `crates/gate`, B1's five logic modules and the D2 modules
+are unchanged, and so are the D1 modules except `enrolled.rs`, which gains `server_identity()` (R152). Its rules are
+R148-R160.
 
 ### Points taken from the pinned model (I06 v4; the design and the vectors are silent)
 
@@ -2272,14 +2273,32 @@ modules are unchanged. Its rules are R148-R160.
   grants come only from the contract role and binding the rig already adds; otherwise RB05 and RB06 refuse the rig's
   read.
 - **G-I01-2 (R159):** every `wait` word counts, definitions aside (stricter than the call forms alone).
+- **`ListenerSetup::Socket` (R149):** it also stands for gate-sys's two sockcreate steps, which the plain listener never
+  reaches, so 31 covers every socket-stage refusal.
+- **The quota tie-break (R156):** a quota object without a name sorts as the empty name.
+- **`listen_plain` (R160), a departure from §15:** the test cannot accept a real peer, since a SEQPACKET client needs a raw
+  `socket` call, which no test may hold; it binds, listens, sees no queued peer and EADDRINUSE on a second bind. It is
+  Linux-only, and every run so far (the build host's `cargo test`, the sim and the verifier) is on macOS, where it holds
+  0 tests: the plain listener's bind, listen and EADDRINUSE behaviour has run nowhere yet. Both are carried to T04.
 
 ### Evidence
 
-To be filled at the heavy checkpoints, which the author runs in order under HOLD_CARGO sequencing: `cargo test` (new
-binaries `observer_status_i01`, `observer_i01_wait`, `observer_i01_request`, `observer_i01_service`,
-`observer_i01_quota`, `observer_i01_role_pin`, `listen_plain`), both musl release builds, `gate.py` (50 contract
-files), its self-test, G-D1-16 and G-D2-7 on both targets, the span check, and the sim. At build only `python3 -I -B`
-text checks ran: the contract digests and sizes, the seal constants and the BPF decode shape, the gate-sys foreign
+The heavy checkpoints ran in order under HOLD_CARGO sequencing, each on the lane monitor's word, on macOS:
+- `cargo test`: 724 passed, 0 failed, in 109 test binaries. The new binaries: `observer_status_i01` 2,
+  `observer_i01_wait` 7, `observer_i01_request` 4, `observer_i01_service` 11, `observer_i01_quota` 3,
+  `observer_i01_role_pin` 9, and `listen_plain` 0 (Linux-only; see the settled points).
+- Both musl release builds: rc 0.
+- `gate.py`: the first run failed its self-test with 27 errors, all from one cause: U6's literal-aware bracket helper was
+  a second module-level `bracket_end`, which replaced D1's two-argument helper. It was renamed `literal_bracket_end`
+  (two lines; no other name is bound twice). After that: "he-gate: passed", self-test 332 OK, 50 contract files,
+  G-I01-1..6 (G-I01-3 with 3 `let`s), the role constants (14), G-D1-16 and G-D2-7 on both targets.
+- The sim (`./ci/verify-offline.sh` over the packet): rc 0, nine argv, the zero-bill scan passing, tracked files
+  unchanged. planeon-gate, planeon-broker, planeon-containment and planeon-writer and their SBOMs are byte-identical to
+  HE-004D2's; planeon-observer changes, by the I01a code and the seccomp-v5 programs.
+- The 8-word span check against the three model files: shared spans only inside contract text (the vectors' pinned
+  refusal texts and the rule data), byte-exact.
+
+At build only `python3 -I -B` text checks ran: the contract digests and sizes, the seal constants and the BPF decode shape, the gate-sys foreign
 symbols, independent mirrors of G-I01-1..6 and of the constants check over the real sources, the serve wiring order,
 a python model of the request checks (56 cases), the quota choice, a python reading of `observer_rbac.rs` over the
 vectors (67 object cases, 65 snapshot cases after the vectors' v3 results, 7 composed), the 8-word span check and the
@@ -2305,7 +2324,13 @@ privacy scan.
   the socket path as `init_t`; `UMask=0177`; the I06 v4 role document and manifest check (RB00), whose
   objects carry no annotations; the SC12 audit policy; Q-HE4I1-11 (b).
 - **W03 / T04:** the type transition labelling `policy-observer.sock` (without it `bind` refuses, 32); T04's checks of
-  the residuals above and of the listener accepting a real peer.
+  the residuals above, of the listener accepting a real peer, and a Linux run of `listen_plain` (bind, listen,
+  EADDRINUSE), which no macOS run reaches.
+- **The next re-pin or gate revision (PR review round 1's notes):** G-I01-5 and `check_socket_items` do not follow a crate
+  alias (`use gate_sys as gs`), which only the two socket files' whole-file pins close today; the rules' textual limits
+  (a split or escaped path literal, `serve_peer_deadlines` unpinned, no `unlinkat`/`renameat` words, a condition such as
+  `cfg!(debug_assertions)` around the role pin's call); nothing pins that `serve` maps the wire's setup errors through
+  `status::wire_setup` (31-34); the no-panic report line does not name the four I01 sources (its count, 25, is right).
 - **What stays code review's:** every index guarded and every arithmetic step checked; the custody order inside
   `serve_peer_step`'s control flow beyond what the fake `PeerOps` records; `I01Socket`'s methods matching their
   `PeerOps` operations one to one.
