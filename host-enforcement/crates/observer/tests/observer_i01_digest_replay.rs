@@ -137,7 +137,8 @@ fn unhex(text: &str) -> Vec<u8> {
     (0..text.len()).step_by(2).map(|at| u8::from_str_radix(&text[at..at + 2], 16).expect("hex digits")).collect()
 }
 
-/// A helper vector's input: `{"$fill": n}` stands for a string of n `a` characters (the model's `_expand`).
+/// Expands a helper vector's input (the model's `_expand`): an object that is exactly `{"$fill": n}` becomes a text of
+/// n letters `a`; arrays and other objects are expanded member by member.
 fn expand(value: &Value) -> Value {
     match value {
         Value::Object(members) => {
@@ -583,7 +584,8 @@ fn every_contract_vector_replays() {
             }
             tally.gates += 1;
         }
-        // The answer's refusal list: every value derived, gated and compared with the signed binding.
+        // The answer's refusal list: each value is derived, gated where the contract gates it, then held to the signed
+        // binding.
         if let Some(answer) = expect.get("observation") {
             let Ok(lists) = &lists else {
                 panic!("vector {id}: an answer over lists B1 refuses");

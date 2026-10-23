@@ -56,18 +56,20 @@ const SEALED_VALUES: [&str; 3] = ["ipFamily", "serviceCIDR", "defaultTolerationS
 const POLICY_KIND: &str = "ValidatingAdmissionPolicy";
 const BINDING_KIND: &str = "ValidatingAdmissionPolicyBinding";
 /// The v4 record's BROKER row: its 20 members, its cgroup's 7, and the document's 14 (the cgroup without its inode).
+/// The row's and the document's members are listed in the order the canonical encoding gives them (code points); only
+/// the sets count, as the row is checked closed and the document's members are encoded sorted.
 const BROKER_MEMBERS: [&str; 20] = [
-    "executable", "executableLabel", "artifactDigest", "interpreterPath", "interpreterLabel", "uid", "gid",
-    "processLabel", "namespaceInodes", "cgroup", "seccompMode", "seccompDefaultAction", "seccompFilterDigest",
-    "noNewPrivs", "rlimitCore", "capabilities", "filePaths", "bpfPrograms", "listenEndpointIds", "outboundEndpointIds",
+    "artifactDigest", "bpfPrograms", "capabilities", "cgroup", "executable", "executableLabel", "filePaths", "gid",
+    "interpreterLabel", "interpreterPath", "listenEndpointIds", "namespaceInodes", "noNewPrivs", "outboundEndpointIds",
+    "processLabel", "rlimitCore", "seccompDefaultAction", "seccompFilterDigest", "seccompMode", "uid",
 ];
 const CGROUP_MEMBERS: [&str; 7] =
     ["path", "inode", "memoryMaxBytes", "pidsMax", "cpuQuotaMicros", "cpuPeriodMicros", "selinuxLabel"];
 const CGROUP_INODE: &str = "inode";
 const BROKER_DOCUMENT: [&str; 14] = [
-    "executable", "executableLabel", "artifactDigest", "uid", "gid", "processLabel", "cgroup", "seccompMode",
-    "seccompDefaultAction", "seccompFilterDigest", "noNewPrivs", "capabilities", "listenEndpointIds",
-    "outboundEndpointIds",
+    "artifactDigest", "capabilities", "cgroup", "executable", "executableLabel", "gid", "listenEndpointIds",
+    "noNewPrivs", "outboundEndpointIds", "processLabel", "seccompDefaultAction", "seccompFilterDigest", "seccompMode",
+    "uid",
 ];
 /// The network policy agent's backend component, and the five members of it the network document holds.
 const AGENT: &str = "NETWORK_POLICY_AGENT";
@@ -90,22 +92,22 @@ pub const CLOSURE_NOT_PASSED: &str = "rbacClosureDigest: I06 closure check not p
 pub const BROKER_ROW_INCOMPLETE: &str = "mutationBroker: broker row incomplete";
 pub const NO_NETWORK_AGENT: &str = "networkEnforcementDigest: no network policy agent";
 /// B1's malformed-object refusals (`rbac::ProduceError::Malformed`'s field) and the contract's text for each
-/// (README section 4.5).
+/// (README section 4.5), in the order of the contract's `refusalTexts` (sorted by text).
 pub const B1_MALFORMED: [(&str, &str); 14] = [
     ("metadata", "rbac: malformed metadata"),
-    ("rules", "rbac: malformed rules"),
-    ("rule", "rbac: malformed rule"),
-    ("rule list", "rbac: malformed rule list"),
-    ("rule (non-resource URLs beside resources)", "rbac: malformed rule (non-resource URLs beside resources)"),
-    ("subjects", "rbac: malformed subjects"),
-    ("subject", "rbac: malformed subject"),
-    ("subject name", "rbac: malformed subject name"),
-    ("subject kind", "rbac: malformed subject kind"),
-    ("subject namespace", "rbac: malformed subject namespace"),
     ("roleRef", "rbac: malformed roleRef"),
     ("roleRef apiGroup", "rbac: malformed roleRef apiGroup"),
     ("roleRef kind", "rbac: malformed roleRef kind"),
     ("roleRef name", "rbac: malformed roleRef name"),
+    ("rule", "rbac: malformed rule"),
+    ("rule (non-resource URLs beside resources)", "rbac: malformed rule (non-resource URLs beside resources)"),
+    ("rule list", "rbac: malformed rule list"),
+    ("rules", "rbac: malformed rules"),
+    ("subject", "rbac: malformed subject"),
+    ("subject kind", "rbac: malformed subject kind"),
+    ("subject name", "rbac: malformed subject name"),
+    ("subject namespace", "rbac: malformed subject namespace"),
+    ("subjects", "rbac: malformed subjects"),
 ];
 
 /// The contract's eleven keys: the seven projections and the four enforcement digests, in its order.
@@ -354,8 +356,9 @@ pub struct Rendered {
     pub directory_hash: String,
 }
 
-/// A projection: its document, the identity the signed binding must hold (`{apiVersion, kind, name, namespace, uid,
-/// projectionDigest}`) and the observed resourceVersion.
+/// A projection: its document; the identity that is compared with the signed binding's (its fixed `apiVersion` and
+/// `kind`, the object's `name`, `namespace` and `uid`, and the `projectionDigest`); and the resourceVersion the read
+/// observed.
 #[derive(Clone, Debug)]
 pub struct ProjectionValue {
     pub document: Value,
@@ -363,7 +366,7 @@ pub struct ProjectionValue {
     pub resource_version: Value,
 }
 
-/// An enforcement digest, with its document for the RBAC closure and the network document.
+/// An enforcement digest; the RBAC closure digest and the network digest also keep the document they digest.
 #[derive(Clone, Debug)]
 pub struct EnforcementValue {
     pub document: Option<Value>,
@@ -459,14 +462,14 @@ pub fn projection_digest(document: &Value) -> Option<String> {
     json::canonical(document).ok().map(|bytes| sha256::prefixed(&bytes))
 }
 
-/// A synthetic projection's uid: the lowercase hex SHA-256 of the canonical `{apiVersion, kind, name, namespace}` of
-/// its fixed identity (README section 3.1), 64 characters.
-pub fn synthetic_uid(api_version: &str, kind: &str, name: &str, namespace: Option<&str>) -> String {
+/// The uid of a synthetic projection (README section 3.1): 64 lowercase hex digits, the SHA-256 of the canonical
+/// encoding of its fixed `{apiVersion, kind, name, namespace}`.
+pub fn synthetic_uid(group_version: &str, kind_name: &str, fixed_name: &str, scope: Option<&str>) -> String {
     let identity = Doc::object(vec![
-        ("apiVersion", Doc::str(api_version)),
-        ("kind", Doc::str(kind)),
-        ("name", Doc::str(name)),
-        ("namespace", Doc::opt_str(namespace)),
+        ("apiVersion", Doc::str(group_version)),
+        ("kind", Doc::str(kind_name)),
+        ("name", Doc::str(fixed_name)),
+        ("namespace", Doc::opt_str(scope)),
     ]);
     sha256::hex(&sha256::digest(&identity.canonical()))
 }
@@ -794,7 +797,7 @@ fn string_list(holder: &Object, name: &str) -> Option<Vec<Value>> {
     }
 }
 
-/// A role's rules (absent or null: none), each with its five lists.
+/// The rules of a role, each with its five lists; a role whose `rules` is missing or null has none.
 fn role_rules(role: &Value) -> Option<Vec<DigestRoleRule>> {
     let items: &[Value] = match role.get("rules") {
         None | Some(Value::Null) => &[],
@@ -1093,10 +1096,10 @@ fn admission_policy(snapshot: &DigestSnapshot<'_>, render: &dyn Fn(&SealedAdmiss
 
 // ------------------------------------------------------------------------------------------------ the digests
 
-/// One of the four enforcement digests at the snapshot (the model's `enforcement`), or the first refusal: with its
-/// document for the RBAC closure and the network document. `closure` is I06's embedded closure (`Closure::embedded`)
-/// and `render` the A2 render, as for [`projection`]. The capture gates are the answer's. A projection key is not a
-/// digest and refuses as its malformed input.
+/// One enforcement digest taken from the snapshot (the model's `enforcement`), or its first refusal; the RBAC closure
+/// digest and the network digest also return the document they digest. `closure` is I06's embedded closure
+/// (`Closure::embedded`) and `render` the A2 render, as for [`projection`]. The capture gates are the answer's. A
+/// projection key is not a digest and refuses as its malformed input.
 pub fn enforcement(key: DigestKey, snapshot: &DigestSnapshot<'_>, closure: &Closure,
                    render: &dyn Fn(&SealedAdmission) -> Option<Rendered>) -> Result<EnforcementValue, &'static str> {
     match key {

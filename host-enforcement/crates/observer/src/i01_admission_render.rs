@@ -7,8 +7,9 @@
 //! logic module under the I01 logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no file is read, no system call
 //! beyond allocation, every function total, no panic, and no caller in the binary (G-I01B-1).
 //!
-//! - [`a2_objects`]: one policy per qualification kind (CREATE in the qualification namespace), the guard that denies
-//!   every API write of an admission-policy or webhook object, and one Deny binding per policy, in the model's order.
+//! - [`a2_objects`]: a policy for each of the three qualification kinds, matching their CREATE requests inside the
+//!   qualification namespace; a guard policy that refuses all API writes to admission policies, their bindings and the
+//!   webhook configurations; and a Deny binding for each policy; all ordered as the model orders them.
 //!   The sealed values enter only the namespace selector, the Service allocation rule and the Pod tolerations rule.
 //! - [`manifest_file_bytes`]: the directory's one file, a v1 List of those objects, canonical JSON (i05-protocol's
 //!   encoder, which equals the model's).
@@ -44,11 +45,12 @@ const ADMISSION_RESOURCES: [&str; 6] = [
     "validatingadmissionpolicies", "validatingadmissionpolicybindings", "mutatingadmissionpolicies",
     "mutatingadmissionpolicybindings", "validatingwebhookconfigurations", "mutatingwebhookconfigurations",
 ];
-/// The Pod echo annotations (`ECHO`), in the model's order: the field and its annotation key.
+/// The Pod echo annotations (`ECHO`), in the model's order, each as the manifest's echo rule names them: the
+/// annotation key, then the Pod field it echoes.
 const ECHO: [(&str, &str); 3] = [
-    ("containers", "planeon.ai/a2-containers"),
-    ("initContainers", "planeon.ai/a2-init-containers"),
-    ("volumes", "planeon.ai/a2-volumes"),
+    ("planeon.ai/a2-containers", "containers"),
+    ("planeon.ai/a2-init-containers", "initContainers"),
+    ("planeon.ai/a2-volumes", "volumes"),
 ];
 /// The two NoExecute taints the Pod tolerations rule names (`NOT_READY`, `UNREACHABLE`).
 const NOT_READY: &str = "node.kubernetes.io/not-ready";
@@ -73,8 +75,8 @@ pub fn render(sealed: &SealedAdmission) -> Option<Rendered> {
     Some(Rendered { objects: objects.iter().map(Doc::to_value).collect(), directory_hash })
 }
 
-/// The sealed directory's one file: a v1 List of the static objects, canonical JSON (the model's
-/// `manifest_file_bytes`).
+/// The bytes of the sealed directory's single file (the model's `manifest_file_bytes`): the static objects as the
+/// items of a v1 List, encoded in canonical JSON.
 pub fn manifest_file_bytes(sealed: &SealedAdmission) -> Vec<u8> {
     manifest_list(&a2_objects(sealed)).canonical()
 }
@@ -175,73 +177,73 @@ fn echo_cel(field: &str, key: &str) -> String {
 
 /// A kind's validations in the model's order (the model's `_validations`), each `{expression, message, reason}`
 /// with reason Forbidden: the ConfigMap rules (the publisher's one exception first), or the reserved-key rule then the
-/// Service or Pod rules.
+/// Service or Pod rules. Each row is written as the manifest holds it: its CEL expression, then its rule id.
 fn validations(kind: &str, sealed: &SealedAdmission) -> Vec<Doc> {
     let publisher = format!("object.metadata.name == '{PUBLISHER_CONFIGMAP}'");
-    let rows: Vec<(&str, String)> = match kind {
+    let rows: Vec<(String, &str)> = match kind {
         "ConfigMap" => vec![
-            ("A2-CM-PUBLISHER",
-             format!("!({publisher}) || (request.userInfo.username == '{PUBLISHER_USER}' && has(object.data) && \
+            (format!("!({publisher}) || (request.userInfo.username == '{PUBLISHER_USER}' && has(object.data) && \
                       object.data.size() == 1 && 'ca.crt' in object.data && !has(object.binaryData) && \
                       !has(object.metadata.labels) && (!has(object.metadata.annotations) || \
-                      object.metadata.annotations.all(k, k == 'kubernetes.io/description')))")),
-            ("A2-RESERVED", format!("{publisher} || ({RESERVED_CEL})")),
-            ("A2-CM-IMMUTABLE", format!("{publisher} || (has(object.immutable) && object.immutable == true)")),
+                      object.metadata.annotations.all(k, k == 'kubernetes.io/description')))"),
+             "A2-CM-PUBLISHER"),
+            (format!("{publisher} || ({RESERVED_CEL})"), "A2-RESERVED"),
+            (format!("{publisher} || (has(object.immutable) && object.immutable == true)"), "A2-CM-IMMUTABLE"),
         ],
         "Service" => vec![
-            ("A2-RESERVED", RESERVED_CEL.to_string()),
-            ("A2-SVC-TYPE",
-             "object.spec.type == 'ClusterIP' && !has(object.spec.externalIPs) && !has(object.spec.externalName) && \
+            (RESERVED_CEL.to_string(), "A2-RESERVED"),
+            ("object.spec.type == 'ClusterIP' && !has(object.spec.externalIPs) && !has(object.spec.externalName) && \
               !has(object.spec.loadBalancerIP) && !has(object.spec.loadBalancerSourceRanges) && \
               !has(object.spec.loadBalancerClass) && !has(object.spec.healthCheckNodePort) && \
               object.spec.ports.all(p, !has(p.nodePort))"
-                 .to_string()),
-            ("A2-SVC-ALLOCATION",
-             format!("object.spec.ipFamilyPolicy == 'SingleStack' && object.spec.ipFamilies.size() == 1 && \
+                 .to_string(),
+             "A2-SVC-TYPE"),
+            (format!("object.spec.ipFamilyPolicy == 'SingleStack' && object.spec.ipFamilies.size() == 1 && \
                       object.spec.ipFamilies[0] == '{}' && object.spec.clusterIPs.size() == 1 && \
                       object.spec.clusterIP == object.spec.clusterIPs[0] && object.spec.clusterIP != 'None' && \
                       cidr('{}').containsIP(object.spec.clusterIP)",
-                     sealed.ip_family, sealed.service_cidr)),
-            ("A2-SVC-DEFAULTS",
-             "object.spec.sessionAffinity == 'None' && object.spec.internalTrafficPolicy == 'Cluster'".to_string()),
+                     sealed.ip_family, sealed.service_cidr),
+             "A2-SVC-ALLOCATION"),
+            ("object.spec.sessionAffinity == 'None' && object.spec.internalTrafficPolicy == 'Cluster'".to_string(),
+             "A2-SVC-DEFAULTS"),
         ],
         _ => {
             let toleration = format!("t.operator == 'Exists' && t.effect == 'NoExecute' && has(t.tolerationSeconds) && \
                                       t.tolerationSeconds == {} && !has(t.value)",
                                      sealed.default_toleration_seconds);
-            let echo: Vec<String> = ECHO.iter().map(|&(field, key)| echo_cel(field, key)).collect();
+            let echo: Vec<String> = ECHO.iter().map(|&(key, field)| echo_cel(field, key)).collect();
             vec![
-                ("A2-RESERVED", RESERVED_CEL.to_string()),
-                ("A2-POD-ECHO", echo.join(" && ")),
-                ("A2-POD-TOKEN",
-                 "has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false"
-                     .to_string()),
-                ("A2-POD-PULL-SECRETS",
-                 "!has(object.spec.imagePullSecrets) || object.spec.imagePullSecrets.size() == 0".to_string()),
-                ("A2-POD-IMAGE-VOLUME",
-                 "!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.image))".to_string()),
-                ("A2-POD-TOLERATIONS",
-                 format!("has(object.spec.tolerations) && object.spec.tolerations.size() == 2 && \
+                (RESERVED_CEL.to_string(), "A2-RESERVED"),
+                (echo.join(" && "), "A2-POD-ECHO"),
+                ("has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false"
+                     .to_string(),
+                 "A2-POD-TOKEN"),
+                ("!has(object.spec.imagePullSecrets) || object.spec.imagePullSecrets.size() == 0".to_string(),
+                 "A2-POD-PULL-SECRETS"),
+                ("!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.image))".to_string(),
+                 "A2-POD-IMAGE-VOLUME"),
+                (format!("has(object.spec.tolerations) && object.spec.tolerations.size() == 2 && \
                           object.spec.tolerations.exists_one(t, t.key == '{NOT_READY}' && {toleration}) && \
-                          object.spec.tolerations.exists_one(t, t.key == '{UNREACHABLE}' && {toleration})")),
-                ("A2-POD-PRIORITY",
-                 "has(object.spec.priority) && object.spec.priority == 0 && has(object.spec.preemptionPolicy) && \
+                          object.spec.tolerations.exists_one(t, t.key == '{UNREACHABLE}' && {toleration})"),
+                 "A2-POD-TOLERATIONS"),
+                ("has(object.spec.priority) && object.spec.priority == 0 && has(object.spec.preemptionPolicy) && \
                   object.spec.preemptionPolicy == 'PreemptLowerPriority' && !has(object.spec.priorityClassName)"
-                     .to_string()),
-                ("A2-POD-PLACEMENT",
-                 "!has(object.spec.runtimeClassName) && !has(object.spec.overhead) && \
+                     .to_string(),
+                 "A2-POD-PRIORITY"),
+                ("!has(object.spec.runtimeClassName) && !has(object.spec.overhead) && \
                   !has(object.spec.nodeName) && !has(object.spec.nodeSelector)"
-                     .to_string()),
-                ("A2-POD-PULL-POLICY",
-                 "object.spec.containers.all(c, c.imagePullPolicy == 'Always') && \
+                     .to_string(),
+                 "A2-POD-PLACEMENT"),
+                ("object.spec.containers.all(c, c.imagePullPolicy == 'Always') && \
                   (!has(object.spec.initContainers) || \
                   object.spec.initContainers.all(c, c.imagePullPolicy == 'Always'))"
-                     .to_string()),
+                     .to_string(),
+                 "A2-POD-PULL-POLICY"),
             ]
         }
     };
     rows.into_iter()
-        .map(|(code, expression)| {
+        .map(|(expression, code)| {
             Doc::object(vec![
                 ("expression", Doc::Str(expression)),
                 ("message", Doc::str(code)),

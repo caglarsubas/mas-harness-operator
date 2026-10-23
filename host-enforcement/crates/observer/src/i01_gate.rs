@@ -1,18 +1,19 @@
 //! The I01 capture gate (HE-004-I01B1; DESIGN-I01B rev 3 sections 2 and 6 and DESIGN-I01B1 rev 2; owner decision
-//! Q-HE4I1-2 and the monitor's Q-I01B-13, Q-I01B-14 and Q-I01B-21): whether a capture-gated value may be in an I01
-//! answer, exactly the contract's rule (`contracts/i01-digests-v1/README.md` section 3.3, `definitions.json`
-//! `captureGate`, the pinned reference model's `capture_gate` and `required_slots`), over plain data. A pure logic
-//! module under the I01 logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no clock, no capture view, no system call
-//! beyond allocation, every function total, no panic, and no caller in the binary (G-I01B-1).
+//! Q-HE4I1-2 and the monitor's Q-I01B-13, Q-I01B-14 and Q-I01B-21): at each I01 answer, it decides if a value under
+//! the capture gate is admitted into it, exactly the contract's rule (`contracts/i01-digests-v1/README.md` section
+//! 3.3, `definitions.json` `captureGate`, the pinned reference model's `capture_gate` and `required_slots`), over
+//! plain data. A pure logic module under the I01 logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no clock, no
+//! capture view, no system call beyond allocation, every function total, no panic, and no caller in the binary
+//! (G-I01B-1).
 //!
 //! - The latest completed capture set at the answer is handed in ([`LatestSet`]): each slot with whether it is `TAKEN`
 //!   in that set, and the set's two ages at the answer. No completed set is `None`. An Expired view is presented as a
 //!   set whose slots are all not taken (README section 3.3).
 //! - The rule: a completed set exists (else the value's own text); every slot the value requires is taken in it (else
-//!   the value's own text); its monotonic age (the answer's reading minus the set's own scheduled start) and its wall
-//!   age (the answer's wall reading minus the set's `set_started_ms`) both lie in 0..=90,000 ms (else "<key>: capture
-//!   set too old"). The texts are the contract's, held in `i01_digest` (`DigestKey::capture_not_passed`,
-//!   `capture_too_old`, `malformed`).
+//!   the value's own text); both ages lie in 0..=90,000 ms, the monotonic one measured from the start the set was
+//!   scheduled for to the answer's reading and the wall one from the set's `set_started_ms` to the answer's wall
+//!   reading (else "<key>: capture set too old"). The texts are the contract's, held in `i01_digest`
+//!   (`DigestKey::capture_not_passed`, `capture_too_old`, `malformed`).
 //! - The gate bound and G-I01B-8's three literal pins live here; `CYCLE` (`observe.rs`), `SCRAPE_TO_SET` and
 //!   `SET_BUDGET` (`capture.rs`) stay where they are. `tools/gate.py` checks each against its source.
 //! - Not here: the facts' construction from R10's capture view and clocks, and the answer (HE-004-I01B3).
