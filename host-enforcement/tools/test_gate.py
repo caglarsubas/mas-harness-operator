@@ -6378,12 +6378,19 @@ I01_LISTEN_TEXT = ("use gate_sys::channel::{self, ListenStep};\n"
 I01_OBSERVE = "crates/observer/src/observe.rs"
 I01_TREE = {gate.OBSERVER_CLIENT: I01_CLIENT_TEXT, gate.OBSERVER_LINUX_NET: I01_NET_TEXT,
             gate.OBSERVER_LINUX_LISTEN: I01_LISTEN_TEXT,
-            gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod client;\npub mod i01_request;\npub mod i01_service;\n"
-                              "pub mod linux_listen;\npub mod linux_net;\n",
+            gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod client;\npub mod i01_admission_render;\npub mod i01_digest;\n"
+                              "pub mod i01_gate;\npub mod i01_request;\npub mod i01_service;\npub mod linux_listen;\n"
+                              "pub mod linux_net;\n",
             I01_OBSERVE: "pub fn run() -> u8 { 0 }\n",
             # Unit U4: the two i01_ sources.
             gate.I01_FILES[0]: "use crate::client::{PeerOps, PeerService};\npub struct I01Service;\n",
-            gate.I01_FILES[1]: "pub fn check(bytes: &[u8]) -> bool { bytes.is_empty() }\n"}
+            gate.I01_FILES[1]: "pub fn check(bytes: &[u8]) -> bool { bytes.is_empty() }\n",
+            # HE-004-I01B1 (DESIGN-I01B1 rev 2 section 4, I1D-4): the digest port's three logic modules.
+            gate.I01_FILES[2]: "pub fn digest(bytes: &[u8]) -> usize { bytes.len() }\n",
+            gate.I01_FILES[3]: "pub fn render() -> u8 { 0 }\n",
+            gate.I01_FILES[4]: "pub const GATE_BOUND_MS: u64 = 90_000;\n"}
+# The I01 fixture's sources: client.rs, linux_net.rs, linux_listen.rs, lib.rs, observe.rs and the five i01_ sources.
+I01_TREE_COUNT = 10
 
 
 class I01ListenerRuleTests(Tree):
@@ -6394,12 +6401,15 @@ class I01ListenerRuleTests(Tree):
 
     def test_the_fixture_passes(self):
         self.assertEqual(gate.I01_PATH, "/run/planeon/live-proxy/policy-observer.sock")
-        self.assertEqual(gate.I01_FILES, ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs"))
-        self.assertEqual(gate.check_observer_never_unlinks(self.base), 7)
+        # HE-004-I01B1 (G-I01B-7 (a)): the service and its request checks, then the digest port's three modules.
+        self.assertEqual(gate.I01_FILES, ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs",
+                                          "crates/observer/src/i01_digest.rs", "crates/observer/src/i01_admission_render.rs",
+                                          "crates/observer/src/i01_gate.rs"))
+        self.assertEqual(gate.check_observer_never_unlinks(self.base), I01_TREE_COUNT)
         self.assertEqual(gate.check_observer_wait_point(self.base), 3)
         self.assertEqual(gate.check_observer_i01_path(self.base), 1)
-        self.assertEqual(gate.check_observer_no_send(self.base), 7)
-        self.assertEqual(gate.check_observer_i01_socket(self.base), 7)
+        self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
+        self.assertEqual(gate.check_observer_i01_socket(self.base), I01_TREE_COUNT)
 
     def test_g_i01_1_no_path_is_removed_or_renamed(self):
         good = self.TREE[I01_OBSERVE]
@@ -6410,7 +6420,7 @@ class I01ListenerRuleTests(Tree):
         # Comments, literals and a strict test block pass.
         self.write(I01_OBSERVE, good + "// unlink and rename in a comment\nconst T: &str = \"remove_file\";\n"
                    "#[cfg(test)]\nmod tests {\n    fn t() { remove_dir_all(p); }\n}\n")
-        self.assertEqual(gate.check_observer_never_unlinks(self.base), 7)
+        self.assertEqual(gate.check_observer_never_unlinks(self.base), I01_TREE_COUNT)
 
     def test_g_i01_2_one_wire_wait_and_one_step(self):
         client, net = gate.OBSERVER_CLIENT, gate.OBSERVER_LINUX_NET
@@ -6476,14 +6486,22 @@ class I01ListenerRuleTests(Tree):
                      good + "pub trait PeerOps {\n}\n"):
             self.refused(gate.check_observer_no_send, client, text, "G-I01-5")
         self.refused(gate.check_observer_no_send, I01_OBSERVE, self.TREE[I01_OBSERVE] + "trait PeerOps {}\n", "G-I01-5")
-        # The i01_ sources: exactly the two built ones (unit U4), declared in lib.rs, naming none of Wire, connect, ConnId
-        # and Client; no response, observation or digest module; and none before their unit builds them.
-        service, request = gate.I01_FILES
+        # The i01_ sources: exactly the built ones (unit U4's two; HE-004-I01B1's digest port adds three), declared in
+        # lib.rs, naming none of Wire, connect, ConnId and Client; no response, observation or answer module; and none
+        # before its unit builds it.
+        service, request = gate.I01_FILES[:2]
         self.assertEqual(gate.I01_FILES_BUILT, gate.I01_FILES)
         for word in ("Wire", "connect", "ConnId", "Client"):
             self.refused(gate.check_observer_no_send, service, self.TREE[service] + "fn f(w: &dyn %s) {}\n" % word, "G-I01-5")
             self.refused(gate.check_observer_no_send, request, self.TREE[request] + "fn %s() {}\n" % word, "G-I01-5")
-        for rel in ("crates/observer/src/i01_response.rs", "crates/observer/src/i01_digest.rs",
+            for rel in gate.I01_FILES[2:]:
+                self.refused(gate.check_observer_no_send, rel, self.TREE[rel] + "fn %s() {}\n" % word, "G-I01-5")
+        # HE-004-I01B1 (DESIGN-I01B rev 3 section 8.5, I1D-4): src/i01_digest.rs, refused here before, is now built and
+        # allowed; I01B3's i01_answer.rs refuses until its packet, as the response and observation modules do.
+        self.write("crates/observer/src/i01_digest.rs", "pub fn answer() {}\n")
+        self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
+        self.write("crates/observer/src/i01_digest.rs", self.TREE["crates/observer/src/i01_digest.rs"])
+        for rel in ("crates/observer/src/i01_response.rs", "crates/observer/src/i01_answer.rs",
                     "crates/observer/src/i01_observation.rs"):
             self.refused(gate.check_observer_no_send, rel, "pub fn answer() {}\n", "G-I01-5")
         self.refused(gate.check_observer_no_send, lib, self.TREE[lib] + "mod i01_observation;\n", "G-I01-5")
@@ -6495,7 +6513,7 @@ class I01ListenerRuleTests(Tree):
         with mock.patch.object(gate, "I01_FILES_BUILT", ()):
             with self.assertRaisesRegex(gate.GateError, "the i01_ sources present .* are not exactly none"):
                 gate.check_observer_no_send(self.base)
-        self.assertEqual(gate.check_observer_no_send(self.base), 7)
+        self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
 
     def test_g_i01_5_the_alias_forms_refuse(self):
         # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): the reviewer's probe and its kin, in both socket
@@ -6533,7 +6551,7 @@ class I01ListenerRuleTests(Tree):
                          [(("gate_sys",), "gs"), (("gate_sys", "channel"), "c"), (("gate_sys", "channel", "send"), None)])
         self.assertEqual(gate.gate_sys_aliases([(("gate_sys",), "gs"), (("gate_sys", "self"), "g2"), (("gate_sys", "tcp"), "t")]),
                          {"gs", "g2"})
-        self.assertEqual(gate.check_observer_no_send(self.base), 7)
+        self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
 
     def test_g_i01_6_the_socket_s_homes_and_its_one_construction(self):
         net, listen = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN
@@ -6554,7 +6572,7 @@ class I01ListenerRuleTests(Tree):
         for text in ("fn f(s: &crate::linux_listen::I01Socket) {}\n", "pub struct H<T = I01Socket>(T);\n"):
             self.refused(gate.check_observer_i01_socket, I01_OBSERVE, self.TREE[I01_OBSERVE] + text, "G-I01-6")
         self.assertIn("I01Socket", gate.DEBUG_HAZARDS)
-        self.assertEqual(gate.check_observer_i01_socket(self.base), 7)
+        self.assertEqual(gate.check_observer_i01_socket(self.base), I01_TREE_COUNT)
 
     def test_the_real_sources_pass(self):
         # Over the observer's real sources (as built): the five rules hold.
@@ -6843,6 +6861,453 @@ class I01bContractFileTests(Tree):
                 del gate.CONTRACTS[rel]
                 self.refuses("%s is not registered at edge record v10's row %d sha256" % (re.escape(rel), row))
         self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+
+
+I01B1_LIB = ("#![forbid(unsafe_code)]\n// i01_digest and i01_gate in a comment\npub mod capture;\npub mod i01_admission_render;\n"
+             "pub mod i01_digest;\npub mod i01_gate;\npub mod observe;\n")
+I01B1_DIGEST = ("//! An i01_digest fixture (`impl Other for DigestKey` and LatestSet in a comment pass).\n"
+                "pub enum DigestKey {\n    Rbac,\n}\n\nimpl DigestKey {\n    pub fn name(self) -> &'static str {\n"
+                "        \"rbac\"\n    }\n}\n\npub struct SealedAdmission {\n    pub namespace: String,\n}\n\n"
+                "pub struct Rendered;\n\n#[cfg(test)]\nmod tests {\n    struct Local;\n}\n")
+I01B1_ISOLATION_TREE = {
+    gate.OBSERVER_LIB: I01B1_LIB,
+    "crates/observer/src/i01_digest.rs": I01B1_DIGEST,
+    "crates/observer/src/i01_admission_render.rs": "use crate::i01_digest::{Rendered, SealedAdmission};\n"
+                                                   "pub fn render(_sealed: &SealedAdmission) -> Option<Rendered> {\n"
+                                                   "    None\n}\n",
+    "crates/observer/src/i01_gate.rs": "use crate::i01_digest::DigestKey;\npub struct LatestSet {\n    pub mono_age_ms: u64,\n}\n"
+                                       "pub fn capture_gate(key: DigestKey) -> &'static str {\n    key.name()\n}\n",
+    "crates/observer/src/observe.rs": "//! i01_digest, DigestKey and LatestSet in a comment.\n"
+                                      "pub fn run() -> &'static str { \"i01_gate Rendered\" }\n",
+    CAPTURE_RS: CAPTURE_TEXT,
+    gate.OBSERVER_MAIN: GOOD_OBSERVER_MAIN,
+}
+
+
+class I01b1IsolationTests(Tree):
+    """HE-004-I01B1 G-I01B-1, its I01B1 form (DESIGN-I01B1 rev 2 section 4, I1D-5), in D2IsolationTests' style: (a) a
+    module name outside its file (a `crate::i01_digest::` call in observe.rs, `use planeon_observer::i01_gate;` in
+    main.rs, `pub use i01_digest::x;` in lib.rs) refuses, and so does a pub mod line removed, doubled or written
+    `pub(crate) mod`; (b) a type of the set named in another observer source refuses; (c) an impl header other than
+    `impl <own type> {` refuses (a trait impl, a generic impl, an impl inside a fn); (d) a `pub use` or `pub(crate) use`
+    of another module's item in one of the three refuses. The fixture and the real sources pass. G-D2-5's own cases
+    are unchanged (D2IsolationTests): the construction is shared (module_isolation)."""
+
+    TREE = I01B1_ISOLATION_TREE
+    RULE = "G-I01B-1"
+
+    def test_the_tree_and_the_real_sources_pass(self):
+        self.assertEqual(gate.I01B1_MODULES, ("i01_digest", "i01_admission_render", "i01_gate"))
+        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
+        # The real sources: the eleven type names i01_digest and i01_gate define, each named only in the three files.
+        self.assertEqual(gate.check_i01b1_isolation(gate.HE), 11)
+
+    def test_a_module_name_outside_its_file_refuses(self):
+        for rel, extra in (("crates/observer/src/observe.rs", "pub fn f() -> u8 { crate::i01_digest::f() }\n"),
+                           (gate.OBSERVER_MAIN, "use planeon_observer::i01_gate;\n"),
+                           (gate.OBSERVER_LIB, "pub use i01_digest::x;\n"),
+                           (CAPTURE_RS, "use crate::i01_admission_render as r;\n")):
+            self.refused(gate.check_i01b1_isolation, rel, self.TREE[rel] + extra, "names the I01B1 module .*" + self.RULE)
+        lib = self.TREE[gate.OBSERVER_LIB]
+        for text in (lib.replace("pub mod i01_digest;\n", ""), lib + "pub mod i01_digest;\n",
+                     lib.replace("pub mod i01_digest;\n", "pub(crate) mod i01_digest;\n")):
+            self.refused(gate.check_i01b1_isolation, gate.OBSERVER_LIB, text, "does not declare `pub mod i01_digest;`")
+
+    def test_a_type_of_the_set_elsewhere_refuses(self):
+        for rel, extra in ((gate.OBSERVER_MAIN, "fn f(key: DigestKey) {}\n"),
+                           (CAPTURE_RS, "pub fn f() -> LatestSet { x() }\n"),
+                           ("crates/observer/src/observe.rs", "type R = Rendered;\n"),
+                           ("crates/observer/src/observe.rs", "pub struct SealedAdmission;\n")):
+            self.refused(gate.check_i01b1_isolation, rel, self.TREE[rel] + extra, "a type the I01B1 module .*" + self.RULE)
+        # Two of the three defining one name refuse.
+        self.refused(gate.check_i01b1_isolation, "crates/observer/src/i01_gate.rs",
+                     self.TREE["crates/observer/src/i01_gate.rs"] + "pub struct Rendered;\n", "defines Rendered, which")
+
+    def test_impl_headers_and_re_exports_refuse(self):
+        rel = "crates/observer/src/i01_digest.rs"
+        for extra in ("impl std::fmt::Display for DigestKey {}\n", "impl Clone for Rendered {}\n", "impl<T> DigestKey {}\n",
+                      "pub fn f() { impl Refusal {} }\n", "impl CaptureEngine {}\n"):
+            self.refused(gate.check_i01b1_isolation, rel, I01B1_DIGEST + extra, "impl header .*" + self.RULE)
+        gate_rs = "crates/observer/src/i01_gate.rs"
+        for extra, message in (("pub use crate::capture::KernelView;\n", "re-exports crate::capture::KernelView"),
+                               ("pub(crate) use crate::observe::run;\n", "re-exports crate::observe::run")):
+            self.refused(gate.check_i01b1_isolation, gate_rs, self.TREE[gate_rs] + extra, message + ".*" + self.RULE)
+        # A re-export of the set's own item passes.
+        self.write(gate_rs, self.TREE[gate_rs] + "pub use crate::i01_digest::Rendered;\n")
+        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
+
+    def test_the_present_modules_are_the_three(self):
+        for rel in ("crates/observer/src/i01_gate.rs", "crates/observer/src/i01_admission_render.rs"):
+            (self.base / rel).unlink()
+            with self.assertRaisesRegex(gate.GateError, "the I01B1 modules present .* not exactly those"):
+                gate.check_i01b1_isolation(self.base)
+            self.write(rel, self.TREE[rel])
+        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
+
+
+class I01b1SymbolTests(unittest.TestCase):
+    """HE-004-I01B1 G-I01B-1's corroboration (G-D2-7's style): no planeon-observer symbol has a path in one of the three
+    modules, by item path (legacy, v0, an inherent impl) or by its first crate root (a closure); a symbol that only
+    mentions one passes."""
+
+    REFUSED = ("_ZN16planeon_observer10i01_digest10projection17h0123456789abcdefE",
+               "_RNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate",
+               "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer10i01_digestNtB2_9DigestKey4name",
+               "_ZN16planeon_observer20i01_admission_render6render17h0123456789abcdefE",
+               "_RNCNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate0B5_")
+    PASSED = ("_RNvNtCs5pXa2Z9YbGW_16planeon_observer7capture10i01_digest",
+              "_RINvNtCsifRdLFh1usa_4core3ptr13drop_in_placeNtNtCs5pXa2Z9YbGW_16planeon_observer10i01_digest9DigestKeyEB4_",
+              "_ZN16planeon_observer7capture8i01_gate17h0123456789abcdefE",
+              "_ZN18planeon_observer_x10i01_digest1f17h0123456789abcdefE", "i01_digest", "main")
+
+    def test_i01b1_symbols_refuse_and_mentions_pass(self):
+        self.assertEqual(gate.check_i01b1_absent(set(self.PASSED)), len(self.PASSED))
+        for name in self.REFUSED:
+            with self.assertRaisesRegex(gate.GateError, "a symbol of the I01B1 module .*G-I01B-1"):
+                gate.check_i01b1_absent(set(self.PASSED) | {name})
+
+
+I01_SOURCE_LIB = "#![forbid(unsafe_code)]\n" + "".join(
+    ('#[cfg(target_os = "linux")]\npub mod %s;\n' if name.startswith("linux_") else "pub mod %s;\n") % name
+    for name in gate.OBSERVER_LIB_MODULES)
+I01_SOURCE_TREE = {
+    gate.OBSERVER_LIB: I01_SOURCE_LIB,
+    **{rel: "pub fn f() -> u8 { 0 }\n" for rel in gate.I01_FILES},
+    gate.OBSERVER_CLIENT: "pub fn c() {}\n",
+    "crates/observer/src/observe.rs": "pub fn run() {}\n\n#[cfg(test)]\nmod tests {\n    mod inner {}\n}\n",
+}
+
+
+class I01SourceRuleTests(Tree):
+    """HE-004-I01B1 G-I01B-7 (DESIGN-I01B rev 3 section 7.5, the I01B1 set): P7-1 an extra i01_ source, P7-2 an extra
+    pub mod line, P7-3 a module not named i01_*, P7-4 a module declared in client.rs or under src/client/, each refuse;
+    a guarded module declared inline in lib.rs refuses (file form), and so does an I01B1 module off the logic or
+    no-panic list; P7-5's I01B1 half, the five i01_ sources, passes, and so do the real sources."""
+
+    TREE = I01_SOURCE_TREE
+    RULE = "G-I01B-7"
+
+    def test_p7_5_the_five_and_the_real_sources_pass(self):
+        self.assertEqual(len(gate.OBSERVER_LIB_MODULES), 38)
+        self.assertEqual(len(gate.I01_FILES_BUILT), 5)
+        self.assertEqual(gate.check_i01b_sources(self.base), 5)
+        self.assertEqual(gate.check_i01b_sources(gate.HE), 5)
+
+    def test_p7_1_to_p7_4_refuse(self):
+        lib = self.TREE[gate.OBSERVER_LIB]
+        self.refused(gate.check_i01b_sources, "crates/observer/src/i01_extra.rs", "pub fn f() {}\n",
+                     "the i01_ sources present .* are not exactly .*" + self.RULE)
+        self.refused(gate.check_i01b_sources, gate.OBSERVER_LIB, lib + "pub mod i01_extra;\n",
+                     "lib.rs declares the modules .*, not exactly OBSERVER_LIB_MODULES")
+        self.write("crates/observer/src/answer.rs", "pub fn answer() {}\n")
+        self.refused(gate.check_i01b_sources, gate.OBSERVER_LIB, lib + "pub mod answer;\n",
+                     "lib.rs declares the modules .*, not exactly OBSERVER_LIB_MODULES")
+        (self.base / "crates/observer/src/answer.rs").unlink()
+        self.refused(gate.check_i01b_sources, gate.OBSERVER_CLIENT, self.TREE[gate.OBSERVER_CLIENT] + "mod i01_x;\n",
+                     "client.rs declares a module; only lib.rs does .*" + self.RULE)
+        self.refused(gate.check_i01b_sources, "crates/observer/src/client/i01_x.rs", "pub fn x() {}\n",
+                     "the i01_ sources present .* are not exactly")
+        self.assertEqual(gate.check_i01b_sources(self.base), 5)
+
+    def test_file_form_and_the_lists(self):
+        lib = self.TREE[gate.OBSERVER_LIB]
+        for text in (lib.replace("pub mod config;\n", "pub mod config { }\n"), lib.replace("pub mod client;\n", ""),
+                     lib + "pub mod client;\n"):
+            self.refused(gate.check_i01b_sources, gate.OBSERVER_LIB, text, "not exactly OBSERVER_LIB_MODULES")
+        self.refused(gate.check_i01b_sources, "crates/observer/src/observe.rs", "pub mod nested {}\n",
+                     "observe.rs declares a module")
+        for listed in ("I01_LOGIC_BUILT", "I01_NO_PANIC_BUILT"):
+            with mock.patch.object(gate, listed, tuple(name for name in getattr(gate, listed) if name != "i01_gate")):
+                with self.assertRaisesRegex(gate.GateError, "i01_gate miss the logic or the no-panic rule"):
+                    gate.check_i01b_sources(self.base)
+        self.assertEqual(gate.check_i01b_sources(self.base), 5)
+
+
+class I01bConstantTests(Tree):
+    """HE-004-I01B1 G-I01B-8 (DESIGN-I01B rev 3 section 6, B2-7) over copies of the real i01_gate.rs, observe.rs,
+    capture.rs, i01_digest.rs, i01_admission_render.rs and definitions.json: the copies and the real tree pass; one
+    refusal per constant (each value changed, each literal pin's citation removed, a second definition) and for the
+    contract's bound; an extra key-prefixed text or a changed pinned text refuses."""
+
+    RULE = "G-I01B-8"
+    COPIED = (gate.I01_GATE_RS, "crates/observer/src/observe.rs", "crates/observer/src/capture.rs",
+              "crates/observer/src/i01_digest.rs", "crates/observer/src/i01_admission_render.rs", gate.I01B_DEFINITIONS)
+
+    def setUp(self):
+        super().setUp()
+        self.real = {rel: (gate.HE / rel).read_text(encoding="utf-8") for rel in self.COPIED}
+        for rel, text in self.real.items():
+            self.write(rel, text)
+
+    def changed(self, rel, old, new, message, check=None):
+        text = self.real[rel]
+        self.assertEqual(text.count(old), 1, old)
+        self.write(rel, text.replace(old, new))
+        with self.assertRaisesRegex(gate.GateError, message + ".*" + self.RULE):
+            (check or gate.check_i01b_constants)(self.base)
+        self.write(rel, text)
+
+    def test_the_copies_and_the_real_tree_pass(self):
+        self.assertEqual(gate.check_i01b_constants(self.base), 7)
+        self.assertEqual(gate.check_i01b_constants(gate.HE), 7)
+        self.assertEqual(gate.check_i01b_refusal_texts(self.base), 90)
+        self.assertEqual(gate.check_i01b_refusal_texts(gate.HE), 90)
+
+    def test_one_refusal_per_constant(self):
+        gate_rs = gate.I01_GATE_RS
+        self.changed(gate_rs, "GATE_BOUND_MS: u64 = 90_000;", "GATE_BOUND_MS: u64 = 90_001;", "GATE_BOUND_MS is not")
+        self.changed("crates/observer/src/observe.rs", "CYCLE: Duration = Duration::from_secs(60);",
+                     "CYCLE: Duration = Duration::from_secs(61);", "CYCLE is not")
+        self.changed("crates/observer/src/capture.rs", "SCRAPE_TO_SET: Duration = Duration::from_secs(5);",
+                     "SCRAPE_TO_SET: Duration = Duration::from_secs(6);", "SCRAPE_TO_SET is not")
+        self.changed("crates/observer/src/capture.rs", "SET_BUDGET: Duration = Duration::from_secs(25);",
+                     "SET_BUDGET: Duration = Duration::from_secs(24);", "SET_BUDGET is not")
+        for name, old, new in (("ANSWER_LIMIT", "usize = 65_536;", "usize = 65_535;"),
+                               ("FRESHNESS_WINDOW_SECONDS", "FRESHNESS_WINDOW_SECONDS: u64 = 5;",
+                                "FRESHNESS_WINDOW_SECONDS: u64 = 6;"),
+                               ("EXCHANGE_DEADLINE_SECONDS", "EXCHANGE_DEADLINE_SECONDS: u64 = 2;",
+                                "EXCHANGE_DEADLINE_SECONDS: u64 = 3;")):
+            self.changed(gate_rs, old, new, "does not pin %s" % name)
+        for name, citation in (("ANSWER_LIMIT", "validate_policy_observation.py:86-88"),
+                               ("FRESHNESS_WINDOW_SECONDS", "validate_policy_observation.py:128"),
+                               ("EXCHANGE_DEADLINE_SECONDS", "Q-I01B-21 (a)")):
+            self.changed(gate_rs, citation, "a citation elsewhere", "does not pin %s" % name)
+        self.changed(gate_rs, "pub const ANSWER_LIMIT: usize = 65_536;",
+                     "pub const ANSWER_LIMIT: usize = 65_536;\nconst ANSWER_LIMIT: usize = 1;",
+                     "does not define ANSWER_LIMIT exactly once")
+        self.changed(gate_rs, "pub const GATE_BOUND_MS: u64 = 90_000;", "pub(crate) const GATE_BOUND_MS: u64 = 90_000;",
+                     "does not define GATE_BOUND_MS exactly once")
+        self.changed(gate.I01B_DEFINITIONS, '"boundMs": 90000', '"boundMs": 90001', "captureGate.boundMs is not")
+
+    def test_the_texts(self):
+        texts = gate.check_i01b_refusal_texts
+        self.changed(gate.I01_GATE_RS, "pub const LIFECYCLE_SLOT",
+                     "const FORGED: &str = \"rbac: a text the contract does not pin\";\npub const LIFECYCLE_SLOT",
+                     "refusal texts are not exactly .*extra", texts)
+        self.changed("crates/observer/src/i01_digest.rs", '"admissionPolicy: rendered hash differs"',
+                     '"admissionPolicy: rendered hashes differ"', "refusal texts are not exactly .*missing", texts)
+        # A pinned text written in a comment only is not written.
+        self.changed("crates/observer/src/i01_digest.rs", '"networkEnforcementDigest: no network policy agent"',
+                     '"" // "networkEnforcementDigest: no network policy agent"', "missing", texts)
+
+
+class I01bGuardedPinTests(Tree):
+    """HE-004-I01B1 R-B3-PIN (DESIGN-I01B1 rev 2 section 1; I1D-3, I1D-10), over copies of the six guarded files and the
+    two crates' lib.rs, in D2ConstructorHomePinTests' form: for each of the six, a changed, added and removed byte, the
+    appended probes (B3-12's trait-item and generic-default forms in the two effect-gate files, X6-4's type alias in all
+    six), a missing file, a symlink to identical bytes and a rename refuse; i01_answer.rs present (empty, a directory or
+    a dangling symlink) refuses; a casefolded sibling of a guarded name refuses (on a case-sensitive file system; on a
+    case-insensitive one the sibling of the absent name is that name, which refuses as present); an inline module in
+    place of a guarded one (I1D-3's probes, `pub mod config { }` and `pub mod linux_os { }`), a doubled declaration and
+    an inline `mod client {` elsewhere refuse; the copies and the real tree pass."""
+
+    RULE = "R-B3-PIN"
+    LIBS = (gate.OBSERVER_LIB, gate.EFFECT_GATE_LIB)
+    LEAK = b"pub trait Leak { fn leak(&self) -> &Conn; }\n"
+    HOLDER = b"pub struct Holder<T = Conn> { pub inner: T }\n"
+    ALIAS = b"pub type Leaked = crate::los::Conn;\n"
+
+    def setUp(self):
+        super().setUp()
+        self.real = {rel: (gate.HE / rel).read_bytes() for rel in tuple(gate.I01B_GUARDED_PINS) + self.LIBS}
+        for rel, data in self.real.items():
+            self.write_bytes(rel, data)
+
+    def write_bytes(self, rel, data):
+        path = self.base / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            path.unlink()
+        path.write_bytes(data)
+
+    def refuses(self, message):
+        with self.assertRaisesRegex(gate.GateError, message + ".*" + self.RULE):
+            gate.check_i01b_guarded_pins(self.base)
+
+    def test_the_copies_and_the_real_tree_pass(self):
+        self.assertEqual(gate.I01B_GUARDED_PINS, {
+            "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
+            "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
+            "crates/observer/src/config.rs": "bef5143c30961fae16e12a90d3dcabeba35433e2082aae79da0d27a0ac2acee8",
+            "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
+            "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
+            "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741"})
+        self.assertEqual(gate.I01B_ABSENT, ("crates/observer/src/i01_answer.rs",))
+        # linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS, unchanged.
+        self.assertIn("crates/observer/src/linux_listen.rs", gate.OBSERVER_HOME_PINS)
+        self.assertIn("crates/observer/src/linux_net.rs", gate.OBSERVER_HOME_PINS)
+        self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+        self.assertEqual(gate.check_i01b_guarded_pins(gate.HE), 7)
+
+    def test_each_pinned_file_refuses_a_change_a_probe_missing_a_symlink_or_a_rename(self):
+        for rel in gate.I01B_GUARDED_PINS:
+            data = self.real[rel]
+            middle = len(data) // 2
+            probes = [self.ALIAS] + ([self.LEAK, self.HOLDER] if rel.startswith("crates/effect-gate/") else [])
+            for changed in [data[:middle] + bytes([data[middle] ^ 1]) + data[middle + 1:], data + b"\n", data[:-1]] + [
+                    data + probe for probe in probes]:
+                self.write_bytes(rel, changed)
+                self.refuses("%s differs from its pinned bytes" % re.escape(rel))
+                self.write_bytes(rel, data)
+            path = self.base / rel
+            path.unlink()
+            self.refuses("%s is missing or a symlink" % re.escape(rel))
+            (self.base / "real.bin").write_bytes(data)
+            path.symlink_to(self.base / "real.bin")
+            self.refuses("%s is missing or a symlink" % re.escape(rel))
+            path.unlink()
+            moved = path.with_name("moved_" + path.name)
+            moved.write_bytes(data)
+            self.refuses("%s is missing or a symlink" % re.escape(rel))
+            moved.unlink()
+            self.write_bytes(rel, data)
+        self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+
+    def test_the_answer_module_stays_absent(self):
+        answer = self.base / "crates/observer/src/i01_answer.rs"
+        answer.write_bytes(b"")
+        self.refuses("i01_answer.rs exists")
+        answer.unlink()
+        answer.mkdir()
+        self.refuses("i01_answer.rs exists")
+        answer.rmdir()
+        answer.symlink_to(self.base / "nowhere.rs")
+        self.refuses("i01_answer.rs exists")
+        answer.unlink()
+        self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+
+    def test_a_casefolded_sibling_refuses(self):
+        probe = self.base / "case-probe"
+        probe.write_bytes(b"")
+        sensitive = not (self.base / "CASE-PROBE").exists()
+        probe.unlink()
+        sibling = self.base / "crates/observer/src/I01_answer.rs"
+        sibling.write_bytes(b"")
+        self.refuses("I01_answer.rs casefolds to the guarded name i01_answer.rs" if sensitive else "i01_answer.rs exists")
+        sibling.unlink()
+        if sensitive:
+            for rel in ("crates/effect-gate/src/Linux_os.rs", "crates/observer/src/CONFIG.rs",
+                        "crates/observer/src/Linux_Net.rs"):
+                (self.base / rel).write_bytes(b"pub fn f() {}\n")
+                self.refuses("%s casefolds to the guarded name" % re.escape(rel))
+                (self.base / rel).unlink()
+        self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+
+    def test_an_inline_module_in_place_of_a_guarded_one_refuses(self):
+        for lib, old, new, message in (
+                (gate.OBSERVER_LIB, b"pub mod config;\n", b"pub mod config { }\n", "does not declare `pub mod config;`"),
+                (gate.EFFECT_GATE_LIB, b"pub mod linux_os;\n", b"pub mod linux_os { }\n",
+                 "does not declare `pub mod linux_os;`"),
+                (gate.OBSERVER_LIB, b"pub mod client;\n", b"pub mod client;\npub mod client;\n",
+                 "does not declare `pub mod client;`"),
+                (gate.OBSERVER_LIB, b"pub mod i01_service;\n", b"", "does not declare `pub mod i01_service;`")):
+            data = self.real[lib]
+            self.assertEqual(data.count(old), 1, old)
+            self.write_bytes(lib, data.replace(old, new))
+            self.refuses(message)
+            self.write_bytes(lib, data)
+        self.write_bytes("crates/observer/src/observe.rs", b"mod client {\n    pub fn f() {}\n}\n")
+        self.refuses("observe.rs holds an inline `mod client {`")
+        (self.base / "crates/observer/src/observe.rs").unlink()
+        self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+
+
+ALIAS_TREE = {
+    gate.EFFECT_GATE_LIB: "#![forbid(unsafe_code)]\n#[cfg(target_os = \"linux\")]\npub mod linux_net;\n"
+                          "#[cfg(target_os = \"linux\")]\npub mod linux_os;\npub mod peers;\n",
+    gate.LINUX_OS: "use gate_sys::channel::Conn;\nuse crate::linux_net::SharedNet;\npub struct Slot;\n",
+    "crates/effect-gate/src/linux_net.rs": "use gate_sys::tcp::TcpConn;\npub struct SharedNet;\n",
+    "crates/effect-gate/src/peers.rs": "pub fn peers() {}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n}\n",
+    gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod i01_admission_render;\npub mod i01_digest;\npub mod i01_gate;\n"
+                       "#[cfg(target_os = \"linux\")]\npub mod linux_listen;\n#[cfg(target_os = \"linux\")]\npub mod linux_net;\n"
+                       "pub mod observe;\n",
+    gate.OBSERVER_LINUX_NET: "use gate_sys::channel;\nuse crate::linux_listen::I01Socket;\npub struct LinuxWire;\n",
+    gate.OBSERVER_LINUX_LISTEN: "use gate_sys::channel::{self, ListenStep};\npub(crate) struct I01Socket;\n",
+    "crates/observer/src/observe.rs": "pub fn run() {}\n",
+    gate.OBSERVER_MAIN: "fn serve() {\n    use planeon_observer::linux_net::LinuxWire;\n}\n",
+    # HE-004-I01B1's three modules (DESIGN-I01B1 rev 2 section 2, I1D-2: the fixture with I01B1's changes).
+    "crates/observer/src/i01_digest.rs": "pub fn digest() {}\n",
+    "crates/observer/src/i01_admission_render.rs": "use crate::i01_digest::digest;\npub fn render() {}\n",
+    "crates/observer/src/i01_gate.rs": "pub fn gate() {}\n",
+}
+# The I1D-11 matrix: (alias spelling x placement x socket file) 9 x 2 x 4, X6-1..X6-4 (the alias with its use site in
+# the socket file) 4 x 2 x 4, and the four scope-root renames x 2 placements x 2 crates: 72 + 32 + 16 = 120 cases.
+ALIAS_SPELLINGS = ("use crate::{m} as a;\n", "use crate::{m}::{{self as a}};\n", "use crate::{{{m}::{{self as a}}}};\n",
+                   "use {m} as a;\n", "use self::{m} as a;\n", "pub(crate) use super::{m} as a;\n",
+                   "mod inner {{\n    pub(crate) use super::{m} as a;\n}}\n", "pub use crate::{m}::Item;\n",
+                   "use crate::{m}::*;\n")
+ALIAS_USE_SITES = ("pub fn leak(slot: &Slot) -> &crate::a::Conn {{ slot.conn() }}\n",
+                   "pub fn leak(slot: &Slot) -> &super::a::Conn {{ slot.conn() }}\n",
+                   "pub fn tcp(slot: &Slot) -> Option<&crate::a::TcpConn> {{ slot.tcp() }}\n",
+                   "pub type Leaked = crate::a::Conn;\n")
+SCOPE_ROOT_RENAMES = ("use crate as r;\n", "use crate::{self as r};\n", "use self as r;\n", "use super as r;\n")
+ALIAS_FILES = ((gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs", gate.LINUX_OS, "linux_os"),
+               (gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs", "crates/effect-gate/src/linux_net.rs", "linux_net"),
+               (gate.OBSERVER_LIB, "crates/observer/src/observe.rs", gate.OBSERVER_LINUX_NET, "linux_net"),
+               (gate.OBSERVER_LIB, "crates/observer/src/observe.rs", gate.OBSERVER_LINUX_LISTEN, "linux_listen"))
+ALIAS_CASES = 120
+
+
+class SocketModuleAliasTests(Tree):
+    """HE-004-I01B1 B3-1, G-I01B-6 (e) (DESIGN-I01B1 rev 2 sections 2 and 6, I1D-1, I1D-2, I1D-11): the matrix of alias
+    declarations (nine spellings: a rename of the module, its trailing self braced and nested, the 2018 relative and
+    self:: forms, a pub(crate) super:: form, the same inside an inline module, a pub use of an item through it and a glob
+    through it), each in lib.rs and in another module of the crate, for each of the four socket files; X6-1..X6-4 with
+    their use sites; and the four scope-root renames in both crates: 120 cases, each refusing. The must-pass: the
+    fixture with I01B1's changes and today's three item imports (effect-gate linux_os.rs:39, observer linux_net.rs:35,
+    main.rs:63), and the real sources."""
+
+    TREE = ALIAS_TREE
+    RULE = "G-I01B-6 \\(e\\)"
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
+        real = sum(1 for crate in gate.SOCKET_CRATE_MODULES for _ in (gate.HE / crate / "src").rglob("*.rs"))
+        self.assertEqual(gate.check_socket_module_aliases(gate.HE), real)
+
+    def test_the_alias_matrix_refuses(self):
+        cases = 0
+        for lib, other, socket, module in ALIAS_FILES:
+            for placement in (lib, other):
+                for spelling in ALIAS_SPELLINGS:
+                    self.refused(gate.check_socket_module_aliases, placement,
+                                 self.TREE[placement] + spelling.format(m=module), "socket module .*" + self.RULE)
+                    cases += 1
+                for site in ALIAS_USE_SITES:
+                    self.write(socket, self.TREE[socket] + site.format())
+                    self.refused(gate.check_socket_module_aliases, placement,
+                                 self.TREE[placement] + ALIAS_SPELLINGS[0].format(m=module), "socket module .*" + self.RULE)
+                    self.write(socket, self.TREE[socket])
+                    cases += 1
+        for lib, other in ((gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs"),
+                           (gate.OBSERVER_LIB, "crates/observer/src/observe.rs")):
+            for placement in (lib, other):
+                for rename in SCOPE_ROOT_RENAMES:
+                    self.refused(gate.check_socket_module_aliases, placement, self.TREE[placement] + rename,
+                                 "imports or renames a scope root .*" + self.RULE)
+                    cases += 1
+        self.assertEqual(cases, ALIAS_CASES)
+        # A use site alone (X6-4 without the alias) is the pins' case, not this rule's.
+        self.write(gate.LINUX_OS, self.TREE[gate.LINUX_OS] + ALIAS_USE_SITES[3].format())
+        self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
+
+    def test_item_imports_pass_and_their_other_forms_refuse(self):
+        main = gate.OBSERVER_MAIN
+        for text in ("fn serve() {\n    use planeon_observer::linux_net::{LinuxWire, Other as O};\n}\n",
+                     "fn serve() {\n    use crate::linux_net::LinuxWire as W;\n}\n"):
+            self.write(main, text)
+            self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
+        for text, message in (("fn serve() {\n    use planeon_observer::linux_net;\n}\n", "imports the socket module"),
+                              ("fn serve() {\n    use planeon_observer::linux_net::{self};\n}\n", "imports the socket module"),
+                              ("use planeon_observer as po;\n", "scope root"),
+                              ("pub use planeon_observer::linux_listen::I01Socket;\n", "re-exports")):
+            self.refused(gate.check_socket_module_aliases, main, text, message + ".*" + self.RULE)
+        # The same item import made pub refuses; a test block's glob of super passes (blanked).
+        self.refused(gate.check_socket_module_aliases, gate.LINUX_OS,
+                     self.TREE[gate.LINUX_OS].replace("use crate::linux_net::SharedNet;", "pub use crate::linux_net::SharedNet;"),
+                     "re-exports .*" + self.RULE)
+        self.refused(gate.check_socket_module_aliases, gate.OBSERVER_LINUX_NET, self.TREE[gate.OBSERVER_LINUX_NET]
+                     + "use crate::linux_listen::{1 + 1};\n", "cannot read .*" + self.RULE)
 
 
 class OutputPrefixTests(unittest.TestCase):
