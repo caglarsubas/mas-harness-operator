@@ -1,0 +1,499 @@
+{
+  "evidenceClass": "UNIT_VERIFICATION_ONLY",
+  "nativeAcceptance": false,
+  "positive": {
+    "profileId": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V1",
+    "binding": {
+      "tenantId": "unit-tenant",
+      "environmentId": "unit-environment",
+      "runNonce": "unit-nonce",
+      "capacityNonce": "unit-capacity-nonce",
+      "endpointId": "unit-proxy",
+      "namespace": "unit-namespace",
+      "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+      "validFrom": "2026-09-08T00:00:00Z",
+      "expiresAt": "2026-09-08T00:10:00Z",
+      "apiEndpointId": "unit-api-proxy"
+    },
+    "capacityEntries": {
+      "kubernetesApiRules": [
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "create",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "unit-namespace",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "get",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "unit-namespace",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "delete",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "unit-namespace",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        }
+      ],
+      "campaignProxyRules": [
+        {
+          "endpointId": "unit-proxy",
+          "namespace": "unit-namespace",
+          "service": "linux-baseline-probes",
+          "port": 9443,
+          "protocol": "HTTPS",
+          "methods": [
+            "POST"
+          ],
+          "paths": [
+            "/v1/linux-baseline/host-isolation-negatives",
+            "/v1/linux-baseline/linux-target-build",
+            "/v1/linux-baseline/full-predecessor-regression",
+            "/v1/linux-baseline/control-container-startup",
+            "/v1/linux-baseline/postgres-migration-and-rls",
+            "/v1/linux-baseline/durable-restart",
+            "/v1/linux-baseline/arbitrary-non-root-uid",
+            "/v1/linux-baseline/read-only-root-filesystem",
+            "/v1/linux-baseline/kubernetes-smoke",
+            "/v1/linux-baseline/default-deny-network"
+          ],
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304,
+          "timeoutSeconds": 900
+        }
+      ],
+      "permittedGvksAndVerbs": [
+        {
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "kind": "ConfigMap",
+          "verbs": [
+            "create",
+            "get",
+            "delete"
+          ],
+          "names": [
+            "unit-fixture"
+          ]
+        }
+      ],
+      "preexistingResourceRefs": [
+        {
+          "apiVersion": "v1",
+          "kind": "ResourceQuota",
+          "namespace": "unit-namespace",
+          "name": "unit-quota",
+          "uid": "unit-quota-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "apiVersion": "v1",
+          "kind": "LimitRange",
+          "namespace": "unit-namespace",
+          "name": "unit-limits",
+          "uid": "unit-limit-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "apiVersion": "v1",
+          "kind": "ServiceAccount",
+          "namespace": "unit-namespace",
+          "name": "campaign",
+          "uid": "unit-service-account-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ],
+      "preallocatedStorageRefs": [],
+      "preallocatedAcceleratorRefs": [],
+      "credentialIdentities": [
+        {
+          "endpointId": "unit-proxy",
+          "purpose": "CAMPAIGN_PROXY_CLIENT_MTLS",
+          "subject": "system:serviceaccount:unit-namespace:campaign",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "certificateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "clientSpkiDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "purpose": "KUBERNETES_PROXY_SERVER_MTLS",
+          "subject": "system:serviceaccount:unit-namespace:campaign",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "certificateDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "clientSpkiDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    },
+    "policy": {
+      "admissionPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "resourceQuotaDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "limitRangeDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "namespaceUid": "unit-namespace-uid",
+      "resourceQuotaUid": "unit-quota-uid",
+      "limitRangeUid": "unit-limit-uid",
+      "serviceAccountUid": "unit-service-account-uid",
+      "rbacDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "networkPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "mutationBrokerDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "maxConcurrentOperations": 1,
+      "serviceAccountDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "quota": {
+      "pods": 0,
+      "configMaps": 1,
+      "services": 0,
+      "cpuMillis": 0,
+      "memoryBytes": 0,
+      "ephemeralStorageBytes": 0
+    },
+    "resources": [
+      {
+        "manifest": {
+          "apiVersion": "v1",
+          "kind": "ConfigMap",
+          "metadata": {
+            "name": "unit-fixture",
+            "namespace": "unit-namespace",
+            "labels": {
+              "planeon.ai/run-nonce": "unit-nonce",
+              "planeon.ai/tenant-id": "unit-tenant"
+            }
+          },
+          "immutable": true,
+          "data": {
+            "fixture.json": "{}"
+          }
+        },
+        "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+      }
+    ],
+    "localImages": []
+  },
+  "negative": [
+    {
+      "label": "cross-tenant",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "metadata",
+        "labels",
+        "planeon.ai/tenant-id"
+      ],
+      "value": "other-tenant"
+    },
+    {
+      "label": "cross-namespace",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "metadata",
+        "namespace"
+      ],
+      "value": "other-namespace"
+    },
+    {
+      "label": "cross-nonce",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "metadata",
+        "labels",
+        "planeon.ai/run-nonce"
+      ],
+      "value": "other-nonce"
+    },
+    {
+      "label": "wrong-subject",
+      "path": [
+        "capacityEntries",
+        "credentialIdentities",
+        0,
+        "subject"
+      ],
+      "value": "system:serviceaccount:other:campaign"
+    },
+    {
+      "label": "wrong-endpoint",
+      "path": [
+        "capacityEntries",
+        "credentialIdentities",
+        0,
+        "endpointId"
+      ],
+      "value": "other-proxy"
+    },
+    {
+      "label": "bearer-fallback",
+      "path": [
+        "capacityEntries",
+        "credentialIdentities",
+        0,
+        "purpose"
+      ],
+      "value": "BEARER"
+    },
+    {
+      "label": "expired-window",
+      "path": [
+        "binding",
+        "expiresAt"
+      ],
+      "value": "2026-09-08T00:00:00Z"
+    },
+    {
+      "label": "overlong-window",
+      "path": [
+        "binding",
+        "expiresAt"
+      ],
+      "value": "2026-09-09T00:00:00Z"
+    },
+    {
+      "label": "credential-overlong",
+      "path": [
+        "capacityEntries",
+        "credentialIdentities",
+        0,
+        "expiresAt"
+      ],
+      "value": "2026-09-09T00:00:00Z"
+    },
+    {
+      "label": "mutable-image",
+      "path": [
+        "localImages"
+      ],
+      "value": [
+        "registry.local/probe:latest"
+      ]
+    },
+    {
+      "label": "new-pvc",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "kind"
+      ],
+      "value": "PersistentVolumeClaim"
+    },
+    {
+      "label": "unknown-resource",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "kind"
+      ],
+      "value": "CloudDatabase"
+    },
+    {
+      "label": "annotation",
+      "path": [
+        "resources",
+        0,
+        "manifest",
+        "metadata",
+        "annotations"
+      ],
+      "value": {
+        "provider": "billable"
+      }
+    },
+    {
+      "label": "quota-exhausted",
+      "path": [
+        "quota",
+        "configMaps"
+      ],
+      "value": 0
+    },
+    {
+      "label": "quota-negative",
+      "path": [
+        "quota",
+        "configMaps"
+      ],
+      "value": -1
+    },
+    {
+      "label": "quota-bool",
+      "path": [
+        "quota",
+        "configMaps"
+      ],
+      "value": true
+    },
+    {
+      "label": "manifest-substitution",
+      "path": [
+        "resources",
+        0,
+        "manifestDigest"
+      ],
+      "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "label": "ungranted-name",
+      "path": [
+        "capacityEntries",
+        "permittedGvksAndVerbs",
+        0,
+        "names"
+      ],
+      "value": [
+        "other"
+      ]
+    },
+    {
+      "label": "ungranted-kind",
+      "path": [
+        "capacityEntries",
+        "permittedGvksAndVerbs",
+        0,
+        "kind"
+      ],
+      "value": "Pod"
+    },
+    {
+      "label": "wildcard-verb",
+      "path": [
+        "capacityEntries",
+        "permittedGvksAndVerbs",
+        0,
+        "verbs"
+      ],
+      "value": [
+        "*"
+      ]
+    },
+    {
+      "label": "discovered-path",
+      "path": [
+        "capacityEntries",
+        "campaignProxyRules",
+        0,
+        "paths",
+        0
+      ],
+      "value": "/arbitrary"
+    },
+    {
+      "label": "larger-response",
+      "path": [
+        "capacityEntries",
+        "campaignProxyRules",
+        0,
+        "responseMaxBytes"
+      ],
+      "value": 4194305
+    },
+    {
+      "label": "longer-deadline",
+      "path": [
+        "capacityEntries",
+        "campaignProxyRules",
+        0,
+        "timeoutSeconds"
+      ],
+      "value": 901
+    },
+    {
+      "label": "new-storage",
+      "path": [
+        "capacityEntries",
+        "preallocatedStorageRefs"
+      ],
+      "value": [
+        {}
+      ]
+    },
+    {
+      "label": "new-accelerator",
+      "path": [
+        "capacityEntries",
+        "preallocatedAcceleratorRefs"
+      ],
+      "value": [
+        {}
+      ]
+    },
+    {
+      "label": "missing-policy",
+      "path": [
+        "policy"
+      ],
+      "value": null
+    },
+    {
+      "label": "client-authority-flag",
+      "path": [
+        "verified"
+      ],
+      "value": true
+    },
+    {
+      "label": "server-credential-missing",
+      "path": [
+        "capacityEntries",
+        "credentialIdentities"
+      ],
+      "value": [
+        {
+          "endpointId": "unit-proxy",
+          "purpose": "CAMPAIGN_PROXY_CLIENT_MTLS",
+          "subject": "system:serviceaccount:unit-namespace:campaign",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "certificateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "clientSpkiDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "label": "same-api-client-endpoint",
+      "path": [
+        "binding",
+        "apiEndpointId"
+      ],
+      "value": "unit-proxy"
+    },
+    {
+      "label": "api-rules-missing",
+      "path": [
+        "capacityEntries",
+        "kubernetesApiRules"
+      ],
+      "value": []
+    }
+  ]
+}
