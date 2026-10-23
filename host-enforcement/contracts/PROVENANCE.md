@@ -314,7 +314,8 @@ binding and observation cases read. `tools/gate.py` holds the four files to thes
 - `contracts/i01-v1/proxy-contract-vectors.json` from `architecture/proxy-contract-inputs/vectors.json`, sha256 `edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7`, 12799 bytes
 
 The contract's reference model and VPO are pinned by digest, not copied, and read as specification only where the
-contract's README and vectors are silent (HE-004-I01B1's MODEL_DEFINED section lists each such point), at harness-onion
+contract's README and vectors are silent (`crates/effect-gate/MODEL_DEFINED.md`, the HE-004-I01B1 section: its points
+P1-P7 list each such point, and R167-R174 the R10-defined behaviour), at harness-onion
 `2043cc27`. VPO is re-pinned here: its bytes at `2043cc27` (its last change) replace the `ed0008be…` pin of the
 HE-004-I01A2 section above. Neither is imported or run by R10.
 
