@@ -25,6 +25,11 @@
 //! Not replayed: `PV`'s 17 observation negatives and 5 binding negatives. Those cases also read the proxy profile,
 //! `architecture/proxy-contract-inputs/vectors.json`, which no edge record registers (edge record v9's replay-scope
 //! note), so replaying them in R10 needs a later record first; the observation side is I01b's.
+//!
+//! HE-004-I01B1 (DESIGN-I01B rev 3 section 8.1; the monitor's R-B1-13 (a)) adds those 22 cases' table as data
+//! (`PV_CASES`): each case's label, the VPO rule it breaks, its checker (an R10 check, or HE-008's profile-side one)
+//! and the packet that replays it. A test holds its labels to `PV`'s negatives 6-27, each once. No row is replayed in
+//! HE-004-I01B1.
 
 use i05_protocol::json::{self, JStr, Value};
 use i05_protocol::sha256;
@@ -42,6 +47,42 @@ const REQUEST_NEGATIVES: [&str; 5] = ["negative-1-request-operation", "negative-
                                       "negative-5-request-previousObservationDigest"];
 /// The chain's refusal of a session's first request.
 const FIRST: RequestRefusal = RequestRefusal::Chain("a session's first request is sequence 1 after the zero digest");
+/// DESIGN-I01B rev 3 section 8.1 (R-B1-13 (a)): `PV`'s 22 binding and observation negatives, each as (case, VPO rule,
+/// checker, packet). A case HE-008 holds profile-side is replayed by no R10 packet ("-"). In cases 23-27 the mutated
+/// binding also changes its digest, so a request naming the positive's digest fails the gate; that is not counted as
+/// the case's checker.
+const PV_CASES: [(&str, &str, &str, &str); 22] = [
+    ("negative-6-observation-challenge", "response substitution", "R10: i01_answer's self-check", "HE-004-I01B3"),
+    ("negative-7-observation-runNonce", "response substitution", "R10: i01_answer's self-check", "HE-004-I01B3"),
+    ("negative-8-observation-bindingDigest", "response substitution", "R10: i01_answer's self-check", "HE-004-I01B3"),
+    ("negative-9-observation-sequence", "response substitution", "R10: i01_answer's self-check", "HE-004-I01B3"),
+    ("negative-10-observation-previousObservationDigest", "response substitution", "R10: i01_answer's self-check",
+     "HE-004-I01B3"),
+    ("negative-11-observation-observedAt", "stale or future", "R10: self-check window", "HE-004-I01B3"),
+    ("negative-12-observation-expiresAt", "stale or future", "R10: self-check window", "HE-004-I01B3"),
+    ("negative-13-observation-expiresAt", "freshness window", "R10: self-check window", "HE-004-I01B3"),
+    ("negative-14-observation-namespace.uid", "observed namespace", "R10: snapshot comparison and self-check",
+     "HE-004-I01B3"),
+    ("negative-15-observation-projections.resourceQuota.projectionDigest", "observed identity or digest",
+     "R10: snapshot comparison and self-check", "HE-004-I01B3"),
+    ("negative-16-observation-projections.rbac.uid", "observed identity or digest",
+     "R10: snapshot comparison and self-check", "HE-004-I01B3"),
+    ("negative-17-observation-quota.used.configMaps", "used <= hard", "R10: self-check", "HE-004-I01B3"),
+    ("negative-18-observation-quota.hard.configMaps", "requested <= hard - used", "HE-008, profile-side", "-"),
+    ("negative-19-observation-quota.used.cpuMillis", "shape", "R10: self-check shape", "HE-004-I01B3"),
+    ("negative-20-observation-quota.hard.cpuMillis", "shape", "R10: self-check shape", "HE-004-I01B3"),
+    ("negative-21-observation-enforcement.policyGeneration", "enforcement proof mismatch", "R10: self-check",
+     "HE-004-I01B3"),
+    ("negative-22-observation-enforcement.hostPreflightDigest", "enforcement proof mismatch",
+     "R10: self-check, and the snapshot comparison", "HE-004-I01B3"),
+    ("negative-23-binding-scope.tenantId", "profile scope", "HE-008, profile-side", "-"),
+    ("negative-24-binding-profileDigest", "profile digest", "HE-008, profile-side", "-"),
+    ("negative-25-binding-namespace.uid", "namespace binding",
+     "R10: the snapshot comparison; HE-008 holds the profile-side half", "HE-004-I01B3"),
+    ("negative-26-binding-projections.serviceAccount.uid", "policy identity",
+     "R10: the snapshot comparison; HE-008 holds the profile-side half", "HE-004-I01B3"),
+    ("negative-27-binding-scope.namespace", "namespace binding", "R10: load-time check (status 13)", "HE-004-I01B2"),
+];
 
 fn parse(text: &str) -> Value {
     json::parse(text).expect("the vendored JSON parses")
@@ -167,6 +208,39 @@ fn the_vendored_files_are_edge_v9_s_and_the_case_counts_hold() {
         let path = texts(case, "path");
         assert!(path.len() == 1 && MEMBERS.contains(&path[0]), "{path:?}");
     }
+}
+
+#[test]
+fn the_pv_case_table_names_pv_s_negatives_6_to_27_each_once() {
+    // DESIGN-I01B rev 3 section 8.1: the labels are exactly PV's binding and observation negatives, in file order, each
+    // once; the request negatives (1-5, replayed above) are not in it.
+    let vectors = vectors();
+    let cases = member(&vectors, "negative").as_array().expect("the negatives are an array");
+    let labels: Vec<&str> = cases.iter().map(|case| text(case, "label")).collect();
+    assert_eq!(labels.len(), 27);
+    let table: Vec<&str> = PV_CASES.iter().map(|&(label, _, _, _)| label).collect();
+    assert_eq!(table, labels[5..]);
+    let mut once = table.clone();
+    once.sort_unstable();
+    once.dedup();
+    assert_eq!(once.len(), 22);
+    for (number, label) in table.iter().enumerate() {
+        assert!(label.starts_with(&format!("negative-{}-", number + 6)), "{label}");
+    }
+    for label in REQUEST_NEGATIVES {
+        assert!(!table.contains(&label), "{label}");
+    }
+    for case in &cases[5..] {
+        assert!(["observation", "binding"].contains(&text(case, "document")), "{}", text(case, "label"));
+    }
+    // Each row names its rule, its checker and its packet; none is replayed in HE-004-I01B1.
+    for (label, rule, checker, packet) in PV_CASES {
+        assert!(!rule.is_empty() && (checker.starts_with("R10: ") || checker.starts_with("HE-008")), "{label}");
+        assert!(["HE-004-I01B2", "HE-004-I01B3", "-"].contains(&packet), "{label}");
+        assert_eq!(packet == "-", checker.starts_with("HE-008"), "{label}");
+    }
+    let count = |packet: &str| PV_CASES.iter().filter(|row| row.3 == packet).count();
+    assert_eq!((count("HE-004-I01B2"), count("HE-004-I01B3"), count("-")), (1, 18, 3));
 }
 
 #[test]
