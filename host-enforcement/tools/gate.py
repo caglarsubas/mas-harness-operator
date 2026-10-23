@@ -156,7 +156,8 @@ deadline are literal pins with their citations, and the modules' refusal texts a
 R-B3-PIN pins the six guarded files not yet pinned (effect-gate's two socket files, the observer's config.rs,
 i01_request.rs, i01_service.rs and client.rs) whole, keeps i01_answer.rs absent, refuses a casefolded sibling of a
 guarded name and an inline module in place of a guarded one; and no use declaration of either crate aliases a socket
-module, re-exports through one or names a scope root alone (B3-1, G-I01B-6 (e)).
+module, re-exports through one, names a scope root alone or globs one outside a crate root (B3-1, G-I01B-6 (e); PR
+review round 1, R1-2). The casefold clause reads a directory listing, so its self-test runs on any file system (R1-4).
 
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
@@ -3719,6 +3720,17 @@ def check_i01b_contracts(base: Path) -> int:
     return len(I01B_EDGE_V10_ROWS)
 
 
+def casefold_siblings(directory: str, entries: list[str], names: set[str], rule: str) -> None:
+    """HE-004-I01B1 R-B3-PIN, I1D-10's casefold clause over one directory's listing (entry names, so the clause is
+    exercised on any file system; PR review round 1, R1-4): an entry whose casefold equals a guarded name's, other than
+    that name itself, refuses."""
+    folded = {name.casefold(): name for name in names}
+    for entry in sorted(entries):
+        name = folded.get(entry.casefold())
+        require(name is None or entry == name, "%s/%s casefolds to the guarded name %s (%s, I1D-10)"
+                % (directory, entry, name, rule))
+
+
 def check_i01b_guarded_pins(base: Path) -> int:
     """HE-004-I01B1 R-B3-PIN (DESIGN-I01B1 rev 2 section 1; the section review's I1D-3 and I1D-10), in
     check_observer_home_pins' form:
@@ -3747,12 +3759,8 @@ def check_i01b_guarded_pins(base: Path) -> int:
     for rel in guarded:
         by_directory.setdefault(posixpath.dirname(rel), set()).add(posixpath.basename(rel))
     for directory, names in sorted(by_directory.items()):
-        folded = {name.casefold(): name for name in names}
-        entries = sorted(entry.name for entry in (base / directory).iterdir()) if (base / directory).is_dir() else []
-        for entry in entries:
-            name = folded.get(entry.casefold())
-            require(name is None or entry == name, "%s/%s casefolds to the guarded name %s (%s, I1D-10)"
-                    % (directory, entry, name, rule))
+        entries = [entry.name for entry in (base / directory).iterdir()] if (base / directory).is_dir() else []
+        casefold_siblings(directory, entries, names, rule)
     codes = {}
     for rel, raw in observer_sources(base, (EFFECT_GATE_CRATE, OBSERVER_CRATE)):
         try:
@@ -3786,7 +3794,11 @@ def check_socket_module_aliases(base: Path) -> int:
       linux_net.rs `crate::linux_listen::I01Socket` and main.rs's `planeon_observer::linux_net::LinuxWire`);
     - a `pub` or `pub(..)` use whose path names a socket module refuses;
     - a use whose path is a scope root alone refuses (`use crate as ..`, `use crate::{self as ..}`, `use self as ..`,
-      `use super as ..`, and in main.rs `planeon_observer` itself); there are none at dd7422ed.
+      `use super as ..`, and in main.rs `planeon_observer` itself); there are none at dd7422ed;
+    - a glob of a scope root (`use crate::*;`, `pub use super::*;`, `use self::*;`, and in main.rs
+      `use planeon_observer::*;`), at any visibility, refuses everywhere but at the top level of a crate's lib.rs (PR
+      review round 1, R1-2): in any other module a pub glob of the crate root re-exports its pub socket modules under a
+      new path; there are none outside strict test blocks at dd7422ed.
     The alias route needs a use site in a socket file too, which the whole-file pins refuse from I01B1 on
     (R-B3-PIN); this rule is the tripwire beside them. The number of sources read."""
     rule = "socket-module aliases, G-I01B-6 (e)"
@@ -3800,8 +3812,10 @@ def check_socket_module_aliases(base: Path) -> int:
             for start, end in reversed(cfg_test_blocks(code)):
                 code = code[:start] + " " * (end - start) + code[end:]
             roots = SCOPE_ROOTS + (("planeon_observer",) if rel == OBSERVER_MAIN else ())
+            library_root = rel == "%s/src/lib.rs" % crate
             for declaration in USE_DECLARATION.finditer(code):
                 public = bool(PUB_PREFIX.search(code, 0, declaration.start()))
+                top_level = library_root and brace_depth(code, declaration.start()) == 0
                 try:
                     paths = use_paths(declaration.group(1))
                 except GateError:
@@ -3813,6 +3827,7 @@ def check_socket_module_aliases(base: Path) -> int:
                         head += 1
                     rest = target[head:]
                     require(rest, "%s imports or renames a scope root (%s)" % (rel, rule))
+                    require(rest != ("*",) or top_level, "%s globs a scope root outside its crate root (%s)" % (rel, rule))
                     require(not public or not any(segment in modules for segment in rest),
                             "%s re-exports a path through a socket module (%s)" % (rel, rule))
                     require(rest[0] not in modules or (len(rest) > 1 and rest[1] not in ("self", "*")),
@@ -5274,8 +5289,8 @@ def main() -> int:
             "module is declared once, in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"
             % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT)))
         say("socket-module aliases (HE-004-I01B1, B3-1, G-I01B-6 (e)): %d sources of %s and %s; no use declaration "
-            "targets a socket module (%s) itself, renamed or not, or globs one, no pub use names one, and none names a "
-            "scope root alone; item imports through a socket module pass"
+            "targets a socket module (%s) itself, renamed or not, or globs one, no pub use names one, none names a "
+            "scope root alone and none globs one outside a crate root; item imports through a socket module pass"
             % (check_socket_module_aliases(HE), EFFECT_GATE_CRATE, OBSERVER_CRATE,
                "; ".join("%s: %s" % (crate, ", ".join(modules)) for crate, modules in SOCKET_CRATE_MODULES.items())))
         say("observer I01B1 isolation (HE-004-I01B1, G-I01B-1, its I01B1 form): the modules present are %s; outside them "

@@ -7193,6 +7193,31 @@ class I01bGuardedPinTests(Tree):
                 (self.base / rel).unlink()
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
 
+    def test_the_casefold_clause_on_a_listing(self):
+        # PR review round 1, R1-4: the clause read over a directory listing (casefold_siblings, which the check calls with
+        # each guarded directory's entries), so its refusal runs on any file system, case-insensitive ones included.
+        rule = "guarded pin, R-B3-PIN"
+        guarded = list(gate.I01B_GUARDED_PINS) + list(gate.I01B_ABSENT) + [gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN]
+        names = {}
+        for rel in guarded:
+            names.setdefault(rel.rsplit("/", 1)[0], set()).add(rel.rsplit("/", 1)[1])
+        self.assertEqual(names, {"crates/effect-gate/src": {"linux_os.rs", "linux_net.rs"},
+                                 "crates/observer/src": {"config.rs", "i01_request.rs", "i01_service.rs", "client.rs",
+                                                         "i01_answer.rs", "linux_listen.rs", "linux_net.rs"}})
+        gate.casefold_siblings("crates/effect-gate/src", ["lib.rs", "linux_os.rs", "linux_net.rs", "peers.rs"],
+                               names["crates/effect-gate/src"], rule)
+        gate.casefold_siblings("crates/observer/src", ["client.rs", "config.rs", "i01_digest.rs", "observe.rs"],
+                               names["crates/observer/src"], rule)
+        for directory, entries, sibling in (("crates/effect-gate/src", ["linux_os.rs", "Linux_os.rs"], "Linux_os.rs"),
+                                            ("crates/effect-gate/src", ["LINUX_NET.RS"], "LINUX_NET.RS"),
+                                            ("crates/observer/src", ["I01_answer.rs"], "I01_answer.rs"),
+                                            ("crates/observer/src", ["config.rs", "Config.rs"], "Config.rs"),
+                                            ("crates/observer/src", ["Linux_Listen.rs"], "Linux_Listen.rs"),
+                                            ("crates/observer/src", ["CLIENT.rs", "client.rs"], "CLIENT.rs")):
+            with self.assertRaisesRegex(gate.GateError, "%s/%s casefolds to the guarded name .*%s"
+                                        % (re.escape(directory), re.escape(sibling), self.RULE)):
+                gate.casefold_siblings(directory, entries, names[directory], rule)
+
     def test_an_inline_module_in_place_of_a_guarded_one_refuses(self):
         for lib, old, new, message in (
                 (gate.OBSERVER_LIB, b"pub mod config;\n", b"pub mod config { }\n", "does not declare `pub mod config;`"),
@@ -7230,12 +7255,13 @@ ALIAS_TREE = {
     "crates/observer/src/i01_admission_render.rs": "use crate::i01_digest::digest;\npub fn render() {}\n",
     "crates/observer/src/i01_gate.rs": "pub fn gate() {}\n",
 }
-# The I1D-11 matrix: (alias spelling x placement x socket file) 9 x 2 x 4, X6-1..X6-4 (the alias with its use site in
-# the socket file) 4 x 2 x 4, and the four scope-root renames x 2 placements x 2 crates: 72 + 32 + 16 = 120 cases.
+# The I1D-11 matrix: (alias spelling x placement x socket file) 10 x 2 x 4, X6-1..X6-4 (the alias with its use site in
+# the socket file) 4 x 2 x 4, and the four scope-root renames x 2 placements x 2 crates: 80 + 32 + 16 = 128 cases (PR
+# review round 1, R1-7: the tenth spelling is the unrenamed module import).
 ALIAS_SPELLINGS = ("use crate::{m} as a;\n", "use crate::{m}::{{self as a}};\n", "use crate::{{{m}::{{self as a}}}};\n",
                    "use {m} as a;\n", "use self::{m} as a;\n", "pub(crate) use super::{m} as a;\n",
                    "mod inner {{\n    pub(crate) use super::{m} as a;\n}}\n", "pub use crate::{m}::Item;\n",
-                   "use crate::{m}::*;\n")
+                   "use crate::{m}::*;\n", "use crate::{m};\n")
 ALIAS_USE_SITES = ("pub fn leak(slot: &Slot) -> &crate::a::Conn {{ slot.conn() }}\n",
                    "pub fn leak(slot: &Slot) -> &super::a::Conn {{ slot.conn() }}\n",
                    "pub fn tcp(slot: &Slot) -> Option<&crate::a::TcpConn> {{ slot.tcp() }}\n",
@@ -7245,16 +7271,20 @@ ALIAS_FILES = ((gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs", gate.LI
                (gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs", "crates/effect-gate/src/linux_net.rs", "linux_net"),
                (gate.OBSERVER_LIB, "crates/observer/src/observe.rs", gate.OBSERVER_LINUX_NET, "linux_net"),
                (gate.OBSERVER_LIB, "crates/observer/src/observe.rs", gate.OBSERVER_LINUX_LISTEN, "linux_listen"))
-ALIAS_CASES = 120
+ALIAS_CASES = 128
+# PR review round 1, R1-2: scope-root globs, refused in every module but a crate's lib.rs top level.
+SCOPE_ROOT_GLOBS = ("use crate::*;\n", "pub use crate::*;\n", "pub(crate) use crate::*;\n", "use self::*;\n",
+                    "use super::*;\n", "pub use super::*;\n")
 
 
 class SocketModuleAliasTests(Tree):
     """HE-004-I01B1 B3-1, G-I01B-6 (e) (DESIGN-I01B1 rev 2 sections 2 and 6, I1D-1, I1D-2, I1D-11): the matrix of alias
-    declarations (nine spellings: a rename of the module, its trailing self braced and nested, the 2018 relative and
-    self:: forms, a pub(crate) super:: form, the same inside an inline module, a pub use of an item through it and a glob
-    through it), each in lib.rs and in another module of the crate, for each of the four socket files; X6-1..X6-4 with
-    their use sites; and the four scope-root renames in both crates: 120 cases, each refusing. The must-pass: the
-    fixture with I01B1's changes and today's three item imports (effect-gate linux_os.rs:39, observer linux_net.rs:35,
+    declarations (ten spellings: a rename of the module, its trailing self braced and nested, the 2018 relative and
+    self:: forms, a pub(crate) super:: form, the same inside an inline module, a pub use of an item through it, a glob
+    through it and the unrenamed import, R1-7), each in lib.rs and in another module of the crate, for each of the four
+    socket files; X6-1..X6-4 with their use sites; and the four scope-root renames in both crates: 128 cases, each
+    refusing. Scope-root globs (R1-2) refuse in every module but a crate's lib.rs top level. The must-pass: the fixture
+    with I01B1's changes and today's three item imports (effect-gate linux_os.rs:39, observer linux_net.rs:35,
     main.rs:63), and the real sources."""
 
     TREE = ALIAS_TREE
@@ -7289,6 +7319,31 @@ class SocketModuleAliasTests(Tree):
         self.assertEqual(cases, ALIAS_CASES)
         # A use site alone (X6-4 without the alias) is the pins' case, not this rule's.
         self.write(gate.LINUX_OS, self.TREE[gate.LINUX_OS] + ALIAS_USE_SITES[3].format())
+        self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
+
+    def test_scope_root_globs_refuse_outside_a_crate_root(self):
+        # PR review round 1, R1-2: in a module other than the crate root, a glob of a scope root (any visibility) refuses,
+        # in both crates; so does one inside an inline module of lib.rs, and main.rs's glob of the library's root.
+        refusals = 0
+        for lib, other in ((gate.EFFECT_GATE_LIB, "crates/effect-gate/src/peers.rs"),
+                           (gate.OBSERVER_LIB, "crates/observer/src/observe.rs")):
+            for glob in SCOPE_ROOT_GLOBS:
+                self.refused(gate.check_socket_module_aliases, other, self.TREE[other] + glob,
+                             "globs a scope root outside its crate root .*" + self.RULE)
+                refusals += 1
+            self.refused(gate.check_socket_module_aliases, lib, self.TREE[lib] + "mod inner {\n    pub use crate::*;\n}\n",
+                         "globs a scope root outside its crate root .*" + self.RULE)
+            refusals += 1
+            # At the top level of the crate root a glob of the root names nothing new, and passes.
+            self.write(lib, self.TREE[lib] + "pub use crate::*;\n")
+            self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
+            self.write(lib, self.TREE[lib])
+        self.refused(gate.check_socket_module_aliases, gate.OBSERVER_MAIN, self.TREE[gate.OBSERVER_MAIN]
+                     + "use planeon_observer::*;\n", "globs a scope root outside its crate root .*" + self.RULE)
+        refusals += 1
+        self.assertEqual(refusals, 2 * len(SCOPE_ROOT_GLOBS) + 3)
+        # A strict test block's glob of super (peers.rs's fixture) is blanked, and the fixture passes.
+        self.assertIn("use super::*;", self.TREE["crates/effect-gate/src/peers.rs"])
         self.assertEqual(gate.check_socket_module_aliases(self.base), len(self.TREE))
 
     def test_item_imports_pass_and_their_other_forms_refuse(self):

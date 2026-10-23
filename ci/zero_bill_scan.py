@@ -13,6 +13,9 @@ ROOT = Path(sys.argv[1] if len(sys.argv) == 2 else ".").resolve()
 errors: list[str] = []
 # Pinned upstream contract files whose own refusal rules name the service types the patterns below refuse (owner decision
 # Q-HE4B1-ZB (a), 2026-10-18): the admission-v3 policy refuses LoadBalancer and NodePort services, so its text names them.
+# Owner decision Q-I01B1-ZB, 2026-10-23 ("Two exact allowlist entries"): the I01 digest contract's vectors.json, which
+# carries that policy's rendered objects, and R10's i01_admission_render.rs, which renders the same policy text from the
+# sealed values. Any later edit of the render changes its bytes and must re-pin its entry here in the same packet.
 # Exactly these paths with exactly these bytes are exempt from those two patterns only; every other pattern still applies
 # to them, and a changed byte, or the same bytes at another path, fails as before.
 SERVICE_TYPE_PATTERNS = (r"(?i)LoadBalancer", r"(?i)NodePort")
@@ -21,6 +24,10 @@ CONTRACT_ALLOWLIST = {
         "1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741",
     "host-enforcement/contracts/admission-v3/vectors.json":
         "a3e2dc9818742ae2188e0e83cf91bb833be836115975b3fb23d5f280f6928cc1",
+    "host-enforcement/contracts/i01-digests-v1/vectors.json":
+        "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
+    "host-enforcement/crates/observer/src/i01_admission_render.rs":
+        "2e23e488b241cf28c5070174c87790bbdb8e22807b7800de3333148939fdabae",
 }
 
 

@@ -2455,12 +2455,11 @@ HE-004-I01B1 build GO and MON-I01B1-A (a) and MON-I01B1-B (a), recorded in the o
 `tools/w03/he004/OWNER_DECISIONS.md`). It vendors edge record v10's four rows (the I01 digest contract's definitions,
 vectors and README, and the proxy-contract vectors; 56 contracts) and re-pins VPO, and it adds the contract's port as
 three pure logic modules that nothing in `serve` reaches, three replays, and the I01B1 gate rules. The observer's
-reachable code is unchanged, and the build is expected to link none of the three modules (G-I01B-1's symbol check);
-whether each binary stays byte-identical to HE-004-I01A2's is recorded with the heavy checkpoint. The contract's
+reachable code is unchanged, and neither musl build links the three modules (G-I01B-1's symbol check). The contract's
 reference model `scripts/policy_observation_digests.py` (`01298fb5…`) and VPO (`3ac03636…`) at harness-onion `2043cc27`
 are pinned by digest in PROVENANCE and read as specification only, never imported or run; VPC is not re-pinned (its
 packet list changes with every packet, and the contract pins its helpers' behaviour by the helper vectors instead). Its
-rules are R167-R174.
+rules are R167-R175.
 
 ### Points taken from the pinned model (the contract's README and vectors are silent)
 
@@ -2484,8 +2483,9 @@ rules are R167-R174.
 | R170 | `i01_admission_render`, the A2 render (Q-I01B-15 (a)): admission v3's `a2_objects` (one policy per qualification kind, the guard, one Deny binding each, in the model's order, the sealed values entering only the namespace selector, the Service allocation rule and the Pod tolerations rule), `manifest_file_bytes` (a v1 List, canonical JSON through i05-protocol's encoder) and the directory's hash over that one file named `planeon-a2.json`, reusing `admission::manifest_directory_hash`. No file is read: the observer renders | DESIGN-I01B §2; README §4.1, §5.1 |
 | R171 | The replays. `observer_i01_digest_replay` (3 tests): the 16 helper vectors, the definitions pin and the 152 vectors with `i01_admission_render::render` handed in; the gate's 69 verdicts with the vectors' ms values as the ages (the replay's adapter checks the contract's capture data shape first; data of another shape, which R10's typed capture view cannot hold, is the key's malformed input, so G-20's three checks hold the adapter, not `i01_gate`); the 12 answer refusal lists and the complete I01 positive's 5 checks as the model composes them (P7), the comparison with the signed binding written in the test; 51 relations. Of the model's 320 checks, 318 are compared and 2 are refused earlier (R172). `observer_i01_render_replay` (4 tests): the render of admission v3's sealed values is the vendored `planeon-a2.json` byte for byte, with H01's and the pinned hash, and its items; each of the 9 `objects` vectors differs from it; the contract's 2 fence digests (P-UNIT, AF-01) and 3 `sealedObjects` documents (P-UNIT, AP-09, AP-11). `observer_i01_pv_replay` gains `PV_CASES`, PV's 22 binding and observation negatives as data (case, VPO rule, checker, packet), and a test holding its labels to negatives 6-27, each once; no row is replayed in I01B1 | DESIGN-I01B §2, §8.1; R-B1-13 (a); MON-I01B1-B (a) |
 | R172 | RB-17's lists refuse earlier (MON-I01B1-A (a)). RB-17 deletes a ClusterRole's name; B1's `Inputs::new` refuses the lists (`ItemShape`, ClusterRoles item 1) before either RBAC value is derived, so R10 never reaches the producer's "rbac: malformed metadata", which the vector pins for `rbac` and `rbacClosureDigest`. Both are refusals and nothing is derived. The replay asserts the earlier refusal for those 2 checks | MON-I01B1-A (a) |
-| R173 | Gate rules (`tools/gate.py`). G-I01B-2 (the four files' rows, PROVENANCE lines, mode and no embedding). G-I01B-1's I01B1 form: G-D2-5's construction, now one function over a module list (`module_isolation`, which G-D2-5 also calls with its own list and messages), over the three modules, with the symbol-table corroboration in G-D2-7's style (`check_i01b1_absent`). G-I01B-7: the `src/**/i01_*.rs` files are the five `I01_FILES_BUILT`, lib.rs declares exactly `OBSERVER_LIB_MODULES` (38: HE-004-I01A2's 35 and the three), each once and in file form, no other source declares a module, and the three take the logic and no-panic rules. G-I01B-8: `GATE_BOUND_MS` against `captureGate.boundMs` (the sum of its three parts), `CYCLE`, `SCRAPE_TO_SET` and `SET_BUDGET` read in place against those parts, the three literal pins with their citations, and the three modules' key-prefixed refusal texts exactly `refusalTexts`. R-B3-PIN: `check_i01b_guarded_pins` (R174). B3-1: `check_socket_module_aliases`, G-I01B-6 (e) as I1D-1 and I1D-2 state it: in every non-test source of effect-gate and the observer, a use path that is a socket module of its crate (renamed or not, its trailing `self` read as the module) or a glob through one refuses, a pub use naming one refuses, a use of a scope root alone refuses, and an item import passes (today's three: effect-gate `linux_os.rs:39`, observer `linux_net.rs:35`, `main.rs:63`). The new checks run right after `check_observer_home_pins`, each printing its count | DESIGN-I01B §6; DESIGN-I01B1 §1, §2, §4; I1D-1..I1D-5, I1D-10, I1D-11 |
-| R174 | R-B3-PIN in I01B1 (`I01B_GUARDED_PINS`): effect-gate's `linux_os.rs` (`88e70bf5…`) and `linux_net.rs` (`d452aa50…`) and the observer's `config.rs` (`bef5143c…`), `i01_request.rs` (`aee536e5…`), `i01_service.rs` (`b94f6daf…`) and `client.rs` (`2987e41d…`) are pinned whole at their `dd7422ed` bytes (each `cmp`-equal to `dd7422ed`, unchanged by I01B1); `linux_listen.rs` and `linux_net.rs` stay in `OBSERVER_HOME_PINS`, unchanged; `i01_answer.rs` has no directory entry (a file, a directory or a dangling symlink refuses). No entry of a guarded file's directory casefolds to a guarded name (pinned, absent or home-pinned) other than that name. Each guarded module is declared once, in file form, in its crate's lib.rs (`pub mod config;`, `pub mod i01_request;`, `pub mod i01_service;`, `pub mod client;`, `pub mod linux_listen;`, `pub mod linux_net;`; effect-gate's `pub mod linux_os;`, `pub mod linux_net;`), and no source of either crate holds an inline `mod <one of them> {` (I1D-3) | R-B3-PIN; DESIGN-I01B1 §1; I1D-3, I1D-10 |
+| R173 | Gate rules (`tools/gate.py`). G-I01B-2 (the four files' rows, PROVENANCE lines, mode and no embedding). G-I01B-1's I01B1 form: G-D2-5's construction, now one function over a module list (`module_isolation`, which G-D2-5 also calls with its own list and messages), over the three modules, with the symbol-table corroboration in G-D2-7's style (`check_i01b1_absent`). G-I01B-7: the `src/**/i01_*.rs` files are the five `I01_FILES_BUILT`, lib.rs declares exactly `OBSERVER_LIB_MODULES` (38: HE-004-I01A2's 35 and the three), each once and in file form, no other source declares a module, and the three take the logic and no-panic rules. G-I01B-8: `GATE_BOUND_MS` against `captureGate.boundMs` (the sum of its three parts), `CYCLE`, `SCRAPE_TO_SET` and `SET_BUDGET` read in place against those parts, the three literal pins with their citations, and the three modules' key-prefixed refusal texts exactly `refusalTexts`. R-B3-PIN: `check_i01b_guarded_pins` (R174). B3-1: `check_socket_module_aliases`, G-I01B-6 (e) as I1D-1 and I1D-2 state it: in every non-test source of effect-gate and the observer, a use path that is a socket module of its crate (renamed or not, its trailing `self` read as the module) or a glob through one refuses, a pub use naming one refuses, a use of a scope root alone refuses, a glob of a scope root refuses everywhere but at the top level of a crate's lib.rs (PR review round 1, R1-2), and an item import passes (today's three: effect-gate `linux_os.rs:39`, observer `linux_net.rs:35`, `main.rs:63`). The new checks run right after `check_observer_home_pins`, each printing its count | DESIGN-I01B §6; DESIGN-I01B1 §1, §2, §4; I1D-1..I1D-5, I1D-10, I1D-11 |
+| R174 | R-B3-PIN in I01B1 (`I01B_GUARDED_PINS`): effect-gate's `linux_os.rs` (`88e70bf5…`) and `linux_net.rs` (`d452aa50…`) and the observer's `config.rs` (`bef5143c…`), `i01_request.rs` (`aee536e5…`), `i01_service.rs` (`b94f6daf…`) and `client.rs` (`2987e41d…`) are pinned whole at their `dd7422ed` bytes (each `cmp`-equal to `dd7422ed`, unchanged by I01B1); `linux_listen.rs` and `linux_net.rs` stay in `OBSERVER_HOME_PINS`, unchanged; `i01_answer.rs` has no directory entry (a file, a directory or a dangling symlink refuses). No entry of a guarded file's directory casefolds to a guarded name (pinned, absent or home-pinned) other than that name (`casefold_siblings`, read over each directory's listing, so its self-test runs on any file system: PR review round 1, R1-4). Each guarded module is declared once, in file form, in its crate's lib.rs (`pub mod config;`, `pub mod i01_request;`, `pub mod i01_service;`, `pub mod client;`, `pub mod linux_listen;`, `pub mod linux_net;`; effect-gate's `pub mod linux_os;`, `pub mod linux_net;`), and no source of either crate holds an inline `mod <one of them> {` (I1D-3) | R-B3-PIN; DESIGN-I01B1 §1; I1D-3, I1D-10 |
+| R175 | The zero-bill allowlist (owner decision Q-I01B1-ZB, "Two exact allowlist entries"). `ci/zero_bill_scan.py`'s `CONTRACT_ALLOWLIST` gains, by exact path and sha256, `host-enforcement/contracts/i01-digests-v1/vectors.json` (`bd9f04bd…`, the vendored contract vectors, which carry the admission policy's rendered objects) and `host-enforcement/crates/observer/src/i01_admission_render.rs` (`2e23e488…`, the render, which writes the same rule text). Each is exempt from the scan's two service-type patterns only: every other pattern still applies, and a changed byte, or the same bytes at another path, fails as before. Any later edit of the render changes its bytes and must re-pin its entry in the same packet; the comment above the allowlist says so, beside Q-HE4B1-ZB's. It is the packet's one `ci/` change, and its transport and merge take the owner's approvals | Q-I01B1-ZB; MON-I01B1-FIX (iii) |
 
 ### Points settled at build (inside DESIGN-I01B's intent)
 
@@ -2510,7 +2510,14 @@ rules are R167-R174.
   complete positive.
 - **G-I01B-6 (e)'s spellings (R173):** a glob through a socket module refuses beside the module itself (an item import
   is a path that continues to an item, not `self` or `*`); a `pub(crate)` use is a `pub` use; in main.rs the library's
-  name is read as a scope root, so `use planeon_observer as po;` refuses. The I1D-11 matrix holds 120 cases.
+  name is read as a scope root, so `use planeon_observer as po;` refuses. A glob of a scope root refuses everywhere but
+  at the top level of a crate's lib.rs, beyond I1D-1's list of scope-root renames (PR review round 1, R1-2). The I1D-11
+  matrix holds 128 cases, the unrenamed module import among its spellings (R1-7).
+- **The BROKER lists' order (MON-I01B1-SPAN-2 (a); PR review round 1, R1-5):** BROKER_MEMBERS (i01_digest.rs:61) and
+  BROKER_DOCUMENT (:69) list the v4 record's 20 BROKER row members and the mutationBroker document's 14 members in
+  code-point order, the canonical encoding's order, not README section 4.6's (MON-I01B1-SPAN-2 (a)). Only membership
+  counts: the row is checked as a closed set, and the document's members are encoded with sorted keys, so the order
+  changes no refusal, no byte and no digest; CGROUP_MEMBERS keeps the README's order for the same reason.
 - **G-I01B-7 (b) in file form (R173):** both of I1D-3's readings are taken: lib.rs's declarations are read only in file
   form, and `check_i01b_guarded_pins` holds the eight guarded declarations to the line-anchored form.
 - **The casefold clause (R174):** it reads the pinned, the absent and the two home-pinned observer socket files' names,
@@ -2530,9 +2537,21 @@ i01_ sources and 38 lib.rs modules, the guarded pins, the 7 constants, the 90 re
 I01B1 isolation) and to the alias matrix's 120 cases; `gate.py` and `test_gate.py` parsed (361 test methods, no name
 bound twice; HE-004-I01A2's 335, part 1's 6 in `I01bContractFileTests` and 20 new, in `I01b1IsolationTests` 5,
 `I01b1SymbolTests` 1, `I01SourceRuleTests` 3, `I01bConstantTests` 3, `I01bGuardedPinTests` 5 and
-`SocketModuleAliasTests` 3, which is B3-11 (e)'s count); line widths and the privacy scan. The heavy checkpoint (`cargo
-test`, both musl builds, `gate.py`, its self-test, the span check and the sim) is the author's, on the lane monitor's
-word, and its results are recorded here before the PR review.
+`SocketModuleAliasTests` 3); line widths and the privacy scan.
+
+The heavy checkpoint, on the lane monitor's word (Q-I01B1-RERUN), at `99c014ca`: `cargo test` 737 passed, 0 failed, in
+112 binaries, with only the vendored ring warnings; the gate's self-test, 361 tests, OK; both musl release builds;
+`he-gate: passed`, with 56 contracts and no symbol of the three I01B1 modules among planeon-observer's 2740 (x86_64) and
+2822 (aarch64) symbols; the span check, 0 shared spans outside contract text and 207 in contract text. The packet commit
+`6d579782` changes only the YAML. The fix for PR review round 1 (MON-I01B1-FIX) adds two self-tests,
+`test_the_casefold_clause_on_a_listing` and `test_scope_root_globs_refuse_outside_a_crate_root` (363 in all, B3-11 (e)'s
+count), grows the I1D-11 matrix to 128 cases and adds R175's allowlist entries. The sim and zero-bill evidence of the
+final head is recorded in the PR body.
+
+The span check's limits (PR review round 1, R1-3): three of its eight baselines are byte-identical to vendored contract
+files (the digest contract's README.md and definitions.json, and admission v3's README.md), so every span they share is
+contract text and they can never report one; its 0 is meaningful against VPO, the reference model, RD,
+`admission_semantics_v3.py` and VPC. It reads only `host-enforcement/`, so `task-packets/` is not scanned.
 
 ### Code and audit
 
@@ -2540,8 +2559,9 @@ word, and its results are recorded here before the PR review.
   lines; `crates/observer/tests/observer_i01_digest_replay.rs` and `observer_i01_render_replay.rs` (new) and
   `observer_i01_pv_replay.rs` (the PV table); `contracts/i01-digests-v1/` and
   `contracts/i01-v1/proxy-contract-vectors.json` with PROVENANCE's section; `tools/gate.py` and `tools/test_gate.py`
-  (R173, R174); this section. No other source under `crates/`, no guarded file, no manifest or lock, no `vendor/`,
-  `licenses/` or `ci/` change.
+  (R173, R174); `ci/zero_bill_scan.py`'s `CONTRACT_ALLOWLIST` and the comment above it (R175); the packet YAML; this
+  section. No other source under `crates/`, no guarded file, no manifest or lock, no `vendor/` or `licenses/` change,
+  and no other `ci/` change.
 
 ### Stated residuals
 
@@ -2605,6 +2625,9 @@ word, and its results are recorded here before the PR review.
 - **The other B3 rules** bind HE-004-I01B2 (B3-2, B3-3, B3-8, B3-9 (a), B3-11 (a) and (c)) and HE-004-I01B3 (B3-4, B3-5,
   B3-6, B3-7, B3-9 (b) and (c), B3-10, B3-11 (b) and (d)), each with round 3's `requiredChange` text as its binding
   wording (DESIGN-I01B1 section 2).
+- **PR review round 1, R1-6** (`reviews/pr-review-I01B1-round1.json`, `cd8c8e9b…`), carried to HE-004-I01B3: its design
+  section requires the replay to drive these 12 answer lists and the complete positive through `i01_answer` itself, not
+  through the test's composition (R171).
 - **Not here:** SR-1, the capture.rs entry and the SERVER-slot statement belong to HE-004-I01B3; the cfg(test)
   correction belongs to HE-004-I01B2.
 - **I01B2, I01B3, HE-008, T04:** unchanged from DESIGN-I01B sections 3, 4, 5 and 8.
