@@ -1,6 +1,8 @@
-//! HE-004-I01B1, its first part (DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; owner decision Q-HE4I1-2 and the
-//! monitor's Q-I01B-26 (a)): the I01 digest contract's vectors (`contracts/i01-digests-v1/vectors.json`, edge record
-//! v10's row 70) replayed against `i01_digest`, each vector's own expectations compared one by one.
+//! HE-004-I01B1 (DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; owner decision Q-HE4I1-2 and the monitor's
+//! Q-I01B-26 (a), MON-I01B1-A (a) and MON-I01B1-B (a)): the I01 digest contract's vectors
+//! (`contracts/i01-digests-v1/vectors.json`, edge record v10's row 70) replayed against `i01_digest`, with
+//! `i01_admission_render`'s render handed in and `i01_gate`'s capture gate, each vector's own expectations compared one
+//! by one.
 //!
 //! - The four vendored files are edge record v10's rows 69-72 (each sha256 and size). `definitions.json` is the
 //!   contract the vectors pin (their `contract.canonicalSha256`), and `i01_digest`'s refusal texts are its
@@ -10,30 +12,37 @@
 //!   lists, each list as the apiserver serves it under its closed-set request.
 //! - Compared: every projection's digest and, where the vector pins them, its identity, document, canonical bytes and
 //!   resourceVersion, or its refusal text; every enforcement digest and its pinned document, or its refusal; every
-//!   digest relation (`same`, `differs`) between two compared values; the definitions pin.
-//! - Deferred to HE-004-I01B1's second part, each counted and asserted here: what needs the A2 render
-//!   (`admissionPolicy` and `admissionFenceDigest` once their sealed values pass: the render handed in records that it
-//!   was asked and renders nothing), the capture gate verdicts (69, with the vectors' ms values as the ages), the
-//!   answer refusal lists (12), the relations over a deferred value (5) and the complete I01 positive (5 checks).
+//!   digest relation (`same`, `differs`) between two compared values; the definitions pin. The A2 render is
+//!   `i01_admission_render::render`, handed in as `i01_digest`'s render argument (MON-I01B1-B (a)).
+//! - The capture gate's verdicts (69): the vector's capture data as `i01_gate`'s plain data, the latest completed set
+//!   with the vectors' ms values as the ages (a negative monotonic age is `scheduled_after_now`). R10's capture view is
+//!   typed, so capture data of another shape (the contract's malformed capture data) has no R10 form: the replay's
+//!   adapter checks the model's data shape and refuses such data as the key's malformed input before the gate.
+//! - The answer refusal lists (12) and the complete I01 positive (5 checks), as the model's `observed` and
+//!   `check_observation_digests` compose them: every value derived with the render, the three gated values gated at
+//!   the answer, each compared with the signed binding (the projection's identity without its resourceVersion, the
+//!   digest with `enforcementPins`), the texts once each, in key order. The comparison is the test's, the model's
+//!   composition over the port's values; HE-004-I01B3's answer logic is not built here.
 //! - One vector's lists never reach a digest: RB-17 deletes a ClusterRole's name, and B1's `Inputs::new` refuses the
 //!   lists (ItemShape, ClusterRoles item 1) before either RBAC value is derived. The vector pins the producer's text,
 //!   "rbac: malformed metadata", which the observer cannot reach; the replay asserts the earlier refusal for both of
-//!   its checks.
+//!   its checks (MON-I01B1-A (a), R10-defined behaviour recorded in MODEL_DEFINED).
 //!
 //! Of the model's 320 checks (16 helper checks, the definitions pin, 120 projection, 46 enforcement, 69 gate, 12 answer
-//! and 51 relation checks, and the complete positive's 5), 208 are compared here, 110 are deferred and 2 are refused
-//! earlier by B1's inputs.
+//! and 51 relation checks, and the complete positive's 5), 318 are compared here and 2 are refused earlier by B1's
+//! inputs.
 
 mod b1_support;
 
-use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use b1_support::apply;
 use i05_protocol::json::{self, JStr, Object, Value};
 use i05_protocol::sha256;
-use planeon_observer::i01_digest::{self, DigestKey, DigestSnapshot, EnforcementValue, ProjectionValue, Rendered,
-                                   SealedAdmission, B1_MALFORMED, CLOSURE_VERSION, SCHEMA_VERSION};
+use planeon_observer::i01_admission_render;
+use planeon_observer::i01_digest::{self, DigestKey, DigestSnapshot, EnforcementValue, ProjectionValue, B1_MALFORMED,
+                                   CLOSURE_VERSION, SCHEMA_VERSION};
+use planeon_observer::i01_gate::{self, LatestSet};
 use planeon_observer::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use planeon_observer::snapshot::Closure;
 
@@ -54,8 +63,16 @@ const ROWS: [(&str, &[u8], &str, usize); 4] = [
 /// The design's counts (DESIGN-I01B rev 3 section 1): 152 vectors and 16 helper vectors.
 const VECTOR_COUNT: usize = 152;
 const HELPER_COUNT: usize = 16;
-/// The complete I01 positive's checks (the model's `_check_complete`), all deferred.
+/// The complete I01 positive's checks (the model's `_check_complete`): the answer refuses nothing, the observed
+/// projections, the observed enforcement, `profileDigest`, and `bindingDigest` with the profile's digests and
+/// references.
 const COMPLETE_CHECKS: usize = 5;
+/// The capture verdicts' data shape (`definitions.json` `captureGate.dataShape`), each member list sorted, and the
+/// largest count it admits (2^53 - 1).
+const CAPTURE_MEMBERS: [&str; 2] = ["answer", "sets"];
+const SET_MEMBERS: [&str; 4] = ["completed", "scheduledMonotonicMs", "slots", "startedWallMs"];
+const ANSWER_MEMBERS: [&str; 2] = ["monotonicMs", "wallMs"];
+const MAX_COUNT: i64 = (1 << 53) - 1;
 /// The contract's eleven snapshot lists and B1's closed-set entry for each.
 const LISTS: [(&str, Resource); 11] = [
     ("namespaces", Resource::Namespaces),
@@ -265,17 +282,181 @@ fn compare_enforcement(at: &str, want: &Value, outcome: Result<EnforcementValue,
     Some(value.digest)
 }
 
-/// The replay's counts: the checks compared, those deferred to the second part, and those B1's inputs refuse earlier.
+/// A snapshot's values as `i01_digest` reads them, over B1's checked lists.
+fn view<'a>(lists: &'a Inputs, snapshot: &'a Value) -> DigestSnapshot<'a> {
+    DigestSnapshot {
+        inputs: lists,
+        resource_version: snapshot.get("resourceVersion"),
+        configuration: snapshot.get("configuration"),
+        adm4_loaded_hash: snapshot.get("adm4LoadedHash"),
+        record: snapshot.get("record"),
+    }
+}
+
+/// The latest completed capture set as `i01_gate`'s plain data, owned.
+struct Latest {
+    slots: Vec<(String, bool)>,
+    scheduled_after_now: bool,
+    mono_age_ms: u64,
+    wall_age_ms: i64,
+}
+
+/// Whether a value is an object holding exactly these member names (sorted).
+fn closed(value: &Value, members: &[&str]) -> bool {
+    value.as_object().is_some_and(|object| {
+        let mut held: Vec<&[u8]> = object.iter().map(|(name, _)| name.as_bytes()).collect();
+        held.sort_unstable();
+        held == members.iter().map(|member| member.as_bytes()).collect::<Vec<&[u8]>>()
+    })
+}
+
+/// The data shape's count: an integer in 0..2^53 - 1.
+fn count(value: Option<&Value>) -> Option<i64> {
+    value.and_then(Value::as_int).and_then(|int| int.to_i64()).filter(|number| (0..=MAX_COUNT).contains(number))
+}
+
+/// The vector's capture verdicts as the gate's plain data (the contract's `captureGate.dataShape`, the model's
+/// `_capture`): `None` for data of another shape; otherwise the latest completed set (the last entry whose `completed`
+/// is true), if any, with each slot taken when it is `TAKEN`, and its two ages at the answer from the vectors' ms
+/// values (the answer's monotonic reading minus the set's own scheduled start, `scheduled_after_now` when that is
+/// negative; the answer's wall reading minus the set's start).
+fn latest_set(capture: &Value) -> Option<Option<Latest>> {
+    if !closed(capture, &CAPTURE_MEMBERS) {
+        return None;
+    }
+    let sets = capture.get("sets").and_then(Value::as_array)?;
+    for set in sets {
+        let slots = set.get("slots").and_then(Value::as_object);
+        let shaped = closed(set, &SET_MEMBERS)
+            && count(set.get("scheduledMonotonicMs")).is_some()
+            && count(set.get("startedWallMs")).is_some()
+            && set.get("completed").and_then(Value::as_bool).is_some()
+            && slots.is_some_and(|slots| slots.iter().all(|(_, state)| matches!(state, Value::Str(_))));
+        if !shaped {
+            return None;
+        }
+    }
+    let answer = capture.get("answer").filter(|answer| closed(answer, &ANSWER_MEMBERS))?;
+    let (monotonic, wall) = (count(answer.get("monotonicMs"))?, count(answer.get("wallMs"))?);
+    let Some(latest) = sets.iter().rev().find(|set| set.get("completed").and_then(Value::as_bool) == Some(true)) else {
+        return Some(None);
+    };
+    let slots = latest.get("slots").and_then(Value::as_object)?;
+    let mono = monotonic - count(latest.get("scheduledMonotonicMs"))?;
+    Some(Some(Latest {
+        // A slot name without a text form cannot be one of R10's slot names, so it is left out (never taken).
+        slots: slots
+            .iter()
+            .filter_map(|(name, state)| Some((name.as_str()?.to_string(), state.as_str() == Some("TAKEN"))))
+            .collect(),
+        scheduled_after_now: mono < 0,
+        mono_age_ms: u64::try_from(mono).unwrap_or(0),
+        wall_age_ms: wall - count(latest.get("startedWallMs"))?,
+    }))
+}
+
+/// The capture gate for one gated value at the vector's answer: the capture data as plain data, then `i01_gate`
+/// (capture data of another shape is the key's malformed input, the adapter's refusal).
+fn gate(key: DigestKey, capture: &Value, record: &Value) -> Result<(), &'static str> {
+    let latest = latest_set(capture).ok_or(key.malformed())?;
+    let set = latest.as_ref().map(|data| LatestSet {
+        slots: &data.slots,
+        scheduled_after_now: data.scheduled_after_now,
+        mono_age_ms: data.mono_age_ms,
+        wall_age_ms: data.wall_age_ms,
+    });
+    i01_gate::capture_gate(key, set.as_ref(), record)
+}
+
+/// Every value of one answer (the model's `observed`): each projection and digest derived at the snapshot, the A2
+/// render handed in, and each of the three gated values gated at the answer, or its first refusal.
+#[allow(clippy::type_complexity)]
+fn observed(view: &DigestSnapshot<'_>, binding: &Value, capture: &Value, closure: &Closure)
+            -> (Vec<(DigestKey, Result<ProjectionValue, &'static str>)>,
+                Vec<(DigestKey, Result<String, &'static str>)>) {
+    let null = Value::Null;
+    let record = view.record.unwrap_or(&null);
+    let projections = DigestKey::POLICIES
+        .into_iter()
+        .map(|key| {
+            let outcome = i01_digest::projection(key, view, binding, &i01_admission_render::render).and_then(|value| {
+                if DigestKey::GATED.contains(&key) {
+                    gate(key, capture, record)?;
+                }
+                Ok(value)
+            });
+            (key, outcome)
+        })
+        .collect();
+    let digests = DigestKey::DIGESTS
+        .into_iter()
+        .map(|key| {
+            let outcome = i01_digest::enforcement(key, view, closure, &i01_admission_render::render).and_then(|value| {
+                if DigestKey::GATED.contains(&key) {
+                    gate(key, capture, record)?;
+                }
+                Ok(value.digest)
+            });
+            (key, outcome)
+        })
+        .collect();
+    (projections, digests)
+}
+
+/// The answer's refusal list (the model's `check_observation_digests`): each value's refusal, or "<key>: differs from
+/// the signed value" when its identity (without resourceVersion) or digest is not the signed binding's (`projections`,
+/// `enforcementPins`), each text once, in key order.
+fn check_observation(view: &DigestSnapshot<'_>, binding: &Value, capture: &Value, closure: &Closure)
+                     -> Vec<&'static str> {
+    let (projections, digests) = observed(view, binding, capture, closure);
+    let signed = binding.get("projections").and_then(Value::as_object);
+    let pins = binding.get("enforcementPins").and_then(Value::as_object);
+    let mut errors: Vec<&'static str> = Vec::new();
+    let mut add = |text: &'static str| {
+        if !errors.contains(&text) {
+            errors.push(text);
+        }
+    };
+    for (key, outcome) in &projections {
+        match outcome {
+            Err(refusal) => add(*refusal),
+            Ok(value) => {
+                let expected = signed.and_then(|signed| signed.get(key.name()));
+                if !expected.is_some_and(|expected| json::py_eq(&value.identity, expected)) {
+                    add(key.differs());
+                }
+            }
+        }
+    }
+    for (key, outcome) in &digests {
+        match outcome {
+            Err(refusal) => add(*refusal),
+            Ok(digest) => {
+                let pinned = pins.and_then(|pins| pins.get(key.name()));
+                if !pinned.is_some_and(|pinned| pinned.as_str() == Some(digest.as_str())) {
+                    add(key.differs());
+                }
+            }
+        }
+    }
+    errors
+}
+
+/// A refusal as the model's `observed` writes it.
+fn refusal_value(text: &str) -> Value {
+    let mut members = Object::new();
+    members.insert(JStr::new("refusal"), Value::str(text));
+    Value::Object(members)
+}
+
+/// The replay's counts: the checks compared, and those B1's inputs refuse earlier.
 #[derive(Debug, Default)]
 struct Tally {
     projections: usize,
     enforcements: usize,
     relations: usize,
-    render_projections: usize,
-    render_enforcements: usize,
     gates: usize,
     answers: usize,
-    deferred_relations: usize,
     b1_inputs: usize,
 }
 
@@ -342,15 +523,9 @@ fn every_contract_vector_replays() {
     let fixtures = member(&vectors, "fixtures");
     assert_eq!(names(fixtures), ["bindings", "captures", "record", "snapshots"]);
     let closure = Closure::embedded().expect("the embedded closure reads");
-    // The A2 render is the second part's: asked, it records that and renders nothing, and the value is deferred.
-    let asked = Cell::new(false);
-    let render = |_: &SealedAdmission| -> Option<Rendered> {
-        asked.set(true);
-        None
-    };
     let mut tally = Tally::default();
     let mut digests: BTreeMap<(String, String), String> = BTreeMap::new();
-    let mut pending: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut refused_earlier: BTreeSet<(String, String)> = BTreeSet::new();
     let rows = array(&vectors, "vectors");
     assert_eq!(rows.len(), VECTOR_COUNT);
     for row in rows {
@@ -364,48 +539,32 @@ fn every_contract_vector_replays() {
         let inputs = combined(fixtures, row);
         let snapshot = member(&inputs, "snapshot");
         let binding = member(&inputs, "binding");
+        let capture = member(&inputs, "capture");
         let projections = keyed(expect, "projections");
         let enforcements = keyed(expect, "enforcement");
-        match Inputs::new(list_inputs(member(snapshot, "lists"))) {
+        let lists = Inputs::new(list_inputs(member(snapshot, "lists")));
+        match &lists {
             Err(error) => {
-                // B1's inputs refuse the lists before any digest is derived.
-                assert_eq!((id, error), ("RB-17", InputError::ItemShape(Resource::ClusterRoles, 1)), "vector {id}");
+                // B1's inputs refuse the lists before any digest is derived (MON-I01B1-A (a)).
+                assert_eq!((id, error), ("RB-17", &InputError::ItemShape(Resource::ClusterRoles, 1)), "vector {id}");
                 for (name, key, want) in projections.iter().chain(enforcements.iter()) {
                     assert!(matches!(key, DigestKey::Rbac | DigestKey::RbacClosureDigest), "vector {id}: {name}");
                     compare_refusal(&format!("vector {id} {name}"), want, "rbac: malformed metadata");
-                    pending.insert((id.to_string(), name.to_string()));
+                    refused_earlier.insert((id.to_string(), name.to_string()));
                     tally.b1_inputs += 1;
                 }
             }
             Ok(lists) => {
-                let view = DigestSnapshot {
-                    inputs: &lists,
-                    resource_version: snapshot.get("resourceVersion"),
-                    configuration: snapshot.get("configuration"),
-                    adm4_loaded_hash: snapshot.get("adm4LoadedHash"),
-                    record: snapshot.get("record"),
-                };
+                let digest_view = view(lists, snapshot);
                 for (name, key, want) in &projections {
-                    asked.set(false);
-                    let outcome = i01_digest::projection(*key, &view, binding, &render);
-                    if asked.get() {
-                        pending.insert((id.to_string(), name.to_string()));
-                        tally.render_projections += 1;
-                        continue;
-                    }
+                    let outcome = i01_digest::projection(*key, &digest_view, binding, &i01_admission_render::render);
                     if let Some(digest) = compare_projection(&format!("vector {id} {name}"), want, outcome) {
                         digests.insert((id.to_string(), name.to_string()), digest);
                     }
                     tally.projections += 1;
                 }
                 for (name, key, want) in &enforcements {
-                    asked.set(false);
-                    let outcome = i01_digest::enforcement(*key, &view, &closure, &render);
-                    if asked.get() {
-                        pending.insert((id.to_string(), name.to_string()));
-                        tally.render_enforcements += 1;
-                        continue;
-                    }
+                    let outcome = i01_digest::enforcement(*key, &digest_view, &closure, &i01_admission_render::render);
                     if let Some(digest) = compare_enforcement(&format!("vector {id} {name}"), want, outcome) {
                         digests.insert((id.to_string(), name.to_string()), digest);
                     }
@@ -413,16 +572,27 @@ fn every_contract_vector_replays() {
                 }
             }
         }
-        // The capture gate's verdicts and the answers are the second part's: each counted, its form checked.
+        // The capture gate's verdicts, with the vector's capture data and the snapshot's record.
+        let null = Value::Null;
+        let record = snapshot.get("record").unwrap_or(&null);
         for (name, key, want) in keyed(expect, "gates") {
             assert!(DigestKey::GATED.contains(&key), "vector {id}: {name} is not a gated value");
-            assert!(want.is_null() || want.as_str().is_some_and(|refusal| refusal.starts_with(name)),
-                    "vector {id}: gate {name}");
+            match gate(key, capture, record) {
+                Ok(()) => assert!(want.is_null(), "vector {id}: gate {name} passes, the vector refuses with {want:?}"),
+                Err(refusal) => assert_eq!(want.as_str(), Some(refusal), "vector {id}: gate {name}"),
+            }
             tally.gates += 1;
         }
+        // The answer's refusal list: every value derived, gated and compared with the signed binding.
         if let Some(answer) = expect.get("observation") {
-            assert!(answer.as_array().is_some_and(|refusals| refusals.iter().all(|item| item.as_str().is_some())),
-                    "vector {id}: an answer's refusal list");
+            let Ok(lists) = &lists else {
+                panic!("vector {id}: an answer over lists B1 refuses");
+            };
+            let want: Vec<&str> =
+                array(expect, "observation").iter().map(|item| item.as_str().expect("a text")).collect();
+            assert!(answer.as_array().is_some());
+            let got = check_observation(&view(lists, snapshot), binding, capture, &closure);
+            assert_eq!(got, want, "vector {id}: answer");
             tally.answers += 1;
         }
         for relation in ["same", "differs"] {
@@ -430,35 +600,104 @@ fn every_contract_vector_replays() {
                 let other = other.as_str().expect("a vector id");
                 let here = (id.to_string(), name.to_string());
                 let there = (other.to_string(), name.to_string());
+                assert!(!refused_earlier.contains(&here) && !refused_earlier.contains(&there),
+                        "vector {id}: {relation} {name} as {other} over a value B1's inputs refuse");
                 match (digests.get(&here), digests.get(&there)) {
                     (Some(ours), Some(theirs)) => {
                         assert_eq!(ours == theirs, relation == "same", "vector {id}: {relation} {name} as {other}");
                         tally.relations += 1;
                     }
-                    _ => {
-                        assert!(pending.contains(&here) || pending.contains(&there),
-                                "vector {id}: {relation} {name} as {other} has no value to compare");
-                        tally.deferred_relations += 1;
-                    }
+                    _ => panic!("vector {id}: {relation} {name} as {other} has no value to compare"),
                 }
             }
         }
     }
-    // The complete I01 positive (the gate, the render and the answer together) is the second part's.
-    let complete = member(&vectors, "complete");
-    assert_eq!(names(complete), COMPLETE_MEMBERS, "the closed complete positive");
-    assert_eq!((text(complete, "snapshot"), text(complete, "capture")), ("closure", "passing"));
     assert_eq!(ids.len(), HELPER_COUNT + VECTOR_COUNT);
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "unique vector ids");
-    // The counts: 105 of 120 projection checks, 40 of 46 enforcement checks and 46 of 51 relations compared.
-    assert_eq!((tally.projections, tally.enforcements, tally.relations), (105, 40, 46), "{tally:?}");
-    let deferred_counts =
-        (tally.render_projections, tally.render_enforcements, tally.gates, tally.answers, tally.deferred_relations);
-    assert_eq!(deferred_counts, (14, 5, 69, 12, 5), "{tally:?}");
+    let complete = replay_complete(&vectors, &closure);
+    // The counts: 119 of 120 projection checks and 45 of 46 enforcement checks (RB-17's two refused earlier), every
+    // gate, answer and relation check, and the complete positive's.
+    assert_eq!((tally.projections, tally.enforcements, tally.relations), (119, 45, 51), "{tally:?}");
+    assert_eq!((tally.gates, tally.answers, complete), (69, 12, COMPLETE_CHECKS), "{tally:?}");
     assert_eq!(tally.b1_inputs, 2, "{tally:?}");
-    let compared = HELPER_COUNT + 1 + tally.projections + tally.enforcements + tally.relations;
-    let deferred = tally.render_projections + tally.render_enforcements + tally.gates + tally.answers
-        + tally.deferred_relations + COMPLETE_CHECKS;
-    assert_eq!((compared, deferred, tally.b1_inputs), (208, 110, 2));
-    assert_eq!(compared + deferred + tally.b1_inputs, 320);
+    let compared = HELPER_COUNT + 1 + tally.projections + tally.enforcements + tally.gates + tally.answers
+        + tally.relations + complete;
+    assert_eq!((compared, tally.b1_inputs), (318, 2));
+    assert_eq!(compared + tally.b1_inputs, 320);
+}
+
+/// The complete I01 positive (the model's `_check_complete`): PV's binding, request and observation and PPV's profile,
+/// with the values the model derives from the `closure` snapshot, the record and the passing capture. The answer over
+/// the fixture refuses nothing; its observed projections (each identity with its resourceVersion) and enforcement
+/// (each digest, with `policyGeneration` the observation's generation) are the observation's; `profileDigest` is the
+/// profile's digest; and `bindingDigest`, the profile's seven policy digests and its three preexisting references
+/// agree with the binding. The number of checks, the model's count.
+fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
+    let complete = member(vectors, "complete");
+    assert_eq!(names(complete), COMPLETE_MEMBERS, "the closed complete positive");
+    assert_eq!((text(complete, "snapshot"), text(complete, "capture")), ("closure", "passing"));
+    let fixtures = member(vectors, "fixtures");
+    let mut snapshot = member(member(fixtures, "snapshots"), text(complete, "snapshot")).clone();
+    match &mut snapshot {
+        Value::Object(members) => members.insert(JStr::new("record"), member(fixtures, "record").clone()),
+        _ => panic!("a snapshot fixture is an object"),
+    }
+    let capture = member(member(fixtures, "captures"), text(complete, "capture"));
+    let (binding, request) = (member(complete, "binding"), member(complete, "request"));
+    let (observation, profile) = (member(complete, "observation"), member(complete, "profile"));
+    let lists = Inputs::new(list_inputs(member(&snapshot, "lists"))).expect("the closure snapshot's lists");
+    let digest_view = view(&lists, &snapshot);
+    // 1. The answer refuses nothing.
+    let answer = check_observation(&digest_view, binding, capture, closure);
+    assert_eq!(answer, Vec::<&str>::new(), "complete positive: the answer");
+    // 2 and 3. The observed values are the observation's.
+    let (projections, enforcement) = observed(&digest_view, binding, capture, closure);
+    let mut observed_projections = Object::new();
+    for (key, outcome) in projections {
+        let value = match outcome {
+            Ok(value) => {
+                let mut identity = value.identity.as_object().cloned().expect("an identity object");
+                identity.insert(JStr::new("resourceVersion"), value.resource_version.clone());
+                Value::Object(identity)
+            }
+            Err(refusal) => refusal_value(refusal),
+        };
+        observed_projections.insert(JStr::new(key.name()), value);
+    }
+    assert!(json::py_eq(&Value::Object(observed_projections), member(observation, "projections")),
+            "complete positive: observed projections");
+    let mut observed_enforcement = Object::new();
+    for (key, outcome) in enforcement {
+        observed_enforcement.insert(JStr::new(key.name()), match outcome {
+            Ok(digest) => Value::str(&digest),
+            Err(refusal) => refusal_value(refusal),
+        });
+    }
+    observed_enforcement.insert(JStr::new("policyGeneration"), member(observation, "generation").clone());
+    assert!(json::py_eq(&Value::Object(observed_enforcement), member(observation, "enforcement")),
+            "complete positive: observed enforcement");
+    // 4. The binding's profileDigest is the profile's digest.
+    let digest_of = |value: &Value| sha256::prefixed(&json::canonical(value).expect("canonical bytes"));
+    assert_eq!(text(binding, "profileDigest"), digest_of(profile), "complete positive: profileDigest");
+    // 5. bindingDigest, the profile's policy digests and its preexisting references agree with the binding.
+    let bound = digest_of(binding);
+    assert_eq!((text(request, "bindingDigest"), text(observation, "bindingDigest")), (bound.as_str(), bound.as_str()),
+               "complete positive: bindingDigest");
+    let signed = member(binding, "projections");
+    let policy = member(profile, "policy");
+    for key in DigestKey::POLICIES {
+        assert_eq!(text(policy, &format!("{}Digest", key.name())), text(member(signed, key.name()), "projectionDigest"),
+                   "complete positive: profile digest {}", key.name());
+    }
+    let references = array(member(profile, "capacityEntries"), "preexistingResourceRefs");
+    for (key, kind) in [(DigestKey::ResourceQuota, "ResourceQuota"), (DigestKey::LimitRange, "LimitRange"),
+                        (DigestKey::ServiceAccount, "ServiceAccount")] {
+        let found: Vec<&Value> = references.iter().filter(|reference| text(reference, "kind") == kind).collect();
+        let entry = member(signed, key.name());
+        assert!(found.len() == 1
+                && text(found[0], "observedDigest") == text(entry, "projectionDigest")
+                && text(found[0], "uid") == text(entry, "uid"),
+                "complete positive: reference {}", key.name());
+    }
+    COMPLETE_CHECKS
 }
