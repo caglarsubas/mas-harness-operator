@@ -227,7 +227,10 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # edge record v8's two I06 v4 rows (harness-onion MET-ENFORCE-039, the backend profile v4's criteria and vectors), read
 # by the tests and by the role pin's constants check, 50. HE-004-I01A2, HE-004-I01a's unit U7 (DESIGN-I01A sections 3 and
 # 7, Q-HE4I1-10 (a), Q-I01A-1): edge record v9's two rows (harness-onion MET-ENFORCE-040, the I01 wire's channel schema
-# and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52.
+# and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52. HE-004-I01B1 (DESIGN-I01B rev
+# 3 section 2, G-I01B-2; Q-I01B-26 (a)): edge record v10's four rows 69-72 (I01B_EDGE_V10_ROWS: the I01 digest contract's
+# definitions, vectors and README, published by MET-ENFORCE-041 and merged at 2043cc27, and the proxy-contract vectors at
+# providerCommit 33de300c), read by the tests only (the digest replay), none embedded, 56.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -288,6 +291,26 @@ CONTRACTS = {
     "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
     "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
     "contracts/i01-v1/vectors.json": "1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124",
+    "contracts/i01-digests-v1/definitions.json": "086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa",
+    "contracts/i01-digests-v1/vectors.json": "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
+    "contracts/i01-digests-v1/README.md": "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae",
+    "contracts/i01-v1/proxy-contract-vectors.json": "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7",
+}
+# HE-004-I01B1 DESIGN-I01B rev 3 sections 2 and 6 (G-I01B-2): edge record v10's rows 69-72, each file's row, provider
+# path and sha256 (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004-I01B).
+I01B_EDGE_V10_ROWS = {
+    "contracts/i01-digests-v1/definitions.json":
+        (69, "architecture/policy-observation-digests/definitions.json",
+         "086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa"),
+    "contracts/i01-digests-v1/vectors.json":
+        (70, "architecture/policy-observation-digests/vectors.json",
+         "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84"),
+    "contracts/i01-digests-v1/README.md":
+        (71, "architecture/policy-observation-digests/README.md",
+         "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae"),
+    "contracts/i01-v1/proxy-contract-vectors.json":
+        (72, "architecture/proxy-contract-inputs/vectors.json",
+         "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7"),
 }
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
@@ -3619,6 +3642,41 @@ def check_observer_home_pins(base: Path) -> int:
     return len(OBSERVER_HOME_PINS)
 
 
+def check_i01b_contracts(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-2 (DESIGN-I01B rev 3 sections 2 and 6, DESIGN-I01B1 rev 2 section 4): edge record v10's rows
+    69-72 (I01B_EDGE_V10_ROWS). Each file is registered in CONTRACTS at its row's sha256; it is present, a regular file
+    and not a symlink, of mode 100644 (no execute bit), and its bytes have that sha256; contracts/PROVENANCE.md holds
+    exactly one provenance line for it (the file, `from` its provider path, its sha256 and `<length> bytes`, in the
+    section's form), with its row's provider path and sha256 and its length; and it is not embedded: it is not in
+    OBSERVER_EMBEDDED_CONTRACTS, and
+    no crate source under crates/*/src holds an include_bytes! or include_str! literal that resolves to it. The number of
+    files."""
+    rule = "the I01 digest contract files, G-I01B-2"
+    provenance_path = base / "contracts/PROVENANCE.md"
+    require(provenance_path.is_file() and not provenance_path.is_symlink(),
+            "contracts/PROVENANCE.md is missing or a symlink (%s)" % rule)
+    provenance = provenance_path.read_text(encoding="utf-8")
+    for rel, (row, provider, expected) in I01B_EDGE_V10_ROWS.items():
+        require(CONTRACTS.get(rel) == expected,
+                "%s is not registered at edge record v10's row %d sha256 (%s)" % (rel, row, rule))
+        path = base / rel
+        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (%s)" % (rel, rule))
+        require(not path.stat().st_mode & 0o111, "%s is not mode 100644 (%s)" % (rel, rule))
+        data = path.read_bytes()
+        require(sha256(data) == expected, "%s differs from edge record v10's row %d (%s)" % (rel, row, rule))
+        lines = re.findall(r"(?m)^- `%s` from `([^`]*)`, sha256 `([0-9a-f]{64})`, (\d+) bytes$" % re.escape(rel),
+                           provenance)
+        require(lines == [(provider, expected, str(len(data)))],
+                "%s has not exactly one PROVENANCE.md line with its provider path, sha256 and length (%s)" % (rel, rule))
+        require(rel not in OBSERVER_EMBEDDED_CONTRACTS, "%s is embedded (%s)" % (rel, rule))
+    for path in sorted((base / "crates").glob("*/src/**/*.rs")):
+        source = path.relative_to(base).as_posix()
+        for literal in OBSERVER_INCLUDE_FORM.findall(path.read_text(encoding="utf-8")):
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(source), literal))
+            require(target not in I01B_EDGE_V10_ROWS, "%s embeds %s (%s)" % (source, target, rule))
+    return len(I01B_EDGE_V10_ROWS)
+
+
 def check_native_profile_use(base: Path) -> int:
     """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5), generalised by HE-004D2 (DESIGN-D2 section 12, G-D2-3) to each of
     NATIVE_PROFILE_SCHEMAS: read without comments, the constant occurs in crates/observer's sources only as its definition
@@ -4894,6 +4952,10 @@ def main() -> int:
             % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
         say("constructor home pins: %d files match their pinned sha256 (%s) (HE-004D2, owner decision Q-D2-END)"
             % (check_observer_home_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_HOME_PINS.items())))
+        say("I01 digest contract files (HE-004-I01B1, G-I01B-2): %d files, %s, each at edge record v10's row sha256, "
+            "mode 100644, with its one PROVENANCE.md line, and none embedded (OBSERVER_EMBEDDED_CONTRACTS stays at %d)"
+            % (check_i01b_contracts(HE), ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V10_ROWS.items()),
+               len(OBSERVER_EMBEDDED_CONTRACTS)))
         say("observer never unlinks (HE-004-I01a, G-I01-1): %d sources of %s name no unlink, remove_file, remove_dir, "
             "remove_dir_all, rename or hard_link outside strict test blocks" % (check_observer_never_unlinks(HE), OBSERVER_CRATE))
         say("observer wait point (HE-004-I01a, G-I01-2): %d counted occurrences: wait once as the one wire wait inside "
