@@ -284,6 +284,44 @@ HE-004-I01A2 section), at harness-onion `6835a6ed`:
 - `scripts/validate_policy_observation.py`, sha256 `ed0008be32c75b4b03a74e6361d84b2b2e9a830f19f8d1ae5a00dbf1792c5a44`, 12952 bytes
 - `scripts/validate_proxy_contract.py`, sha256 `130194464c6271e8033cda32f166fa07d0dac774f2c48510da28093a3b9ab77e`, 16007 bytes
 
+## The I01 digest contract and the proxy-contract vectors, the observer's digest port (HE-004-I01B1)
+
+HE-004-I01b's first packet (DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; owner decision Q-HE4I1-2, the
+monitor's Q-I01B-26 (a) and the HE-004-I01B1 build GO): the four rows edge registry record v10 adds, rows 69 to 72 of
+`architecture/artifact-edges/operator-harness-engineering-v10.json` (sha256
+`a4fad53dfadbe8a5d79d4049fbba83173adaacec8d33df5ca377aa288539364e`, 36172 bytes; harness-onion MET-ENFORCE-041, merged
+at `2043cc27`, read by exact path at harness-onion main `b5166194`), consumer packet HE-004-I01B, status
+REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer paths exactly these.
+
+- Rows 69 to 71 are the I01 digest contract's three data files (DIGEST-CONTRACT). MET-ENFORCE-041 publishes them itself,
+  so they carry a null `providerCommit` and `providerPacket` MET-ENFORCE-041; each was copied with
+  `git show 2043cc27:<providerPath>` (harness-onion `2043cc27883448e3ff030b7868110e295f32fe09`, that packet's merge and
+  each file's last change).
+- Row 72 is the proxy-contract vectors (PPV), already on harness-onion main, at `providerCommit`
+  `33de300cabb497044c679d51df13d36d14a4b906` (its last change, so no provider packet); it was copied with
+  `git show 33de300c:<providerPath>`. Edge record v9 did not register it (the HE-004-I01A2 section above); row 72 does.
+
+Before any byte was copied, each row's sha256, mode, provider path and consumer path were compared with the build brief;
+after, each file's sha256, length and mode were checked against its row. None is embedded: `crates/observer/src/contracts.rs`
+is unchanged and `OBSERVER_EMBEDDED_CONTRACTS` stays at its five files. The tests alone read them: the contract's vectors
+drive `crates/observer/tests/observer_i01_digest_replay.rs`, which also holds `definitions.json` to the vectors' pin and
+`crates/observer/src/i01_digest.rs`'s refusal texts to its `refusalTexts`, and PPV is the profile the I01 wire vectors'
+binding and observation cases read. `tools/gate.py` holds the four files to these rows and lines (G-I01B-2, 56 registered files).
+
+- `contracts/i01-digests-v1/definitions.json` from `architecture/policy-observation-digests/definitions.json`, sha256 `086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa`, 35940 bytes
+- `contracts/i01-digests-v1/vectors.json` from `architecture/policy-observation-digests/vectors.json`, sha256 `bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84`, 468843 bytes
+- `contracts/i01-digests-v1/README.md` from `architecture/policy-observation-digests/README.md`, sha256 `e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae`, 46944 bytes
+- `contracts/i01-v1/proxy-contract-vectors.json` from `architecture/proxy-contract-inputs/vectors.json`, sha256 `edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7`, 12799 bytes
+
+The contract's reference model and VPO are pinned by digest, not copied, and read as specification only where the
+contract's README and vectors are silent (`crates/effect-gate/MODEL_DEFINED.md`, the HE-004-I01B1 section: its points
+P1-P7 list each such point, and R167-R174 the R10-defined behaviour), at harness-onion
+`2043cc27`. VPO is re-pinned here: its bytes at `2043cc27` (its last change) replace the `ed0008be…` pin of the
+HE-004-I01A2 section above. Neither is imported or run by R10.
+
+- `scripts/policy_observation_digests.py`, sha256 `01298fb5c6acdae3248174265bbe576dd553eeb19bce1a48cb1e2734972c09c5`, 83711 bytes
+- `scripts/validate_policy_observation.py`, sha256 `3ac03636013f2386deb53af741aa67856e7c52f9c0270da854cfbd5415ea4662`, 13005 bytes
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

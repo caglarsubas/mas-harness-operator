@@ -144,6 +144,21 @@ rule follow a source's own aliases of gate_sys and of its socket modules (resolv
 or glob of gate_sys and an extern crate in the observer's two socket files (R1-3); serve's wire construction is the one
 match mapping its refusal through status::wire_setup (R1-5); the no-panic rule names the four I01 sources (R1-6).
 
+HE-004-I01B1 (the I01 digest port; DESIGN-I01B rev 3 sections 2 and 6 and DESIGN-I01B1 rev 2, closed under Q-I01B-CAP;
+the monitor's Q-I01B-7..27, R-B3-A, R-B3-PIN and MON-I01B1-A/B) registers edge record v10's four rows, the I01 digest
+contract's definitions, vectors and README and the proxy-contract vectors (G-I01B-2, 56 files, none embedded). Its three
+logic modules (i01_digest, i01_admission_render, i01_gate) take the I01 logic and no-panic rules, are the i01_ sources
+beside the service and its request checks, and are reachable from no source but each other and lib.rs's pub mod lines
+(G-I01B-1's I01B1 form, G-D2-5's construction; their symbols absent from planeon-observer's symbol table); lib.rs
+declares exactly OBSERVER_LIB_MODULES in file form and no other source declares a module (G-I01B-7); the gate bound
+and the three R10 constants it sums match definitions.json, ANSWER_LIMIT, the freshness window and the exchange
+deadline are literal pins with their citations, and the modules' refusal texts are exactly the contract's (G-I01B-8).
+R-B3-PIN pins the six guarded files not yet pinned (effect-gate's two socket files, the observer's config.rs,
+i01_request.rs, i01_service.rs and client.rs) whole, keeps i01_answer.rs absent, refuses a casefolded sibling of a
+guarded name and an inline module in place of a guarded one; and no use declaration of either crate aliases a socket
+module, re-exports through one, names a scope root alone or globs one outside a crate root (B3-1, G-I01B-6 (e); PR
+review round 1, R1-2). The casefold clause reads a directory listing, so its self-test runs on any file system (R1-4).
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -227,7 +242,10 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # edge record v8's two I06 v4 rows (harness-onion MET-ENFORCE-039, the backend profile v4's criteria and vectors), read
 # by the tests and by the role pin's constants check, 50. HE-004-I01A2, HE-004-I01a's unit U7 (DESIGN-I01A sections 3 and
 # 7, Q-HE4I1-10 (a), Q-I01A-1): edge record v9's two rows (harness-onion MET-ENFORCE-040, the I01 wire's channel schema
-# and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52.
+# and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52. HE-004-I01B1 (DESIGN-I01B rev
+# 3 section 2, G-I01B-2; Q-I01B-26 (a)): edge record v10's four rows 69-72 (I01B_EDGE_V10_ROWS: the I01 digest contract's
+# definitions, vectors and README, published by MET-ENFORCE-041 and merged at 2043cc27, and the proxy-contract vectors at
+# providerCommit 33de300c), read by the tests only (the digest replay), none embedded, 56.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -288,6 +306,26 @@ CONTRACTS = {
     "contracts/native-profile-v3/vectors.json": "14af47a69c972039294be8659c31332acd5326bfb0a3a38384a2c6bf9d11fe6d",
     "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
     "contracts/i01-v1/vectors.json": "1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124",
+    "contracts/i01-digests-v1/definitions.json": "086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa",
+    "contracts/i01-digests-v1/vectors.json": "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
+    "contracts/i01-digests-v1/README.md": "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae",
+    "contracts/i01-v1/proxy-contract-vectors.json": "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7",
+}
+# HE-004-I01B1 DESIGN-I01B rev 3 sections 2 and 6 (G-I01B-2): edge record v10's rows 69-72, each file's row, provider
+# path and sha256 (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004-I01B).
+I01B_EDGE_V10_ROWS = {
+    "contracts/i01-digests-v1/definitions.json":
+        (69, "architecture/policy-observation-digests/definitions.json",
+         "086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa"),
+    "contracts/i01-digests-v1/vectors.json":
+        (70, "architecture/policy-observation-digests/vectors.json",
+         "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84"),
+    "contracts/i01-digests-v1/README.md":
+        (71, "architecture/policy-observation-digests/README.md",
+         "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae"),
+    "contracts/i01-v1/proxy-contract-vectors.json":
+        (72, "architecture/proxy-contract-inputs/vectors.json",
+         "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7"),
 }
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
@@ -790,6 +828,29 @@ OBSERVER_HOME_PINS = {
     "crates/observer/src/linux_net.rs": "41a23aa7d6215d5f8194b703da511a8945d7600f1f0d306affb94cd830ac17ac",
     "crates/observer/src/linux_listen.rs": "d06742932d92eaf05308158d37ce670859f316e1b0fe7a1972b8e4c93be5433b",
 }
+# HE-004-I01B1 R-B3-PIN (the monitor's ruling closing DESIGN-I01B under Q-I01B-CAP; DESIGN-I01B1 rev 2 section 1): every
+# guarded file is pinned whole by sha256. The six not yet pinned are pinned here at their dd7422ed bytes (I01B1 changes
+# none of them); linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS; i01_answer.rs must be absent (no directory
+# entry, lexists) until I01B3 replaces the absence with its pin. Each guarded module is declared only in file form, once,
+# in its crate's lib.rs (I1D-3), and no entry of a guarded file's directory casefolds to a guarded name but that name
+# (I1D-10).
+EFFECT_GATE_CRATE = "crates/effect-gate"
+I01B_GUARDED_PINS = {
+    "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
+    "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
+    "crates/observer/src/config.rs": "bef5143c30961fae16e12a90d3dcabeba35433e2082aae79da0d27a0ac2acee8",
+    "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
+    "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
+    "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
+}
+I01B_ABSENT = ("crates/observer/src/i01_answer.rs",)
+I01B_FILE_FORM = {"crates/observer/src/lib.rs": ("config", "i01_request", "i01_service", "client", "linux_listen",
+                                                 "linux_net"),
+                  "crates/effect-gate/src/lib.rs": ("linux_os", "linux_net")}
+# HE-004-I01B1 B3-1 (G-I01B-6 (e); DESIGN-I01B1 rev 2 sections 2 and 6, I1D-1 and I1D-2): each crate's socket modules, the
+# scope roots a use path's head may hold, and the binary's library root (main.rs only).
+SOCKET_CRATE_MODULES = {EFFECT_GATE_CRATE: ("linux_os", "linux_net"), OBSERVER_CRATE: ("linux_net", "linux_listen")}
+SCOPE_ROOTS = ("crate", "self", "super")
 # HE-003A2 DESIGN section 3 (Q-A2-2 (a), D1-9, D2-2): Dir::read_link is pub (gate-sys's host tests call it), so among
 # the linked crates' non-test sources, read without comments and with literals kept, the word read_link appears exactly
 # twice: its definition `fn read_link(` in openat.rs and the one call `read_link("exe",` in channel.rs (ProcDir::exe).
@@ -993,8 +1054,12 @@ D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NA
 # HE-004-I01a DESIGN-I01A section 12: the I01 request checks (i01_request, the pure part of the I01 service, unit U4)
 # and the role pin (observer_rbac, unit U6) take B1's logic rule with B1's whitelist plus their own paths, each as its
 # unit adds it (I01_LOGIC_BUILT); they reach neither the I01 service, the wire nor D2's modules.
-I01_LOGIC_NAMES = ("i01_request", "observer_rbac")
-I01_LOGIC_BUILT = ("i01_request", "observer_rbac")
+# HE-004-I01B1 (DESIGN-I01B rev 3 section 2; G-I01B-7 (d)): the digest port's three logic modules join them, the
+# whitelist gaining their crate:: and self:: paths; none reaches the capture engine, the epoch, the configuration, the
+# enrolled record's loader, the quota pair or std::time, and none is reachable from serve (G-I01B-1).
+I01B1_MODULES = ("i01_digest", "i01_admission_render", "i01_gate")
+I01_LOGIC_NAMES = ("i01_request", "observer_rbac") + I01B1_MODULES
+I01_LOGIC_BUILT = ("i01_request", "observer_rbac") + I01B1_MODULES
 I01_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in I01_LOGIC_BUILT)
 I01_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + tuple(("crate", name) for name in I01_LOGIC_NAMES)
                    + tuple(("self", name) for name in I01_LOGIC_NAMES))
@@ -1037,8 +1102,8 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # before the scan, and only when its argument holds no `{` or `}` (PR review round 1, R1-1: a block argument can hold an
 # item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
 # HE-004-I01a DESIGN-I01A section 12: the I01 listener joins it (unit U3); the I01 service, its request checks and
-# the role pin as their units add them (I01_NO_PANIC_BUILT).
-I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac")
+# the role pin as their units add them (I01_NO_PANIC_BUILT). HE-004-I01B1 (G-I01B-7 (d)): the digest port's three.
+I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac") + I01B1_MODULES
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
     "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
@@ -2123,7 +2188,8 @@ def check_observer_no_panic(base: Path) -> int:
     """HE-004C DESIGN-C section 15 (G8, D1-14 (c)): each of OBSERVER_NO_PANIC (the HE-004C modules, main.rs and
     status.rs; HE-004D1, G-D1-11: enrolled.rs, capture.rs and linux_capture.rs; HE-004-I01a, I01_NO_PANIC_BUILT: the
     four I01 sources linux_listen.rs, i01_service.rs, i01_request.rs and observer_rbac.rs, named here since HE-004-I01A2,
-    R1-6) exists and, read with comments removed, literal contents emptied and the whitespace around `::` removed, names
+    R1-6, and HE-004-I01B1's i01_digest.rs, i01_admission_render.rs and i01_gate.rs, G-I01B-7 (d)) exists and, read
+    with comments removed, literal contents emptied and the whitespace around `::` removed, names
     no panicking macro or call (PANICS) outside strict #[cfg(test)] mod tests blocks. HE-004D1: observer-sys's three
     sources (OBSERVER_SYS_NO_PANIC) too, after their item-level compile-time asserts are removed (const_asserts). The
     number of sources."""
@@ -3619,6 +3685,270 @@ def check_observer_home_pins(base: Path) -> int:
     return len(OBSERVER_HOME_PINS)
 
 
+def check_i01b_contracts(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-2 (DESIGN-I01B rev 3 sections 2 and 6, DESIGN-I01B1 rev 2 section 4): edge record v10's rows
+    69-72 (I01B_EDGE_V10_ROWS). Each file is registered in CONTRACTS at its row's sha256; it is present, a regular file
+    and not a symlink, of mode 100644 (no execute bit), and its bytes have that sha256; contracts/PROVENANCE.md holds
+    exactly one provenance line for it (the file, `from` its provider path, its sha256 and `<length> bytes`, in the
+    section's form), with its row's provider path and sha256 and its length; and it is not embedded: it is not in
+    OBSERVER_EMBEDDED_CONTRACTS, and
+    no crate source under crates/*/src holds an include_bytes! or include_str! literal that resolves to it. The number of
+    files."""
+    rule = "the I01 digest contract files, G-I01B-2"
+    provenance_path = base / "contracts/PROVENANCE.md"
+    require(provenance_path.is_file() and not provenance_path.is_symlink(),
+            "contracts/PROVENANCE.md is missing or a symlink (%s)" % rule)
+    provenance = provenance_path.read_text(encoding="utf-8")
+    for rel, (row, provider, expected) in I01B_EDGE_V10_ROWS.items():
+        require(CONTRACTS.get(rel) == expected,
+                "%s is not registered at edge record v10's row %d sha256 (%s)" % (rel, row, rule))
+        path = base / rel
+        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (%s)" % (rel, rule))
+        require(not path.stat().st_mode & 0o111, "%s is not mode 100644 (%s)" % (rel, rule))
+        data = path.read_bytes()
+        require(sha256(data) == expected, "%s differs from edge record v10's row %d (%s)" % (rel, row, rule))
+        lines = re.findall(r"(?m)^- `%s` from `([^`]*)`, sha256 `([0-9a-f]{64})`, (\d+) bytes$" % re.escape(rel),
+                           provenance)
+        require(lines == [(provider, expected, str(len(data)))],
+                "%s has not exactly one PROVENANCE.md line with its provider path, sha256 and length (%s)" % (rel, rule))
+        require(rel not in OBSERVER_EMBEDDED_CONTRACTS, "%s is embedded (%s)" % (rel, rule))
+    for path in sorted((base / "crates").glob("*/src/**/*.rs")):
+        source = path.relative_to(base).as_posix()
+        for literal in OBSERVER_INCLUDE_FORM.findall(path.read_text(encoding="utf-8")):
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(source), literal))
+            require(target not in I01B_EDGE_V10_ROWS, "%s embeds %s (%s)" % (source, target, rule))
+    return len(I01B_EDGE_V10_ROWS)
+
+
+def casefold_siblings(directory: str, entries: list[str], names: set[str], rule: str) -> None:
+    """HE-004-I01B1 R-B3-PIN, I1D-10's casefold clause over one directory's listing (entry names, so the clause is
+    exercised on any file system; PR review round 1, R1-4): an entry whose casefold equals a guarded name's, other than
+    that name itself, refuses."""
+    folded = {name.casefold(): name for name in names}
+    for entry in sorted(entries):
+        name = folded.get(entry.casefold())
+        require(name is None or entry == name, "%s/%s casefolds to the guarded name %s (%s, I1D-10)"
+                % (directory, entry, name, rule))
+
+
+def check_i01b_guarded_pins(base: Path) -> int:
+    """HE-004-I01B1 R-B3-PIN (DESIGN-I01B1 rev 2 section 1; the section review's I1D-3 and I1D-10), in
+    check_observer_home_pins' form:
+    - every I01B_GUARDED_PINS file is present, a regular file and not a symlink, and byte-exact (its sha256 equals its
+      pin);
+    - every I01B_ABSENT path has no directory entry (a dangling symlink, an empty file or a directory refuses);
+    - no entry of a guarded file's directory casefolds to a guarded name (the pinned, absent and home-pinned socket
+      files) other than that name itself;
+    - each guarded module is declared in its crate's lib.rs exactly once, in file form, as a line-anchored `pub mod
+      <name>;` (a cfg attribute before it aside), and no source of either crate holds an inline `mod <name> {`, so no
+      inline module can orphan a pinned file.
+    The sources are read without comments, literal contents emptied and the whitespace around `::` removed. The number
+    of guarded entries (six pins and one absence)."""
+    rule = "guarded pin, R-B3-PIN"
+    for rel, expected in I01B_GUARDED_PINS.items():
+        path = base / rel
+        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (%s)" % (rel, rule))
+        require(sha256(path.read_bytes()) == expected, "%s differs from its pinned bytes (%s)" % (rel, rule))
+    for rel in I01B_ABSENT:
+        path = base / rel
+        require(not path.is_symlink() and not path.exists(),
+                "%s exists; it stays absent until HE-004-I01B3 pins it (%s)" % (rel, rule))
+    guarded = list(I01B_GUARDED_PINS) + list(I01B_ABSENT) + [rel for rel in OBSERVER_HOME_PINS
+                                                             if rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN)]
+    by_directory: dict[str, set[str]] = {}
+    for rel in guarded:
+        by_directory.setdefault(posixpath.dirname(rel), set()).add(posixpath.basename(rel))
+    for directory, names in sorted(by_directory.items()):
+        entries = [entry.name for entry in (base / directory).iterdir()] if (base / directory).is_dir() else []
+        casefold_siblings(directory, entries, names, rule)
+    codes = {}
+    for rel, raw in observer_sources(base, (EFFECT_GATE_CRATE, OBSERVER_CRATE)):
+        try:
+            codes[rel] = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    for lib, modules in I01B_FILE_FORM.items():
+        require(lib in codes, "%s is missing (%s, I1D-3)" % (lib, rule))
+        for name in modules:
+            line = re.compile(r"(?m)^[ \t]*(?:#\s*\[\s*cfg\s*\([^\]]*\)\s*\]\s*)?pub\s+mod\s+%s\s*;" % name)
+            require(len(line.findall(codes[lib])) == 1, "%s does not declare `pub mod %s;` exactly once, in file form "
+                    "(%s, I1D-3)" % (lib, name, rule))
+    names = sorted({name for modules in I01B_FILE_FORM.values() for name in modules})
+    inline = re.compile(r"\bmod\s+(%s)\s*\{" % "|".join(names))
+    for rel, code in sorted(codes.items()):
+        found = inline.search(code)
+        require(not found, "%s holds an inline `mod %s {` (%s, I1D-3)" % (rel, found.group(1) if found else "", rule))
+    return len(I01B_GUARDED_PINS) + len(I01B_ABSENT)
+
+
+def check_socket_module_aliases(base: Path) -> int:
+    """HE-004-I01B1 B3-1, G-I01B-6 (e) (DESIGN-I01B1 rev 2 sections 2 and 6; exactly as the section review's I1D-1 and
+    I1D-2 state it). Every non-test source of crates/effect-gate/src and crates/observer/src, main.rs included, is read
+    as observer_code reads it (comments removed, literal contents emptied, the whitespace around `::` removed, strict
+    test blocks blanked), and its use trees are expanded as use_paths expands them (an unreadable tree refuses). Each use
+    path is read after its leading `crate`, `self` and `super` segments (and, in the observer's main.rs,
+    `planeon_observer`) are dropped, a trailing `self` read as its module:
+    - a path that is exactly a socket module of its crate (SOCKET_CRATE_MODULES), renamed or not, refuses, and so does a
+      glob through one; an item import passes: a path that continues past the socket module to an item other than
+      `self`, and is not pub (today's three: effect-gate linux_os.rs's `crate::linux_net::SharedNet`, the observer's
+      linux_net.rs `crate::linux_listen::I01Socket` and main.rs's `planeon_observer::linux_net::LinuxWire`);
+    - a `pub` or `pub(..)` use whose path names a socket module refuses;
+    - a use whose path is a scope root alone refuses (`use crate as ..`, `use crate::{self as ..}`, `use self as ..`,
+      `use super as ..`, and in main.rs `planeon_observer` itself); there are none at dd7422ed;
+    - a glob of a scope root (`use crate::*;`, `pub use super::*;`, `use self::*;`, and in main.rs
+      `use planeon_observer::*;`), at any visibility, refuses everywhere but at the top level of a crate's lib.rs (PR
+      review round 1, R1-2): in any other module a pub glob of the crate root re-exports its pub socket modules under a
+      new path; there are none outside strict test blocks at dd7422ed.
+    The alias route needs a use site in a socket file too, which the whole-file pins refuse from I01B1 on
+    (R-B3-PIN); this rule is the tripwire beside them. The number of sources read."""
+    rule = "socket-module aliases, G-I01B-6 (e)"
+    count = 0
+    for crate, modules in SOCKET_CRATE_MODULES.items():
+        for rel, raw in observer_sources(base, (crate,)):
+            try:
+                code = PATH_SPACE.sub("::", rust_code(raw))
+            except GateError as error:
+                raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+            for start, end in reversed(cfg_test_blocks(code)):
+                code = code[:start] + " " * (end - start) + code[end:]
+            roots = SCOPE_ROOTS + (("planeon_observer",) if rel == OBSERVER_MAIN else ())
+            library_root = rel == "%s/src/lib.rs" % crate
+            for declaration in USE_DECLARATION.finditer(code):
+                public = bool(PUB_PREFIX.search(code, 0, declaration.start()))
+                top_level = library_root and brace_depth(code, declaration.start()) == 0
+                try:
+                    paths = use_paths(declaration.group(1))
+                except GateError:
+                    raise GateError("%s holds a use declaration the alias rule cannot read (%s)" % (rel, rule)) from None
+                for path, _ in paths:
+                    target = path[:-1] if path[-1:] == ("self",) else path
+                    head = 0
+                    while head < len(target) and target[head] in roots:
+                        head += 1
+                    rest = target[head:]
+                    require(rest, "%s imports or renames a scope root (%s)" % (rel, rule))
+                    require(rest != ("*",) or top_level, "%s globs a scope root outside its crate root (%s)" % (rel, rule))
+                    require(not public or not any(segment in modules for segment in rest),
+                            "%s re-exports a path through a socket module (%s)" % (rel, rule))
+                    require(rest[0] not in modules or (len(rest) > 1 and rest[1] not in ("self", "*")),
+                            "%s imports the socket module %s itself, renamed or not (%s)" % (rel, rest[0], rule))
+            count += 1
+    return count
+
+
+def check_i01b_sources(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-7 (a)-(d) (DESIGN-I01B rev 3 sections 2, 6 and 7.5; Q-I01B-28 amended; B1-4). Over
+    crates/observer's sources, read as observer_code reads them (comments removed, literal contents emptied, the
+    whitespace around `::` removed, strict test blocks blanked):
+    (a) the `src/**/i01_*.rs` files (rglob) are exactly I01_FILES_BUILT (five in I01B1);
+    (b) lib.rs's module declarations are exactly OBSERVER_LIB_MODULES, each once and in file form (`mod <name>;`), so a
+        response module not named i01_* refuses too (HE-004-I01A PR review R1-4);
+    (c) no other observer source declares a module item;
+    (d) I01_LOGIC_BUILT and I01_NO_PANIC_BUILT hold the three I01B1 modules.
+    The number of i01_ sources."""
+    rule = "the i01_ sources, G-I01B-7"
+    source = base / OBSERVER_CRATE / "src"
+    present = sorted(path.relative_to(base).as_posix() for path in source.rglob("i01_*.rs"))
+    require(present == sorted(I01_FILES_BUILT), "the i01_ sources present (%s) are not exactly %s (%s)"
+            % (", ".join(present) or "none", ", ".join(sorted(I01_FILES_BUILT)), rule))
+    codes = observer_code(base, rule)
+    require(OBSERVER_LIB in codes, "%s is missing (%s)" % (OBSERVER_LIB, rule))
+    declared = MODULE_DECLARATION.findall(codes[OBSERVER_LIB])
+    require(sorted(name for name, _ in declared) == sorted(OBSERVER_LIB_MODULES) and all(end == ";" for _, end in declared),
+            "%s declares the modules [%s], not exactly OBSERVER_LIB_MODULES, each once in file form (%s)"
+            % (OBSERVER_LIB, ", ".join(name + end for name, end in declared), rule))
+    for rel, code in sorted(codes.items()):
+        if rel != OBSERVER_LIB:
+            require(not MODULE_ITEM.search(code), "%s declares a module; only lib.rs does (%s)" % (rel, rule))
+    missing = [name for name in I01B1_MODULES if name not in I01_LOGIC_BUILT or name not in I01_NO_PANIC_BUILT]
+    require(not missing, "%s miss the logic or the no-panic rule (%s)" % (", ".join(missing), rule))
+    return len(present)
+
+
+def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str, rule: str) -> tuple[int, list[str], int]:
+    """HE-004-I01B1 G-I01B-8: the one line-anchored `pub const <name>: <kind> = <form>;` of a raw source, the only
+    `const <name>` there: its value (the form's integer, underscores removed), the source's lines and the line's
+    index."""
+    path = base / rel
+    require(path.is_file(), "%s is missing (%s)" % (rel, rule))
+    raw = path.read_text(encoding="utf-8")
+    lines = raw.split("\n")
+    pattern = re.compile(r"pub const %s: %s = %s;" % (re.escape(name), re.escape(kind), form))
+    found = [(index, match) for index, line in enumerate(lines) if (match := pattern.fullmatch(line))]
+    require(len(found) == 1 and len(re.findall(r"\bconst\s+%s\b" % re.escape(name), raw)) == 1,
+            "%s does not define %s exactly once, as a line-anchored pub const (%s)" % (rel, name, rule))
+    index, match = found[0]
+    return int(match.group(1).replace("_", "")), lines, index
+
+
+def check_i01b_constants(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-8, the constants (DESIGN-I01B rev 3 section 6; B2-7), each against its own source, read from
+    the raw sources (pinned_constant):
+    - i01_gate.rs's GATE_BOUND_MS is the vendored definitions.json's captureGate.boundMs, which is its bound's cycleMs
+      plus scrapeToSetMs plus setBudgetMs;
+    - observe.rs's CYCLE and capture.rs's SCRAPE_TO_SET and SET_BUDGET (`Duration::from_secs(<n>)`, read in place) are
+      those three, in seconds;
+    - i01_gate.rs's ANSWER_LIMIT (65,536; VPO :86-88), FRESHNESS_WINDOW_SECONDS (5; VPO :128) and
+      EXCHANGE_DEADLINE_SECONDS (2; Q-I01B-21 (a)) are their literal pins, each with its citation in the doc comment
+      directly above it.
+    One refusal per constant. The number of constants (seven)."""
+    rule = "constants and texts, G-I01B-8"
+    try:
+        capture_gate = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))["captureGate"]
+        bound, parts = capture_gate["boundMs"], capture_gate["bound"]
+        sources = {member: parts[member] for _, _, member in I01B_DURATION_PINS}
+    except (OSError, ValueError, KeyError, TypeError):
+        raise GateError("%s has no readable captureGate bound (%s)" % (I01B_DEFINITIONS, rule)) from None
+    require(all(type(value) is int for value in [bound, *sources.values()]) and bound == sum(sources.values()),
+            "%s's captureGate.boundMs is not its bound's three parts (%s)" % (I01B_DEFINITIONS, rule))
+    name, kind = I01B_GATE_BOUND
+    value, _, _ = pinned_constant(base, I01_GATE_RS, name, kind, r"([0-9][0-9_]*)", rule)
+    require(value == bound, "%s's %s is not %s's captureGate.boundMs (%s)" % (I01_GATE_RS, name, I01B_DEFINITIONS, rule))
+    for rel, name, member in I01B_DURATION_PINS:
+        value, _, _ = pinned_constant(base, rel, name, "Duration", r"Duration::from_secs\(([0-9][0-9_]*)\)", rule)
+        require(value * 1000 == sources[member],
+                "%s's %s is not %s's captureGate.bound.%s (%s)" % (rel, name, I01B_DEFINITIONS, member, rule))
+    for name, kind, pinned, citation in I01B_LITERAL_PINS:
+        value, lines, index = pinned_constant(base, I01_GATE_RS, name, kind, r"([0-9][0-9_]*)", rule)
+        above = index
+        while above > 0 and lines[above - 1].startswith("///"):
+            above -= 1
+        documented = " ".join(line[3:].strip() for line in lines[above:index])
+        require(value == pinned and citation in documented,
+                "%s does not pin %s to %d with its citation %s (%s)" % (I01_GATE_RS, name, pinned, citation, rule))
+    return 1 + len(I01B_DURATION_PINS) + len(I01B_LITERAL_PINS)
+
+
+def check_i01b_refusal_texts(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-8, the texts (DESIGN-I01B rev 3 section 6): the refusal texts the three I01B1 modules write,
+    their string literals read without comments and with literals kept that start with one of the contract's eleven
+    keys and `: `, are exactly the vendored definitions.json's refusalTexts, each written at least once, and no other
+    key-prefixed text is written. The number of texts."""
+    rule = "constants and texts, G-I01B-8"
+    try:
+        definitions = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))
+        pinned = definitions["refusalTexts"]
+        keys = list(definitions["projections"]) + list(definitions["enforcementDigests"])
+    except (OSError, ValueError, KeyError, TypeError):
+        raise GateError("%s has no readable refusalTexts and keys (%s)" % (I01B_DEFINITIONS, rule)) from None
+    require(type(pinned) is list and all(type(text) is str for text in pinned) and len(set(pinned)) == len(pinned)
+            and len(keys) == 11, "%s's refusalTexts or keys are not readable (%s)" % (I01B_DEFINITIONS, rule))
+    prefix = re.compile(r"(?:%s): " % "|".join(re.escape(key) for key in keys))
+    written = set()
+    for name in I01B1_MODULES:
+        rel = "crates/observer/src/%s.rs" % name
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+        try:
+            kept = rust_code((base / rel).read_text(encoding="utf-8"), literals=True)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        written |= {literal for literal in RUST_STRING.findall(kept) if prefix.match(literal)}
+    extra, missing = sorted(written - set(pinned)), sorted(set(pinned) - written)
+    require(not extra and not missing, "the I01B1 modules' refusal texts are not exactly %s's refusalTexts: extra %s, "
+            "missing %s (%s)" % (I01B_DEFINITIONS, extra, missing, rule))
+    return len(pinned)
+
+
 def check_native_profile_use(base: Path) -> int:
     """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5), generalised by HE-004D2 (DESIGN-D2 section 12, G-D2-3) to each of
     NATIVE_PROFILE_SCHEMAS: read without comments, the constant occurs in crates/observer's sources only as its definition
@@ -3670,8 +4000,33 @@ I01_SOCKET_NAME = "policy-observer.sock"
 I01_PATH_CONSTANT = re.compile(r'(?m)^[ \t]*const\s+I01_PATH\s*:\s*&\s*str\s*=\s*"%s"\s*;' % re.escape(I01_PATH))
 # G-I01-5: nothing leaves I01a. The i01_ sources as their units add them (U4: the service and its request checks;
 # U3 held none).
-I01_FILES = ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs")
+# HE-004-I01B1 (G-I01B-7 (a); Q-I01B-28 amended): the digest port's three logic modules make five.
+I01_FILES = ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs") + tuple(
+    "crates/observer/src/%s.rs" % name for name in I01B1_MODULES)
 I01_FILES_BUILT = I01_FILES
+# HE-004-I01B1 G-I01B-7 (b) (DESIGN-I01B rev 3 section 6; B1-4; HE-004-I01A PR review R1-4's "a response module not named
+# i01_*"): the observer's lib.rs declares exactly these modules, each once and in file form: HE-004-I01A2's 35 and
+# I01B1's three (I01B3 adds i01_answer).
+OBSERVER_LIB_MODULES = ("admission", "capture", "capture_check", "capture_schema", "client", "composition", "config",
+                        "contracts", "credentials", "enrolled", "exposition", "http", "i01_request", "i01_service",
+                        "i06_evidence", "inputs", "kernel_text", "linux_capture", "linux_listen", "linux_net", "observe",
+                        "observer_rbac", "operational", "qualification", "quota", "rbac", "record_check", "requests",
+                        "seal", "signed_config", "snapshot", "status", "tls", "utc", "watch") + I01B1_MODULES
+MODULE_DECLARATION = re.compile(r"\bmod\s+([A-Za-z_]\w*)\s*([;{])")
+# HE-004-I01B1 G-I01B-8 (DESIGN-I01B rev 3 section 6; B2-7): each constant against its own source. The gate bound and
+# the three R10 constants it sums, from the vendored definitions.json (captureGate); G-I01B-8's three literal pins in
+# i01_gate.rs, each with the citation its doc comment must hold; and the refusal texts the three modules write, read
+# with literals kept, exactly definitions.json's refusalTexts.
+I01_GATE_RS = "crates/observer/src/i01_gate.rs"
+I01B_DEFINITIONS = "contracts/i01-digests-v1/definitions.json"
+I01B_GATE_BOUND = ("GATE_BOUND_MS", "u64")
+I01B_DURATION_PINS = (("crates/observer/src/observe.rs", "CYCLE", "cycleMs"),
+                      ("crates/observer/src/capture.rs", "SCRAPE_TO_SET", "scrapeToSetMs"),
+                      ("crates/observer/src/capture.rs", "SET_BUDGET", "setBudgetMs"))
+I01B_LITERAL_PINS = (("ANSWER_LIMIT", "usize", 65536, "scripts/validate_policy_observation.py:86-88"),
+                     ("FRESHNESS_WINDOW_SECONDS", "u64", 5, "scripts/validate_policy_observation.py:128"),
+                     ("EXCHANGE_DEADLINE_SECONDS", "u64", 2, "Q-I01B-21 (a)"))
+RUST_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"', re.S)
 I01_MODULE = re.compile(r"\bmod\s+(i01_\w*)")
 I01_REFUSED_WORDS = re.compile(r"\b(?:Wire|connect|ConnId|Client)\b")
 PEER_SEND = re.compile(r"\bpeer_send\b")
@@ -3809,8 +4164,9 @@ def check_observer_no_send(base: Path) -> int:
     linux_net.rs and linux_listen.rs, gate-sys's channel send is unreachable (a `Watched::Conn` hands out a `&Conn`):
     read with source_uses, as the socket-item rule reads them, no use path imports `send` from gate_sys::channel
     (braced, renamed or not) and none renames the channel module; and no `channel::send` path occurs, with any prefix.
-    The i01_ sources are exactly I01_FILES_BUILT (the I01 service and its request checks: no I01 response,
-    observation or digest module), lib.rs declares exactly those i01_ modules, and they name none of Wire, connect,
+    The i01_ sources are exactly I01_FILES_BUILT (the I01 service and its request checks, and from HE-004-I01B1 the
+    digest port's three logic modules: no I01 response, observation or answer module), lib.rs declares exactly those
+    i01_ modules, and they name none of Wire, connect,
     ConnId and Client. PeerOps is declared once, in client.rs, exactly as `pub trait PeerOps {` (no supertrait).
     HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): in the two socket files the use paths are read with
     the source's aliases followed (resolved_uses), so `use gate_sys as gs; use gs::channel::{send};` imports send and
@@ -4085,23 +4441,22 @@ def check_observer_role_constants(base: Path) -> int:
 
 # --- HE-004D2: the D2 logic modules' isolation and host-path literal, and their absence from the binary (DESIGN-D2 12) ---
 
-def check_observer_d2_isolation(base: Path) -> int:
-    """HE-004D2 DESIGN-D2 sections 9 and 12 (G-D2-5; owner decision Q-HE4D2-5 (a); D2-4): the source-level construction
-    that keeps the D2 logic modules unreachable from serve. Over crates/observer's non-test sources, read without comments,
-    literal contents emptied and the whitespace around `::` removed: the D2 files present are exactly D2_LOGIC_BUILT (so
-    each takes the logic rule, G-D2-4); (a) the four module names occur outside the D2 files only in lib.rs, each built one
-    exactly as its line-anchored `pub mod <name>;` and nothing else there; (b) the D2 type set is derived from the D2
-    files, every name they define as a struct, enum, union, trait or type item at any depth outside strict test blocks,
-    each defined once among them, and none of those names occurs in another crates/observer source (whatever it is there,
-    a definition included); (c) in the D2 files every impl header is exactly `impl <a name of that set> {` (no `for`, no
-    generic parameter) and every `pub use` names only D2 paths. With the existing pre-main, macro and included-code rules
-    (forced exports, assembled names), no other source can reach a D2 item. The number of D2 type names."""
-    rule = "D2 isolation, G-D2-5"
+def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...], label: str, rule: str) -> int:
+    """G-D2-5's construction over a list of crates/observer modules (HE-004D2's D2 modules; HE-004-I01B1's three digest
+    port modules, G-I01B-1's I01B1 form). Over crates/observer's non-test sources, read without comments, literal
+    contents emptied and the whitespace around `::` removed: the module files present are exactly `built` (so each takes
+    the logic rule); (a) the module names occur outside the modules' files only in lib.rs, each built one exactly as its
+    line-anchored `pub mod <name>;` and nothing else there; (b) the type set is derived from the modules' files, every
+    name they define as a struct, enum, union, trait or type item at any depth outside strict test blocks, each defined
+    once among them, and none of those names occurs in another crates/observer source (whatever it is there, a
+    definition included); (c) in the modules' files every impl header is exactly `impl <a name of that set> {` (no
+    `for`, no generic parameter) and every `pub use` names only the modules' paths. `label` names the modules in the
+    refusals. The number of type names."""
     sources = observer_sources(base, (OBSERVER_CRATE,))
-    d2_files = {"crates/observer/src/%s.rs" % name: name for name in D2_LOGIC_NAMES}
-    present = sorted(name for rel, name in d2_files.items() if (base / rel).is_file())
-    require(present == sorted(D2_LOGIC_BUILT), "the D2 modules present (%s) are not exactly those that take the logic rule "
-            "(%s) (%s)" % (", ".join(present) or "none", ", ".join(D2_LOGIC_BUILT), rule))
+    module_files = {"crates/observer/src/%s.rs" % name: name for name in names}
+    present = sorted(name for rel, name in module_files.items() if (base / rel).is_file())
+    require(present == sorted(built), "the %s modules present (%s) are not exactly those that take the logic rule "
+            "(%s) (%s)" % (label, ", ".join(present) or "none", ", ".join(built), rule))
     codes = {}
     for rel, raw in sources:
         try:
@@ -4109,7 +4464,7 @@ def check_observer_d2_isolation(base: Path) -> int:
         except GateError as error:
             raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
     defined: dict[str, str] = {}
-    for rel in sorted(rel for rel in codes if rel in d2_files):
+    for rel in sorted(rel for rel in codes if rel in module_files):
         scanned = codes[rel]
         for start, end in reversed(cfg_test_blocks(scanned)):
             scanned = scanned[:start] + " " + scanned[end:]
@@ -4117,35 +4472,53 @@ def check_observer_d2_isolation(base: Path) -> int:
             name = item.group(1)
             require(name not in defined, "%s defines %s, which %s defines too (%s)" % (rel, name, defined.get(name), rule))
             defined[name] = rel
-    module_words = re.compile(r"\b(?:%s)\b" % "|".join(D2_LOGIC_NAMES))
+    module_words = re.compile(r"\b(?:%s)\b" % "|".join(names))
     type_words = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(name) for name in sorted(defined))) if defined else None
     for rel, code in codes.items():
-        if rel in d2_files:
+        if rel in module_files:
             continue
         rest = code
         if rel == OBSERVER_LIB:
-            for name in D2_LOGIC_BUILT:
+            for name in built:
                 declaration = re.compile(r"(?m)^[ \t]*pub\s+mod\s+%s\s*;" % name)
                 require(len(declaration.findall(rest)) == 1, "%s does not declare `pub mod %s;` exactly once, on its own line (%s)"
                         % (rel, name, rule))
                 rest = declaration.sub(" ", rest)
         found = module_words.search(rest)
-        require(not found, "%s names the D2 module %s other than in lib.rs's one `pub mod` line (%s)"
-                % (rel, found.group(0) if found else "", rule))
+        require(not found, "%s names the %s module %s other than in lib.rs's one `pub mod` line (%s)"
+                % (rel, label, found.group(0) if found else "", rule))
         hit = type_words.search(code) if type_words else None
-        require(not hit, "%s names %s, a type the D2 module %s defines (%s)"
-                % (rel, hit.group(0) if hit else "", defined.get(hit.group(0)) if hit else "", rule))
-    for rel in sorted(rel for rel in codes if rel in d2_files):
+        require(not hit, "%s names %s, a type the %s module %s defines (%s)"
+                % (rel, hit.group(0) if hit else "", label, defined.get(hit.group(0)) if hit else "", rule))
+    for rel in sorted(rel for rel in codes if rel in module_files):
         code = codes[rel]
         for _, header in impl_headers(rel, code):
             form = re.fullmatch(r"impl ([A-Za-z_]\w*)", header)
-            require(form and form.group(1) in defined, "%s has the impl header `%s`; every impl in a D2 module is exactly "
-                    "`impl <a type it defines> {` (%s)" % (rel, header, rule))
+            require(form and form.group(1) in defined, "%s has the impl header `%s`; every impl in a %s module is exactly "
+                    "`impl <a type it defines> {` (%s)" % (rel, header, label, rule))
         for declaration in PUB_USE_DECLARATION.finditer(code):
             for path, _ in use_paths(declaration.group(1)):
-                require(len(path) > 1 and path[0] in ("crate", "self") and path[1] in D2_LOGIC_NAMES,
-                        "%s re-exports %s, not a D2 item (%s)" % (rel, "::".join(path), rule))
+                require(len(path) > 1 and path[0] in ("crate", "self") and path[1] in names,
+                        "%s re-exports %s, not a %s item (%s)" % (rel, "::".join(path), label, rule))
     return len(defined)
+
+
+def check_observer_d2_isolation(base: Path) -> int:
+    """HE-004D2 DESIGN-D2 sections 9 and 12 (G-D2-5; owner decision Q-HE4D2-5 (a); D2-4): the source-level construction
+    that keeps the D2 logic modules unreachable from serve (module_isolation over D2_LOGIC_NAMES, the built ones
+    D2_LOGIC_BUILT). With the existing pre-main, macro and included-code rules (forced exports, assembled names), no other
+    source can reach a D2 item. The number of D2 type names."""
+    return module_isolation(base, D2_LOGIC_NAMES, D2_LOGIC_BUILT, "D2", "D2 isolation, G-D2-5")
+
+
+def check_i01b1_isolation(base: Path) -> int:
+    """HE-004-I01B1 G-I01B-1, its I01B1 form (DESIGN-I01B rev 3 section 6; DESIGN-I01B1 rev 2 section 4, I1D-5): G-D2-5's
+    construction (module_isolation) over the digest port's three modules, i01_digest, i01_admission_render and
+    i01_gate: (a) their names occur outside their files only in lib.rs's line-anchored `pub mod <name>;`; (b) the type
+    set they define is named in no other observer source; (c) every impl header in them is `impl <a type of the set>
+    {`; (d) every `pub use` in them names only their own paths. So nothing in serve reaches them in I01B1; I01B3's form
+    (i01_answer) replaces this rule. The number of type names."""
+    return module_isolation(base, I01B1_MODULES, I01B1_MODULES, "I01B1", "I01B1 isolation, G-I01B-1")
 
 
 def check_observer_interpreter_tree(base: Path) -> int:
@@ -4178,6 +4551,19 @@ def check_d2_absent(names: set[str]) -> int:
         for path in (item_path(name), symbol_path(name)[0]):
             if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in D2_LOGIC_NAMES:
                 raise GateError("planeon-observer's symbol table holds %s, a symbol of the D2 module %s (G-D2-7)" % (name, path[1]))
+    return len(names)
+
+
+def check_i01b1_absent(names: set[str]) -> int:
+    """HE-004-I01B1 G-I01B-1's corroboration (DESIGN-I01B rev 3 section 6, in G-D2-7's style; I1D-5): no symbol of
+    planeon-observer's .symtab has an item path or a first-crate-root path beginning `planeon_observer::<one of the
+    digest port's three modules>`; a symbol that only mentions one passes. Build-time corroboration of G-I01B-1's I01B1
+    form, not its proof. The number of symbols read."""
+    for name in names:
+        for path in (item_path(name), symbol_path(name)[0]):
+            if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in I01B1_MODULES:
+                raise GateError("planeon-observer's symbol table holds %s, a symbol of the I01B1 module %s (G-I01B-1)"
+                                % (name, path[1]))
     return len(names)
 
 
@@ -4894,6 +5280,31 @@ def main() -> int:
             % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
         say("constructor home pins: %d files match their pinned sha256 (%s) (HE-004D2, owner decision Q-D2-END)"
             % (check_observer_home_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_HOME_PINS.items())))
+        say("I01 digest contract files (HE-004-I01B1, G-I01B-2): %d files, %s, each at edge record v10's row sha256, "
+            "mode 100644, with its one PROVENANCE.md line, and none embedded (OBSERVER_EMBEDDED_CONTRACTS stays at %d)"
+            % (check_i01b_contracts(HE), ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V10_ROWS.items()),
+               len(OBSERVER_EMBEDDED_CONTRACTS)))
+        say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 at their dd7422ed bytes, "
+            "%s absent (no directory entry); no directory entry casefolds to a guarded name but itself, and each guarded "
+            "module is declared once, in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"
+            % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT)))
+        say("socket-module aliases (HE-004-I01B1, B3-1, G-I01B-6 (e)): %d sources of %s and %s; no use declaration "
+            "targets a socket module (%s) itself, renamed or not, or globs one, no pub use names one, none names a "
+            "scope root alone and none globs one outside a crate root; item imports through a socket module pass"
+            % (check_socket_module_aliases(HE), EFFECT_GATE_CRATE, OBSERVER_CRATE,
+               "; ".join("%s: %s" % (crate, ", ".join(modules)) for crate, modules in SOCKET_CRATE_MODULES.items())))
+        say("observer I01B1 isolation (HE-004-I01B1, G-I01B-1, its I01B1 form): the modules present are %s; outside them "
+            "their names occur only as lib.rs's pub mod lines, none of the %d type names they define occurs in another %s "
+            "source, every impl in them is `impl <its own type> {` and none re-exports another item"
+            % (", ".join(I01B1_MODULES), check_i01b1_isolation(HE), OBSERVER_CRATE))
+        say("observer i01_ sources (HE-004-I01B1, G-I01B-7): %d files, exactly %s; lib.rs declares exactly the %d "
+            "OBSERVER_LIB_MODULES, each once in file form, and no other source declares a module; the I01B1 modules take "
+            "the logic and no-panic rules" % (check_i01b_sources(HE), ", ".join(I01_FILES_BUILT), len(OBSERVER_LIB_MODULES)))
+        say("I01B1 constants and texts (HE-004-I01B1, G-I01B-8): %d constants against their sources (GATE_BOUND_MS, CYCLE, "
+            "SCRAPE_TO_SET and SET_BUDGET against %s's captureGate; %s as literal pins with their citations); the three "
+            "modules' %d refusal texts are exactly its refusalTexts"
+            % (check_i01b_constants(HE), I01B_DEFINITIONS, ", ".join(name for name, _, _, _ in I01B_LITERAL_PINS),
+               check_i01b_refusal_texts(HE)))
         say("observer never unlinks (HE-004-I01a, G-I01-1): %d sources of %s name no unlink, remove_file, remove_dir, "
             "remove_dir_all, rename or hard_link outside strict test blocks" % (check_observer_never_unlinks(HE), OBSERVER_CRATE))
         say("observer wait point (HE-004-I01a, G-I01-2): %d counted occurrences: wait once as the one wire wait inside "
@@ -4940,6 +5351,8 @@ def main() -> int:
                     say("%s planeon-observer capture symbols (G-D1-14): %s" % (target, ", ".join(check_capture_symbols(names))))
                     say("%s planeon-observer D2 symbols (G-D2-7): none of its %d symbols has a path in planeon_observer::%s"
                         % (target, check_d2_absent(names), ", ::".join(D2_LOGIC_NAMES)))
+                    say("%s planeon-observer I01B1 symbols (G-I01B-1): none of its %d symbols has a path in "
+                        "planeon_observer::%s" % (target, check_i01b1_absent(names), ", ::".join(I01B1_MODULES)))
                     say("%s planeon-observer exempt span (G-D1-16): the %d bytes of %s occur exactly once, at offset %d "
                         "(length %d); the host-path scan (%s, the build root and the home directory) reads the binary "
                         "with that one span blanked and finds none; HOST_PATHS is unchanged, and every other binary is "
