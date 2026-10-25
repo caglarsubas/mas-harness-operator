@@ -4871,14 +4871,15 @@ I01B3_REFUSED_WORDS = re.compile(r"\b(?:leak|from_utf8|from_utf8_unchecked|trans
 I01B3_REFUSAL_WORDS = re.compile(r"\b(Err|ok_or|ok_or_else|map_err)\b")
 I01B3_RULE_WORD = re.compile(r"(?<![\w.])require\b")
 I01B3_PUSH_WORD = re.compile(r"\.\s*push\b")
+# The positions whose argument is a closure, never a fn item: map_err( [R1-1 (d)] and ok_or_else( [R2-1].
+I01B3_CLOSURE_ONLY = ("map_err", "ok_or_else")
 I01B1_REFUSAL_METHODS = ("malformed", "bound_exceeded", "differs")
 I01B1_DIGEST_RS = "crates/observer/src/i01_digest.rs"
-# (t5)'s refusals' list [R1-1 (c)]: its one declaration in fn refusals' outermost block, the methods it may be named
-# with, and Vec::push( with `&mut <list>` first (its turbofish optional).
+# (t5)'s refusals' list [R1-1 (c), tightened by PR review round 2's R2-3]: its one declaration in fn refusals' outermost
+# block, and the only two methods it may be named with there, the write `.push(` and the read `.contains(`.
 I01B3_LIST_DECLARATION = re.compile(r"\blet\s+mut\s+([a-z_][a-z0-9_]*)\s*:\s*Vec\s*<\s*&\s*'static\s+str\s*>\s*=\s*"
                                     r"Vec::new\(\s*\)\s*;")
-I01B3_LIST_METHODS = ("push", "extend", "insert", "contains")
-I01B3_LIST_PATH_PUSH = re.compile(r"\bpush\s*(?:::\s*<[^;{}]*>)?\s*\(\s*&\s*mut\s*$")
+I01B3_LIST_METHODS = ("push", "contains")
 # (t8) [R1-1 (b)]: the words that occur only as a call, in OBSERVER_LOGIC_WORDS' form; (t2) and (t9) [R1-2 (a), (b)]:
 # str named as a word, parenthesized or not.
 I01B3_CALL_ONLY = tuple((re.compile(r"(?<![\w.])%s\b" % word if word == "require" else r"\b%s\b" % word), word)
@@ -5022,13 +5023,14 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
     `require(`'s text argument, and every `.push(` argument, each word called past an optional turbofish (call_opening,
     PR review round 1's R1-1 (a)), is exactly one const named in I01B3_TEXT_PINS, one lower-case binding, or one
     I01B1_REFUSAL_METHODS method called on a lower-case binding. A lower-case name counts as a binding only when no
-    `fn`, `const` or `static` item of i01_answer.rs has that name [R1-2 (c)], and `map_err(`'s argument is a closure,
-    never a fn item [R1-1 (d)]. An `Err(` pattern (followed by `=>`, by `=` other than `==`, or by `|` other than `||`)
-    constructs nothing and is not read; a word that is not called is (t8)'s. Refusals' list [R1-1 (c)]: fn refusals
-    declares it once, in its outermost block, as `let mut <list>: Vec<&'static str> = Vec::new();`, and its tail is
-    `<list>`; in its body the list is named only there, as the receiver of `.push(`, `.extend(`, `.insert(` or
-    `.contains(`, or as `&mut <list>`, Vec::push('s first argument; `.extend(`'s argument, `.insert(`'s second and
-    Vec::push('s second are positions too, held to the same rule (`.push(` is read above). Each listed method is
+    `fn`, `const` or `static` item of i01_answer.rs has that name [R1-2 (c)], each item name read so that no qualifier
+    hides it (`\\bfn\\s+(name)` whatever precedes `fn`, as in `const fn`, `pub const fn`, `unsafe fn` or `async fn`, and
+    `\\b(?:const|static)\\s+(name)\\s*[:=]`; PR review round 2's R2-1); and the arguments of `map_err(` [R1-1 (d)] and
+    `ok_or_else(` [R2-1] are closures, never fn items. An `Err(` pattern (followed by `=>`, by `=` other than `==`, or
+    by `|` other than `||`) constructs nothing and is not read; a word that is not called is (t8)'s. Refusals' list
+    [R1-1 (c), tightened by R2-3; refusals_list_names]: fn refusals declares it once, in its outermost block, as
+    `let mut <list>: Vec<&'static str> = Vec::new();`, its tail is `<list>`, and in its body the list is named only
+    there and as the receiver of `.push(` (a position read above) or `.contains(`. Each listed method is
     `pub fn <name>(self) -> &'static str` in i01_digest.rs. The number of positions read."""
     _, _, code = answer_source(base, rule)
     digest = base / I01B1_DIGEST_RS
@@ -5038,7 +5040,8 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
         require(len(re.findall(r"\bpub\s+fn\s+%s\s*\(\s*self\s*\)\s*->\s*&\s*'static\s+str\s*\{" % method, digest_code)) == 1,
                 "%s does not define the refusal method %s returning one text (%s (t5))" % (I01B1_DIGEST_RS, method, rule))
     texts = {name for name, _, _ in I01B3_TEXT_PINS}
-    items = set(re.findall(r"\b(?:fn|const|static)\s+([A-Za-z_]\w*)", code))
+    items = (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
+             | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
     method = re.compile(r"([a-z_][a-z0-9_]*)\s*\.\s*(?:%s)\s*\(\s*\)" % "|".join(I01B1_REFUSAL_METHODS))
 
     def binding(name: str) -> bool:
@@ -5055,8 +5058,8 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
     def refused(word: str, arguments: list[str]) -> str:
         return ("%s's %s( argument(s) `%s` not one pinned text const, one lower-case binding that no item names, or one "
                 "I01B1 refusal method on such a binding%s (%s (t5))"
-                % (I01_ANSWER, word, " ".join(" ".join(arguments).split()), ", map_err( taking a closure"
-                   if word == "map_err" else "", rule))
+                % (I01_ANSWER, word, " ".join(" ".join(arguments).split()), ", %s( taking a closure" % word
+                   if word in I01B3_CLOSURE_ONLY else "", rule))
 
     read = 0
     for word in I01B3_REFUSAL_WORDS.finditer(code):
@@ -5067,7 +5070,8 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
         if word.group(1) == "Err" and (after.startswith("=>") or re.match(r"=(?!=)", after) or re.match(r"\|(?!\|)", after)):
             continue
         arguments = call_arguments(code, opening)
-        require(len(arguments) == 1 and named(arguments[0], word.group(1) == "map_err"), refused(word.group(1), arguments))
+        require(len(arguments) == 1 and named(arguments[0], word.group(1) in I01B3_CLOSURE_ONLY),
+                refused(word.group(1), arguments))
         read += 1
     for word in I01B3_RULE_WORD.finditer(code):
         opening = call_opening(code, word.end())
@@ -5083,16 +5087,17 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
         arguments = call_arguments(code, opening)
         require(len(arguments) == 1 and named(arguments[0]), refused(".push", arguments))
         read += 1
-    for word, arguments, held in refusals_list_positions(code, rule):
-        require(held is not None and named(held), refused(word, arguments))
-        read += 1
+    refusals_list_names(code, rule)
     return read
 
 
-def refusals_list_positions(code: str, rule: str) -> list[tuple[str, list[str], str | None]]:
-    """(t5)'s refusals' list [R1-1 (c)], as answer_texts_t5_positions states it: the list's declaration and tail and
-    the places it is named are checked here; its `.extend(`, `.insert(` and Vec::push( positions are returned, each as
-    (the call, its arguments, the argument (t5) holds, None when the call's arity is not the method's)."""
+def refusals_list_names(code: str, rule: str) -> None:
+    """(t5)'s refusals' list [R1-1 (c)], as answer_texts_t5_positions states it. U6's refusals_list_positions,
+    tightened by PR review round 2's R2-3 and renamed, since it no longer returns positions: inside fn refusals the
+    list's name occurs only at its one declaration (in the outermost block), its tail, and as the receiver of `.push(`
+    (whose argument the push loop reads) or `.contains(`; `.extend(`, `.insert(`, `Vec::push(&mut <list>, ..)`, a
+    helper taking `&mut <list>` (a module fn named push included) and any other naming refuse. Outside fn refusals,
+    `.extend(` and `.insert(` stay legal (the shipped file uses both)."""
     span = function_span(code, "refusals")
     require(span is not None, "%s does not define fn refusals once (%s (t5))" % (I01_ANSWER, rule))
     opening, end = span
@@ -5105,31 +5110,13 @@ def refusals_list_positions(code: str, rule: str) -> list[tuple[str, list[str], 
     tail = statements[-1]
     require(code[tail[0]:tail[1]].strip() == name, "%s's fn refusals does not return its list %s as its tail (%s (t5))"
             % (I01_ANSWER, name, rule))
-    positions: list[tuple[str, list[str], str | None]] = []
     for found in re.finditer(r"\b%s\b" % name, code[:end]):
         if found.start() < opening or found.start() in (declaration, tail[0]):
             continue
         call = re.match(r"\s*\.\s*(%s)\b" % "|".join(I01B3_LIST_METHODS), code[found.end():])
-        if call:
-            at = call_opening(code, found.end() + call.end())
-            require(at is not None, "%s's refusals list %s is named with %s other than as a call (%s (t5))"
-                    % (I01_ANSWER, name, call.group(1), rule))
-            arguments = call_arguments(code, at)
-            if call.group(1) == "extend":
-                positions.append(("%s.extend" % name, arguments, arguments[0] if len(arguments) == 1 else None))
-            elif call.group(1) == "insert":
-                positions.append(("%s.insert" % name, arguments, arguments[1] if len(arguments) == 2 else None))
-            continue
-        path_push = I01B3_LIST_PATH_PUSH.search(code[:found.start()])
-        if path_push:
-            arguments = call_arguments(code, code.rfind("(", path_push.start(), found.start()))
-            if len(arguments) == 2 and re.fullmatch(r"&\s*mut\s+%s" % name, arguments[0].strip()):
-                positions.append(("Vec::push", arguments, arguments[1]))
-                continue
-        raise GateError("%s's fn refusals names its list %s other than as its declaration, its tail, the receiver of %s "
-                        "or Vec::push('s `&mut %s` (%s (t5))"
-                        % (I01_ANSWER, name, ", ".join(".%s(" % method for method in I01B3_LIST_METHODS), name, rule))
-    return positions
+        require(call is not None and call_opening(code, found.end() + call.end()) is not None,
+                "%s's fn refusals names its list %s other than at its declaration, its tail and the receivers of %s "
+                "(%s (t5))" % (I01_ANSWER, name, " and ".join(".%s(" % method for method in I01B3_LIST_METHODS), rule))
 
 
 def answer_texts_t6_key_prefixed(base: Path, rule: str) -> None:
@@ -5179,17 +5166,30 @@ def answer_texts_t9_no_str_alias(base: Path, rule: str) -> None:
                 % (I01_ANSWER, item.group(1), rule))
 
 
+def answer_texts_t10_refusals_no_return(base: Path, rule: str) -> None:
+    """(t10) No early exit from fn refusals [PR review round 2's R2-2]: in i01_answer.rs read without comments, the word
+    `return` occurs nowhere inside fn refusals' span (function_span, its closures included), so the answer list leaves
+    refusals only as its tail, the list (t5) pins; `return vec![..]` or `return Vec::from([..])` is refused."""
+    _, _, code = answer_source(base, rule)
+    span = function_span(code, "refusals")
+    require(span is not None, "%s does not define fn refusals once (%s (t10))" % (I01_ANSWER, rule))
+    require(not re.search(r"\breturn\b", code[span[0]:span[1]]), "%s's fn refusals returns early; its list leaves only "
+            "as its tail (%s (t10))" % (I01_ANSWER, rule))
+
+
 def check_i01b3_texts(base: Path) -> int:
     """HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 section 5; I3D-7, I3E-3, I3F-1..3; PR review round 1's
     R1-1 and R1-2), each its own function with its own message: (t1) the 17 text pins with their citations and the key
     consts' pins; (t2) the str-const set, str read as a word; (t3) no `"` outside the pinned const lines; (t4) no other
-    route to a text; (t5) every refusal position, turbofish or not and refusals' list writes included, names a pinned
-    text, a binding no item names or an I01B1 refusal method, and map_err( takes a closure; (t6) no key-prefixed
-    literal; (t7) no static; (t8) the refusal words only as calls; (t9) no `type` naming str. They run in the order
-    (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), so that a key-prefixed literal, which only a const line can
-    hold, is refused with (t6)'s message, and a str const or alias reaching a refusal with (t2)'s or (t9)'s. The stated
-    limit (a text reaching a refusal through a local; a helper other than the rule helper returning `Err(param)`; `?`
-    on an I01B1 result) stays with R-TEXT and the tests' expected texts. The number of pins."""
+    route to a text; (t5) every refusal position, turbofish or not, names a pinned text, a binding no item names (item
+    names read past any qualifier) or an I01B1 refusal method, map_err( and ok_or_else( take a closure, and refusals'
+    list is named only at its declaration, its tail and the .push( and .contains( receivers; (t6) no key-prefixed
+    literal; (t7) no static; (t8) the refusal words only as calls; (t9) no `type` naming str; (t10) no `return` in fn
+    refusals. They run in the order (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), so that a key-prefixed
+    literal, which only a const line can hold, is refused with (t6)'s message, and a str const or alias reaching a
+    refusal with (t2)'s or (t9)'s. The stated limit (a text reaching a refusal through a local; a helper other than the
+    rule helper returning `Err(param)`; `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The
+    number of pins."""
     rule = "constants and texts, G-I01B-8"
     pins = answer_texts_t1_pins(base, rule)
     answer_texts_t6_key_prefixed(base, rule)
@@ -5200,6 +5200,7 @@ def check_i01b3_texts(base: Path) -> int:
     answer_texts_t8_calls_only(base, rule)
     answer_texts_t5_positions(base, rule)
     answer_texts_t7_no_static(base, rule)
+    answer_texts_t10_refusals_no_return(base, rule)
     return pins
 
 
@@ -6639,14 +6640,15 @@ def main() -> int:
             "modules' %d refusal texts are exactly its refusalTexts"
             % (check_i01b_constants(HE), I01B_DEFINITIONS, ", ".join(name for name, _, _, _ in I01B_LITERAL_PINS),
                check_i01b_refusal_texts(HE)))
-        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t9)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
+        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t10)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
             "citations and its %d key consts with their values (t1); its consts whose type names str exactly those, each "
             "once, top-level and line-anchored, the values distinct and no key or R10 text a refusal or VPO text (t2); no "
             "string outside those lines (t3); no stringify!, concat!, include_str!, include_bytes!, env!, option_env!, "
             "format_args!, file!, module_path!, leak, from_utf8 or transmute (t4); %d refusal positions, turbofish or "
-            "not and refusals' list writes included, each naming a pinned text, a binding no item names or one of %s on "
-            "such a binding, map_err( taking a closure (t5); no key-prefixed text (t6); no static (t7); %s only as calls "
-            "(t8); no type alias naming str (t9)"
+            "not, each naming a pinned text, a binding no item names or one of %s on such a binding, map_err( and "
+            "ok_or_else( taking a closure, and refusals' list named only at its declaration, its tail and the .push( and "
+            ".contains( receivers (t5); no key-prefixed text (t6); no static (t7); %s only as calls (t8); no type alias "
+            "naming str (t9); no return in fn refusals (t10)"
             % (check_i01b3_texts(HE), I01_ANSWER, len(I01B3_TEXT_PINS), len(I01B3_KEY_CONSTS),
                answer_texts_t5_positions(HE, "G-I01B-8 (t5)"), ", ".join(I01B1_REFUSAL_METHODS),
                ", ".join(word for _, word in I01B3_CALL_ONLY)))

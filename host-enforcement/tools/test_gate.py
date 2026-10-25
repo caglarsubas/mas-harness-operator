@@ -8252,6 +8252,7 @@ I01B3_NAMESPACE_PIN = 'pub const OBSERVED_NAMESPACE_TEXT: &str = "observed names
 I01B3_KEY_UID = 'pub const KEY_UID: &str = "uid";\n'
 I01B3_LIST_LET = "    let mut list: Vec<&'static str> = Vec::new();\n"
 I01B3_LIST_TAIL = "    list\n}\n"
+I01B3_LIST_PUSH = "                list.push(text);\n"
 I01B3_X9_1 = ("impl Clone for Derived where Derived: Sized {\n    fn clone(&self) -> Self where Self: Sized {\n        forged()\n"
               "    }\n}\n\n")
 I01B3_NEW_1 = ("    impl CaptureFacts {\n        pub fn mint(policy_values: Vec<u8>) -> Option<Derived> {\n"
@@ -8416,12 +8417,28 @@ I01B3_TEXT_ROWS = (
     ("H8-10 a lower-case const typed through a type alias of str", "(t9)", None,
      ((_ANSWER, I01B3_TOP, "type Text = str;\nconst scope_text: &Text = KEY_SCOPE;\n\n" + I01B3_TOP),
       (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    # PR review round 2's forms N-10 (both spellings), M-1 (both spellings) and M-2 (R2-1..R2-3; U7), each planted from
+    # the round-2 record's huntedForms text.
+    ("N-10 a const fn as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or_else(scope_text)?;\n" + I01B3_IN_ANSWER))),
+    ("N-10b a pub const fn as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "pub const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or_else(scope_text)?;\n" + I01B3_IN_ANSWER))),
+    ("M-1 an early return of vec! from refusals", "(t10)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if facts.expired { return vec![KEY_SCOPE]; }\n"),)),
+    ("M-1b an early return of Vec::from from refusals", "(t10)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if facts.expired { return Vec::from([KEY_SCOPE]); }\n"),)),
+    ("M-2 a module fn push given refusals' list", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "fn push(into: &mut Vec<&'static str>, text: &'static str) { into.extend([text, KEY_SCOPE]); }\n\n"
+                           + I01B3_TOP),
+      (_ANSWER, I01B3_LIST_PUSH, "                push(&mut list, text);\n"))),
 )
 I01B3_TEXT_FUNCTIONS = {"(t1)": "answer_texts_t1_pins", "(t2)": "answer_texts_t2_set",
                         "(t3)": "answer_texts_t3_no_other_string", "(t4)": "answer_texts_t4_routes",
                         "(t5)": "answer_texts_t5_positions", "(t6)": "answer_texts_t6_key_prefixed",
                         "(t7)": "answer_texts_t7_no_static", "(t8)": "answer_texts_t8_calls_only",
-                        "(t9)": "answer_texts_t9_no_str_alias"}
+                        "(t9)": "answer_texts_t9_no_str_alias", "(t10)": "answer_texts_t10_refusals_no_return"}
 
 
 def i01b3_answer_tree(changes=()):
@@ -8488,7 +8505,9 @@ class I01b3TextTests(I01b3AnswerTreeTests):
     literal; (t7) a static aliasing a key const and a fn-local static shadowing a pinned name; U3's const array of key
     consts, (t2)'s since R1-2 (a); and PR review round 1's H8-1 .. H8-10: (t5) the Err, ok_or and map_err turbofish, a fn
     item as map_err's argument and refusals' list via Vec::push and extend; (t8) Err and the rule helper as function
-    values; (t2) a lower-case const typed &(str); (t9) one typed through a type alias of str) refuses with its own
+    values; (t2) a lower-case const typed &(str); (t9) one typed through a type alias of str; and PR review round 2's
+    N-10 and N-10b, a const fn and a pub const fn as ok_or_else's argument, (t5); M-1 and M-1b, an early return of
+    vec! and Vec::from from refusals, (t10); M-2, a module fn push given refusals' list, (t5)) refuses with its own
     check's message."""
 
     def test_the_fixture_and_the_real_sources_pass(self):
@@ -8514,10 +8533,12 @@ class I01b3TextTests(I01b3AnswerTreeTests):
         self.plant(())
 
     def test_the_rows(self):
-        self.assertEqual(len(I01B3_TEXT_ROWS), 41)
+        self.assertEqual(len(I01B3_TEXT_ROWS), 46)
         self.assertEqual(sorted({clause for _, clause, _, _ in I01B3_TEXT_ROWS}), sorted(I01B3_TEXT_FUNCTIONS))
-        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-10:]],
+        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-15:-5]],
                          ["H8-%d" % number for number in range(1, 11)])
+        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-5:]],
+                         ["N-10", "N-10b", "M-1", "M-1b", "M-2"])
 
     def test_each_row_refuses_with_its_own_check_s_message(self):
         self.refuses_each(I01B3_TEXT_ROWS, gate.check_i01b3_texts, "constants and texts, G-I01B-8")
@@ -8543,12 +8564,18 @@ class I01b3TextTests(I01b3AnswerTreeTests):
         for code in ("Err)", "Err, y", "Err::new(x)", "Err::<u8; (x)", "Err::<u8 { (x)", "Err::<u8"):
             self.assertIsNone(gate.call_opening(code, 3), code)
 
-    def test_refusals_list_is_named_only_at_its_positions(self):
-        # R1-1 (c): the real list's only write is `.push(`; its `.insert(` is a position, and any other naming of the
-        # list, a second declaration or another tail refuses, each with (t5)'s message.
+    def test_refusals_list_is_named_only_at_its_receivers(self):
+        # R1-1 (c), tightened by R2-3: inside fn refusals the list is named only at its declaration, its tail and the
+        # .push( and .contains( receivers. Its .extend( and .insert( (even with a binding), Vec::push(&mut list, ..), a
+        # helper taking &mut list, any other naming, a second declaration or another tail refuse, each with (t5)'s
+        # message; .extend( and .insert( outside refusals stay legal, as the real file's traversal and objects use them.
         _, _, code = gate.answer_source(gate.HE, "G-I01B-8")
-        self.assertEqual(gate.refusals_list_positions(code, "G-I01B-8"), [])
-        for old, new in ((I01B3_LIST_LET, I01B3_LIST_LET + "    list.insert(0, KEY_SCOPE);\n"),
+        self.assertIsNone(gate.refusals_list_names(code, "G-I01B-8"))
+        self.assertIn(".extend(", code)
+        self.assertIn(".insert(", code)
+        for old, new in ((I01B3_LIST_LET, I01B3_LIST_LET + "    list.insert(0, text_of_nothing);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    let more = Vec::new();\n    list.extend(more);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    Vec::push(&mut list, text_of_nothing);\n"),
                          (I01B3_LIST_LET, I01B3_LIST_LET + "    list.push(text_of_nothing);\n    list[0] = KEY_SCOPE;\n"),
                          (I01B3_LIST_LET, I01B3_LIST_LET + "    grow(&mut list);\n"),
                          (I01B3_LIST_LET, I01B3_LIST_LET + "    let list = vec![KEY_SCOPE];\n"),
@@ -8560,8 +8587,9 @@ class I01b3TextTests(I01b3AnswerTreeTests):
                     gate.check_i01b3_texts(self.base)
             finally:
                 self.plant(())
-        # A binding at the list's positions passes, as at `.push(`.
-        self.plant(((gate.I01_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    let more = Vec::new();\n    list.extend(more);\n"),))
+        # Its .contains( and .push( with a binding pass, as the real refusals writes and reads it.
+        self.plant(((gate.I01_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if !list.contains(&KEY_SCOPE) {\n"
+                                                                       "        list.push(text_of_nothing);\n    }\n"),))
         self.assertEqual(gate.check_i01b3_texts(self.base), 54)
         self.plant(())
 
