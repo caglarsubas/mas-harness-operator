@@ -7328,7 +7328,7 @@ class I01bGuardedPinTests(Tree):
         self.assertEqual(gate.I01B_GUARDED_PINS, {
             "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
             "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
-            "crates/observer/src/config.rs": "bef5143c30961fae16e12a90d3dcabeba35433e2082aae79da0d27a0ac2acee8",
+            "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
             "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
             "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
             "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741"})
