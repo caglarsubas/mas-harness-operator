@@ -6941,6 +6941,8 @@ class I01b4ReplayScopeTests(Tree):
     - (b) row 79's file included by an observer src file or by another test; the digest replay's include removed or
       doubled, or the file read at run time there; a concat! form in another test;
     - (c) fn validate_profile, fn precondition and mod proxy_profile_v2, each planted in a src and a tests file;
+    - a const fn read as the fn it qualifies (PR review round 1, R1-1): const fn validate_profile, pub const fn
+      precondition and pub const unsafe fn validate_profile (clause (c)), and const fn preconditions (clause (c1));
     - I4D-1's five forms: (1) a test crate root named after profile v2 (tests/profile_v2_check.rs, and a directory so
       named); (2) fn preconditions; (3) fn r#precondition; (4) struct ProxyProfileV2 with an impl; (5) macro_rules!
       validate_profile;
@@ -7031,6 +7033,19 @@ class I01b4ReplayScopeTests(Tree):
                     "crates/observer/src/ProfileV2.rs"):
             self.refused(gate.check_i01b4_replay_scope, rel, validate,
                          re.escape("%s is named after profile v2 (the replay scope, G-I01B4-1, clause (c2))" % rel))
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+
+    def test_a_const_fn_is_read_as_the_fn_it_qualifies(self):
+        # PR review round 1, R1-1: `const` before `fn`, `unsafe`, `extern` or `async` is a qualifier, not the item.
+        for rel in ("crates/observer/src/planted.rs", "crates/effect-gate/tests/planted.rs"):
+            self.declares(rel, "const fn validate_profile() -> bool {\n    true\n}\n", "fn validate_profile", "(c)")
+            self.declares(rel, "pub const fn precondition() -> bool {\n    true\n}\n", "fn precondition", "(c)")
+            self.declares(rel, "pub const unsafe fn validate_profile() -> bool {\n    true\n}\n", "fn validate_profile",
+                          "(c)")
+            self.declares(rel, "const fn preconditions() -> bool {\n    true\n}\n", "fn preconditions", "(c1)")
+        # A const item is still read as a const.
+        self.declares("crates/observer/src/planted.rs", "pub const PRECONDITION: bool = true;\n", "const PRECONDITION",
+                      "(c1)")
         self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
 
     def test_row_79_s_texts_or_the_schema_digest_elsewhere_refuse(self):

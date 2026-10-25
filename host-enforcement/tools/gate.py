@@ -166,7 +166,8 @@ definitions, vectors and README, admission v4's README, vectors and sealed plane
 pinned. G-I01B-8 reads the contract v2's definitions, whose texts and bound equal v1's. G-I01B4-1, the absence clause
 (Q-I01B4-5; I4D-1, I4D-2): no registered or held contract file is profile v2's schema, by name or by bytes; row 79's file
 is included only by the digest replay, exactly once, and named in no other crate source; and no crate source declares
-a profile v2 validator (validate_profile, precondition or a proxy_profile_v2 item), names a file after profile v2, or
+an item under the names clauses (c) and (c1) read (validate_profile, precondition or a proxy_profile_v2 item; a const
+fn is read as its fn), names a file after profile v2, or
 holds row 79's negative texts or the schema's digest outside the digest replay. R-B3-PIN is unchanged: I01B4 changes
 no guarded file.
 
@@ -383,7 +384,8 @@ I01B_EDGE_V11_ROWS = {
 # scripts/policy_observation_digests_v2.py:150-151, not registered and not vendored); row 79's file, its one reader
 # and the number of its distinct negative expect texts; and the names a profile v2 validator would take: clause (c)'s
 # fn and mod names, clause (c1)'s identifiers and clause (c2)'s file-name part, each read case-insensitively with
-# underscores removed (and hyphens, in a path).
+# underscores removed (and hyphens, in a path). A `const` followed by `fn`, `unsafe`, `extern` or `async` is a qualifier,
+# not an item, so `[pub] const [unsafe|extern ".."] fn NAME` is read as the fn NAME (PR review round 1, R1-1).
 PROFILE_V2_SCHEMA_NAME = "profile.schema.json"
 PROFILE_V2_SCHEMA_SHA256 = "e5ef3c3d112bce97d94da4b465b52feb69935a144f26dd711440acd6c67ad592"
 I01B4_ROW79 = "contracts/i01-v2/proxy-profile-v2-vectors.json"
@@ -394,8 +396,8 @@ I01B4_FN_MOD_PART = "profile_v2"
 I01B4_ITEM_NAMES = ("validateprofile", "precondition", "preconditions")
 I01B4_ITEM_PART = "proxyprofilev2"
 I01B4_PATH_PART, I01B4_PATH_EXEMPT = "profilev2", "nativeprofile"
-I01B4_ITEM = re.compile(r"\b(?:(fn|mod|struct|enum|trait|type|const|static)\s+(?:mut\s+)?|(macro_rules)\s*!\s*)"
-                        r"(?:r#)?([A-Za-z_]\w*)")
+I01B4_ITEM = re.compile(r"\b(?:(fn|mod|struct|enum|trait|type|const(?!\s+(?:fn|unsafe|extern|async)\b)|static)\s+"
+                        r"(?:mut\s+)?|(macro_rules)\s*!\s*)(?:r#)?([A-Za-z_]\w*)")
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
 # validator's; native-profile v5's schema, unit B1's, the capture validators'). Every other registered file is read by
@@ -5448,8 +5450,9 @@ def main() -> int:
                ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V11_ROWS.items()),
                len(OBSERVER_EMBEDDED_CONTRACTS)))
         say("I01B4 replay scope (HE-004-I01B4, G-I01B4-1): %d crate sources; no registered or contracts/ file is profile "
-            "v2's %s, by name or by sha256 %s; %s is included exactly once, by %s, and named in no other source; no fn, "
-            "mod or other item takes a profile v2 validator's name (clauses (c), (c1)), no source path is named after "
+            "v2's %s, by name or by sha256 %s; %s is included exactly once, by %s, and named in no other source; no fn "
+            "(a const fn read as its fn), mod or other item takes a profile v2 validator's name (clauses (c), (c1)), no "
+            "source path is named after "
             "profile v2 (c2), and row 79's %d negative texts and the schema's sha256 occur in no other source (c3)"
             % (check_i01b4_replay_scope(HE), PROFILE_V2_SCHEMA_NAME, PROFILE_V2_SCHEMA_SHA256, I01B4_ROW79,
                I01B4_ROW79_READER, I01B4_ROW79_TEXTS))
