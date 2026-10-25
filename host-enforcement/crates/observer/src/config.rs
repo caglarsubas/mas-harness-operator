@@ -22,13 +22,26 @@
 //! by [`ObserverConfig::parse_with_record`] with v1's helpers and checks. The record's path must name one entry of the
 //! configuration's own directory (`/etc/planeon/policy-observer`, typed `planeon_etc_t`), other than `config.json` and
 //! `config.json.sig` (D1-3); anything else is status 13. [`ObserverConfig::parse`] and [`FORMAT`] are unchanged, so a v2
-//! document is refused there, and `serve` calls only the v2 parse, so the binary refuses every v1 document. The
+//! document is refused there, and `serve` called only the v2 parse (since HE-004-I01B2, only the v3 parse), so the
+//! binary refuses every v1 document. The
 //! signature's domain stays `planeon.observer-config/v1` (`signed_config::payload`): each document's own `format` member
 //! is signed under it, so a signed v1 document never parses as v2.
+//!
+//! HE-004-I01B2 (DESIGN-I01B2 rev 3 sections 3 and 4; the monitor's Q-I01B2D-1 (a) and Q-I01B2D-2 (a); MODEL_DEFINED's
+//! HE-004-I01B2 section) adds `planeon.observer-config/v3`, the observer configuration successor: v2's nine members
+//! with that format, `generation` narrowed to 64 lowercase hex, plus `sealedAdmission` (`ipFamily`, `serviceCIDR`,
+//! `defaultTolerationSeconds`) and `binding`, the release-listed binding document inline in its canonical form; eleven
+//! members, closed. [`ObserverConfig::parse_v3`] is the only parse `serve` calls (v1 and v2 documents refuse, their
+//! format differs), and after v2's checks it runs the load-time checks in this order, each refusing at status 13 with
+//! its own text: the binding's namespaces equal `qualificationNamespace`, the binding's form against the channel
+//! schema's `$defs.binding` ([`BINDING_FORM`], written from that text), its service-account subject in the
+//! qualification namespace, and the sealed values' forms. Only then is the member bound, once, and kept in the private
+//! field the accessor [`ObserverConfig::binding`] reads; `parse` and `parse_with_record` leave it `Value::Null` and
+//! `sealed` `None`. The signature's domain stays `planeon.observer-config/v1`.
 
 use std::fmt;
 
-use gate_sys::inet::{parse_authority, InetAddress, IpLiteral};
+use gate_sys::inet::{parse_authority, parse_ipv4, parse_ipv6, InetAddress, IpLiteral};
 use i05_protocol::json::{self, Object, Value};
 
 use crate::signed_config::{DOCUMENT_NAME, PRODUCTION_DIR, SIGNATURE_NAME};
@@ -57,6 +70,28 @@ const MEMBERS: [&str; 8] = ["format", "generation", "validity", "apiserverAuthor
 /// The v2 root's members, exactly: v1's and the qualification record.
 const MEMBERS_V2: [&str; 9] = ["format", "generation", "validity", "apiserverAuthority", "qualificationNamespace",
                                "credentials", "admission", "enrollment", "qualificationRecord"];
+/// The format of the observer configuration successor (HE-004-I01B2); its signature's domain stays [`FORMAT`].
+pub const FORMAT_V3: &str = "planeon.observer-config/v3";
+/// The v3 root's members, exactly: v2's, the sealed admission values and the binding document.
+const MEMBERS_V3: [&str; 11] = ["format", "generation", "validity", "apiserverAuthority", "qualificationNamespace",
+                                "credentials", "admission", "enrollment", "qualificationRecord", "sealedAdmission",
+                                "binding"];
+/// `sealedAdmission`'s members, exactly.
+const SEALED_MEMBERS: [&str; 3] = ["ipFamily", "serviceCIDR", "defaultTolerationSeconds"];
+/// The Kubernetes Service API's two `ipFamilies` values, the only `ipFamily` texts.
+pub const IP_FAMILIES: [&str; 2] = ["IPv4", "IPv6"];
+/// The load-time checks' own refusal texts (DESIGN-I01B2 section 4), so that a refusal names its check.
+pub const BINDING_NAMESPACES_REFUSAL: &str =
+    "binding namespaces: binding.scope.namespace, binding.namespace.name and qualificationNamespace are not one namespace";
+pub const BINDING_SUBJECT_REFUSAL: &str =
+    "binding subject: binding.scope.serviceAccountSubject is not system:serviceaccount:<qualificationNamespace>:<name>";
+pub const SEALED_FAMILY_REFUSAL: &str = "sealed values: sealedAdmission.ipFamily is not IPv4 or IPv6";
+pub const SEALED_CIDR_REFUSAL: &str =
+    "sealed values: sealedAdmission.serviceCIDR is not a network of ipFamily in canonical text with every host bit zero";
+pub const SEALED_SECONDS_REFUSAL: &str =
+    "sealed values: sealedAdmission.defaultTolerationSeconds is not an integer in 0..2^53-1";
+/// The prefix of the binding form's refusal, which names the member that refused.
+pub const BINDING_FORM_REFUSAL: &str = "binding form:";
 
 /// A file the configuration names: an absolute normalised path and its pin.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -74,8 +109,9 @@ pub struct CredentialFiles {
     pub key: FileRef,
 }
 
-/// The checked configuration.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// The checked configuration. HE-004-I01B2: i05-protocol's `Value` derives only `Clone` and `Debug`, so the derive is
+/// exactly those two (I2D-2); no whole configuration is compared.
+#[derive(Clone, Debug)]
 pub struct ObserverConfig {
     /// R19's store-name form; kept for HE-004-I01's generation-equality rule (HS43).
     pub generation: String,
@@ -89,7 +125,118 @@ pub struct ObserverConfig {
     pub pinned_manifest_hash: String,
     pub expected_plugin: String,
     pub nonce: String,
+    /// HE-004-I01B2: the binding document inline (v3's checked `binding` member), private, read only through the
+    /// accessor; `Value::Null` from `parse` and `parse_with_record`.
+    binding: Value,
+    /// HE-004-I01B2 (Q-I01B2D-2 (a)): the sealed admission values, kept for HE-004-I01B3; `None` from `parse` and
+    /// `parse_with_record`.
+    pub sealed: Option<SealedValues>,
 }
+
+/// The sealed admission values of configuration v3 (`sealedAdmission`), in their checked forms: HE-008 computes them
+/// with the v2 model at enrollment, and HE-004-I01B3's A2 render reads them. A forged value changes only the render's
+/// hash, which must equal ADM-4's loaded hash and the binding's `enforcementPins.admissionFenceDigest`, so it fails
+/// closed (MODEL_DEFINED's HE-004-I01B2 section). Never defaulted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SealedValues {
+    pub ip_family: String,
+    pub service_cidr: String,
+    pub default_toleration_seconds: u64,
+}
+
+/// The pattern of one text member of the channel schema's `$defs.binding` (CS, `contracts/i01-v1/channel.schema.json`),
+/// written by hand from CS's pattern text ([`TextPattern::pattern_text`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextPattern {
+    /// `^sha256:[0-9a-f]{64}$`
+    Digest,
+    /// `^[a-z0-9][a-z0-9.-]{0,62}$`
+    Label,
+    /// `^system:serviceaccount:[a-z0-9.-]+:[a-z0-9.-]+$`
+    Subject,
+    /// `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$`
+    Instant,
+    /// `^[A-Za-z0-9-]{1,128}$`
+    Uid,
+    /// `^[A-Za-z0-9./-]+$`
+    ApiVersion,
+    /// `^[A-Za-z][A-Za-z0-9]+$`
+    Kind,
+}
+
+/// The seven patterns, each once.
+pub const TEXT_PATTERNS: [TextPattern; 7] = [TextPattern::Digest, TextPattern::Label, TextPattern::Subject,
+                                             TextPattern::Instant, TextPattern::Uid, TextPattern::ApiVersion,
+                                             TextPattern::Kind];
+
+/// A text member: `type` string, `minLength` and `maxLength` (code points) and `pattern`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TextBounds {
+    pub min: usize,
+    pub max: usize,
+    pub pattern: TextPattern,
+}
+
+/// One member's form in CS's `$defs.binding`, as the load-time check reads it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BindingForm {
+    /// `{"const": <text>}`.
+    Const(&'static str),
+    /// `{"type": "string", "minLength", "maxLength", "pattern"}`.
+    Text(TextBounds),
+    /// `{"oneOf": [<a text form>, {"type": "null"}]}`.
+    TextOrNull(TextBounds),
+    /// `{"type": "object", "additionalProperties": false, "required": <the names>, "properties": <the names>}`: a
+    /// closed object, each member required.
+    Object(&'static [(&'static str, BindingForm)]),
+}
+
+const DIGEST_TEXT: BindingForm = BindingForm::Text(TextBounds { min: 1, max: 71, pattern: TextPattern::Digest });
+const LABEL_TEXT: BindingForm = BindingForm::Text(TextBounds { min: 1, max: 63, pattern: TextPattern::Label });
+const UID_TEXT: BindingForm = BindingForm::Text(TextBounds { min: 1, max: 128, pattern: TextPattern::Uid });
+const INSTANT_TEXT: BindingForm = BindingForm::Text(TextBounds { min: 1, max: 20, pattern: TextPattern::Instant });
+const PROJECTION: BindingForm = BindingForm::Object(&[
+    ("apiVersion", BindingForm::Text(TextBounds { min: 1, max: 128, pattern: TextPattern::ApiVersion })),
+    ("kind", BindingForm::Text(TextBounds { min: 1, max: 128, pattern: TextPattern::Kind })),
+    ("name", LABEL_TEXT),
+    ("namespace", BindingForm::TextOrNull(TextBounds { min: 1, max: 63, pattern: TextPattern::Label })),
+    ("uid", UID_TEXT),
+    ("projectionDigest", DIGEST_TEXT),
+]);
+
+/// CS's `$defs.binding`, whole (Q-I01B2D-1 (a)): `observer_config_v3` holds this table to CS's text.
+pub const BINDING_FORM: BindingForm = BindingForm::Object(&[
+    ("schemaVersion", BindingForm::Const("planeon.internal.policy-observation-binding/v1")),
+    ("profileDigest", DIGEST_TEXT),
+    ("scope", BindingForm::Object(&[
+        ("tenantId", LABEL_TEXT),
+        ("environmentId", LABEL_TEXT),
+        ("runNonce", LABEL_TEXT),
+        ("capacityNonce", LABEL_TEXT),
+        ("endpointId", LABEL_TEXT),
+        ("namespace", LABEL_TEXT),
+        ("serviceAccountSubject", BindingForm::Text(TextBounds { min: 1, max: 256, pattern: TextPattern::Subject })),
+        ("validFrom", INSTANT_TEXT),
+        ("expiresAt", INSTANT_TEXT),
+    ])),
+    ("observer", BindingForm::Object(&[("executableDigest", DIGEST_TEXT), ("manifestDigest", DIGEST_TEXT)])),
+    ("namespace", BindingForm::Object(&[("name", LABEL_TEXT), ("uid", UID_TEXT)])),
+    ("projections", BindingForm::Object(&[
+        ("admissionPolicy", PROJECTION),
+        ("resourceQuota", PROJECTION),
+        ("limitRange", PROJECTION),
+        ("serviceAccount", PROJECTION),
+        ("rbac", PROJECTION),
+        ("networkPolicy", PROJECTION),
+        ("mutationBroker", PROJECTION),
+    ])),
+    ("enforcementPins", BindingForm::Object(&[
+        ("admissionFenceDigest", DIGEST_TEXT),
+        ("rbacClosureDigest", DIGEST_TEXT),
+        ("networkEnforcementDigest", DIGEST_TEXT),
+        ("hostPreflightDigest", DIGEST_TEXT),
+    ])),
+]);
 
 /// Why a document is refused (every case is status 13).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -290,6 +437,221 @@ pub fn is_record_path(path: &str) -> bool {
     })
 }
 
+/// The v3 generation (HE-004-I01B2): 64 lowercase hex digits, within R19's store-name form.
+pub fn is_generation_v3(text: &str) -> bool {
+    text.len() == 64 && lower_hex(text) && is_generation(text)
+}
+
+/// A byte of CS's class `[a-z0-9.-]`.
+fn label_byte(byte: u8) -> bool {
+    byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-')
+}
+
+/// One segment of a service-account subject: `[a-z0-9.-]+`.
+fn segment(text: &str) -> bool {
+    !text.is_empty() && text.bytes().all(label_byte)
+}
+
+impl TextPattern {
+    /// CS's pattern text, exactly as `$defs.binding` writes it.
+    pub fn pattern_text(self) -> &'static str {
+        match self {
+            TextPattern::Digest => "^sha256:[0-9a-f]{64}$",
+            TextPattern::Label => "^[a-z0-9][a-z0-9.-]{0,62}$",
+            TextPattern::Subject => "^system:serviceaccount:[a-z0-9.-]+:[a-z0-9.-]+$",
+            TextPattern::Instant => "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+            TextPattern::Uid => "^[A-Za-z0-9-]{1,128}$",
+            TextPattern::ApiVersion => "^[A-Za-z0-9./-]+$",
+            TextPattern::Kind => "^[A-Za-z][A-Za-z0-9]+$",
+        }
+    }
+
+    /// Whether the whole of `text` matches the pattern (the hand-written reading of [`TextPattern::pattern_text`]; `$`
+    /// only at the end, as in ECMA-262).
+    pub fn matches(self, text: &str) -> bool {
+        let bytes = text.as_bytes();
+        match self {
+            TextPattern::Digest => is_digest(text),
+            TextPattern::Label => {
+                bytes.first().is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+                    && bytes.len() <= 63
+                    && bytes.iter().all(|byte| label_byte(*byte))
+            }
+            TextPattern::Subject => text
+                .strip_prefix("system:serviceaccount:")
+                .and_then(|rest| rest.split_once(':'))
+                .is_some_and(|(space, name)| segment(space) && segment(name)),
+            TextPattern::Instant => {
+                bytes.len() == 20
+                    && bytes.iter().enumerate().all(|(index, byte)| match index {
+                        4 | 7 => *byte == b'-',
+                        10 => *byte == b'T',
+                        13 | 16 => *byte == b':',
+                        19 => *byte == b'Z',
+                        _ => byte.is_ascii_digit(),
+                    })
+            }
+            TextPattern::Uid => {
+                (1..=128).contains(&bytes.len()) && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+            }
+            TextPattern::ApiVersion => {
+                !bytes.is_empty() && bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'/' | b'-'))
+            }
+            TextPattern::Kind => {
+                bytes.first().is_some_and(u8::is_ascii_alphabetic) && bytes.len() >= 2 && bytes.iter().all(u8::is_ascii_alphanumeric)
+            }
+        }
+    }
+}
+
+impl TextBounds {
+    /// Whether `text` holds `min` to `max` code points and matches the pattern.
+    pub fn admits(self, text: &str) -> bool {
+        (self.min..=self.max).contains(&text.chars().count()) && self.pattern.matches(text)
+    }
+}
+
+/// The member at `path` (object member names) of an optional value.
+fn member_at<'a>(value: Option<&'a Value>, path: &[&str]) -> Option<&'a Value> {
+    path.iter().try_fold(value?, |node, name| node.get(name))
+}
+
+/// The first load-time check (DESIGN-I01B2 section 4; it replays PV case 27): `binding.scope.namespace` and
+/// `binding.namespace.name` both equal `qualificationNamespace` (a missing or non-text one refuses here too).
+fn binding_namespaces(member: Option<&Value>, namespace: &str) -> Result<(), ConfigError> {
+    let scoped = member_at(member, &["scope", "namespace"]).and_then(Value::as_str);
+    let named = member_at(member, &["namespace", "name"]).and_then(Value::as_str);
+    if scoped != Some(namespace) || named != Some(namespace) {
+        return check(BINDING_NAMESPACES_REFUSAL.to_string());
+    }
+    Ok(())
+}
+
+/// The second load-time check (Q-I01B2D-1 (a)): the binding document against [`BINDING_FORM`], each object closed with
+/// every member required, the one constant, each text's length bounds and pattern, and a projection's namespace a
+/// label or null. The refusal names the member.
+fn binding_form(member: Option<&Value>) -> Result<(), ConfigError> {
+    let Some(document) = member else { return check(format!("{BINDING_FORM_REFUSAL} the binding member is missing")) };
+    let mut stack = vec![(document, BINDING_FORM, "binding".to_string())];
+    while let Some((value, form, path)) = stack.pop() {
+        let held = match form {
+            BindingForm::Const(expected) => value.as_str() == Some(expected),
+            BindingForm::Text(bounds) => value.as_str().is_some_and(|text| bounds.admits(text)),
+            BindingForm::TextOrNull(bounds) => value.is_null() || value.as_str().is_some_and(|text| bounds.admits(text)),
+            BindingForm::Object(members) => match value.as_object() {
+                Some(object)
+                    if object.len() == members.len() && members.iter().all(|(name, _)| object.get(name).is_some()) =>
+                {
+                    for (name, inner) in members {
+                        if let Some(child) = object.get(name) {
+                            stack.push((child, *inner, format!("{path}.{name}")));
+                        }
+                    }
+                    true
+                }
+                _ => false,
+            },
+        };
+        if !held {
+            return check(format!("{BINDING_FORM_REFUSAL} {path} is not of the channel schema's $defs.binding form"));
+        }
+    }
+    Ok(())
+}
+
+/// The third load-time check: `binding.scope.serviceAccountSubject` is `system:serviceaccount:<qualificationNamespace>:
+/// <name>`, the name as CS's pattern allows.
+fn binding_subject(member: Option<&Value>, namespace: &str) -> Result<(), ConfigError> {
+    let name = member_at(member, &["scope", "serviceAccountSubject"])
+        .and_then(Value::as_str)
+        .and_then(|subject| subject.strip_prefix("system:serviceaccount:"))
+        .and_then(|rest| rest.strip_prefix(namespace))
+        .and_then(|rest| rest.strip_prefix(':'));
+    if !name.is_some_and(segment) {
+        return check(BINDING_SUBJECT_REFUSAL.to_string());
+    }
+    Ok(())
+}
+
+/// The canonical text of an IPv6 address (RFC 5952): lowercase hex groups without leading zeros, the longest run of
+/// two or more zero groups (the first if tied) written `::`, no dotted tail.
+fn ipv6_text(octets: &[u8; 16]) -> String {
+    let words: Vec<u16> = octets
+        .chunks_exact(2)
+        .map(|pair| match pair {
+            [high, low] => u16::from_be_bytes([*high, *low]),
+            _ => 0,
+        })
+        .collect();
+    let (mut best, mut run) = ((0usize, 0usize), (0usize, 0usize));
+    for (index, word) in words.iter().enumerate() {
+        if *word == 0 {
+            if run.1 == 0 {
+                run.0 = index;
+            }
+            run.1 = run.1.saturating_add(1);
+            if run.1 > best.1 {
+                best = run;
+            }
+        } else {
+            run.1 = 0;
+        }
+    }
+    let hex = |part: &[u16]| part.iter().map(|word| format!("{word:x}")).collect::<Vec<_>>().join(":");
+    if best.1 < 2 {
+        return hex(&words);
+    }
+    let head = words.get(..best.0).unwrap_or_default();
+    let tail = words.get(best.0.saturating_add(best.1)..).unwrap_or_default();
+    format!("{}::{}", hex(head), hex(tail))
+}
+
+/// `serviceCIDR` (I2D-10): a network of `family` in canonical text, then `/` and a decimal prefix without a leading zero
+/// (0..32 for IPv4, 0..128 for IPv6), every host bit zero. IPv4 is four decimal octets without leading zeros
+/// (gate-sys's `parse_ipv4`); IPv6 is RFC 5952's lowercase compressed form (the text must equal [`ipv6_text`]).
+pub fn is_service_cidr(family: &str, cidr: &str) -> bool {
+    let Some((address, prefix)) = cidr.split_once('/') else { return false };
+    if prefix.is_empty()
+        || prefix.len() > 3
+        || !prefix.bytes().all(|byte| byte.is_ascii_digit())
+        || (prefix.len() > 1 && prefix.starts_with('0'))
+    {
+        return false;
+    }
+    let Ok(bits) = prefix.parse::<u32>() else { return false };
+    match family {
+        "IPv4" => parse_ipv4(address)
+            .is_some_and(|octets| bits <= 32 && (u32::from_be_bytes(octets) & u32::MAX.checked_shr(bits).unwrap_or(0)) == 0),
+        "IPv6" => parse_ipv6(address).is_some_and(|octets| {
+            bits <= 128
+                && ipv6_text(&octets) == address
+                && (u128::from_be_bytes(octets) & u128::MAX.checked_shr(bits).unwrap_or(0)) == 0
+        }),
+        _ => false,
+    }
+}
+
+/// The fourth load-time check (DESIGN-I01B2 section 4, I2D-10; R10-defined, since neither the v2 model nor admission v4
+/// states a form): `sealedAdmission` closed; `ipFamily` exactly `IPv4` or `IPv6`; `serviceCIDR` a canonical network of
+/// that family; `defaultTolerationSeconds` an integer in 0..2^53-1. It names nothing of the digest port (G-I01B-1).
+fn sealed_values(value: Option<&Value>) -> Result<SealedValues, ConfigError> {
+    let what = "sealedAdmission";
+    let object = closed(value, what, &SEALED_MEMBERS)?;
+    let family = text(object, "ipFamily", what)?;
+    if !IP_FAMILIES.contains(&family) {
+        return check(SEALED_FAMILY_REFUSAL.to_string());
+    }
+    let cidr = text(object, "serviceCIDR", what)?;
+    if !is_service_cidr(family, cidr) {
+        return check(SEALED_CIDR_REFUSAL.to_string());
+    }
+    let seconds = integer(object, "defaultTolerationSeconds", what)?;
+    if seconds > MAX_INTEGER {
+        return check(SEALED_SECONDS_REFUSAL.to_string());
+    }
+    Ok(SealedValues { ip_family: family.to_string(), service_cidr: cidr.to_string(), default_toleration_seconds: seconds })
+}
+
 impl ObserverConfig {
     /// Checks a verified document (see the module documentation) and returns the typed configuration.
     pub fn parse(document: &[u8]) -> Result<ObserverConfig, ConfigError> {
@@ -315,6 +677,39 @@ impl ObserverConfig {
         if !is_record_path(&record.path) {
             return check("qualificationRecord.path is not an entry of the configuration's directory".to_string());
         }
+        Ok((config, record))
+    }
+
+    /// Checks a verified `planeon.observer-config/v3` document (HE-004-I01B2; DESIGN-I01B2 sections 3 and 4): the root's
+    /// eleven members and the format, v2's checks (`fn members`) with `generation` narrowed to 64 lowercase hex, and the
+    /// record's reference as `parse_with_record` checks it; then the load-time checks in their order (the namespaces,
+    /// the binding's form against CS, the subject, the sealed values' forms). Only after every check is the `binding`
+    /// member bound, once, and assigned once (I2D-3). The typed configuration and the record's path and pin; every
+    /// refusal is status 13. `serve` calls only this parse.
+    pub fn parse_v3(document: &[u8]) -> Result<(ObserverConfig, FileRef), ConfigError> {
+        let value = canonical_value(document)?;
+        let root = closed(Some(&value), "the document", &MEMBERS_V3)?;
+        if text(root, "format", "the document")? != FORMAT_V3 {
+            return schema(format!("the document's format is not {FORMAT_V3}"));
+        }
+        let mut config = ObserverConfig::members(root)?;
+        if !is_generation_v3(&config.generation) {
+            return check("generation is not 64 lowercase hex digits (configuration v3)".to_string());
+        }
+        let record = file_ref(root.get("qualificationRecord"), "qualificationRecord")?;
+        if !is_record_path(&record.path) {
+            return check("qualificationRecord.path is not an entry of the configuration's directory".to_string());
+        }
+        binding_namespaces(root.get("binding"), &config.namespace)?;
+        binding_form(root.get("binding"))?;
+        binding_subject(root.get("binding"), &config.namespace)?;
+        let sealed = sealed_values(root.get("sealedAdmission"))?;
+        let binding = match root.get("binding") {
+            Some(member) => member.clone(),
+            None => return schema("the document holds no binding member".to_string()),
+        };
+        config.sealed = Some(sealed);
+        config.binding = binding;
         Ok((config, record))
     }
 
@@ -367,12 +762,20 @@ impl ObserverConfig {
             pinned_manifest_hash: pinned.to_string(),
             expected_plugin: plugin.to_string(),
             nonce: nonce.to_string(),
+            binding: Value::Null,
+            sealed: None,
         })
     }
 
     /// Whether `notAfter` is reached at the wall second `now` (status 94 while running).
     pub fn expired(&self, now: u64) -> bool {
         now >= self.not_after
+    }
+
+    /// The binding document inline (HE-004-I01B2, B2-11 (f)): v3's checked `binding` member as `parse_v3` kept it,
+    /// `Value::Null` after `parse` and `parse_with_record`; the one argument of `serve`'s `I01Binding::from_config`.
+    pub fn binding(&self) -> &Value {
+        &self.binding
     }
 }
 

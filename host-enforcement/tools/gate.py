@@ -171,6 +171,20 @@ fn is read as its fn), names a file after profile v2, or
 holds row 79's negative texts or the schema's digest outside the digest replay. R-B3-PIN is unchanged: I01B4 changes
 no guarded file.
 
+HE-004-I01B2 (configuration v3 and the binding; DESIGN-I01B2 rev 3 sections 1, 5 and 7, with DESIGN-I01B rev 3 section
+6's G-I01B-3 and G-I01B-4, round 3's B3-2, B3-3, B3-8 and B3-11 (a), and the section reviews' I2D-1..14 and I2E-1..7;
+the monitor's Q-I01B2D-1..4) gives serve fourteen calls, configuration v3's parse in place of the v2 parse and
+I01Binding::from_config fourth, refuses the v2 parse in serve beside the v1 parse and adds I01Binding to serve's pinned
+imports. G-I01B-3 (check_i01b_binding) holds I01Binding closed: one definition with two private fields and the one
+derive, one inherent impl of from_config and two getters, its one literal inside from_config, the fields read only
+through the getters, no rename or alias, and its six named positions at three exact signatures. G-I01B-4
+(check_i01b_constructor) holds its one construction: from_config twice; serve twice in main.rs; observe::run('s seven
+arguments; serve's load and parse statements pinned whole, outermost and in order, document and config each counted at
+their places, parse_v3 twice in the crate; and in config.rs the private field, its accessor and the one ObserverConfig
+literal, no rename or type item naming ObserverConfig, the dot form twice, parse_v3's local binding bound once and
+assigned once, and no Self. Each sub-clause is its own function. R-B3-PIN re-pins config.rs, i01_request.rs and
+i01_service.rs at I01B2's bytes.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -505,7 +519,9 @@ OBSERVER_MAIN_USES = tuple(sorted(
     # HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): serve's in-body imports of the capture setup.
     + [(("planeon_observer", "capture", "CaptureEngine"), None), (("planeon_observer", "capture_schema", "CaptureSchema"), None),
        (("planeon_observer", "enrolled", "self"), None), (("planeon_observer", "enrolled", "Enrolled"), None),
-       (("planeon_observer", "linux_capture", "LinuxCapture"), None)]))
+       (("planeon_observer", "linux_capture", "LinuxCapture"), None)]
+    # HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5): serve's import of the closed binding.
+    + [(("planeon_observer", "i01_request", "I01Binding"), None)]))
 GATE_SEAL_SITE = {"main": GATE_MAIN, "before": (GATE_CONFIG, SIGNED_CONFIG), "calls": SEAL_CALLS, "uses": MAIN_USES,
                   "functions": MAIN_FUNCTIONS, "adjacent": False}
 OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": OBSERVER_MAIN_USES,
@@ -515,19 +531,23 @@ OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEA
 # parse with the record's reference in place of the v1 parse, the capture schema, the record's read, the enrolled record
 # and the capture roots joining them. HE-004-I01a DESIGN-I01A sections 6 and 12: thirteen, the enrolled record's server
 # identity (`enrolled.server_identity(`) right after Enrolled::new and before the record moves into the capture engine
-# (the I01 service's identity, which observe::run takes).
+# (the I01 service's identity, which observe::run takes). HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5, DIB section 3.3):
+# fourteen, configuration v3's parse in place of the v2 parse, and the binding's one constructor fourth, right after the
+# lifetime.
 OBSERVER_WIRING = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bsigned_config::load\s*\(", "signed_config::load("),
-    (r"\bObserverConfig::parse_with_record\s*\(", "ObserverConfig::parse_with_record("),
+    (r"\bObserverConfig::parse_v3\s*\(", "ObserverConfig::parse_v3("),
     (r"(?<![\w:])config::check_lifetime\s*\(", "config::check_lifetime("),
+    (r"\bI01Binding::from_config\s*\(", "I01Binding::from_config("),
     (r"\bcredentials::observer_inputs\s*\(", "credentials::observer_inputs("),
     (r"(?<![\w:])client_config\s*\(", "client_config("), (r"\bCaptureSchema::embedded\s*\(", "CaptureSchema::embedded("),
     (r"(?<![\w:])enrolled::load_record\s*\(", "enrolled::load_record("), (r"\bEnrolled::new\s*\(", "Enrolled::new("),
     (r"(?<![\w:.])enrolled\s*\.\s*server_identity\s*\(", "enrolled.server_identity("),
     (r"\bLinuxWire::new\s*\(", "LinuxWire::new("), (r"\bLinuxCapture::new\s*\(", "LinuxCapture::new("),
     (r"\bClosure::embedded\s*\(", "Closure::embedded("), (r"(?<![\w:])observe::run\s*\(", "observe::run(")))
-# The v1 parse no longer appears in serve (G-D1-8).
+# The v1 parse no longer appears in serve (G-D1-8), nor, since HE-004-I01B2 (DIB section 3.3), the v2 parse.
 OBSERVER_V1_PARSE = re.compile(r"\bObserverConfig::parse\s*\(")
+OBSERVER_V2_PARSE = re.compile(r"\bObserverConfig::parse_with_record\s*\(")
 # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-5): serve maps LinuxWire::new's refusal through status::wire_setup (24
 # for the poller, 31-34 for the I01 listener's steps) in exactly this match, so a return to one status for every setup
 # refusal refuses (read without comments, the whitespace around `::` removed, any other spacing allowed).
@@ -909,9 +929,12 @@ EFFECT_GATE_CRATE = "crates/effect-gate"
 I01B_GUARDED_PINS = {
     "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
     "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
-    "crates/observer/src/config.rs": "bef5143c30961fae16e12a90d3dcabeba35433e2082aae79da0d27a0ac2acee8",
-    "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
-    "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
+    # HE-004-I01B2 (DESIGN-I01B2 rev 3 section 1): these three re-pinned at I01B2's bytes (configuration v3, its
+    # load-time checks and the private binding with its accessor; the closed I01Binding and from_config; the service
+    # holding the binding and closing a passing request as NotAnswered).
+    "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
+    "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
+    "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
     "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
 }
 I01B_ABSENT = ("crates/observer/src/i01_answer.rs",)
@@ -2153,6 +2176,23 @@ def check_observer_includes(base: Path) -> int:
     return count
 
 
+def serve_body(base: Path, rule: str) -> str:
+    """The observer's main.rs fn serve body as check_observer_serve reads it (HE-004C; shared with G-I01B-4 since
+    HE-004-I01B2): comments removed, literal contents emptied, the whitespace around `::` removed, and the body from its
+    `{` to its `}` with every use declaration replaced by one space. One fn serve with a body, or it refuses (`rule`)."""
+    rel = OBSERVER_MAIN
+    require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    try:
+        code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    found = list(FN_SERVE.finditer(code))
+    require(len(found) == 1, "%s does not hold exactly one fn serve (%s)" % (rel, rule))
+    opening = code.find("{", found[0].end())
+    require(opening >= 0, "%s's fn serve has no body (%s)" % (rel, rule))
+    return USE_DECLARATION.sub(" ", code[opening:block_end(code, opening)])
+
+
 def check_observer_serve(base: Path) -> int:
     """HE-004C DESIGN-C sections 14 and 15 (G5's wiring rule, D1-1): the observer's main.rs holds one fn serve, and in its
     body, read without comments and use declarations and with the whitespace around `::` removed, each OBSERVER_WIRING
@@ -2171,19 +2211,13 @@ def check_observer_serve(base: Path) -> int:
     stays code review's (R5-1), as what any other called function does in turn. HE-004-I01A2 (HE-004-I01a PR review
     round 1, R1-5): the wire's construction is exactly once WIRE_SETUP_MATCH, `let wire = match LinuxWire::new(sealed)
     { Ok(wire) => wire, Err(error) => return status::wire_setup(&error), };`, so its refusal keeps the statuses 24 and
-    31-34. The number of calls."""
-    rel = OBSERVER_MAIN
-    require((base / rel).is_file(), "%s is missing (observer wiring order)" % rel)
-    try:
-        code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
-    except GateError as error:
-        raise GateError("%s: %s (observer wiring order)" % (rel, error)) from None
-    found = list(FN_SERVE.finditer(code))
-    require(len(found) == 1, "%s does not hold exactly one fn serve (observer wiring order)" % rel)
-    opening = code.find("{", found[0].end())
-    require(opening >= 0, "%s's fn serve has no body (observer wiring order)" % rel)
-    body = USE_DECLARATION.sub(" ", code[opening:block_end(code, opening)])
+    31-34. HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5; DIB section 3.3): fourteen calls, `ObserverConfig::parse_v3(` in
+    place of the v2 parse and `I01Binding::from_config(` fourth, and serve calls neither the v1 nor the v2 parse (G-I01B-4
+    (b)'s refused parses; the rest of G-I01B-4 is check_i01b_constructor's). The number of calls."""
+    body = serve_body(base, "observer wiring order")
     require(not OBSERVER_V1_PARSE.search(body), "serve calls the v1 ObserverConfig::parse( (observer wiring order, G-D1-8)")
+    require(not OBSERVER_V2_PARSE.search(body), "serve calls the v2 ObserverConfig::parse_with_record( (observer wiring "
+            "order, HE-004-I01B2)")
     positions = []
     for pattern, name in OBSERVER_WIRING:
         calls = list(pattern.finditer(body))
@@ -3997,6 +4031,461 @@ def check_socket_module_aliases(base: Path) -> int:
     return count
 
 
+# HE-004-I01B2 G-I01B-3, `I01Binding` closed (DESIGN-I01B rev 3 section 6 (i)-(vi); DESIGN-I01B2 rev 3 sections 6 and 7;
+# B3-8 and B3-11 (a); Q-I01B-19, SR-2, B2-1), in G-D2-8's token-rule form: the struct-expression-or-pattern form, read
+# after `::` normalisation with any spacing inside `< >`; the three exact signatures that hold (vi)'s positions 3, 5 and
+# 6; the fields and the derive. Each clause is its own function, called from check_i01b_binding.
+I01B2_REQUEST = "crates/observer/src/i01_request.rs"
+I01B2_CONFIG = "crates/observer/src/config.rs"
+BINDING_LITERAL = re.compile(r"\bI01Binding(?:::\s*<\s*>)?\s*\{")
+BINDING_FIELDS = ["signed_digest: String", "signed_nonce: String"]
+BINDING_DERIVE = {"Debug", "PartialEq", "Eq"}
+BINDING_SIGNATURES = (
+    (re.compile(r"\bpub\s+fn\s+from_config\s*\(\s*binding\s*:\s*&\s*Value\s*\)\s*->\s*Option\s*<\s*(I01Binding)\s*>\s*\{"),
+     "pub fn from_config(binding: &Value) -> Option<I01Binding>"),
+    (re.compile(r"\bpub\s+fn\s+binding_gate\s*\(\s*request\s*:\s*&\s*I01Request\s*,\s*binding\s*:\s*Option\s*<\s*&\s*"
+                r"(I01Binding)\s*>\s*\)\s*->\s*Result\s*<\s*\(\s*\)\s*,\s*RequestRefusal\s*>\s*\{"),
+     "pub fn binding_gate(request: &I01Request, binding: Option<&I01Binding>) -> Result<(), RequestRefusal>"),
+    (re.compile(r"\bpub\s+fn\s+check_request\s*\(\s*bytes\s*:\s*&\s*\[\s*u8\s*\]\s*,\s*truncated\s*:\s*bool\s*,\s*chain\s*:"
+                r"\s*&\s*mut\s+Chain\s*,\s*binding\s*:\s*Option\s*<\s*&\s*(I01Binding)\s*>\s*\)\s*->\s*Result\s*<\s*"
+                r"I01Request\s*,\s*RequestRefusal\s*>\s*\{"),
+     "pub fn check_request(bytes: &[u8], truncated: bool, chain: &mut Chain, binding: Option<&I01Binding>) -> "
+     "Result<I01Request, RequestRefusal>"))
+
+
+def function_span(code: str, name: str) -> tuple[int, int] | None:
+    """(the `{`, the index after the `}`) of the one `fn <name>(` of a source read without comments and with literal
+    contents emptied; None when there is not exactly one."""
+    found = list(re.finditer(r"\bfn\s+%s\s*\(" % name, code))
+    if len(found) != 1:
+        return None
+    opening = code.find("{", found[0].end())
+    return (opening, block_end(code, opening)) if opening >= 0 else None
+
+
+def closed_binding_i_definition(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (i): i01_request.rs defines struct I01Binding once; its fields are exactly `signed_digest: String` and
+    `signed_nonce: String`, with no visibility; its attributes are exactly one `#[derive(..)]` of {Debug, PartialEq, Eq}
+    (no cfg_attr or other attribute, so Clone, Copy and Default are never derived)."""
+    code = codes[I01B2_REQUEST]
+    structs = list(re.finditer(r"\bstruct\s+I01Binding\b", code))
+    require(len(structs) == 1, "%s does not define struct I01Binding exactly once (%s (i))" % (I01B2_REQUEST, rule))
+    fields = [re.sub(r"\s+", " ", field.strip()) for field in struct_fields(code, structs[0].end())]
+    require(not any(re.match(r"pub\b", field) for field in fields),
+            "%s holds a field of I01Binding with a visibility (%s (i))" % (I01B2_REQUEST, rule))
+    require(sorted(fields) == BINDING_FIELDS, "%s's I01Binding fields are not exactly %s (%s (i))"
+            % (I01B2_REQUEST, " and ".join(BINDING_FIELDS), rule))
+    start = re.search(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bstruct\s+I01Binding\b", code).start()
+    attributes = [re.sub(r"\s+", "", attribute) for attribute in token_attributes(code, start)]
+    derives = [re.fullmatch(r"#\[derive\(([^()]*)\)\]", attribute) for attribute in attributes]
+    require(len(attributes) == 1 and derives[0], "%s carries an attribute other than its one derive on I01Binding (%s (i))"
+            % (I01B2_REQUEST, rule))
+    names = {name for name in derives[0].group(1).split(",") if name}
+    for refused in ("Default", "Clone", "Copy"):
+        require(refused not in names, "%s derives %s on I01Binding (%s (i))" % (I01B2_REQUEST, refused, rule))
+    require(names == BINDING_DERIVE, "%s derives other than Debug, PartialEq and Eq on I01Binding (%s (i))"
+            % (I01B2_REQUEST, rule))
+
+
+def closed_binding_ii_construction(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (ii): in i01_request.rs BINDING_LITERAL matches exactly once outside the definition and the impl header,
+    inside fn from_config's body (a return type before a body brace, `-> I01Binding {`, also matches and fails closed);
+    `Self {` and `Self(` occur nowhere there; and no other observer source matches it."""
+    code = codes[I01B2_REQUEST]
+    found = SELF_LITERAL.search(code)
+    require(not found, "%s writes `Self{` or `Self(`; I01Binding's one literal names its type (%s (ii))"
+            % (I01B2_REQUEST, rule))
+    excluded = {found.start(1) for found in re.finditer(r"\b(?:struct|impl)\s+(I01Binding)\b", code)}
+    literals = [found.start() for found in BINDING_LITERAL.finditer(code) if found.start() not in excluded]
+    span = function_span(code, "from_config")
+    require(len(literals) == 1 and span is not None and span[0] < literals[0] < span[1],
+            "%s writes the I01Binding literal other than once, in fn from_config (%s (ii))" % (I01B2_REQUEST, rule))
+    for rel, other in sorted(codes.items()):
+        if rel != I01B2_REQUEST:
+            require(not BINDING_LITERAL.search(other), "%s writes the I01Binding literal; only %s's fn from_config does "
+                    "(%s (ii))" % (rel, I01B2_REQUEST, rule))
+
+
+def closed_binding_iii_impls(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (iii): every impl header in the observer that names I01Binding is exactly `impl I01Binding {`, one, in
+    i01_request.rs, so no trait impl exists; its body holds exactly fn from_config and the two getters, whose bodies are
+    `&self.signed_digest` and `&self.signed_nonce`, and no const, type or static."""
+    homes = []
+    for rel, code in sorted(codes.items()):
+        for position, header in impl_headers(rel, code):
+            if "I01Binding" in header.split():
+                require(rel == I01B2_REQUEST and header == "impl I01Binding", "%s holds an impl naming I01Binding other "
+                        "than %s's one `impl I01Binding {` (%s (iii))" % (rel, I01B2_REQUEST, rule))
+                homes.append(position)
+    require(len(homes) == 1, "%s holds an impl naming I01Binding other than its one `impl I01Binding {` (%s (iii))"
+            % (I01B2_REQUEST, rule))
+    code = codes[I01B2_REQUEST]
+    opening = code.find("{", homes[0])
+    body = code[opening + 1:block_end(code, opening) - 1]
+    require(sorted(re.findall(r"\bfn\s+([A-Za-z_]\w*)", body)) == ["from_config", "signed_digest", "signed_nonce"],
+            "%s's impl I01Binding holds a fn other than from_config and its two getters (%s (iii))" % (I01B2_REQUEST, rule))
+    for name in ("signed_digest", "signed_nonce"):
+        span = function_span(body, name)
+        require(span is not None and re.sub(r"\s+", "", body[span[0] + 1:span[1] - 1]) == "&self.%s" % name,
+                "%s's getter %s is not `&self.%s` (%s (iii))" % (I01B2_REQUEST, name, name, rule))
+    require(not re.search(r"(?<!')\b(?:const|type|static)\b", body), "%s's impl I01Binding holds a const, type or static "
+            "(%s (iii))" % (I01B2_REQUEST, rule))
+
+
+def closed_binding_iv_fields(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (iv): outside i01_request.rs's impl I01Binding, `.signed_digest` and `.signed_nonce` occur only as the
+    getter calls."""
+    code = codes[I01B2_REQUEST]
+    impls = list(re.finditer(r"\bimpl\s+I01Binding\s*\{", code))
+    span = (impls[0].start(), block_end(code, impls[0].end() - 1)) if len(impls) == 1 else (0, 0)
+    for rel, other in sorted(codes.items()):
+        for use in re.finditer(r"\.\s*(?:r#)?(signed_digest|signed_nonce)\b(?!\s*\()", other):
+            require(rel == I01B2_REQUEST and span[0] <= use.start() < span[1], "%s uses the I01Binding field %s other "
+                    "than through its getter (%s (iv))" % (rel, use.group(1), rule))
+
+
+def closed_binding_v_names(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (v): I01Binding is renamed with `as` nowhere and named by no `type` item (read to its `;` at bracket
+    depth 0, at any nesting)."""
+    for rel, code in sorted(codes.items()):
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s (v))" % (rel, rule)) from None
+        require(not re.search(r"\bI01Binding\s+as\b|\bas\s+I01Binding\b", code)
+                and not any(re.search(r"\bI01Binding\b", text) for text in type_items),
+                "%s renames or aliases I01Binding (%s (v))" % (rel, rule))
+
+
+def closed_binding_vi_name_count(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-3 (vi), G-D2-8's name count with B3-11 (a)'s and B3-8's exact signatures: in i01_request.rs the word
+    I01Binding occurs exactly six times, at `struct I01Binding`, `impl I01Binding {`, from_config's return type in `pub
+    fn from_config(binding: &Value) -> Option<I01Binding>`, its one literal, and the parameter of binding_gate's and
+    check_request's exact signatures."""
+    code = codes[I01B2_REQUEST]
+    positions = []
+    for pattern, signature in BINDING_SIGNATURES:
+        found = list(pattern.finditer(code))
+        require(len(found) == 1, "%s does not hold `%s` exactly once (%s (vi), B3-8, B3-11 (a))"
+                % (I01B2_REQUEST, signature, rule))
+        positions.append(found[0].start(1))
+    words = [found.start() for found in re.finditer(r"\bI01Binding\b", code)]
+    span = function_span(code, "from_config")
+    expected = set(positions) | {found.start(1) for found in re.finditer(r"\b(?:struct|impl)\s+(I01Binding)\b", code)}
+    expected |= {found.start() for found in BINDING_LITERAL.finditer(code) if span and span[0] < found.start() < span[1]}
+    require(len(words) == 6 and set(words) == expected, "%s names I01Binding %d times, not at its six positions (%s (vi))"
+            % (I01B2_REQUEST, len(words), rule))
+
+
+def check_i01b_binding(base: Path) -> int:
+    """HE-004-I01B2 G-I01B-3, `I01Binding` closed (DESIGN-I01B rev 3 section 6; DESIGN-I01B2 rev 3 section 7, with
+    (vi)'s position 3 read as B3-11 (a)'s exact signature and positions 5 and 6 as B3-8's). crates/observer's non-test
+    sources are read as observer_code reads them (comments removed, literal contents emptied, the whitespace around `::`
+    removed, strict test blocks blanked), and each clause is its own function: (i) the definition, (iii) the impls, (ii)
+    the construction, (iv) the fields, (v) the names, (vi) the name count. The macro rule and `#![forbid(unsafe_code)]`
+    stand beside it. The number of clauses."""
+    rule = "I01Binding closed, G-I01B-3"
+    codes = observer_code(base, rule)
+    require(I01B2_REQUEST in codes, "%s is missing (%s)" % (I01B2_REQUEST, rule))
+    closed_binding_i_definition(codes, rule)
+    closed_binding_iii_impls(codes, rule)
+    closed_binding_ii_construction(codes, rule)
+    closed_binding_iv_fields(codes, rule)
+    closed_binding_v_names(codes, rule)
+    closed_binding_vi_name_count(codes, rule)
+    return 6
+
+
+# HE-004-I01B2 G-I01B-4, one constructor call (DESIGN-I01B rev 3 section 6 (a)-(c); DESIGN-I01B2 rev 3 sections 3, 5 and
+# 7: B3-2, B3-3, I2D-1, I2D-3, I2D-4 (1), I2D-13, I2E-1..3, I2E-5, I2E-7). serve's three pinned statements, each matched
+# whole with any spacing, as WIRE_SETUP_MATCH matches the wire's; the words the positional counts read; the accessor.
+FROM_CONFIG_STATEMENT = re.compile(r"\blet\s+Some\s*\(\s*binding\s*\)\s*=\s*I01Binding::from_config\s*\(\s*config\s*\.\s*"
+                                   r"binding\s*\(\s*\)\s*\)\s*else\s*\{\s*return\s+status::CONFIG_CHECK\s*;?\s*\}\s*;")
+LOAD_STATEMENT = re.compile(r"\blet\s+document\s*=\s*match\s+signed_config::load\s*\(\s*\)\s*\{\s*Ok\s*\(\s*document\s*\)\s*"
+                            r"=>\s*document\s*,\s*Err\s*\(\s*error\s*\)\s*=>\s*return\s+status::config_load\s*\(\s*&\s*"
+                            r"error\s*\)\s*,?\s*\}\s*;")
+PARSE_STATEMENT = re.compile(r"\blet\s+Ok\s*\(\s*\(\s*config\s*,\s*record_ref\s*\)\s*\)\s*=\s*ObserverConfig::parse_v3\s*"
+                             r"\(\s*&\s*document\s*\)\s*else\s*\{\s*return\s+status::CONFIG_CHECK\s*;?\s*\}\s*;")
+DROP_DOCUMENT = re.compile(r"drop\s*\(\s*document\s*\)\s*;")
+OBSERVE_RUN_CALL = re.compile(r"(?<![\w:])observe::run\s*\(")
+OBSERVE_RUN_ARGUMENTS = ["wire", "config", "tls", "closure", "captures", "server", "binding"]
+DOCUMENT_WORD = re.compile(r"\bdocument\b")
+CONFIG_WORD = re.compile(r"\bconfig\b(?!::)")
+CONFIG_PLACES = (re.compile(r"(?<![\w:])config::check_lifetime\s*\(\s*&\s*(config)\s*,"),
+                 re.compile(r"\bI01Binding::from_config\s*\(\s*(config)\s*\.\s*binding\s*\(\s*\)\s*\)"),
+                 re.compile(r"\bcredentials::observer_inputs\s*\(\s*&\s*(config)\s*\.\s*credentials\s*\)"))
+OBSERVER_CONFIG_LITERAL = re.compile(r"\bObserverConfig(?:::\s*<\s*>)?\s*\{")
+DOT_BINDING = re.compile(r"\.\s*(?:r#)?binding\b")
+BINDING_ACCESSOR = re.compile(r"\bpub\s+fn\s+binding\s*\(\s*&\s*self\s*\)\s*->\s*&\s*Value\s*\{")
+
+
+def outermost_statements(code: str, opening: int, rule: str) -> list[tuple[int, int]]:
+    """The statements of the block whose `{` is at `opening`, each as (start past its leading whitespace, end)."""
+    return [(start + len(code[start:end]) - len(code[start:end].lstrip()), end)
+            for start, end in block_statements(code, opening + 1, rule)]
+
+
+def holding(statements: list[tuple[int, int]], position: int) -> tuple[int, int] | None:
+    """The statement that holds `position`, if any."""
+    return next((span for span in statements if span[0] <= position < span[1]), None)
+
+
+def paren_end(code: str, opening: int) -> int:
+    """The index after the `)` that closes the `(` at `opening` (literal contents emptied)."""
+    depth = 0
+    for index in range(opening, len(code)):
+        depth += {"(": 1, ")": -1}.get(code[index], 0)
+        if depth == 0:
+            return index + 1
+    raise GateError("a call without its closing parenthesis")
+
+
+def constructor_a_from_config(codes: dict[str, str], body: str, statements: list[tuple[int, int]], rule: str) -> None:
+    """G-I01B-4 (a): over the whole crate's non-test sources (main.rs included), the word from_config occurs exactly
+    twice: `fn from_config(` inside i01_request.rs's `impl I01Binding {`, and serve's pinned statement, a statement of
+    serve's outermost block. A reference, wrapper, alias, qualified spelling or non-strict `#[cfg(test)] fn` adds a
+    word."""
+    words = sum(len(re.findall(r"\bfrom_config\b", code)) for code in codes.values())
+    require(words == 2, "from_config occurs %d times, not exactly twice: fn from_config( and serve's one statement (%s (a))"
+            % (words, rule))
+    code = codes[I01B2_REQUEST]
+    impls = list(re.finditer(r"\bimpl\s+I01Binding\s*\{", code))
+    definitions = list(re.finditer(r"\bfn\s+from_config\s*\(", code))
+    require(len(impls) == 1 and len(definitions) == 1
+            and impls[0].end() <= definitions[0].start() < block_end(code, impls[0].end() - 1),
+            "%s does not define fn from_config inside its one impl I01Binding (%s (a))" % (I01B2_REQUEST, rule))
+    found = [(match.start(), match.end()) for match in FROM_CONFIG_STATEMENT.finditer(body)]
+    require(len(found) == 1 and found[0] in statements, "serve does not hold `let Some(binding) = I01Binding::from_config("
+            "config.binding()) else { return status::CONFIG_CHECK };` exactly once, as a statement of its outermost block "
+            "(%s (a))" % rule)
+
+
+def constructor_b_wiring(main: str, body: str, rule: str) -> None:
+    """G-I01B-4 (b), beside check_observer_serve's fourteen calls and refused parses and the seal-order grammar's imports:
+    in main.rs (comments removed), `\\bserve\\s*\\(` matches exactly twice (B2-10) and the word serve occurs exactly twice
+    (B3-3), `fn serve(` and OBSERVER_TAIL's call; and serve's one observe::run( takes exactly OBSERVE_RUN_ARGUMENTS."""
+    calls, words = len(re.findall(r"\bserve\s*\(", main)), len(re.findall(r"\bserve\b", main))
+    require(calls == 2, "main.rs matches `serve(` %d times, not its definition and the tail's call (%s (b), B2-10)"
+            % (calls, rule))
+    require(words == 2, "main.rs names the word serve %d times, not only `fn serve(` and OBSERVER_TAIL's call (%s (b), "
+            "B3-3)" % (words, rule))
+    runs = list(OBSERVE_RUN_CALL.finditer(body))
+    require(len(runs) == 1 and call_arguments(body, runs[0].end() - 1) == OBSERVE_RUN_ARGUMENTS,
+            "serve's observe::run( arguments are not exactly %s (%s (b))" % (", ".join(OBSERVE_RUN_ARGUMENTS), rule))
+
+
+def constructor_b1_load_pin(body: str, rule: str) -> None:
+    """G-I01B-4 (b1) [I2E-1]: the load statement is exactly once `let document = match signed_config::load() {
+    Ok(document) => document, Err(error) => return status::config_load(&error), };`, spacing free."""
+    require(len(LOAD_STATEMENT.findall(body)) == 1, "serve's load statement is not exactly once `let document = match "
+            "signed_config::load() { Ok(document) => document, Err(error) => return status::config_load(&error), };` (%s "
+            "(b1), I2E-1)" % rule)
+
+
+def constructor_b2_document(body: str, statements: list[tuple[int, int]], rule: str) -> None:
+    """G-I01B-4 (b2) [I2E-2 (i)], positional: the word document occurs exactly 5 times in serve's body: 3 in the
+    outermost statement holding `signed_config::load(` (the pinned load statement), 1 in the outermost statement holding
+    parse_v3 (the pinned parse statement), and 1 in `drop(document);`, an outermost statement after it."""
+    words = [found.start() for found in DOCUMENT_WORD.finditer(body)]
+    load = next((span for span in statements if re.search(r"\bsigned_config::load\s*\(", body[span[0]:span[1]])), None)
+    parse_word = re.search(r"\bparse_v3\b", body)
+    parse = holding(statements, parse_word.start()) if parse_word else None
+    drops = [span for span in statements if DROP_DOCUMENT.fullmatch(body[span[0]:span[1]].strip())]
+    count = lambda span: sum(span[0] <= word < span[1] for word in words)
+    require(len(words) == 5 and load is not None and parse is not None and len(drops) == 1 and count(load) == 3
+            and count(parse) == 1 and count(drops[0]) == 1 and drops[0][0] >= parse[1],
+            "serve names document %d times, not 3 in the pinned load statement, 1 in the pinned parse statement and 1 in "
+            "`drop(document);`, an outermost statement after it (%s (b2), I2E-2 (i))" % (len(words), rule))
+
+
+def constructor_b3_config(body: str, statements: list[tuple[int, int]], rule: str) -> None:
+    """G-I01B-4 (b3) [I2E-2 (ii)], positional: the word config not followed by `::` occurs exactly 5 times in serve's
+    body: once in the outermost statement holding parse_v3 (the pinned parse statement's pattern), once each in
+    `config::check_lifetime(&config, `, the from_config statement's `config.binding()` and
+    `credentials::observer_inputs(&config.credentials)`, and once as observe::run('s second argument."""
+    words = [found.start() for found in CONFIG_WORD.finditer(body)]
+    places = []
+    parse_word = re.search(r"\bparse_v3\b", body)
+    parse = holding(statements, parse_word.start()) if parse_word else None
+    if parse:
+        places.append([word for word in words if parse[0] <= word < parse[1]])
+    for pattern in CONFIG_PLACES:
+        places.append([found.start(1) for found in pattern.finditer(body)])
+    runs = list(OBSERVE_RUN_CALL.finditer(body))
+    if len(runs) == 1:
+        opening = runs[0].end() - 1
+        arguments = call_arguments(body, opening)
+        inside = [word for word in words if opening < word < paren_end(body, opening)]
+        places.append(inside if arguments[1:2] == ["config"] else [])
+    require(len(words) == 5 and len(places) == 5 and all(len(place) == 1 for place in places)
+            and sorted(place[0] for place in places) == words,
+            "serve names config (not before ::) %d times, not once each in the pinned parse statement, `config::"
+            "check_lifetime(&config, `, the from_config statement's `config.binding()`, `credentials::observer_inputs("
+            "&config.credentials)` and observe::run('s second argument (%s (b3), I2E-2 (ii))" % (len(words), rule))
+
+
+def constructor_b4_outermost(body: str, statements: list[tuple[int, int]], rule: str) -> None:
+    """G-I01B-4 (b4) [I2E-2 (iii)]: every match of the pinned load and parse statements is a statement of serve's
+    outermost block, and the load statement comes before the parse statement."""
+    loads = [(found.start(), found.end()) for found in LOAD_STATEMENT.finditer(body)]
+    parses = [(found.start(), found.end()) for found in PARSE_STATEMENT.finditer(body)]
+    require(all(span in statements for span in loads + parses) and all(load[1] <= parse[0] for load in loads
+                                                                       for parse in parses),
+            "serve's pinned load and parse statements are not statements of its outermost block, in that order (%s (b4), "
+            "I2E-2 (iii))" % rule)
+
+
+def constructor_b5_parse_pin(body: str, rule: str) -> None:
+    """G-I01B-4 (b5) [I2D-4 (1)]: the parse statement is exactly once `let Ok((config, record_ref)) =
+    ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };`, spacing free."""
+    require(len(PARSE_STATEMENT.findall(body)) == 1, "serve's parse statement is not exactly once `let Ok((config, "
+            "record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };` (%s (b5), I2D-4 "
+            "(1))" % rule)
+
+
+def constructor_b6_parse_v3(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (b6) [I2E-2 (iv)]: over every observer source as observer_code reads it (use declarations kept, lib.rs
+    and main.rs included), the word parse_v3 occurs exactly twice: its definition `fn parse_v3(` inside config.rs's one
+    `impl ObserverConfig {`, and once inside main.rs's fn serve."""
+    words = sum(len(re.findall(r"\bparse_v3\b", code)) for code in codes.values())
+    config, main = codes.get(I01B2_CONFIG, ""), codes.get(OBSERVER_MAIN, "")
+    impls = list(re.finditer(r"\bimpl\s+ObserverConfig\s*\{", config))
+    definitions = list(re.finditer(r"\bfn\s+parse_v3\s*\(", config))
+    defined = (len(impls) == 1 and len(definitions) == 1
+               and impls[0].end() <= definitions[0].start() < block_end(config, impls[0].end() - 1))
+    serve = function_span(main, "serve")
+    called = serve is not None and len(re.findall(r"\bparse_v3\b", main[serve[0]:serve[1]])) == 1
+    require(words == 2 and defined and called, "parse_v3 occurs %d times in the observer's non-test sources, not exactly "
+            "its definition inside impl ObserverConfig in config.rs and serve's one call (%s (b6), I2E-2 (iv))"
+            % (words, rule))
+
+
+def constructor_c_accessor(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c), restated as B3-2 requires: in config.rs, ObserverConfig's field binding is exactly `binding: Value`
+    (no visibility); `pub fn binding(&self) -> &Value` is its one fn binding, with its body exactly `&self.binding`; and
+    the struct-expression-or-pattern form OBSERVER_CONFIG_LITERAL matches exactly once outside the struct definition and
+    the impl headers, inside fn members, holding `binding: Value::Null`. `Self` is (c4)'s and the dot forms (c2)'s."""
+    code = codes[I01B2_CONFIG]
+    structs = list(re.finditer(r"\bstruct\s+ObserverConfig\b", code))
+    fields = [re.sub(r"\s+", " ", field.strip()) for field in struct_fields(code, structs[0].end())] if len(structs) == 1 else []
+    named = [field for field in fields if re.match(r"(?:pub\s*(?:\([^)]*\)\s*)?)?binding\s*:", field)]
+    accessors = list(re.finditer(r"\bfn\s+binding\s*\(", code))
+    exact = list(BINDING_ACCESSOR.finditer(code))
+    body = code[exact[0].end():block_end(code, exact[0].end() - 1) - 1] if len(exact) == 1 else ""
+    require(len(structs) == 1 and named == ["binding: Value"] and len(accessors) == 1 and len(exact) == 1
+            and exact[0].start() <= accessors[0].start() < exact[0].end() and re.sub(r"\s+", "", body) == "&self.binding",
+            "%s: ObserverConfig's binding accessor or field is not as pinned (%s (c))" % (I01B2_CONFIG, rule))
+    headers = []
+    for position, header in impl_headers(I01B2_CONFIG, code):
+        if "ObserverConfig" in header.split():
+            headers.append((position, bracket_scan(code, position + 4, "{;", "%s: an impl header" % I01B2_CONFIG)[0] + 1))
+    name = structs[0].end() - len("ObserverConfig")
+    literals = [found for found in OBSERVER_CONFIG_LITERAL.finditer(code)
+                if found.start() != name and not any(start <= found.start() < end for start, end in headers)]
+    members = function_span(code, "members")
+    inner = code[literals[0].end() - 1:block_end(code, literals[0].end() - 1)] if len(literals) == 1 else ""
+    require(len(literals) == 1 and members is not None and members[0] < literals[0].start() < members[1]
+            and re.search(r"\bbinding\s*:\s*Value::Null\b", inner),
+            "%s writes the ObserverConfig literal or pattern other than once, in fn members holding `binding: Value::Null` "
+            "(%s (c), B3-2)" % (I01B2_CONFIG, rule))
+
+
+def constructor_c1_alias(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c1) [I2D-1; I2E-5]: crate-wide, use declarations kept, ObserverConfig is renamed with `as` in no use
+    declaration or use tree, and no `type` item at any nesting (associated types included), read to its `;` at bracket
+    depth 0, names it."""
+    for rel, code in sorted(codes.items()):
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s (c1))" % (rel, rule)) from None
+        renamed = any(re.search(r"\bObserverConfig\s+as\b", found.group(1)) for found in USE_DECLARATION.finditer(code))
+        require(not renamed and not any(re.search(r"\bObserverConfig\b", text) for text in type_items),
+                "%s renames ObserverConfig with `as` or names it in a type item (%s (c1), I2D-1, I2E-5)" % (rel, rule))
+
+
+def constructor_c2_dot_form(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c2) [I2D-13]: in config.rs the dot form `\\.\\s*(?:r#)?binding\\b` (G-D2-8's reading, so a call such as
+    `self.binding()` counts) occurs exactly twice: once in the accessor's body and once in fn parse_v3's body."""
+    code = codes[I01B2_CONFIG]
+    uses = [found.start() for found in DOT_BINDING.finditer(code)]
+    spans = [function_span(code, "binding"), function_span(code, "parse_v3")]
+    require(len(uses) == 2 and all(span is not None and sum(span[0] < use < span[1] for use in uses) == 1 for span in spans),
+            "%s reads or writes the dot form .binding %d times, not once in the accessor's body and once in parse_v3 (%s "
+            "(c2), I2D-13)" % (I01B2_CONFIG, len(uses), rule))
+
+
+def constructor_c3_bound_once(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c3) [I2D-3; I2E-3], over fn parse_v3's body: (1) the word binding, other than in a dot form (c2's) and
+    other than a `field:` name in a struct expression or pattern, occurs exactly twice: once as the pattern of the one
+    outermost `let binding = ..;` (no `mut`, `ref mut` or `&mut`), and once as the right side of the one outermost
+    `config.binding = binding;` after it; so (2) binding is the left side of `=` nowhere else, and (3) the assignment
+    is a statement of parse_v3's outermost block, not in a nested fn, closure, loop or arm."""
+    code = codes[I01B2_CONFIG]
+    span = function_span(code, "parse_v3")
+    message = ("%s's fn parse_v3 does not bind the local binding once, as an outermost `let binding = ..;`, and assign it "
+               "once, as the outermost `config.binding = binding;` after it (%s (c3), I2D-3, I2E-3)" % (I01B2_CONFIG, rule))
+    require(span is not None, message)
+    words = []
+    for found in re.finditer(r"\bbinding\b", code[span[0]:span[1]]):
+        position = span[0] + found.start()
+        before = code[:position][:-2] if code[:position].endswith("r#") else code[:position]
+        if re.search(r"\.\s*$", before):
+            continue
+        if re.search(r"[{,]\s*$", before) and re.match(r"\s*:(?!:)", code[position + len("binding"):]):
+            continue
+        words.append(position)
+    statements = outermost_statements(code, span[0], rule)
+    lets = [statement for statement in statements if re.match(r"let\s+binding\s*=(?![=>])", code[statement[0]:statement[1]])]
+    assigns = [statement for statement in statements
+               if re.fullmatch(r"config\s*\.\s*binding\s*=\s*binding\s*;", code[statement[0]:statement[1]].strip())]
+    require(len(words) == 2 and len(lets) == 1 and len(assigns) == 1 and lets[0][1] <= assigns[0][0]
+            and lets[0][0] <= words[0] < lets[0][1] and assigns[0][0] <= words[1] < assigns[0][1], message)
+
+
+def constructor_c4_no_self(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c4) [I2E-7]: config.rs, read without comments, names no word Self (none at 330e9d83; it fails closed),
+    so no `Self {`, `Self(`, `-> Self {` or Self pattern reaches the binding."""
+    found = len(re.findall(r"\bSelf\b", codes[I01B2_CONFIG]))
+    require(not found, "%s names Self %d time(s); it names no Self (%s (c4), I2E-7)" % (I01B2_CONFIG, found, rule))
+
+
+def check_i01b_constructor(base: Path) -> int:
+    """HE-004-I01B2 G-I01B-4, one constructor call (DESIGN-I01B rev 3 section 6; DESIGN-I01B2 rev 3 sections 3, 5 and 7).
+    crates/observer's non-test sources are read as observer_code reads them (use declarations kept), serve's body as
+    check_observer_serve reads it (use declarations removed) and main.rs whole without comments. Each sub-clause is its
+    own function, so that exactly one can be disabled: (a) from_config twice, serve's statement outermost; (b) serve
+    twice in main.rs and observe::run('s arguments; (b1) the pinned load statement; (b2) document 5 times and (b3) config
+    5 times at their places; (b4) both pinned statements outermost and in order; (b5) the pinned parse statement; (b6)
+    parse_v3 twice; (c) the accessor, the field and the one ObserverConfig literal; (c1) no rename or type item naming
+    ObserverConfig; (c2) the dot form twice; (c3) the local binding bound once and assigned once; (c4) no Self in
+    config.rs. The number of clauses."""
+    rule = "one constructor call, G-I01B-4"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_MAIN, I01B2_CONFIG, I01B2_REQUEST):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    try:
+        main = PATH_SPACE.sub("::", rust_code((base / OBSERVER_MAIN).read_text(encoding="utf-8")))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (OBSERVER_MAIN, error, rule)) from None
+    body = serve_body(base, rule)
+    statements = outermost_statements(body, 0, rule)
+    constructor_a_from_config(codes, body, statements, rule)
+    constructor_b_wiring(main, body, rule)
+    constructor_b1_load_pin(body, rule)
+    constructor_b2_document(body, statements, rule)
+    constructor_b3_config(body, statements, rule)
+    constructor_b4_outermost(body, statements, rule)
+    constructor_b5_parse_pin(body, rule)
+    constructor_b6_parse_v3(codes, rule)
+    constructor_c_accessor(codes, rule)
+    constructor_c1_alias(codes, rule)
+    constructor_c2_dot_form(codes, rule)
+    constructor_c3_bound_once(codes, rule)
+    constructor_c4_no_self(codes, rule)
+    return 13
+
+
 def check_i01b_sources(base: Path) -> int:
     """HE-004-I01B1 G-I01B-7 (a)-(d) (DESIGN-I01B rev 3 sections 2, 6 and 7.5; Q-I01B-28 amended; B1-4). Over
     crates/observer's sources, read as observer_code reads them (comments removed, literal contents emptied, the
@@ -5332,8 +5821,8 @@ def main() -> int:
             "main (HE-004C); calls between the stages only %s; its imports are the pinned set (serve's included), its only "
             "items two fn main and fn serve, its only attributes the crate's forbid and the two cfgs; no socket or thread "
             "name through the stage-2 statement" % (OBSERVER_MAIN, check_seal_order(HE, OBSERVER_SEAL_SITE)))
-        say("observer wiring order: serve calls %d steps each exactly once, in this order: %s, and not the v1 parse "
-            "(HE-004C, G5; HE-004D1, G-D1-8); LinuxWire and LinuxCapture are constructed exactly once each, their "
+        say("observer wiring order: serve calls %d steps each exactly once, in this order: %s, and neither the v1 nor the "
+            "v2 parse (HE-004C, G5; HE-004D1, G-D1-8; HE-004-I01B2); LinuxWire and LinuxCapture are constructed exactly once each, their "
             "qualified forms counted (HE-004D2, G-D2-11); the wire's refusal maps through status::wire_setup "
             "(HE-004-I01A2, R1-5)"
             % (check_observer_serve(HE), ", ".join(name for _, name in OBSERVER_WIRING)))
@@ -5456,10 +5945,26 @@ def main() -> int:
             "profile v2 (c2), and row 79's %d negative texts and the schema's sha256 occur in no other source (c3)"
             % (check_i01b4_replay_scope(HE), PROFILE_V2_SCHEMA_NAME, PROFILE_V2_SCHEMA_SHA256, I01B4_ROW79,
                I01B4_ROW79_READER, I01B4_ROW79_TEXTS))
-        say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 at their dd7422ed bytes, "
-            "%s absent (no directory entry); no directory entry casefolds to a guarded name but itself, and each guarded "
-            "module is declared once, in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"
+        say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 (config.rs, i01_request.rs "
+            "and i01_service.rs re-pinned at HE-004-I01B2's bytes, the others at dd7422ed's), %s absent (no directory "
+            "entry); no directory entry casefolds to a guarded name but itself, and each guarded module is declared once, "
+            "in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"
             % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT)))
+        say("I01Binding closed (HE-004-I01B2, G-I01B-3): %d clauses over %s's sources: %s defines struct I01Binding once, "
+            "with only the private fields signed_digest and signed_nonce and the one derive of Debug, PartialEq and Eq "
+            "(i); its one impl is `impl I01Binding {` with fn from_config and the two getters (iii); its one literal is "
+            "inside fn from_config, no other source writes it and it holds no `Self{` (ii); the fields are read outside "
+            "the impl only through the getters (iv); it is renamed and aliased nowhere (v); and it names I01Binding "
+            "exactly six times, at from_config's, binding_gate's and check_request's exact signatures (vi; B3-8, B3-11 "
+            "(a))" % (check_i01b_binding(HE), OBSERVER_CRATE, I01B2_REQUEST))
+        say("one constructor call (HE-004-I01B2, G-I01B-4): %d clauses: from_config occurs twice, its definition and "
+            "serve's one outermost statement (a); serve occurs twice in main.rs and observe::run( takes %s (b); serve's "
+            "load statement is pinned (b1), document occurs 5 times (b2) and config 5 times (b3) at their places, the "
+            "pinned load and parse statements are outermost and in order (b4), the parse statement is pinned (b5) and "
+            "parse_v3 occurs twice in the crate (b6); in %s the accessor, the private field and the one ObserverConfig "
+            "literal in fn members (c), no rename or type item naming ObserverConfig (c1), the dot form .binding twice "
+            "(c2), parse_v3's local binding bound once and assigned once (c3) and no Self (c4)"
+            % (check_i01b_constructor(HE), ", ".join(OBSERVE_RUN_ARGUMENTS), I01B2_CONFIG))
         say("socket-module aliases (HE-004-I01B1, B3-1, G-I01B-6 (e)): %d sources of %s and %s; no use declaration "
             "targets a socket module (%s) itself, renamed or not, or globs one, no pub use names one, none names a "
             "scope root alone and none globs one outside a crate root; item imports through a socket module pass"

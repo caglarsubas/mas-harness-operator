@@ -2954,6 +2954,7 @@ fn serve(sealed: &Sealed) -> u8 {
     use planeon_observer::config::{self, ObserverConfig};
     use planeon_observer::credentials;
     use planeon_observer::enrolled::{self, Enrolled};
+    use planeon_observer::i01_request::I01Binding;
     use planeon_observer::linux_capture::LinuxCapture;
     use planeon_observer::linux_net::LinuxWire;
     use planeon_observer::observe;
@@ -2966,11 +2967,12 @@ fn serve(sealed: &Sealed) -> u8 {
         Ok(document) => document,
         Err(error) => return status::config_load(&error),
     };
-    let Ok((config, record_ref)) = ObserverConfig::parse_with_record(&document) else { return status::CONFIG_CHECK };
+    let Ok((config, record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };
     drop(document);
     if let Err(error) = config::check_lifetime(&config, utc::wall_seconds()) {
         return status::lifetime(&error);
     }
+    let Some(binding) = I01Binding::from_config(config.binding()) else { return status::CONFIG_CHECK };
     let Ok((serving_ca, identity)) = credentials::observer_inputs(&config.credentials) else { return status::CREDENTIALS };
     let Ok(tls) = client_config(identity, serving_ca, time_provider()) else { return status::TLS_SETUP };
     let Ok((schema, record_schema)) = CaptureSchema::embedded() else { return status::CAPTURE_SCHEMA };
@@ -2997,7 +2999,7 @@ fn serve(sealed: &Sealed) -> u8 {
     };
     let Ok(closure) = Closure::embedded() else { return status::CLOSURE };
     let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));
-    status::observation(&observe::run(wire, config, tls, closure, captures, server))
+    status::observation(&observe::run(wire, config, tls, closure, captures, server, binding))
 }
 """
 OBSERVER_SEAL = "crates/observer/src/seal.rs"
@@ -4085,12 +4087,15 @@ class ObserverSocketModuleTests(Tree):
 
 
 # HE-004D1 (G-D1-8): twelve steps, one call each; HE-004-I01a: thirteen, the server identity after Enrolled::new.
+# HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5; I2D-9): fourteen, configuration v3's parse and the binding's one
+# constructor fourth; the wire step is SERVE_STEPS[10].
 SERVE_STEPS = (
     "    let document = match signed_config::load() {\n        Ok(document) => document,\n"
     "        Err(error) => return status::config_load(&error),\n    };\n",
-    "    let Ok((config, record_ref)) = ObserverConfig::parse_with_record(&document) else { return status::CONFIG_CHECK };\n"
+    "    let Ok((config, record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };\n"
     "    drop(document);\n",
     "    if let Err(error) = config::check_lifetime(&config, utc::wall_seconds()) {\n        return status::lifetime(&error);\n    }\n",
+    "    let Some(binding) = I01Binding::from_config(config.binding()) else { return status::CONFIG_CHECK };\n",
     "    let Ok((serving_ca, identity)) = credentials::observer_inputs(&config.credentials) else { return status::CREDENTIALS };\n",
     "    let Ok(tls) = client_config(identity, serving_ca, time_provider()) else { return status::TLS_SETUP };\n",
     "    let Ok((schema, record_schema)) = CaptureSchema::embedded() else { return status::CAPTURE_SCHEMA };\n",
@@ -4107,7 +4112,7 @@ SERVE_STEPS = (
     "        Err(error) => return status::capture_setup(&error),\n    };\n",
     "    let Ok(closure) = Closure::embedded() else { return status::CLOSURE };\n",
     "    let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));\n"
-    "    status::observation(&observe::run(wire, config, tls, closure, captures, server))\n",
+    "    status::observation(&observe::run(wire, config, tls, closure, captures, server, binding))\n",
 )
 
 
@@ -4121,19 +4126,20 @@ class ObserverServeTests(Tree):
 
     def test_the_wiring_passes(self):
         self.assertEqual("".join(SERVE_STEPS) in GOOD_OBSERVER_MAIN, True)
-        self.assertEqual(gate.check_observer_serve(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
+        # HE-004-I01B2 (I2D-9): configuration v3's parse in place of the v2 parse, the binding's constructor fourth.
         self.assertEqual([name for _, name in gate.OBSERVER_WIRING],
-                         ["signed_config::load(", "ObserverConfig::parse_with_record(", "config::check_lifetime(",
-                          "credentials::observer_inputs(", "client_config(", "CaptureSchema::embedded(",
-                          "enrolled::load_record(", "Enrolled::new(", "enrolled.server_identity(", "LinuxWire::new(",
-                          "LinuxCapture::new(",
+                         ["signed_config::load(", "ObserverConfig::parse_v3(", "config::check_lifetime(",
+                          "I01Binding::from_config(", "credentials::observer_inputs(", "client_config(",
+                          "CaptureSchema::embedded(", "enrolled::load_record(", "Enrolled::new(", "enrolled.server_identity(",
+                          "LinuxWire::new(", "LinuxCapture::new(",
                           "Closure::embedded(", "observe::run("])
         # Spaced paths, comments naming the calls and the in-body use declarations are read through.
         spaced = (GOOD_OBSERVER_MAIN.replace("signed_config::load()", "signed_config :: load ()")
                   .replace("Closure::embedded()", "Closure ::embedded ( )")
                   .replace("    use planeon_observer::utc;\n", "    use planeon_observer::utc;\n    // observe::run( again in a comment\n"))
         self.write(gate.OBSERVER_MAIN, spaced)
-        self.assertEqual(gate.check_observer_serve(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
 
     def test_each_call_missing_refuses(self):
         body = "".join(SERVE_STEPS)
@@ -4168,12 +4174,13 @@ class ObserverServeTests(Tree):
                      GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ") + "    let _again = enrolled.server_identity();\n")):
             self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN, text, "enrolled.server_identity. exactly once|in this order")
         self.write(gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(step, step.replace("enrolled.", "enrolled . ")))
-        self.assertEqual(gate.check_observer_serve(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
 
     def test_the_wire_s_refusal_maps_through_wire_setup(self):
         # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-5): main.rs's match maps LinuxWire::new's refusal through
         # status::wire_setup (24, 31-34); one status for every setup refusal, another mapping or a lost arm refuses.
-        good = SERVE_STEPS[9]
+        # HE-004-I01B2 (I2D-9): the wire step is the eleventh of fourteen.
+        good = SERVE_STEPS[10]
         self.assertIn("status::wire_setup(&error)", good)
         self.assertEqual(GOOD_OBSERVER_MAIN.count(good), 1)
         self.assertEqual(len(gate.WIRE_SETUP_MATCH.findall(GOOD_OBSERVER_MAIN)), 1)
@@ -4190,7 +4197,7 @@ class ObserverServeTests(Tree):
         spaced = ("    let wire = match LinuxWire :: new ( sealed ) { // the wire\n        Ok ( wire ) => wire,\n"
                   "        Err(error) => return status :: wire_setup ( & error )\n    };\n")
         self.write(gate.OBSERVER_MAIN, GOOD_OBSERVER_MAIN.replace(good, spaced))
-        self.assertEqual(gate.check_observer_serve(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
 
     def test_bypass_forms_refuse(self):
         for old, new in (("observe::run(", "planeon_observer::observe::run("), ("client_config(identity", "tls::client_config(identity"),
@@ -5225,19 +5232,31 @@ class ObserverExemptSpanTests(unittest.TestCase):
 
 
 class ObserverServeV1ParseTests(Tree):
-    """HE-004D1 G-D1-8: serve's imports gain the capture setup's, and the v1 parse no longer passes in serve."""
+    """HE-004D1 G-D1-8: serve's imports gain the capture setup's, and the v1 parse no longer passes in serve.
+    HE-004-I01B2 (DIB section 3.3; I2D-9): nor the v2 parse, and serve's imports gain I01Binding."""
 
     TREE = OBSERVER_TREE
 
     def test_the_v1_parse_and_a_missing_import_refuse(self):
         self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN,
-                     GOOD_OBSERVER_MAIN.replace("ObserverConfig::parse_with_record(", "ObserverConfig::parse("), "v1")
+                     GOOD_OBSERVER_MAIN.replace("ObserverConfig::parse_v3(", "ObserverConfig::parse("), "v1")
         self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN,
                      GOOD_OBSERVER_MAIN.replace("    drop(document);\n", "    let _ = ObserverConfig::parse(&document);\n"), "v1")
         for use in ("    use planeon_observer::capture::CaptureEngine;\n", "    use planeon_observer::linux_capture::LinuxCapture;\n",
-                    "    use planeon_observer::enrolled::{self, Enrolled};\n"):
+                    "    use planeon_observer::enrolled::{self, Enrolled};\n", "    use planeon_observer::i01_request::I01Binding;\n"):
             self.refused(lambda base: gate.check_seal_order(base, gate.OBSERVER_SEAL_SITE), gate.OBSERVER_MAIN,
                          GOOD_OBSERVER_MAIN.replace(use, ""), "imports are not exactly the pinned set")
+
+    def test_the_v2_parse_refuses(self):
+        # HE-004-I01B2: parse_with_record( in serve refuses, in place of parse_v3( or beside it (DIB section 7.2's wiring
+        # case).
+        self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN,
+                     GOOD_OBSERVER_MAIN.replace("ObserverConfig::parse_v3(", "ObserverConfig::parse_with_record("), "v2")
+        self.refused(gate.check_observer_serve, gate.OBSERVER_MAIN,
+                     GOOD_OBSERVER_MAIN.replace("    drop(document);\n",
+                                                "    let _ = ObserverConfig::parse_with_record(&document);\n    drop(document);\n"),
+                     "v2 ObserverConfig::parse_with_record")
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
 
 
 class ObserverWordListTests(Tree):
@@ -5815,7 +5834,7 @@ class D2QualifiedConstructorTests(Tree):
 
     def test_the_fixture_passes(self):
         self.assertEqual([name for _, name in gate.QUALIFIED_CONSTRUCTORS], ["LinuxWire", "LinuxCapture"])
-        self.assertEqual(gate.check_observer_serve(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
         self.assertEqual(gate.check_observer_capture_callers(self.base), 4)
 
     def test_a_second_qualified_construction_in_serve_refuses(self):
@@ -7328,9 +7347,9 @@ class I01bGuardedPinTests(Tree):
         self.assertEqual(gate.I01B_GUARDED_PINS, {
             "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
             "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
-            "crates/observer/src/config.rs": "bef5143c30961fae16e12a90d3dcabeba35433e2082aae79da0d27a0ac2acee8",
-            "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
-            "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
+            "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
+            "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
+            "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
             "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741"})
         self.assertEqual(gate.I01B_ABSENT, ("crates/observer/src/i01_answer.rs",))
         # linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS, unchanged.
@@ -7435,6 +7454,486 @@ class I01bGuardedPinTests(Tree):
         self.refuses("observe.rs holds an inline `mod client {`")
         (self.base / "crates/observer/src/observe.rs").unlink()
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
+
+
+# HE-004-I01B2 (DESIGN-I01B2 rev 3 section 7; DIB sections 7.1 and 7.2): G-I01B-3's and G-I01B-4's fixture: main.rs's
+# serve (GOOD_OBSERVER_MAIN), config.rs's private binding with its accessor and parse_v3, i01_request.rs's closed
+# binding, and the two sources that carry it.
+I01B2_CONFIG_TEXT = """//! A config.rs fixture (`ObserverConfig {`, `Self {`, `.binding`, `parse_v3` and `type C = ObserverConfig;` in a comment pass).
+use i05_protocol::json::{Object, Value};
+
+#[derive(Clone, Debug)]
+pub struct ObserverConfig {
+    pub namespace: String,
+    binding: Value,
+    pub sealed: Option<SealedValues>,
+}
+
+impl ObserverConfig {
+    pub fn parse_v3(document: &[u8]) -> Result<(ObserverConfig, FileRef), ConfigError> {
+        let value = canonical_value(document)?;
+        let root = closed(Some(&value), "the document", &MEMBERS_V3)?;
+        let mut config = ObserverConfig::members(root)?;
+        let record = file_ref(root.get("qualificationRecord"), "qualificationRecord")?;
+        binding_namespaces(root.get("binding"), &config.namespace)?;
+        let sealed = sealed_values(root.get("sealedAdmission"))?;
+        let binding = match root.get("binding") {
+            Some(member) => member.clone(),
+            None => return schema("the document holds no binding member".to_string()),
+        };
+        config.sealed = Some(sealed);
+        config.binding = binding;
+        Ok((config, record))
+    }
+
+    fn members(root: &Object) -> Result<ObserverConfig, ConfigError> {
+        let namespace = text(root, "qualificationNamespace", "the document")?;
+        Ok(ObserverConfig { namespace: namespace.to_string(), binding: Value::Null, sealed: None })
+    }
+
+    pub fn binding(&self) -> &Value {
+        &self.binding
+    }
+}
+"""
+I01B2_REQUEST_TEXT = """//! An i01_request.rs fixture (`I01Binding {`, `Self {` and `impl Clone for I01Binding` in a comment pass).
+use i05_protocol::json::{self, Value};
+use i05_protocol::sha256;
+
+/// HE-008's binding.
+#[derive(Debug, PartialEq, Eq)]
+pub struct I01Binding {
+    signed_digest: String,
+    signed_nonce: String,
+}
+
+impl I01Binding {
+    pub fn from_config(binding: &Value) -> Option<I01Binding> {
+        let encoded = json::canonical(binding).ok()?;
+        let signed_nonce = binding.get("scope")?.get("runNonce")?.as_str()?.to_string();
+        let signed_digest = sha256::prefixed(&encoded);
+        Some(I01Binding { signed_digest, signed_nonce })
+    }
+
+    pub fn signed_digest(&self) -> &str {
+        &self.signed_digest
+    }
+
+    pub fn signed_nonce(&self) -> &str {
+        &self.signed_nonce
+    }
+}
+
+pub fn binding_gate(request: &I01Request, binding: Option<&I01Binding>) -> Result<(), RequestRefusal> {
+    match binding {
+        Some(bound) if bound.signed_digest() == request.binding_digest && bound.signed_nonce() == request.run_nonce => Ok(()),
+        _ => Err(RequestRefusal::Binding),
+    }
+}
+
+pub fn check_request(bytes: &[u8], truncated: bool, chain: &mut Chain, binding: Option<&I01Binding>)
+                     -> Result<I01Request, RequestRefusal> {
+    let value = frame(bytes, truncated)?;
+    let checked = request_schema(&value)?;
+    chain.check(&checked)?;
+    binding_gate(&checked, binding)?;
+    Ok(checked)
+}
+"""
+I01B2_SERVICE_TEXT = """//! An i01_service.rs fixture.
+use crate::i01_request::{check_request, Chain, I01Binding};
+
+pub struct I01Service {
+    binding: I01Binding,
+}
+
+impl I01Service {
+    pub fn new(binding: I01Binding) -> I01Service {
+        I01Service { binding }
+    }
+
+    pub fn request(&self, bytes: &[u8], chain: &mut Chain) -> bool {
+        check_request(bytes, false, chain, Some(&self.binding)).is_ok()
+    }
+}
+"""
+I01B2_OBSERVE_TEXT = """//! An observe.rs fixture (`I01Binding::from_config(` and `ObserverConfig::parse_v3(` in a comment pass).
+use crate::config::ObserverConfig;
+use crate::i01_request::I01Binding;
+use crate::i01_service::I01Service;
+
+pub fn run(config: ObserverConfig, binding: I01Binding) -> I01Service {
+    let _ = config;
+    I01Service::new(binding)
+}
+"""
+I01B2_LIB_TEXT = "#![forbid(unsafe_code)]\npub mod config;\npub mod i01_request;\npub mod i01_service;\npub mod observe;\n"
+I01B2_SERVICE = "crates/observer/src/i01_service.rs"
+I01B2_OBSERVE = "crates/observer/src/observe.rs"
+I01B2_TREE = {gate.OBSERVER_MAIN: GOOD_OBSERVER_MAIN, gate.OBSERVER_LIB: I01B2_LIB_TEXT, gate.I01B2_CONFIG: I01B2_CONFIG_TEXT,
+              gate.I01B2_REQUEST: I01B2_REQUEST_TEXT, I01B2_SERVICE: I01B2_SERVICE_TEXT, I01B2_OBSERVE: I01B2_OBSERVE_TEXT}
+# The fixture's anchors the plantings change, each once in its file.
+I01B2_LOAD_OK = "        Ok(document) => document,\n"
+I01B2_LOAD_ERR = "        Err(error) => return status::config_load(&error),\n"
+I01B2_PARSE = "    let Ok((config, record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };\n"
+I01B2_FROM = "    let Some(binding) = I01Binding::from_config(config.binding()) else { return status::CONFIG_CHECK };\n"
+I01B2_RUN = "    status::observation(&observe::run(wire, config, tls, closure, captures, server, binding))\n"
+I01B2_USE = "use i05_protocol::json::{Object, Value};\n"
+I01B2_LET = "        let binding = match root.get(\"binding\") {\n"
+I01B2_ASSIGN = "        config.binding = binding;\n"
+I01B2_ACCESSOR = "    pub fn binding(&self) -> &Value {\n"
+I01B2_OBSERVE_USE = "use crate::i01_service::I01Service;\n"
+I01B2_LIB_LAST = "pub mod observe;\n"
+# The monitor's ruling on round 2 (and I2E-4): every NEW-n and H-n form is a self-test row, one sub-clause each, refused
+# with that sub-clause's message, and passing the gate with only that sub-clause disabled (the build's mutation proof,
+# which reads this table). Each row: (label, sub-clause, ((file, anchor, replacement), ..)). A row's spelling keeps every
+# other sub-clause's places, so that only its own sub-clause refuses it (BUILD.md records where it departs from the
+# record's wording; the record's own spellings are test_the_review_records_own_spellings_refuse's).
+I01B2_CLAUSE_FUNCTIONS = {"(b1)": "constructor_b1_load_pin", "(b2)": "constructor_b2_document",
+                          "(b3)": "constructor_b3_config", "(b4)": "constructor_b4_outermost",
+                          "(b5)": "constructor_b5_parse_pin", "(b6)": "constructor_b6_parse_v3",
+                          "(c1)": "constructor_c1_alias", "(c2)": "constructor_c2_dot_form",
+                          "(c3)": "constructor_c3_bound_once", "(c4)": "constructor_c4_no_self"}
+_MAIN, _CONFIG = gate.OBSERVER_MAIN, gate.I01B2_CONFIG
+I01B2_ROWS = (
+    # (b1) the pinned load statement [I2E-1]: an unsigned literal in either arm (the arm keeps document's three words).
+    ("H1", "(b1)", ((_MAIN, I01B2_LOAD_OK, "        Ok(document) => { let _ = document; b\"{}\".to_vec() }\n"),)),
+    ("H1b", "(b1)", ((_MAIN, I01B2_LOAD_ERR, "        Err(_) => b\"{}\".to_vec(),\n"),)),
+    # (b2) document 5 times [I2E-2 (i)].
+    ("NEW-3b", "(b2)", ((_MAIN, I01B2_PARSE, "    let document = b\"{}\".to_vec();\n" + I01B2_PARSE),)),
+    ("H2", "(b2)", ((_MAIN, I01B2_PARSE, "    let mut document = document;\n    document.clear();\n"
+                                         "    document.extend_from_slice(b\"{}\");\n" + I01B2_PARSE),)),
+    ("H2b", "(b2)", ((_MAIN, I01B2_PARSE, "    let mut document = document;\n    document = b\"{}\".to_vec();\n" + I01B2_PARSE),)),
+    ("H2c", "(b2)", ((_MAIN, I01B2_PARSE, "    let document = match Ok::<Vec<u8>, u8>(document) {\n"
+                                          "        Ok(mut document) => { document.clear(); document.extend_from_slice(b\"{}\"); "
+                                          "document }\n        Err(_) => return status::CONFIG_CHECK,\n    };\n"
+                                          + I01B2_PARSE),)),
+    ("H3c", "(b2)", ((_MAIN, I01B2_PARSE, "    let Some(document) = Some(b\"{}\".to_vec()) else { return 0 };\n" + I01B2_PARSE),)),
+    ("H8-document", "(b2)", ((_MAIN, I01B2_PARSE, "    let r#document = b\"{}\".to_vec();\n" + I01B2_PARSE),)),
+    # (b3) config 5 times at its places [I2E-2 (ii)].
+    ("NEW-4b", "(b3)", ((_MAIN, I01B2_FROM, "    let config = observe::Wrap(config);\n" + I01B2_FROM),)),
+    ("H3", "(b3)", ((_MAIN, I01B2_FROM, "    let (config, _) = (observe::Wrap(config), ());\n" + I01B2_FROM),)),
+    ("H3b", "(b3)", ((_MAIN, I01B2_FROM, "    let observe::Held { config } = observe::hold(config);\n" + I01B2_FROM),)),
+    ("H3d", "(b3)", ((_MAIN, I01B2_RUN, "    { let config = observe::other(); status::observation(&observe::run(wire, config, "
+                                        "tls, closure, captures, server, binding)) }\n"),)),
+    ("H8-config", "(b3)", ((_MAIN, I01B2_FROM, "    let r#config = config;\n" + I01B2_FROM),)),
+    # (b4) both pinned statements outermost, in order [I2E-2 (iii)].
+    ("H10", "(b4)", ((_MAIN, I01B2_PARSE, "    { " + I01B2_PARSE.strip() + " }\n"),)),
+    # (b5) the pinned parse statement [I2D-4 (1)].
+    ("NEW-3a", "(b5)", ((_MAIN, I01B2_PARSE, "    let Ok((config, record_ref)) = ObserverConfig::parse_v3(if document.is_empty() "
+                                             "{ b\"{}\" } else { b\"{}\" }) else { return status::CONFIG_CHECK };\n"),)),
+    ("H7c", "(b5)", ((_MAIN, "ObserverConfig::parse_v3(&document)", "<ObserverConfig>::parse_v3(&document)"),)),
+    # (b6) parse_v3 twice in the crate [I2E-2 (iv)].
+    ("NEW-4a", "(b6)", ((I01B2_OBSERVE, I01B2_OBSERVE_USE,
+                         I01B2_OBSERVE_USE + "pub fn reparse(d: &[u8]) -> bool { ObserverConfig::parse_v3(d).is_ok() }\n"),)),
+    ("H7", "(b6)", ((I01B2_OBSERVE, I01B2_OBSERVE_USE,
+                     I01B2_OBSERVE_USE + "static P: fn(&[u8]) -> Result<(ObserverConfig, FileRef), ConfigError> = "
+                                         "ObserverConfig::parse_v3;\n"),)),
+    ("H7b", "(b6)", ((I01B2_OBSERVE, I01B2_OBSERVE_USE,
+                      I01B2_OBSERVE_USE + "pub trait Again { fn again(d: &[u8]) -> bool { ObserverConfig::parse_v3(d).is_ok() } }\n"),)),
+    ("H7d", "(b6)", ((I01B2_OBSERVE, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "use crate::config::ObserverConfig::parse_v3 as p;\n"),)),
+    ("H8-parse_v3", "(b6)", ((I01B2_OBSERVE, I01B2_OBSERVE_USE,
+                              I01B2_OBSERVE_USE + "pub fn reparse(d: &[u8]) -> bool { ObserverConfig::r#parse_v3(d).is_ok() }\n"),)),
+    # (c1) no rename or type item naming ObserverConfig [I2D-1; I2E-5].
+    ("X4-7 (NEW-1)", "(c1)", ((_CONFIG, I01B2_USE, I01B2_USE + "type C = ObserverConfig;\n"),
+                              (_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        let config = C { binding: forged(), ..config };\n"))),
+    ("X4-8 (NEW-1b)", "(c1)", ((_CONFIG, I01B2_USE, I01B2_USE + "use self::ObserverConfig as Oc;\n"),
+                               (_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        let Oc { binding: slot, .. } = &mut config;\n"
+                                                                     "        *slot = forged();\n"))),
+    ("H5", "(c1)", ((gate.OBSERVER_LIB, I01B2_LIB_LAST, I01B2_LIB_LAST + "pub use crate::config::ObserverConfig as X;\n"),
+                    (_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        let config = crate::X { binding: forged(), ..config };\n"))),
+    ("H6", "(c1)", ((_CONFIG, I01B2_USE, I01B2_USE + "trait Tr { type Out; }\nimpl Tr for u8 { type Out = ObserverConfig; }\n"
+                                                     "type A = <u8 as Tr>::Out;\n"),
+                    (_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        let config = A { binding: forged(), ..config };\n"))),
+    ("H8-ObserverConfig", "(c1)", ((_CONFIG, I01B2_USE, I01B2_USE + "type C = r#ObserverConfig;\n"),
+                                   (_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        let config = C { binding: forged(), ..config };\n"))),
+    # (c2) the dot form read as G-D2-8 reads it [I2D-13].
+    ("NEW-10", "(c2)", ((_CONFIG, I01B2_ASSIGN, I01B2_ASSIGN + "        config . r#binding = forged();\n"),)),
+    ("H9", "(c2)", ((_CONFIG, I01B2_LET, "        let _seen = config.binding();\n" + I01B2_LET),)),
+    ("H8-binding", "(c2)", ((_CONFIG, I01B2_ACCESSOR, "    fn rebind(config: &mut ObserverConfig, value: Value) {\n"
+                                                      "        config.r#binding = value;\n    }\n\n" + I01B2_ACCESSOR),)),
+    # (c3) I2D-3's clause [I2E-3].
+    ("NEW-2", "(c3)", ((_CONFIG, I01B2_ASSIGN, "        let binding = forged();\n" + I01B2_ASSIGN),)),
+    ("H4", "(c3)", ((_CONFIG, I01B2_LET, I01B2_LET.replace("let binding", "let mut binding")),
+                    (_CONFIG, I01B2_ASSIGN, "        binding = forged();\n" + I01B2_ASSIGN))),
+    ("H4b", "(c3)", ((_CONFIG, I01B2_ASSIGN, "        let set = |binding: Value| config.binding = binding;\n        set(forged());\n"),)),
+    ("H4c", "(c3)", ((_CONFIG, I01B2_ASSIGN, "        match forged() {\n            binding => config.binding = binding,\n        }\n"),)),
+    ("H4d", "(c3)", ((_CONFIG, I01B2_ASSIGN, "        for binding in [forged()] {\n            config.binding = binding;\n        }\n"),)),
+    # (c4) no word Self in config.rs [I2E-7].
+    ("X4-Self", "(c4)", ((_CONFIG, I01B2_ACCESSOR, "    fn rebuilt(self, binding: Value) -> Self {\n        Self { binding, ..self }\n"
+                                                   "    }\n\n" + I01B2_ACCESSOR),)),
+)
+
+
+def i01b2_tree(changes=()):
+    """I01B2_TREE with each (file, anchor, replacement) applied; each anchor must occur once in its file."""
+    texts = dict(I01B2_TREE)
+    for rel, old, new in changes:
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+class I01BindingRuleTests(Tree):
+    """HE-004-I01B2 G-I01B-3 and G-I01B-4 (DESIGN-I01B2 rev 3 section 7; DIB sections 7.1 and 7.2), over the fixture
+    (main.rs's serve, config.rs's accessor and parse_v3, i01_request.rs's closed binding): the fixture and the real
+    sources pass; DIB section 7.1's rows P3-1..P3-7, SR-2, N2-1 and N2-1b and round 3's X3-1..X3-4 refuse under
+    G-I01B-3; section 7.2's rows P4-1..P4-6, N2-2 and N2-2b, its two positives and two wiring cases, and round 3's X4-1,
+    X4-2, X4-3, X4-3b, X4-4, X4-5 and X4-6 under G-I01B-4; and the 35 NEW-n and H-n rows, one sub-clause each, each
+    refused with its own sub-clause's message (I2E-4)."""
+
+    TREE = I01B2_TREE
+
+    def plant(self, changes):
+        for rel, text in i01b2_tree(changes).items():
+            self.write(rel, text)
+
+    def refuses(self, check, changes, message):
+        self.plant(changes)
+        try:
+            with self.assertRaisesRegex(gate.GateError, message):
+                check(self.base)
+        finally:
+            self.plant(())
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual(gate.check_i01b_binding(self.base), 6)
+        self.assertEqual(gate.check_i01b_constructor(self.base), 13)
+        self.assertEqual(gate.check_observer_serve(self.base), 14)
+        self.assertEqual(gate.check_i01b_binding(gate.HE), 6)
+        self.assertEqual(gate.check_i01b_constructor(gate.HE), 13)
+
+    def test_g_i01b_3_section_7_1_rows_refuse(self):
+        binding, constructor = gate.check_i01b_binding, gate.check_i01b_constructor
+        request, service, observe = gate.I01B2_REQUEST, I01B2_SERVICE, I01B2_OBSERVE
+        service_use = "use crate::i01_request::{check_request, Chain, I01Binding};\n"
+        derive = "#[derive(Debug, PartialEq, Eq)]\npub struct I01Binding"
+        getter = "    pub fn signed_digest(&self) -> &str {\n"
+        literal = "        Some(I01Binding { signed_digest, signed_nonce })\n"
+        last = "    Ok(checked)\n}\n"
+        other_file = "i01_service.rs writes the I01Binding literal; only"
+        # P3-1, P3-2: a literal outside its module, also split-path and spaced.
+        for planted in ("fn forge(d: String, n: String) -> Option<I01Binding> { Some(I01Binding { signed_digest: d, "
+                        "signed_nonce: n }) }\n",
+                        "fn forge() -> Option<I01Binding> { Some(crate::i01_request::I01Binding { signed_digest: "
+                        "String::new(), signed_nonce: String::new() }) }\n",
+                        "fn forge() -> Option<I01Binding> { Some(i01_request :: I01Binding { ..todo() }) }\n"):
+            self.refuses(binding, ((service, service_use, service_use + planted),), other_file)
+        # P3-3: `Self {` in an impl elsewhere.
+        self.refuses(binding, ((service, service_use, service_use + "impl I01Binding { fn forge() -> Self { Self { "
+                                                                    "signed_digest: String::new(), signed_nonce: "
+                                                                    "String::new() } } }\n"),),
+                     "i01_service.rs holds an impl naming I01Binding other than")
+        # P3-4: a second constructor in the impl, written `Self {`, and as a free fn.
+        self.refuses(binding, ((request, getter, "    pub fn forge(d: String, n: String) -> I01Binding {\n        I01Binding "
+                                                 "{ signed_digest: d, signed_nonce: n }\n    }\n\n" + getter),),
+                     "holds a fn other than from_config and its two getters")
+        self.refuses(binding, ((request, literal, literal.replace("I01Binding {", "Self {")),), "writes `Self\\{`")
+        self.refuses(binding, ((request, last, last + "pub fn forge(d: String, n: String) -> Option<I01Binding> {\n    "
+                                                      "Some(I01Binding { signed_digest: d, signed_nonce: n })\n}\n"),),
+                     "writes the I01Binding literal other than once, in fn from_config")
+        # P3-5 and SR-2: Default, cfg_attr, Clone, Copy; the trait impls in two files.
+        for new, message in (("#[derive(Debug, Default, PartialEq, Eq)]\npub struct I01Binding", "derives Default on I01Binding"),
+                             ("#[cfg_attr(test, derive(Default))]\n" + derive, "an attribute other than its one derive"),
+                             ("#[derive(Clone, Debug, PartialEq, Eq)]\npub struct I01Binding", "derives Clone on I01Binding"),
+                             ("#[derive(Copy, Clone, Debug, PartialEq, Eq)]\npub struct I01Binding", "derives Clone on I01Binding")):
+            self.refuses(binding, ((request, derive, new),), message)
+        self.refuses(binding, ((service, service_use, service_use + "impl Clone for I01Binding { fn clone(&self) -> "
+                                                                    "I01Binding { todo() } }\n"),),
+                     "i01_service.rs holds an impl naming I01Binding other than")
+        self.refuses(binding, ((observe, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "impl Copy for I01Binding {}\n"),),
+                     "observe.rs holds an impl naming I01Binding other than")
+        # P3-6: pub fields and a write.
+        for visibility in ("pub ", "pub(crate) "):
+            self.refuses(binding, ((request, "    signed_digest: String,\n", "    %ssigned_digest: String,\n" % visibility),),
+                         "a field of I01Binding with a visibility")
+        self.refuses(binding, ((observe, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "pub fn forge(b: &mut I01Binding) { "
+                                                                                "b.signed_digest = String::new(); }\n"),),
+                     "observe.rs uses the I01Binding field signed_digest other than through its getter")
+        # P3-7: an alias.
+        for planted in ("use crate::i01_request::I01Binding as B;\n", "type B = I01Binding;\n"):
+            self.refuses(binding, ((observe, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + planted),), "renames or aliases I01Binding")
+        # N2-1: the empty-turbofish literal, as a free fn, inside another impl, spaced, and in i01_service.rs.
+        forge = "pub fn forge(d: String, n: String) -> Option<I01Binding> { Some(I01Binding::<> { signed_digest: d, " \
+                "signed_nonce: n }) }\n"
+        own = "writes the I01Binding literal other than once, in fn from_config"
+        self.refuses(binding, ((request, last, last + forge),), own)
+        self.refuses(binding, ((request, last, last + "pub struct Chain;\nimpl Chain {\n    " + forge + "}\n"),), own)
+        self.refuses(binding, ((request, last, last + forge.replace("I01Binding::<> {", "I01Binding :: < > {")),), own)
+        self.refuses(binding, ((service, service_use, service_use + forge),), other_file)
+        # N2-1b: destructuring outside the module.
+        self.refuses(binding, ((service, service_use, service_use + "fn peek(b: I01Binding) -> String { let I01Binding { "
+                                                                    "signed_digest, .. } = b; signed_digest }\n"),),
+                     other_file)
+        # G-I01B-4 does not refuse these G-I01B-3 forms that name no from_config (they are G-I01B-3's).
+        self.plant(((request, derive, "#[derive(Clone, Debug, PartialEq, Eq)]\npub struct I01Binding"),))
+        self.assertEqual(constructor(self.base), 13)
+        self.plant(())
+
+    def test_g_i01b_3_round_3_rows_refuse(self):
+        binding, request = gate.check_i01b_binding, gate.I01B2_REQUEST
+        literal = "        Some(I01Binding { signed_digest, signed_nonce })\n"
+        from_config = ("    pub fn from_config(binding: &Value) -> Option<I01Binding> {\n"
+                       "        let encoded = json::canonical(binding).ok()?;\n"
+                       "        let signed_nonce = binding.get(\"scope\")?.get(\"runNonce\")?.as_str()?.to_string();\n"
+                       "        let signed_digest = sha256::prefixed(&encoded);\n" + literal + "    }\n")
+        # X3-1: a minting closure; the name still occurs six times, so only the exact signature refuses it (B3-11 (a)).
+        minting = ("    pub fn from_config(binding: &Value) -> Option<impl Fn(String, String) -> I01Binding> {\n"
+                   "        let _ = binding;\n        Some(|signed_digest, signed_nonce| I01Binding { signed_digest, "
+                   "signed_nonce })\n    }\n")
+        self.refuses(binding, ((request, from_config, minting),),
+                     re.escape("does not hold `pub fn from_config(binding: &Value) -> Option<I01Binding>` exactly once"))
+        # X3-2: a const literal.
+        self.refuses(binding, ((request, "    Ok(checked)\n}\n", "    Ok(checked)\n}\nconst FORGED: I01Binding = I01Binding "
+                                                               "{ signed_digest: String::new(), signed_nonce: String::new() };\n"),),
+                     "writes the I01Binding literal other than once, in fn from_config")
+        # X3-3: a nested fn inside from_config's body.
+        self.refuses(binding, ((request, literal, "        fn mint(d: String, n: String) -> Option<I01Binding> { "
+                                                  "Some(I01Binding { signed_digest: d, signed_nonce: n }) }\n"
+                                                  "        mint(signed_digest, signed_nonce)\n"),),
+                     "holds a fn other than from_config and its two getters")
+        # X3-4: destructuring inside i01_request.rs.
+        self.refuses(binding, ((request, "    match binding {\n", "    if let Some(I01Binding { signed_digest, .. }) = binding "
+                                                               "{ let _ = signed_digest; }\n    match binding {\n"),),
+                     "writes the I01Binding literal other than once, in fn from_config")
+
+    def test_g_i01b_4_section_7_2_rows_refuse(self):
+        binding, constructor = gate.check_i01b_binding, gate.check_i01b_constructor
+        observe, anchor = I01B2_OBSERVE, I01B2_OBSERVE_USE
+        count = "from_config occurs 3 times, not exactly twice"
+        # P4-1, P4-2, P4-3's wrapper, P4-5's two qualified spellings, P4-6's non-strict cfg(test) fn.
+        for planted in ("pub fn twice(doc: &Value) { let _ = I01Binding::from_config(doc); }\n",
+                        "pub fn reference() { let make = I01Binding::from_config; let _ = make; }\n",
+                        "pub fn again(c: &Value) -> Option<I01Binding> { I01Binding::from_config(c) }\n",
+                        "pub fn qualified(doc: &Value) { let _ = <I01Binding>::from_config(doc); }\n",
+                        "pub fn qualified(doc: &Value) { let _ = I01Binding::<>::from_config(doc); }\n",
+                        "#[cfg(test)]\nfn helper(doc: &Value) { let _ = I01Binding::from_config(doc); }\n"):
+            self.refuses(constructor, ((observe, anchor, anchor + planted),), count)
+        # P4-3's From impl (G-I01B-3 (iii)); P4-4's alias call (G-I01B-3 (v) and (a)).
+        self.refuses(binding, ((observe, anchor, anchor + "impl From<&Value> for I01Binding { fn from(v: &Value) -> "
+                                                          "I01Binding { todo() } }\n"),),
+                     "observe.rs holds an impl naming I01Binding other than")
+        alias = "use crate::i01_request::I01Binding as B;\npub fn alias(doc: &Value) { let _ = B::from_config(doc); }\n"
+        self.refuses(binding, ((observe, anchor, anchor + alias),), "renames or aliases I01Binding")
+        self.refuses(constructor, ((observe, anchor, anchor + alias),), count)
+        # N2-2: a recursive serve.
+        self.refuses(constructor, ((gate.OBSERVER_MAIN, I01B2_RUN, "    if retry { return serve(sealed); }\n" + I01B2_RUN),),
+                     re.escape("main.rs matches `serve(` 3 times, not its definition and the tail's call"))
+        # N2-2b: an accessor handing out another value, a pub field (c), and a second dot write outside parse_v3 (c2).
+        config = gate.I01B2_CONFIG
+        for old, new in (("        &self.binding\n", "        &self.other\n"), ("    binding: Value,\n", "    pub binding: Value,\n")):
+            self.refuses(constructor, ((config, old, new),), "ObserverConfig's binding accessor or field is not as pinned")
+        self.refuses(constructor, ((config, I01B2_ACCESSOR, "    fn reset(config: &mut ObserverConfig, v: Value) {\n"
+                                                            "        config.binding = v;\n    }\n\n" + I01B2_ACCESSOR),),
+                     re.escape("G-I01B-4 (c2)"))
+
+    def test_g_i01b_4_positives_and_wiring_cases(self):
+        constructor = gate.check_i01b_constructor
+        # Positive: a call inside a strict #[cfg(test)] mod tests block passes (the fixture's pass is the other one).
+        self.plant(((I01B2_OBSERVE, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "#[cfg(test)]\nmod tests {\n    use super::*;\n"
+                                                                          "    fn twice(doc: &Value) { let _ = "
+                                                                          "I01Binding::from_config(doc); }\n}\n"),))
+        self.assertEqual(constructor(self.base), 13)
+        self.assertEqual(gate.check_i01b_binding(self.base), 6)
+        self.plant(())
+        # Wiring: the statement before check_lifetime( (the wiring order's), or wrapped in loop { .. } ((a)).
+        lifetime = "    if let Err(error) = config::check_lifetime(&config, utc::wall_seconds()) {\n"
+        self.refuses(gate.check_observer_serve, ((gate.OBSERVER_MAIN, I01B2_FROM, ""),
+                                                 (gate.OBSERVER_MAIN, lifetime, I01B2_FROM + lifetime)),
+                     "serve does not call .* in this order")
+        self.refuses(constructor, ((gate.OBSERVER_MAIN, I01B2_FROM, "    loop {\n    " + I01B2_FROM + "        break;\n    }\n"),),
+                     re.escape("as a statement of its outermost block (one constructor call, G-I01B-4 (a))"))
+        # Wiring: parse_with_record( in serve.
+        self.refuses(gate.check_observer_serve, ((gate.OBSERVER_MAIN, "ObserverConfig::parse_v3(", "ObserverConfig::parse_with_record("),),
+                     "v2 ObserverConfig::parse_with_record")
+
+    def test_g_i01b_4_round_3_rows_refuse(self):
+        constructor, config = gate.check_i01b_constructor, gate.I01B2_CONFIG
+        word = "main.rs names the word serve 3 times"
+        # X4-1, X4-2, X4-3 (B3-3's word count) and X4-3b (B2-10's pattern).
+        for planted, message in (("    let again = serve;\n    if retry { return again(sealed); }\n", word),
+                                 ("    if retry { return serve::<>(sealed); }\n", word),
+                                 ("    if retry { return (serve)(sealed); }\n", word),
+                                 ("    if retry { return self::serve(sealed); }\n", re.escape("main.rs matches `serve(` 3 times"))):
+            self.refuses(constructor, ((gate.OBSERVER_MAIN, I01B2_RUN, planted + I01B2_RUN),), message)
+        # X4-4 and X4-6 (Self: (c4)); X4-5 (the restated literal pattern: (c)).
+        self.refuses(constructor, ((config, I01B2_ACCESSOR, "    fn rebind(self, binding: Value) -> Self {\n        Self { "
+                                                            "binding, ..self }\n    }\n\n" + I01B2_ACCESSOR),),
+                     re.escape("G-I01B-4 (c4)"))
+        self.refuses(constructor, ((config, I01B2_ASSIGN, I01B2_ASSIGN + "        let config = ObserverConfig::<> { binding: "
+                                                                         "forged(), ..config };\n"),),
+                     "writes the ObserverConfig literal or pattern other than once, in fn members")
+        self.refuses(constructor, ((config, I01B2_ASSIGN, I01B2_ASSIGN + "        let Self { binding: slot, .. } = &mut config;\n"
+                                                                         "        *slot = forged();\n"),),
+                     re.escape("G-I01B-4 (c4)"))
+
+    def rows_of(self, clause):
+        rows = [row for row in I01B2_ROWS if row[1] == clause]
+        self.assertTrue(rows, clause)
+        for label, _, changes in rows:
+            with self.subTest(row=label):
+                self.refuses(gate.check_i01b_constructor, changes, re.escape("G-I01B-4 %s" % clause))
+        return len(rows)
+
+    def test_the_35_rows_are_named_once_and_name_their_sub_clauses(self):
+        labels = [label for label, _, _ in I01B2_ROWS]
+        self.assertEqual((len(I01B2_ROWS), len(set(labels))), (35, 35))
+        counts = {clause: sum(row[1] == clause for row in I01B2_ROWS) for clause in I01B2_CLAUSE_FUNCTIONS}
+        self.assertEqual(counts, {"(b1)": 2, "(b2)": 6, "(b3)": 5, "(b4)": 1, "(b5)": 2, "(b6)": 5,
+                                  "(c1)": 5, "(c2)": 3, "(c3)": 5, "(c4)": 1})
+        for function in I01B2_CLAUSE_FUNCTIONS.values():
+            self.assertTrue(callable(getattr(gate, function)), function)
+
+    def test_b1_the_pinned_load_statement(self):
+        self.assertEqual(self.rows_of("(b1)"), 2)
+
+    def test_b2_document_five_times(self):
+        self.assertEqual(self.rows_of("(b2)"), 6)
+
+    def test_b3_config_five_times(self):
+        self.assertEqual(self.rows_of("(b3)"), 5)
+
+    def test_b4_outermost_and_in_order(self):
+        self.assertEqual(self.rows_of("(b4)"), 1)
+
+    def test_b5_the_pinned_parse_statement(self):
+        self.assertEqual(self.rows_of("(b5)"), 2)
+
+    def test_b6_parse_v3_twice(self):
+        self.assertEqual(self.rows_of("(b6)"), 5)
+
+    def test_c1_no_alias_or_type_item(self):
+        self.assertEqual(self.rows_of("(c1)"), 5)
+
+    def test_c2_the_dot_form(self):
+        self.assertEqual(self.rows_of("(c2)"), 3)
+
+    def test_c3_bound_once(self):
+        self.assertEqual(self.rows_of("(c3)"), 5)
+
+    def test_c4_no_self(self):
+        self.assertEqual(self.rows_of("(c4)"), 1)
+
+    def test_the_review_records_own_spellings_refuse(self):
+        # The records' spellings where a row's spelling departs from them (each also breaks another place, so it can
+        # name more than one sub-clause): refused by G-I01B-4 all the same.
+        main, observe = gate.OBSERVER_MAIN, I01B2_OBSERVE
+        load = "    let document = match signed_config::load() {\n"
+        for changes in (
+                ((main, I01B2_LOAD_OK, "        Ok(_) => b\"{}\".to_vec(),\n"),),
+                ((main, load, load.replace("let document", "let mut document")),
+                 (main, I01B2_PARSE, "    document.clear();\n    document.extend_from_slice(b\"{}\");\n" + I01B2_PARSE)),
+                ((main, load, load.replace("let document", "let mut document")),
+                 (main, I01B2_PARSE, "    document = b\"{}\".to_vec();\n" + I01B2_PARSE)),
+                ((main, I01B2_LOAD_OK, "        Ok(mut document) => { document.clear(); document.extend_from_slice(b\"{}\"); "
+                                       "document }\n"),),
+                ((main, "ObserverConfig::parse_v3(&document)", "ObserverConfig::parse_v3(b\"{}\")"),),
+                ((main, I01B2_PARSE, "    let (config, record_ref) = { " + I01B2_PARSE.strip() + " (config, record_ref) };\n"),),
+                ((observe, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "pub fn reparse(d: &[u8]) -> Option<ObserverConfig> { "
+                                                                  "ObserverConfig::parse_v3(d).ok().map(|(config, _)| config) }\n"),
+                 (main, I01B2_FROM, "    let config = observe::reparse(b\"{}\").unwrap_or(config);\n" + I01B2_FROM))):
+            self.refuses(gate.check_i01b_constructor, changes, "G-I01B-4")
 
 
 ALIAS_TREE = {

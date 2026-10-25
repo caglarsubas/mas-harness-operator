@@ -24,6 +24,12 @@
 //! record moves into the capture engine; the epoch builds the I01 service from it. The Linux wire's constructor also
 //! opens and registers the I01 listener, so its refusal maps through `status::wire_setup` (24 for the poller, 31-34
 //! for the listener).
+//!
+//! HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5; G-I01B-4) gives `serve` fourteen calls: the parse is configuration v3's
+//! (`ObserverConfig::parse_v3`, 13), and right after the lifetime the one statement building the binding from the
+//! configuration's checked member (`I01Binding::from_config(config.binding())`, 13 when it has no digest or nonce); the
+//! epoch takes it as `observe::run`'s seventh argument. The load and parse statements are pinned whole, and `document`
+//! and `config` each occur only at their pinned places.
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;
@@ -59,6 +65,7 @@ fn serve(sealed: &Sealed) -> u8 {
     use planeon_observer::config::{self, ObserverConfig};
     use planeon_observer::credentials;
     use planeon_observer::enrolled::{self, Enrolled};
+    use planeon_observer::i01_request::I01Binding;
     use planeon_observer::linux_capture::LinuxCapture;
     use planeon_observer::linux_net::LinuxWire;
     use planeon_observer::observe;
@@ -71,11 +78,12 @@ fn serve(sealed: &Sealed) -> u8 {
         Ok(document) => document,
         Err(error) => return status::config_load(&error),
     };
-    let Ok((config, record_ref)) = ObserverConfig::parse_with_record(&document) else { return status::CONFIG_CHECK };
+    let Ok((config, record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };
     drop(document);
     if let Err(error) = config::check_lifetime(&config, utc::wall_seconds()) {
         return status::lifetime(&error);
     }
+    let Some(binding) = I01Binding::from_config(config.binding()) else { return status::CONFIG_CHECK };
     let Ok((serving_ca, identity)) = credentials::observer_inputs(&config.credentials) else {
         return status::CREDENTIALS;
     };
@@ -104,5 +112,5 @@ fn serve(sealed: &Sealed) -> u8 {
     };
     let Ok(closure) = Closure::embedded() else { return status::CLOSURE };
     let captures = Box::new(CaptureEngine::new(capture, enrolled, schema));
-    status::observation(&observe::run(wire, config, tls, closure, captures, server))
+    status::observation(&observe::run(wire, config, tls, closure, captures, server, binding))
 }

@@ -16,7 +16,11 @@
 //! - A peer step reads one request: the window; the pidfd alive and the process unchanged (start time, cgroup and
 //!   label); one receive, whose SCM_CREDENTIALS must give the accept's pid, uid and gid and whose SCM_SECURITY must
 //!   equal SO_PEERSEC's bytes exactly; the process unchanged again; then `i01_request`'s checks and the binding gate,
-//!   which in I01a refuses every request (no binding exists before HE-008), so every session closes there.
+//!   which in I01a refused every request (no binding existed before HE-008), so every session closed there.
+//!   HE-004-I01B2 (DESIGN-I01B2 rev 3 section 6): the service holds the configuration's [`I01Binding`], handed to
+//!   [`I01Service::new`] by `observe::run`, and the gate compares each request with it; a refused request closes at its
+//!   step, as before, and a request that passes closes as [`Closed::NotAnswered`]: nothing is answered or sent before
+//!   HE-004-I01B3.
 //! - The window: the wall second passed in (`None`, a clock before the epoch, closes without a latch) must lie in
 //!   `[validFrom, expiresAt - 3 s)` (the capture engine's margin). Before `validFrom` the session closes with no latch;
 //!   from `expiresAt - 3 s` on the service latches closed until the process ends, whatever the clock says later.
@@ -30,7 +34,7 @@ use crate::capture::EXPIRY_MARGIN_MS;
 use crate::client::{AcceptResult, ListenerBackoff, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService,
                     PeerWatch, ProcIdentity};
 use crate::enrolled::{ServerClass, ServerIdentity};
-use crate::i01_request::{check_request, Chain, RequestRefusal};
+use crate::i01_request::{check_request, Chain, I01Binding, RequestRefusal};
 
 /// A session's idle bound, from its accept to its first request.
 pub const IDLE_BOUND: Duration = Duration::from_secs(2);
@@ -52,6 +56,8 @@ pub enum Closed {
     Receive,
     /// The request checks or the binding gate.
     Request(RequestRefusal),
+    /// HE-004-I01B2: a request that passed the checks and the binding gate; nothing is answered before HE-004-I01B3.
+    NotAnswered,
     /// The idle or the outer bound.
     Bound,
     /// The peer's watch failed.
@@ -71,9 +77,11 @@ struct Session {
     chain: Chain,
 }
 
-/// The I01 service: the server's identity, the expiry latch, the listener's backoff and the one session.
+/// The I01 service: the server's identity, the configuration's binding, the expiry latch, the listener's backoff and
+/// the one session.
 pub struct I01Service {
     server: ServerIdentity,
+    binding: I01Binding,
     cgroup: Vec<u8>,
     latched: bool,
     backoff: ListenerBackoff,
@@ -93,11 +101,13 @@ fn unchanged(ops: &mut dyn PeerOps, session: &Session) -> bool {
 }
 
 impl I01Service {
-    /// The service for the enrolled server (`serve`'s identity, built by the epoch).
-    pub fn new(server: ServerIdentity) -> I01Service {
+    /// The service for the enrolled server (`serve`'s identity, built by the epoch) and the configuration's binding
+    /// (`serve`'s one `I01Binding::from_config`, HE-004-I01B2).
+    pub fn new(server: ServerIdentity, binding: I01Binding) -> I01Service {
         let cgroup = format!("0::/{}\n", server.cgroup_rel).into_bytes();
         I01Service {
             server,
+            binding,
             cgroup,
             latched: false,
             backoff: ListenerBackoff::default(),
@@ -226,9 +236,12 @@ impl I01Service {
                     return Some(Closed::Changed);
                 }
                 let bytes = self.buffer.get(..length).unwrap_or_default();
-                // Q-I01A-3 (a): no binding exists before HE-008, so the gate refuses whatever passes the checks.
-                let refusal = check_request(bytes, false, &mut session.chain, None).err().unwrap_or(RequestRefusal::Binding);
-                Some(Closed::Request(refusal))
+                // HE-004-I01B2: the configuration's binding gates the request. A refusal closes at its step; a request
+                // that passes is not answered before HE-004-I01B3, so it closes too, and nothing is sent.
+                match check_request(bytes, false, &mut session.chain, Some(&self.binding)) {
+                    Ok(_) => Some(Closed::NotAnswered),
+                    Err(refusal) => Some(Closed::Request(refusal)),
+                }
             }
             PeerRecv::Truncated | PeerRecv::Ancillary | PeerRecv::Eof | PeerRecv::Failed(_) => Some(Closed::Receive),
         }

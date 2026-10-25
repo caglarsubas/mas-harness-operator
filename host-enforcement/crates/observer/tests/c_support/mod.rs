@@ -15,10 +15,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gate_sys::inet::{InetAddress, IpLiteral};
+use gate_sys::inet::InetAddress;
+use i05_protocol::json::Doc;
 use planeon_observer::client::{AcceptResult, ConnId, Connecting, ExeLink, Interest, PeerCreds, PeerId, PeerOps, PeerRecv,
                                PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, Woken};
-use planeon_observer::config::{CredentialFiles, FileRef, ObserverConfig};
+use planeon_observer::config::{FileRef, ObserverConfig, FORMAT};
 use planeon_observer::credentials::ObserverIdentity;
 use planeon_observer::inputs::Resource;
 use planeon_observer::observe::{Epoch, ObserverExit, Settings, Trace};
@@ -292,22 +293,28 @@ pub fn pin(path: &str) -> FileRef {
 }
 
 /// A checked configuration for the scripted apiserver at `127.0.0.1:6443`, valid from an hour before the tests' start
-/// until `lifetime` after it.
+/// until `lifetime` after it. HE-004-I01B2 (DESIGN-I01B2 section 3): the configuration's `binding` field is private, so
+/// this is `ObserverConfig::parse` over a v1 test document carrying the same values and lifetime.
 pub fn config_for(lifetime: Duration) -> ObserverConfig {
-    ObserverConfig {
-        generation: "g-1".to_string(),
-        not_before: wall_start() - 3_600,
-        not_after: wall_start() + lifetime.as_secs(),
-        authority: "127.0.0.1:6443".to_string(),
-        address: InetAddress { ip: IpLiteral::V4([127, 0, 0, 1]), port: 6443 },
-        namespace: NAMESPACE.to_string(),
-        credentials: CredentialFiles { serving_ca: pin("/etc/planeon/observer/ca.crt"),
-                                       chain: vec![pin("/etc/planeon/observer/tls.crt")],
-                                       key: pin("/etc/planeon/observer/tls.key") },
-        pinned_manifest_hash: pinned_hash(),
-        expected_plugin: PLUGIN.to_string(),
-        nonce: NONCE.to_string(),
-    }
+    let entry = |path: &str| Doc::object(vec![("path", Doc::str(path)), ("sha256", Doc::str(&pin(path).sha256))]);
+    let second = |value: u64| Doc::Int(i64::try_from(value).expect("a wall second within i64"));
+    let document = Doc::object(vec![
+        ("format", Doc::str(FORMAT)),
+        ("generation", Doc::str("g-1")),
+        ("validity", Doc::object(vec![("notBefore", second(wall_start() - 3_600)),
+                                      ("notAfter", second(wall_start() + lifetime.as_secs()))])),
+        ("apiserverAuthority", Doc::str("127.0.0.1:6443")),
+        ("qualificationNamespace", Doc::str(NAMESPACE)),
+        ("credentials", Doc::object(vec![
+            ("apiserverServingCa", entry("/etc/planeon/observer/ca.crt")),
+            ("observerIdentity", Doc::object(vec![("chain", Doc::Array(vec![entry("/etc/planeon/observer/tls.crt")])),
+                                                  ("key", entry("/etc/planeon/observer/tls.key"))])),
+        ])),
+        ("admission", Doc::object(vec![("pinnedManifestHash", Doc::str(&pinned_hash())),
+                                       ("expectedPlugin", Doc::str(PLUGIN))])),
+        ("enrollment", Doc::object(vec![("nonce", Doc::str(NONCE))])),
+    ]);
+    ObserverConfig::parse(&document.canonical()).expect("the v1 test configuration parses")
 }
 
 // ------------------------------------------------------------------------------------------ the RBAC lists
