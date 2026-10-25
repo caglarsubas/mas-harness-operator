@@ -8250,6 +8250,8 @@ I01B3_NAMESPACE_DOC = ("/// VPO's observed namespace against the binding's (harn
                        "at\n/// f9882c1a).\n")
 I01B3_NAMESPACE_PIN = 'pub const OBSERVED_NAMESPACE_TEXT: &str = "observed namespace";\n'
 I01B3_KEY_UID = 'pub const KEY_UID: &str = "uid";\n'
+I01B3_LIST_LET = "    let mut list: Vec<&'static str> = Vec::new();\n"
+I01B3_LIST_TAIL = "    list\n}\n"
 I01B3_X9_1 = ("impl Clone for Derived where Derived: Sized {\n    fn clone(&self) -> Self where Self: Sized {\n        forged()\n"
               "    }\n}\n\n")
 I01B3_NEW_1 = ("    impl CaptureFacts {\n        pub fn mint(policy_values: Vec<u8>) -> Option<Derived> {\n"
@@ -8318,9 +8320,9 @@ I01B3_DERIVED_ROWS = (
 I01B3_DERIVED_FUNCTIONS = {"(i)": "derived_i_struct", "(ii)": "derived_ii_literal", "(iii)": "derived_iii_impls",
                            "(iv)": "derived_iv_fields", "(v)": "derived_v_names", "(vi)": "derived_vi_name_count",
                            "(vii)": "derived_vii_top_level"}
-# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3]: G-I01B-8's I01B3 rows, (t1)-(t7), each with its named check
-# (the first of its actual set to refuse, the checks running (t1), (t6), (t2)-(t5), (t7)), no stated set (section 4
-# states sets for G-I01B-9 only), and its plantings.
+# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review round 1's R1-1 and R1-2 (U6): G-I01B-8's I01B3
+# rows, (t1)-(t9), each with its named check (the first of its actual set to refuse, the checks running (t1), (t6),
+# (t2), (t9), (t3), (t4), (t8), (t5), (t7)), no stated set (section 4 states sets for G-I01B-9 only), and its plantings.
 I01B3_TEXT_ROWS = (
     ("(t1) a changed VPO text", "(t1)", None,
      ((_ANSWER, I01B3_NAMESPACE_PIN, I01B3_NAMESPACE_PIN.replace('"observed namespace"', '"observed namespaces"')),)),
@@ -8368,7 +8370,8 @@ I01B3_TEXT_ROWS = (
     ("(t5) an I01B1 non-refusal text, DigestKey::name()", "(t5)", None,
      ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(DigestKey::Rbac.name());\n    }\n"
                                  + I01B3_IN_ANSWER),)),
-    ("(t5) a const array of key consts", "(t5)", None,
+    # U3's (t5) row: since R1-2 (a), (t2) reads the array's `[&str; 1]` as a type naming str and refuses it first.
+    ("(t2) a const array of key consts", "(t2)", None,
      ((_ANSWER, I01B3_TOP, "const KEYS: [&str; 1] = [KEY_SCOPE];\n\n" + I01B3_TOP),
       (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(KEYS[0]);\n    }\n" + I01B3_IN_ANSWER))),
     ("(t5) a KEY_ const through the rule function", "(t5)", None,
@@ -8386,11 +8389,39 @@ I01B3_TEXT_ROWS = (
      ((_ANSWER, I01B3_TOP, "pub static ALIAS: &str = KEY_SCOPE;\n\n" + I01B3_TOP),)),
     ("(t7) a fn-local static shadowing a pinned name", "(t7)", None,
      ((_ANSWER, I01B3_IN_ANSWER, "    static OBSERVED_NAMESPACE_TEXT: &str = KEY_SCOPE;\n" + I01B3_IN_ANSWER),)),
+    # PR review round 1's hunted forms H8-1 .. H8-10 (R1-1, R1-2; U6), in the spellings of the record's findings.
+    ("H8-1 Err turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err::<Vec<u8>, &'static str>(KEY_SCOPE);\n    }\n"
+                                 + I01B3_IN_ANSWER),)),
+    ("H8-2 ok_or turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or::<&'static str>(KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-3 map_err turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = json::canonical(derived.binding_member())\n"
+                                 "        .map_err::<&'static str, _>(|_| KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-4 Err as a function value", "(t8)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    Some(KEY_SCOPE).filter(..).map_or(Ok(()), Err)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-5 the rule helper as a function value", "(t8)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let rule = require;\n    rule(.., KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-6 a fn item as map_err's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "fn scope_text(_: json::Error) -> &'static str {\n    KEY_SCOPE\n}\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = json::canonical(derived.binding_member()).map_err(scope_text)?;\n"
+                                 + I01B3_IN_ANSWER))),
+    ("H8-7 refusals' list via Vec::push", "(t5)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    Vec::push(&mut list, KEY_SCOPE);\n"),)),
+    ("H8-8 refusals' list via extend", "(t5)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    list.extend([KEY_SCOPE]);\n"),)),
+    ("H8-9 a lower-case const typed &(str)", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, "const scope_text: &(str) = KEY_SCOPE;\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    ("H8-10 a lower-case const typed through a type alias of str", "(t9)", None,
+     ((_ANSWER, I01B3_TOP, "type Text = str;\nconst scope_text: &Text = KEY_SCOPE;\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
 )
 I01B3_TEXT_FUNCTIONS = {"(t1)": "answer_texts_t1_pins", "(t2)": "answer_texts_t2_set",
                         "(t3)": "answer_texts_t3_no_other_string", "(t4)": "answer_texts_t4_routes",
                         "(t5)": "answer_texts_t5_positions", "(t6)": "answer_texts_t6_key_prefixed",
-                        "(t7)": "answer_texts_t7_no_static"}
+                        "(t7)": "answer_texts_t7_no_static", "(t8)": "answer_texts_t8_calls_only",
+                        "(t9)": "answer_texts_t9_no_str_alias"}
 
 
 def i01b3_answer_tree(changes=()):
@@ -8452,10 +8483,13 @@ class I01b3TextTests(I01b3AnswerTreeTests):
     text, a missing citation, a key const holding an invented value; (t2) an unlisted R10 text, a second const with a
     text's value, a key const equal to a text, a fn-local const, a `&'static str` const outside the lists, a pinned line
     inside a block comment with the name redefined; (t3) a bare literal and raw, byte and C strings; (t4) stringify!,
-    file!() and module_path!(); (t5) Default::default(), a slice of a pinned const, an I01B1 non-refusal text, a const
-    array of key consts, and a KEY_ const through the rule function, map_err, ok_or_else(move ||) and a braced argument;
-    (t6) a key-prefixed literal; (t7) a static aliasing a key const and a fn-local static shadowing a pinned name)
-    refuses with its own check's message."""
+    file!() and module_path!(); (t5) Default::default(), a slice of a pinned const, an I01B1 non-refusal text, and a
+    KEY_ const through the rule function, map_err, ok_or_else(move ||) and a braced argument; (t6) a key-prefixed
+    literal; (t7) a static aliasing a key const and a fn-local static shadowing a pinned name; U3's const array of key
+    consts, (t2)'s since R1-2 (a); and PR review round 1's H8-1 .. H8-10: (t5) the Err, ok_or and map_err turbofish, a fn
+    item as map_err's argument and refusals' list via Vec::push and extend; (t8) Err and the rule helper as function
+    values; (t2) a lower-case const typed &(str); (t9) one typed through a type alias of str) refuses with its own
+    check's message."""
 
     def test_the_fixture_and_the_real_sources_pass(self):
         self.assertEqual((len(gate.I01B3_TEXT_PINS), len(gate.I01B3_KEY_CONSTS)), (17, 37))
@@ -8480,11 +8514,56 @@ class I01b3TextTests(I01b3AnswerTreeTests):
         self.plant(())
 
     def test_the_rows(self):
-        self.assertEqual(len(I01B3_TEXT_ROWS), 31)
+        self.assertEqual(len(I01B3_TEXT_ROWS), 41)
         self.assertEqual(sorted({clause for _, clause, _, _ in I01B3_TEXT_ROWS}), sorted(I01B3_TEXT_FUNCTIONS))
+        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-10:]],
+                         ["H8-%d" % number for number in range(1, 11)])
 
     def test_each_row_refuses_with_its_own_check_s_message(self):
         self.refuses_each(I01B3_TEXT_ROWS, gate.check_i01b3_texts, "constants and texts, G-I01B-8")
+
+    def test_the_record_s_hunted_spellings_refuse_too(self):
+        # PR review round 1's huntedForms spell H8-1, H8-2 and H8-4 with KEY_X; the rows plant its findings' spellings.
+        for text, clause in (("        return Err::<_, _>(KEY_X);\n", "(t5)"),
+                             ("        let _ = utc_text(now).ok_or::<_>(KEY_X)?;\n", "(t5)"),
+                             ("        Some(KEY_X).map_or(Ok(()), Err)?;\n", "(t8)")):
+            self.plant(((gate.I01_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n" + text + "    }\n" + I01B3_IN_ANSWER),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 %s)" % clause),
+                                            msg=text):
+                    gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+
+    def test_call_opening_reads_an_optional_turbofish(self):
+        # R1-1 (a): the `(` past whitespace and a balanced turbofish; none when the word is not called.
+        for code in ("Err(x)", "Err (x)", "Err::<_, _>(x)", "Err::<Vec<Vec<u8>>, &'static str>(x)",
+                     "Err::<fn(u8) -> u8, ()>(x)", "Err:: < u8 > (x)"):
+            self.assertEqual(code[gate.call_opening(code, 3):], "(x)", code)
+        for code in ("Err)", "Err, y", "Err::new(x)", "Err::<u8; (x)", "Err::<u8 { (x)", "Err::<u8"):
+            self.assertIsNone(gate.call_opening(code, 3), code)
+
+    def test_refusals_list_is_named_only_at_its_positions(self):
+        # R1-1 (c): the real list's only write is `.push(`; its `.insert(` is a position, and any other naming of the
+        # list, a second declaration or another tail refuses, each with (t5)'s message.
+        _, _, code = gate.answer_source(gate.HE, "G-I01B-8")
+        self.assertEqual(gate.refusals_list_positions(code, "G-I01B-8"), [])
+        for old, new in ((I01B3_LIST_LET, I01B3_LIST_LET + "    list.insert(0, KEY_SCOPE);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    list.push(text_of_nothing);\n    list[0] = KEY_SCOPE;\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    grow(&mut list);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    let list = vec![KEY_SCOPE];\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + I01B3_LIST_LET),
+                         (I01B3_LIST_TAIL, "    vec![KEY_SCOPE]\n}\n")):
+            self.plant(((gate.I01_ANSWER, old, new),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t5))"), msg=new):
+                    gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+        # A binding at the list's positions passes, as at `.push(`.
+        self.plant(((gate.I01_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    let more = Vec::new();\n    list.extend(more);\n"),))
+        self.assertEqual(gate.check_i01b3_texts(self.base), 54)
+        self.plant(())
 
 
 class OutputPrefixTests(unittest.TestCase):
