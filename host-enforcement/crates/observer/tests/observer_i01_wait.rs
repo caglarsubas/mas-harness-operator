@@ -19,10 +19,12 @@ use std::time::{Duration, Instant};
 
 use c_support::{observer_tls, shared_pki, Rig};
 use gate_sys::inet::{InetAddress, IpLiteral};
+use i05_protocol::json;
 use planeon_observer::client::{AcceptResult, Client, ConnId, Connecting, ExeLink, Interest, ListenerBackoff, PeerCreds, PeerId,
                                PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService, PeerWatch, PollError,
                                ProcIdentity, Ready, Transfer, Wire, Woken, LISTENER_BACKOFF, LISTENER_FAULT_LIMIT};
 use planeon_observer::enrolled::{ServerClass, ServerIdentity};
+use planeon_observer::i01_request::I01Binding;
 use planeon_observer::i01_service::I01Service;
 use planeon_observer::observe::ObserverExit;
 
@@ -329,8 +331,13 @@ fn a_healthy_epoch_with_the_i01_service_and_no_peer_ends_as_without_it() {
                                   cgroup_rel: "planeon.slice/planeon-proxy-server.service".to_string(),
                                   class: ServerClass::Observed, interpreter: "/opt/planeon/python/3.12.14/bin/python3.12".to_string(),
                                   valid_from: 0, expires_at: u64::MAX / 2 };
+    // HE-004-I01B2 (B3-9 (a), I2D-7): the service's binding is `from_config` over a test binding document.
+    let document = json::parse("{\"schemaVersion\":\"planeon.internal.policy-observation-binding/v1\",\
+                                \"scope\":{\"runNonce\":\"run-1\"}}")
+        .expect("a test binding document");
+    let binding = I01Binding::from_config(&document).expect("the test document has a digest and a nonce");
     let rig = Rig::new();
-    let mut epoch = rig.epoch().with_peer_service(Box::new(I01Service::new(server)));
+    let mut epoch = rig.epoch().with_peer_service(Box::new(I01Service::new(server, binding)));
     assert_eq!(epoch.run(), ObserverExit::ConfigExpired);
     assert!(!epoch.client().listener_failed());
 }

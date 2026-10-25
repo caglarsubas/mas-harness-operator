@@ -4,8 +4,12 @@
 //! over 16,384 bytes and one cut short; depth 17; a non-printable or non-ASCII byte, a float, a duplicate key, an integer
 //! out of range; the non-canonical encodings (unsorted keys, whitespace, a `\u` escape, a leading zero, `-0`); an extra
 //! member and a missing one; each schema form; and the chain (sequence 1 after the zero digest first, and no later
-//! request passing in I01a, which answers nothing). The PV replay is U7's.
+//! request passing in I01a, which answers nothing). The PV replay is U7's. HE-004-I01B2 (DESIGN-I01B rev 3 section
+//! 3.4, DESIGN-I01B2 section 8): the test binding is built only through `I01Binding::from_config`, over a test binding
+//! document B whose digest and nonce the request names; B2 (B with one member changed) and another request nonce refuse.
 
+use i05_protocol::json::{self, Value};
+use i05_protocol::sha256;
 use planeon_observer::i01_request::{binding_gate, check_request, frame, request_schema, Chain, I01Binding, I01Request,
                                     RequestRefusal, MAX_INTEGER, MEMBERS, REQUEST_DEPTH, REQUEST_LIMIT, ZERO_DIGEST};
 
@@ -13,11 +17,23 @@ const DIGEST: &str = "sha256:111111111111111111111111111111111111111111111111111
 const CHALLENGE: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const NONCE: &str = "run-7.a";
 
-/// A canonical request with `sequence` and `previous`.
-fn request(sequence: u64, previous: &str) -> String {
-    format!("{{\"bindingDigest\":\"{DIGEST}\",\"challenge\":\"{CHALLENGE}\",\"operation\":\"OBSERVE_POLICY\",\
-             \"previousObservationDigest\":\"{previous}\",\"runNonce\":\"{NONCE}\",\
+/// A canonical request naming `digest` and `nonce`, with `sequence` and `previous`.
+fn request_naming(digest: &str, nonce: &str, sequence: u64, previous: &str) -> String {
+    format!("{{\"bindingDigest\":\"{digest}\",\"challenge\":\"{CHALLENGE}\",\"operation\":\"OBSERVE_POLICY\",\
+             \"previousObservationDigest\":\"{previous}\",\"runNonce\":\"{nonce}\",\
              \"schemaVersion\":\"planeon.internal.policy-observation-request/v1\",\"sequence\":{sequence}}}")
+}
+
+/// A canonical request with `sequence` and `previous`, naming DIGEST and NONCE.
+fn request(sequence: u64, previous: &str) -> String {
+    request_naming(DIGEST, NONCE, sequence, previous)
+}
+
+/// A test binding document (the gate reads only its canonical digest and its `scope.runNonce`).
+fn binding_document(nonce: &str, tenant: &str) -> Value {
+    json::parse(&format!("{{\"schemaVersion\":\"planeon.internal.policy-observation-binding/v1\",\
+                          \"scope\":{{\"runNonce\":\"{nonce}\",\"tenantId\":\"{tenant}\"}}}}"))
+        .expect("a test binding document")
 }
 
 fn first() -> String {
@@ -40,18 +56,33 @@ fn a_canonical_first_request_passes_every_check_but_the_absent_binding() {
     let checked = parsed(&bytes);
     assert_eq!(checked, I01Request { binding_digest: DIGEST.to_string(), run_nonce: NONCE.to_string(),
                                      challenge: CHALLENGE.to_string(), sequence: 1, previous_digest: ZERO_DIGEST.to_string() });
-    // I01a: no binding exists, so the gate closes every request that passes the other checks.
+    // I01a's case: no binding, so the gate closes every request that passes the other checks.
     assert_eq!(check_request(bytes.as_bytes(), false, &mut Chain::default(), None), Err(RequestRefusal::Binding));
-    // A test binding (never built in the binary) passes the request it names and refuses any other.
-    let bound = I01Binding { binding_digest: DIGEST.to_string(), run_nonce: NONCE.to_string() };
+    // The bound case (DESIGN-I01B rev 3 section 3.4): a binding only through from_config, over a test binding document
+    // B; the request names B's digest d and nonce n, and the gate and the whole check pass it.
+    let document = binding_document(NONCE, "unit-tenant");
+    let bound = I01Binding::from_config(&document).expect("B has a digest and a nonce");
+    let d = sha256::prefixed(&json::canonical(&document).expect("a canonical encoding"));
+    assert_eq!((bound.signed_digest(), bound.signed_nonce()), (d.as_str(), NONCE));
+    let named = request_naming(&d, NONCE, 1, ZERO_DIGEST);
+    let checked = parsed(&named);
     assert_eq!(binding_gate(&checked, Some(&bound)), Ok(()));
-    assert_eq!(check_request(bytes.as_bytes(), false, &mut Chain::default(), Some(&bound)), Ok(checked.clone()));
-    for other in [I01Binding { binding_digest: DIGEST.replace('1', "3"), run_nonce: NONCE.to_string() },
-                  I01Binding { binding_digest: DIGEST.to_string(), run_nonce: "run-7.b".to_string() }] {
-        assert_eq!(binding_gate(&checked, Some(&other)), Err(RequestRefusal::Binding));
-        assert_eq!(check_request(bytes.as_bytes(), false, &mut Chain::default(), Some(&other)), Err(RequestRefusal::Binding));
-    }
+    assert_eq!(check_request(named.as_bytes(), false, &mut Chain::default(), Some(&bound)), Ok(checked.clone()));
+    // Another digest: B2, B with one member changed, refuses the request naming d.
+    let other = I01Binding::from_config(&binding_document(NONCE, "other-tenant")).expect("B2 has a digest and a nonce");
+    assert_ne!(other.signed_digest(), d);
+    assert_eq!(binding_gate(&checked, Some(&other)), Err(RequestRefusal::Binding));
+    assert_eq!(check_request(named.as_bytes(), false, &mut Chain::default(), Some(&other)), Err(RequestRefusal::Binding));
+    // Another nonce: the request varies, not the binding; d with run-7.b refuses against B.
+    let renonced = request_naming(&d, "run-7.b", 1, ZERO_DIGEST);
+    assert_eq!(binding_gate(&parsed(&renonced), Some(&bound)), Err(RequestRefusal::Binding));
+    assert_eq!(check_request(renonced.as_bytes(), false, &mut Chain::default(), Some(&bound)), Err(RequestRefusal::Binding));
+    // No binding: unchanged.
     assert_eq!(binding_gate(&checked, None), Err(RequestRefusal::Binding));
+    // from_config gives nothing without a scope.runNonce text.
+    for text in ["{\"scope\":{}}", "{\"scope\":{\"runNonce\":7}}", "{}", "[]", "null"] {
+        assert_eq!(I01Binding::from_config(&json::parse(text).expect("JSON")), None, "{text}");
+    }
 }
 
 #[test]

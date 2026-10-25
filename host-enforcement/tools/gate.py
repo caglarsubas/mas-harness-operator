@@ -909,11 +909,12 @@ EFFECT_GATE_CRATE = "crates/effect-gate"
 I01B_GUARDED_PINS = {
     "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
     "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
-    # HE-004-I01B2 (DESIGN-I01B2 rev 3 section 1): re-pinned at I01B2's bytes (configuration v3, its load-time checks
-    # and the private binding with its accessor).
+    # HE-004-I01B2 (DESIGN-I01B2 rev 3 section 1): these three re-pinned at I01B2's bytes (configuration v3, its
+    # load-time checks and the private binding with its accessor; the closed I01Binding and from_config; the service
+    # holding the binding and closing a passing request as NotAnswered).
     "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
-    "crates/observer/src/i01_request.rs": "aee536e52aa977b0ef84ee84a3f5d3fb07044a9621ed58a8feece573646b6668",
-    "crates/observer/src/i01_service.rs": "b94f6dafd6ad7c8fedce4c8e4a4564f9fdc33f40847444bd4021741c03c26dbd",
+    "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
+    "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
     "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
 }
 I01B_ABSENT = ("crates/observer/src/i01_answer.rs",)

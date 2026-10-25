@@ -14,10 +14,14 @@
 //! - The chain, per session: a session's first request carries sequence 1 and the all-zero previous digest; a later one
 //!   would carry the next sequence, a challenge other than its predecessor's and the digest of the last answer, and
 //!   I01a answers nothing, so no later request passes.
-//! - The binding gate: `bindingDigest` and `runNonce` must equal HE-008's binding. I01a has none (the observer's
-//!   configuration holds no binding member), so the gate refuses every request; the tests drive it with a test binding.
+//! - The binding gate: `bindingDigest` and `runNonce` must equal HE-008's binding. I01a had none, so the gate refused
+//!   every request. HE-004-I01B2 (DESIGN-I01B2 rev 3 section 6; G-I01B-3 and G-I01B-4): [`I01Binding`] is closed (private
+//!   fields, no `Clone`, one literal) and built only by [`I01Binding::from_config`], once, in `serve`, from configuration
+//!   v3's checked `binding` member: its digest is `sha256:` and the hex SHA-256 of the member's canonical encoding, its
+//!   nonce the member's `scope.runNonce`. The gate compares through the two getters; `None` still refuses every request.
 
 use i05_protocol::json::{self, Object, Value};
+use i05_protocol::sha256;
 
 /// The largest request datagram.
 pub const REQUEST_LIMIT: usize = 16_384;
@@ -71,11 +75,33 @@ pub struct I01Request {
     pub previous_digest: String,
 }
 
-/// HE-008's binding as the gate compares it (a test value in I01a: nothing builds one in the binary).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// HE-008's binding as the gate compares it (HE-004-I01B2, G-I01B-3): the signed configuration's binding digest and run
+/// nonce, private, never cloned, and built only by [`I01Binding::from_config`].
+#[derive(Debug, PartialEq, Eq)]
 pub struct I01Binding {
-    pub binding_digest: String,
-    pub run_nonce: String,
+    signed_digest: String,
+    signed_nonce: String,
+}
+
+impl I01Binding {
+    /// The binding of configuration v3's checked `binding` member (`ObserverConfig::binding`): `sha256:` and the hex
+    /// SHA-256 of its canonical encoding, and its `scope.runNonce`; `None` if either is missing (status 13 in `serve`).
+    pub fn from_config(binding: &Value) -> Option<I01Binding> {
+        let encoded = json::canonical(binding).ok()?;
+        let signed_nonce = binding.get("scope")?.get("runNonce")?.as_str()?.to_string();
+        let signed_digest = sha256::prefixed(&encoded);
+        Some(I01Binding { signed_digest, signed_nonce })
+    }
+
+    /// The binding digest the configuration was signed with.
+    pub fn signed_digest(&self) -> &str {
+        &self.signed_digest
+    }
+
+    /// The run nonce the configuration was signed with.
+    pub fn signed_nonce(&self) -> &str {
+        &self.signed_nonce
+    }
 }
 
 /// Whether every byte is printable ASCII.
@@ -234,11 +260,11 @@ impl Chain {
     }
 }
 
-/// The binding gate (DESIGN-I01A section 8): the request's `bindingDigest` and `runNonce` must equal the binding's;
-/// without a binding every request is refused.
+/// The binding gate (DESIGN-I01A section 8): the request's `bindingDigest` and `runNonce` must equal the binding's, read
+/// through its getters (HE-004-I01B2); without a binding every request is refused.
 pub fn binding_gate(request: &I01Request, binding: Option<&I01Binding>) -> Result<(), RequestRefusal> {
     match binding {
-        Some(bound) if bound.binding_digest == request.binding_digest && bound.run_nonce == request.run_nonce => Ok(()),
+        Some(bound) if bound.signed_digest() == request.binding_digest && bound.signed_nonce() == request.run_nonce => Ok(()),
         _ => Err(RequestRefusal::Binding),
     }
 }

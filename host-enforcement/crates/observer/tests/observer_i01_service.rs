@@ -6,7 +6,9 @@
 //!   server makes no `peer_exe` call; every custody failure closes, the named label negatives among them (one byte off,
 //!   a NUL where both should carry it, a doubled NUL, an empty label).
 //! - Each message: SCM_CREDENTIALS and SCM_SECURITY against the accept's (exactly), the process unchanged before and after
-//!   the read, the receive's other outcomes, and the request checks; every session closes at the absent binding.
+//!   the read, the receive's other outcomes, and the request checks; a request that does not name the service's
+//!   binding closes at the gate, and since HE-004-I01B2 (B3-9 (a), I2D-7) the service holds a `from_config` test binding
+//!   and a request naming it closes as `NotAnswered`, nothing sent.
 //! - The window: a start before `validFrom` (no latch), the `expiresAt - 3 s` cut and its latch, a clock stepped back, no
 //!   clock; the idle and outer bounds.
 //! - The listener: its two reasons to leave the wait (a session, a backoff), the backoff's deadline, faults, the twelfth
@@ -21,7 +23,7 @@ use planeon_observer::capture_schema::CaptureSchema;
 use planeon_observer::client::{AcceptResult, ExeLink, PeerCreds, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv,
                                PeerService, PeerWatch, ProcIdentity, Ready, LISTENER_BACKOFF};
 use planeon_observer::enrolled::{record_form, Enrolled, RecordBytes, ServerClass, ServerIdentity};
-use planeon_observer::i01_request::{RequestRefusal, ZERO_DIGEST};
+use planeon_observer::i01_request::{I01Binding, RequestRefusal, ZERO_DIGEST};
 use planeon_observer::i01_service::{Closed, I01Service, IDLE_BOUND, OUTER_BOUND};
 use planeon_observer::kernel_text;
 
@@ -126,12 +128,26 @@ impl PeerOps for FakePeer {
     }
 }
 
-/// A canonical first request.
-fn first_request() -> Vec<u8> {
-    format!("{{\"bindingDigest\":\"sha256:{}\",\"challenge\":\"{}\",\"operation\":\"OBSERVE_POLICY\",\
+/// A canonical first request naming `digest` and the nonce `run-1`.
+fn request_naming(digest: &str) -> Vec<u8> {
+    format!("{{\"bindingDigest\":\"{digest}\",\"challenge\":\"{}\",\"operation\":\"OBSERVE_POLICY\",\
              \"previousObservationDigest\":\"{ZERO_DIGEST}\",\"runNonce\":\"run-1\",\
-             \"schemaVersion\":\"planeon.internal.policy-observation-request/v1\",\"sequence\":1}}", "1".repeat(64), "2".repeat(64))
+             \"schemaVersion\":\"planeon.internal.policy-observation-request/v1\",\"sequence\":1}}", "2".repeat(64))
         .into_bytes()
+}
+
+/// A canonical first request naming a binding no test document gives (its digest is all ones).
+fn first_request() -> Vec<u8> {
+    request_naming(&format!("sha256:{}", "1".repeat(64)))
+}
+
+/// The service's binding (HE-004-I01B2, B3-9 (a), I2D-7): `I01Binding::from_config` over a test binding document whose
+/// `scope.runNonce` is `run-1`.
+fn test_binding() -> I01Binding {
+    let document = json::parse("{\"schemaVersion\":\"planeon.internal.policy-observation-binding/v1\",\
+                                \"scope\":{\"runNonce\":\"run-1\",\"tenantId\":\"unit-tenant\"}}")
+        .expect("a test binding document");
+    I01Binding::from_config(&document).expect("the test document has a digest and a nonce")
 }
 
 /// A datagram of `bytes` with the accept's credentials and label, as the kernel delivers them.
@@ -141,7 +157,7 @@ fn datagram(bytes: &[u8]) -> (Vec<u8>, PeerRecv) {
 
 /// A service and its fake after one accept at `WALL`.
 fn accepted(class: ServerClass, change: impl FnOnce(&mut FakePeer)) -> (I01Service, FakePeer, Instant) {
-    let mut service = I01Service::new(server(class));
+    let mut service = I01Service::new(server(class), test_binding());
     let mut ops = FakePeer::good();
     change(&mut ops);
     let now = Instant::now();
@@ -226,7 +242,7 @@ fn every_custody_failure_closes() {
 }
 
 #[test]
-fn a_request_is_read_with_its_message_custody_and_closes_at_the_absent_binding() {
+fn a_request_is_read_with_its_message_custody_and_closes_at_a_binding_it_does_not_name() {
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
     ops.calls.clear();
     ops.recvs.push_back(datagram(&first_request()));
@@ -234,6 +250,15 @@ fn a_request_is_read_with_its_message_custody_and_closes_at_the_absent_binding()
     assert_eq!(ops.calls, ["alive", "proc_read", "recv", "alive", "proc_read", "close"]);
     assert_eq!(service.last_closed(), Some(Closed::Request(RequestRefusal::Binding)));
     assert!(!service.session_open());
+    // HE-004-I01B2 (I2D-7): a request naming the service's binding (its digest and nonce) passes the checks and the
+    // gate and closes as NotAnswered, with the same calls; nothing is sent (PeerOps has no send).
+    let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
+    ops.calls.clear();
+    ops.recvs.push_back(datagram(&request_naming(test_binding().signed_digest())));
+    assert_eq!(service.serve_peer_step(&mut ops, WALL, now, PeerReady::Peer(PEER, READY)), PeerOutcome::Served);
+    assert_eq!(ops.calls, ["alive", "proc_read", "recv", "alive", "proc_read", "close"]);
+    assert_eq!(service.last_closed(), Some(Closed::NotAnswered));
+    assert_eq!((service.session_open(), ops.closed.as_slice()), (false, [PEER].as_slice()));
     // Nothing queued keeps the session; a step for another peer is not this session's.
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
     service.serve_peer_step(&mut ops, WALL, now, PeerReady::Peer(PEER, READY));
@@ -315,7 +340,7 @@ fn a_refused_request_closes_with_its_step() {
 #[test]
 fn the_record_s_window_bounds_every_session() {
     // Before validFrom: closed, no latch; a later accept inside the window opens a session.
-    let mut service = I01Service::new(server(ServerClass::Observed));
+    let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let mut ops = FakePeer::good();
     ops.accepts.push_back(AcceptResult::Peer(PeerId(2)));
     let now = Instant::now();
@@ -324,12 +349,12 @@ fn the_record_s_window_bounds_every_session() {
     service.serve_peer_step(&mut ops, Some(VALID_FROM), now, PeerReady::Listener(READY));
     assert!(service.session_open());
     // No wall clock: closed without a latch.
-    let mut service = I01Service::new(server(ServerClass::Observed));
+    let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let mut ops = FakePeer::good();
     service.serve_peer_step(&mut ops, None, now, PeerReady::Listener(READY));
     assert_eq!((service.last_closed(), service.latched()), (Some(Closed::Window), false));
     // From expiresAt - 3 s: closed and latched; a clock stepped back stays latched.
-    let mut service = I01Service::new(server(ServerClass::Observed));
+    let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let mut ops = FakePeer::good();
     ops.accepts.push_back(AcceptResult::Peer(PeerId(2)));
     service.serve_peer_step(&mut ops, Some(EXPIRES_AT - 3), now, PeerReady::Listener(READY));
@@ -340,7 +365,7 @@ fn the_record_s_window_bounds_every_session() {
     // One second earlier is still inside.
     let (service, _, _) = accepted(ServerClass::Observed, |_| {});
     assert!(service.session_open());
-    let mut inside = I01Service::new(server(ServerClass::Observed));
+    let mut inside = I01Service::new(server(ServerClass::Observed), test_binding());
     inside.serve_peer_step(&mut FakePeer::good(), Some(EXPIRES_AT - 4), now, PeerReady::Listener(READY));
     assert!(inside.session_open() && !inside.latched());
     // An open session is cut at the next deadline call or read once the cut comes, and the latch holds.
@@ -368,7 +393,7 @@ fn the_idle_and_outer_bounds_cut_a_session() {
 
 #[test]
 fn the_listener_leaves_the_wait_for_a_session_or_a_backoff_and_faults_escalate() {
-    let mut service = I01Service::new(server(ServerClass::Observed));
+    let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let now = Instant::now();
     assert_eq!(service.peer_plan(now), PeerPlan { watch: PeerWatch { listener: true, peer: None }, deadline: None });
     // A fault: EPOLLERR, a failed watch or an accept error takes the listener out of the wait for 5 s.
@@ -395,7 +420,7 @@ fn the_listener_leaves_the_wait_for_a_session_or_a_backoff_and_faults_escalate()
     failing.accepts = VecDeque::from([AcceptResult::Fault(24)]);
     assert_eq!(service.serve_peer_step(&mut failing, WALL, at, PeerReady::Listener(READY)), PeerOutcome::ListenerFailed);
     // An accept between faults clears the count; the session then keeps the listener out of the wait.
-    let mut service = I01Service::new(server(ServerClass::Observed));
+    let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let mut ops = FakePeer::good();
     for _ in 0..11 {
         service.serve_peer_step(&mut ops, WALL, now, PeerReady::ListenerFault);

@@ -7,7 +7,9 @@
 //! - The binding the configuration keeps is the document's own member, byte for byte: read here from the document
 //!   bytes by this test's own canonical parse, never through `ObserverConfig`, over three documents (PV's positive
 //!   binding, S1's v2 binding, and PV's with two members no load-time check compares changed), so neither a constant
-//!   nor a rebuilt subset passes (I2E-6). An input-triggered substitution is R-TEXT's (the PR review reads `parse_v3`).
+//!   nor a rebuilt subset passes (I2E-6). `I01Binding::from_config` over the kept member gives `sha256:` and the hex
+//!   SHA-256 of the member's canonical encoding, and the member's `scope.runNonce` (I2D-3). An input-triggered
+//!   substitution is R-TEXT's (the PR review reads `parse_v3`).
 //! - Each load-time check refuses with its own text, in section 4's order, the namespaces first (I2D-8).
 //! - The binding form is held to the vendored channel schema's `$defs.binding` (`CS`), whole: every object, the
 //!   constant, every text's bounds and pattern, the projections' `oneOf`; each hand-written pattern agrees with CS's
@@ -21,10 +23,12 @@ use std::collections::BTreeSet;
 
 use i05_protocol::json::{self, Doc, JStr, Object, Value};
 use i05_protocol::regex::Regex;
+use i05_protocol::sha256;
 use planeon_observer::config::{is_generation_v3, is_service_cidr, BindingForm, ConfigError, ObserverConfig, SealedValues,
                                TextBounds, TextPattern, BINDING_FORM, BINDING_FORM_REFUSAL, BINDING_NAMESPACES_REFUSAL,
                                BINDING_SUBJECT_REFUSAL, FORMAT, FORMAT_V2, FORMAT_V3, IP_FAMILIES, SEALED_CIDR_REFUSAL,
                                SEALED_FAMILY_REFUSAL, TEXT_PATTERNS};
+use planeon_observer::i01_request::I01Binding;
 use planeon_observer::signed_config;
 use planeon_observer::status;
 
@@ -280,6 +284,10 @@ fn the_binding_is_the_document_s_member_byte_for_byte() {
         // The member's canonical form is in the document's bytes as written.
         let inline = [b"\"binding\":".as_slice(), &canonical(&expected)].concat();
         assert!(bytes.windows(inline.len()).any(|window| window == inline.as_slice()));
+        // The one constructor over the kept member: the member's canonical digest and its scope.runNonce (I2D-3).
+        let bound = I01Binding::from_config(config.binding()).expect("the kept member has a digest and a nonce");
+        assert_eq!(bound.signed_digest(), format!("sha256:{}", sha256::hex(&sha256::digest(&canonical(&expected)))));
+        assert_eq!(bound.signed_nonce(), text(member(&expected, "scope"), "runNonce"));
         kept.push(canonical(config.binding()));
     }
     // Three different members kept: no constant, and no subset rebuilt from what the checks compare.

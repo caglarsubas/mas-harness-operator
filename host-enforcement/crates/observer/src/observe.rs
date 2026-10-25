@@ -51,7 +51,9 @@
 //! HE-004-I01a (DESIGN-I01A sections 5 and 14): [`run`] builds the I01 service from the server identity `serve`
 //! passes (`I01Service::new`) and attaches it to the client ([`Epoch::with_peer_service`]), so every wait of every
 //! phase serves I01; a wait that ends because the I01 listener failed persistently ends the epoch with
-//! [`ObserverExit::Listener`] (status 35) instead of the poller's 95.
+//! [`ObserverExit::Listener`] (status 35) instead of the poller's 95. HE-004-I01B2 (DESIGN-I01B2 rev 3 sections 5 and
+//! 6): [`run`] takes a seventh argument, the configuration's binding from `serve`'s one `I01Binding::from_config`, and
+//! hands it to `I01Service::new(server, binding)`.
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -70,6 +72,7 @@ use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
 use crate::enrolled::ServerIdentity;
 use crate::exposition::Exposition;
 use crate::http::{self, Answer, Request, LIST_BODY_LIMIT, SMALL_BODY_LIMIT, SNAPSHOT_BODY_LIMIT};
+use crate::i01_request::I01Binding;
 use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use crate::observer_rbac::{self, RbacLists};
@@ -422,13 +425,14 @@ pub fn expansion_weight(inputs: &Inputs) -> Option<u64> {
     Some(total)
 }
 
-/// The epoch with production settings, the capture engine and the I01 service for `server` (HE-004-I01a), run to its
-/// exit (`serve`'s last step).
+/// The epoch with production settings, the capture engine and the I01 service for `server` (HE-004-I01a) and the
+/// configuration's `binding` (HE-004-I01B2, `serve`'s one `I01Binding::from_config`), run to its exit (`serve`'s last
+/// step).
 pub fn run<W: Wire + PeerOps>(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure,
-                              captures: Box<dyn CaptureCycle>, server: ServerIdentity) -> ObserverExit {
+                              captures: Box<dyn CaptureCycle>, server: ServerIdentity, binding: I01Binding) -> ObserverExit {
     Epoch::new(wire, config, tls, closure, Settings::production())
         .with_captures(captures)
-        .with_peer_service(Box::new(I01Service::new(server)))
+        .with_peer_service(Box::new(I01Service::new(server, binding)))
         .run()
 }
 

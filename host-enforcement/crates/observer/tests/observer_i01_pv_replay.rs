@@ -11,8 +11,9 @@
 //!   binding. The test binding is built from the positive's binding document: the SHA-256 of i05-protocol's canonical
 //!   encoding of that document, which must be the `bindingDigest` the positive's request names (the evidence that R10's
 //!   canonical form is the one `PV` was written with), and the scope's `runNonce`.
-//! - The test binding is a value of this test binary only. The I01 service passes no binding (`i01_service.rs`), so
-//!   through `serve` every request closes at the gate and proves nothing.
+//! - HE-004-I01B2 (DESIGN-I01B2 section 8, I2D-6): the test binding is `I01Binding::from_config` over the positive's
+//!   binding document, the one constructor `serve` calls on the configuration's checked member; its digest and nonce
+//!   are read through the getters, and the request negatives are refused against that one binding.
 //! - Negative 1 (another operation) refuses at the schema; negatives 2 and 3 (another `runNonce`, another
 //!   `bindingDigest`) pass framing, the schema and the chain and refuse only at the gate; negatives 4 and 5
 //!   (sequence 2, a previous digest other than zero) refuse at the chain. The positive passes every check.
@@ -51,7 +52,9 @@
 //!   HE-004-I01B2, and the 18 rows whose packet is HE-004-I01B3 against their checkers in HE-004-I01B3, each as the
 //!   derived case on S1's v2 triple (row 74), with the derivation rule unchanged; each packet's design section states
 //!   it and whether PV's v1 cases are also replayed. Cases 18, 23 and 24 (packet `-`, checker HE-008's profile-side
-//!   one) are replayed in no R10 packet.
+//!   one) are replayed in no R10 packet. HE-004-I01B2 replayed negative-27 (Q-I01B2D-3 (a)): PV's own case and W3's
+//!   derived case on S1's triple, each as a v3 document refused at the namespace check, status 13
+//!   (`observer_config_v3`); the 18 HE-004-I01B3 rows stay carried.
 
 use i05_protocol::json::{self, JStr, Value};
 use i05_protocol::sha256;
@@ -179,13 +182,11 @@ fn with_value(document: &Value, path: &[Value], new: &Value) -> Value {
     copy
 }
 
-/// The test binding: HE-008's binding as the gate compares it, built from `PV`'s positive binding document. A value of
-/// this test binary only; nothing in the observer builds one.
+/// The test binding: HE-008's binding as the gate compares it, `I01Binding::from_config` over `PV`'s positive binding
+/// document (HE-004-I01B2: the one constructor, which `serve` calls on the configuration's checked member).
 #[cfg(test)]
 fn test_binding(positive: &Value) -> I01Binding {
-    let binding = member(positive, "binding");
-    I01Binding { binding_digest: sha256::prefixed(&canonical(binding)),
-                 run_nonce: text(member(binding, "scope"), "runNonce").to_string() }
+    I01Binding::from_config(member(positive, "binding")).expect("the positive's binding has a digest and a nonce")
 }
 
 /// `PV`'s request negatives, each with its request: the positive's with the negative's one change.
@@ -352,8 +353,9 @@ fn pv_s_positive_request_passes_every_check_with_the_test_binding() {
     let request = member(positive, "request");
     // The positive's request names the digest of the binding document's canonical encoding, and the scope's nonce.
     let bound = test_binding(positive);
-    assert_eq!(bound.binding_digest, text(request, "bindingDigest"));
-    assert_eq!(bound.run_nonce, text(request, "runNonce"));
+    assert_eq!(bound.signed_digest(), text(request, "bindingDigest"));
+    assert_eq!(bound.signed_nonce(), text(request, "runNonce"));
+    assert_eq!(bound.signed_digest(), sha256::prefixed(&canonical(member(positive, "binding"))));
     let bytes = canonical(request);
     let framed = frame(&bytes, false).expect("the positive's request frames");
     let checked = request_schema(&framed).expect("the positive's request has the schema's form");
@@ -389,11 +391,10 @@ fn refuses_at_its_own_step(label: &str, request: &Value, bound: &I01Binding) {
             let checked = schema.unwrap_or_else(|error| panic!("{label} has the schema's form: {error:?}"));
             assert_eq!(Chain::default().check(&checked), Ok(()), "{label}");
             assert_eq!(binding_gate(&checked, Some(bound)), Err(refusal), "{label}");
-            // The changed member is the refusal's cause: a binding naming it would pass the request.
-            let named = I01Binding { binding_digest: checked.binding_digest.clone(),
-                                     run_nonce: checked.run_nonce.clone() };
-            assert_ne!(&named, bound, "{label}");
-            assert_eq!(binding_gate(&checked, Some(&named)), Ok(()), "{label}");
+            // The changed member is the refusal's cause (HE-004-I01B2: refused against the one from_config binding,
+            // no second binding built): exactly one of the request's two binding members differs from the binding's.
+            let differs = (checked.binding_digest != bound.signed_digest(), checked.run_nonce != bound.signed_nonce());
+            assert!(differs == (true, false) || differs == (false, true), "{label}: {differs:?}");
         }
         other => panic!("{label}: no request negative refuses at {other:?}"),
     }
@@ -463,8 +464,7 @@ fn s1_s_triple_request_passes_and_pv_s_request_negatives_refuse_on_it() {
     // Framing, the schema, a fresh chain and binding_gate, with the test binding built from the triple's binding (its
     // canonical digest is the request's bindingDigest, and the scope's runNonce).
     let bound = test_binding(triple);
-    assert_eq!((bound.binding_digest.as_str(), bound.run_nonce.as_str()),
-               (TRIPLE_BINDING_DIGEST, text(request, "runNonce")));
+    assert_eq!((bound.signed_digest(), bound.signed_nonce()), (TRIPLE_BINDING_DIGEST, text(request, "runNonce")));
     assert_eq!(text(request, "bindingDigest"), TRIPLE_BINDING_DIGEST);
     let bytes = canonical(request);
     let checked = request_schema(&frame(&bytes, false).expect("the triple's request frames"))
