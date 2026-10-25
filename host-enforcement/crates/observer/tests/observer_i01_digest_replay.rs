@@ -23,8 +23,11 @@
 //!   the sealed-namespace equality), as the model's `observed` and `check_observation_digests` compose them: every
 //!   value derived with the render, the three gated values gated at the answer, each compared with the signed binding
 //!   (the projection's identity without its resourceVersion, the digest with `enforcementPins`), the texts once each,
-//!   in key order. The comparison is the test's, the model's composition over the port's values; HE-004-I01B3's answer
-//!   logic is not built here.
+//!   in key order. HE-004-I01B3 (DESIGN-I01B3 rev 4 sections 3.3 and 7; R1-6, Q-1d (a)): both run through
+//!   `i01_answer` itself, `derive` over the vector's snapshot, record, closure and binding, then `refusals` with the
+//!   vector's capture data as `CaptureFacts`; the test's own composition is removed. The answer list reads neither the
+//!   quota pair, the generation nor the configuration window, so they are stated inputs (`null`, the empty text and
+//!   the widest window).
 //! - One vector's lists never reach a digest: RB-17 deletes a ClusterRole's name, and B1's `Inputs::new` refuses the
 //!   lists (ItemShape, ClusterRoles item 1) before either RBAC value is derived. The vector pins the producer's text,
 //!   "rbac: malformed metadata", which the observer cannot reach; the replay asserts the earlier refusal for both of
@@ -51,6 +54,7 @@ use b1_support::apply;
 use i05_protocol::json::{self, JStr, Object, Value};
 use i05_protocol::sha256;
 use planeon_observer::i01_admission_render;
+use planeon_observer::i01_answer::{self, CaptureFacts, Derived};
 use planeon_observer::i01_digest::{self, DigestKey, DigestSnapshot, EnforcementValue, ProjectionValue, B1_MALFORMED,
                                    CLOSURE_VERSION, SCHEMA_VERSION};
 use planeon_observer::i01_gate::{self, LatestSet};
@@ -435,78 +439,34 @@ fn gate(key: DigestKey, capture: &Value, record: &Value) -> Result<(), &'static 
     i01_gate::capture_gate(key, set.as_ref(), record)
 }
 
-/// Every value of one answer (the model's `observed`): each projection and digest derived at the snapshot, the A2
-/// render handed in, and each of the three gated values gated at the answer, or its first refusal.
-#[allow(clippy::type_complexity)]
-fn observed(view: &DigestSnapshot<'_>, binding: &Value, capture: &Value, closure: &Closure)
-            -> (Vec<(DigestKey, Result<ProjectionValue, &'static str>)>,
-                Vec<(DigestKey, Result<String, &'static str>)>) {
-    let null = Value::Null;
-    let record = view.record.unwrap_or(&null);
-    let projections = DigestKey::POLICIES
-        .into_iter()
-        .map(|key| {
-            let outcome = i01_digest::projection(key, view, binding, &i01_admission_render::render).and_then(|value| {
-                if DigestKey::GATED.contains(&key) {
-                    gate(key, capture, record)?;
-                }
-                Ok(value)
-            });
-            (key, outcome)
-        })
-        .collect();
-    let digests = DigestKey::DIGESTS
-        .into_iter()
-        .map(|key| {
-            let outcome = i01_digest::enforcement(key, view, closure, &i01_admission_render::render).and_then(|value| {
-                if DigestKey::GATED.contains(&key) {
-                    gate(key, capture, record)?;
-                }
-                Ok(value.digest)
-            });
-            (key, outcome)
-        })
-        .collect();
-    (projections, digests)
+/// One vector's derivations through `i01_answer::derive` (HE-004-I01B3, R1-6): B1's checked lists, the snapshot's
+/// resourceVersion, configuration, ADM-4 loaded hash and record, I06's closure and the vector's binding. The answer
+/// list reads neither the quota pair, the generation nor the configuration window: they are stated inputs here
+/// (`null`, the empty text and the widest window).
+fn derived(lists: &Inputs, snapshot: &Value, binding: &Value, closure: &Closure) -> Derived {
+    i01_answer::derive(lists, member(snapshot, "resourceVersion"), member(snapshot, "configuration"),
+                       member(snapshot, "adm4LoadedHash"), member(snapshot, "record"), closure, binding, &Value::Null,
+                       "", 0, u64::MAX)
+        .unwrap_or_else(|refusal| panic!("the vector's derivations are built: {refusal}"))
 }
 
-/// The answer's refusal list (the model's `check_observation_digests`): each value's refusal, or "<key>: differs from
-/// the signed value" when its identity (without resourceVersion) or digest is not the signed binding's (`projections`,
-/// `enforcementPins`), each text once, in key order.
-fn check_observation(view: &DigestSnapshot<'_>, binding: &Value, capture: &Value, closure: &Closure)
-                     -> Vec<&'static str> {
-    let (projections, digests) = observed(view, binding, capture, closure);
-    let signed = binding.get("projections").and_then(Value::as_object);
-    let pins = binding.get("enforcementPins").and_then(Value::as_object);
-    let mut errors: Vec<&'static str> = Vec::new();
-    let mut add = |text: &'static str| {
-        if !errors.contains(&text) {
-            errors.push(text);
-        }
-    };
-    for (key, outcome) in &projections {
-        match outcome {
-            Err(refusal) => add(*refusal),
-            Ok(value) => {
-                let expected = signed.and_then(|signed| signed.get(key.name()));
-                if !expected.is_some_and(|expected| json::py_eq(&value.identity, expected)) {
-                    add(key.differs());
-                }
-            }
-        }
+/// The vector's capture data as `i01_answer`'s facts (DESIGN-I01B3 rev 4 section 3.2): the latest completed set, with
+/// its slots and its two ages at the answer, or no completed set; the vectors' views never expire, and the record
+/// digest is no gate input (Q-CB-11 (a)), so it is left empty.
+fn facts(capture: &Value) -> CaptureFacts {
+    let latest = latest_set(capture).expect("an answer vector's capture data has the contract's data shape");
+    let completed = latest.is_some();
+    let none = Latest { slots: Vec::new(), scheduled_after_now: false, mono_age_ms: 0, wall_age_ms: 0 };
+    let set = latest.unwrap_or(none);
+    CaptureFacts {
+        completed,
+        expired: false,
+        scheduled_after_now: set.scheduled_after_now,
+        slots: set.slots,
+        mono_age_ms: set.mono_age_ms,
+        wall_age_ms: set.wall_age_ms,
+        record_digest: String::new(),
     }
-    for (key, outcome) in &digests {
-        match outcome {
-            Err(refusal) => add(*refusal),
-            Ok(digest) => {
-                let pinned = pins.and_then(|pins| pins.get(key.name()));
-                if !pinned.is_some_and(|pinned| pinned.as_str() == Some(digest.as_str())) {
-                    add(key.differs());
-                }
-            }
-        }
-    }
-    errors
 }
 
 /// A refusal as the model's `observed` writes it.
@@ -667,8 +627,8 @@ fn every_contract_vector_replays() {
             }
             tally.gates += 1;
         }
-        // The answer's refusal list: each value is derived, gated where the contract gates it, then held to the signed
-        // binding.
+        // The answer's refusal list, through i01_answer (R1-6): each value is derived, gated where the contract gates
+        // it, then held to the signed binding.
         if let Some(answer) = expect.get("observation") {
             let Ok(lists) = &lists else {
                 panic!("vector {id}: an answer over lists B1 refuses");
@@ -676,7 +636,7 @@ fn every_contract_vector_replays() {
             let want: Vec<&str> =
                 array(expect, "observation").iter().map(|item| item.as_str().expect("a text")).collect();
             assert!(answer.as_array().is_some());
-            let got = check_observation(&view(lists, snapshot), binding, capture, &closure);
+            let got = i01_answer::refusals(&derived(lists, snapshot, binding, &closure), &facts(capture));
             assert_eq!(got, want, "vector {id}: answer");
             tally.answers += 1;
         }
@@ -721,7 +681,8 @@ fn every_contract_vector_replays() {
 /// observation's generation) are the observation's; `profileDigest` is the profile's digest; `bindingDigest`, the
 /// profile's seven policy digests and its three preexisting references agree with the binding; and the snapshot's
 /// qualification namespace is the sealed namespace. Profile v2's `validate` and `precondition` are not run in R10. The
-/// number of checks R10 runs.
+/// number of checks R10 runs. HE-004-I01B3 (R1-6): checks 1-3 run through `i01_answer::derive` and `refusals`; the
+/// observed values are `derive`'s, each gated value's gate having passed in check 1.
 fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     let complete = member(vectors, "complete");
     assert_eq!(names(complete), COMPLETE_MEMBERS, "the closed complete positive");
@@ -736,14 +697,13 @@ fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     let (binding, request) = (member(complete, "binding"), member(complete, "request"));
     let (observation, profile) = (member(complete, "observation"), member(complete, "profile"));
     let lists = Inputs::new(list_inputs(member(&snapshot, "lists"))).expect("the qual snapshot's lists");
-    let digest_view = view(&lists, &snapshot);
+    let derived = derived(&lists, &snapshot, binding, closure);
     // 1. The answer refuses nothing.
-    let answer = check_observation(&digest_view, binding, capture, closure);
+    let answer = i01_answer::refusals(&derived, &facts(capture));
     assert_eq!(answer, Vec::<&str>::new(), "complete positive: the answer");
     // 2 and 3. The observed values are the observation's.
-    let (projections, enforcement) = observed(&digest_view, binding, capture, closure);
     let mut observed_projections = Object::new();
-    for (key, outcome) in projections {
+    for (key, outcome) in derived.policy_values() {
         let value = match outcome {
             Ok(value) => {
                 let mut identity = value.identity.as_object().cloned().expect("an identity object");
@@ -757,9 +717,9 @@ fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     assert!(json::py_eq(&Value::Object(observed_projections), member(observation, "projections")),
             "complete positive: observed projections");
     let mut observed_enforcement = Object::new();
-    for (key, outcome) in enforcement {
+    for (key, outcome) in derived.digest_values() {
         observed_enforcement.insert(JStr::new(key.name()), match outcome {
-            Ok(digest) => Value::str(&digest),
+            Ok(value) => Value::str(&value.digest),
             Err(refusal) => refusal_value(refusal),
         });
     }
