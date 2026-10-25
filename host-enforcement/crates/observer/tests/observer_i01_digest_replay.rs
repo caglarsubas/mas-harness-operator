@@ -68,7 +68,7 @@ const ROWS: [(&str, &[u8], &str, usize); 4] = [
     ("i01-digests-v2/vectors.json", VECTORS, "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
      602_663),
     ("i01-digests-v2/README.md", README, "fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090", 60_473),
-    // Row 79's file, named once in this source, by its include literal above (G-I01B4-1 (b)).
+    // Row 79's file, named once in this source, by the include_bytes! literal above (G-I01B4-1 (b)).
     ("i01-v2/, row 79", PROXY_VECTORS, "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc", 62_297),
 ];
 /// The design's counts (DESIGN-I01B rev 3 section 1, unchanged in v2): 152 vectors and 16 helper vectors.

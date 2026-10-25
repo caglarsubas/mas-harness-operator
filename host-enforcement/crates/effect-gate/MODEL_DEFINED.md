@@ -2651,3 +2651,201 @@ contract text and they can never report one; its 0 is meaningful against VPO, th
 > - **B, MON-I01B1-B (a):** the replay scope is split. Part 1 asserts the 110 checks as deferred, part 2 compares them, and the render comes in as a function.
 
 The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-004-I01B4: the I01 digest contract v2 re-vendor (`contracts/i01-digests-v2/`, `contracts/admission-v4/`, `contracts/i01-v2/proxy-profile-v2-vectors.json`; `i01_admission_render` on admission v4, `i01_digest` on v2; three replays; `tools/gate.py`; `ci/zero_bill_scan.py`)
+
+The packet is LPK-1's step S3 with W3 (DESIGN-I01B4 revision 2, sha256 `3324993c…`, its section review's I4D-1 to I4D-14
+binding; the lane monitor's Q-I01B4-1..12, MON-I01B4-FAMILY, Q-I01B4D-1 (a) and Q-I01B4D-2 (a), the owner's Q-I01B4-ZB
+and the HE-004-I01B4 build GO, recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`). It vendors edge record
+v11's seven rows 73-79 (the I01 digest contract v2's definitions, vectors and README, admission v4's README, vectors and
+sealed `planeon-a2.json`, and profile v2's vectors; 63 contracts) and re-pins VPO; it moves the A2 render to admission v4
+and the digest port's schema version to v2, both in place; it moves the digest and render replays to v2 and v4, which
+retires v1's, and derives W3's wire cases in the PV replay; and it adds G-I01B4-1. The three I01 modules stay unreachable
+from `serve` and absent from both binaries (G-I01B-1), so no reachable code changes. The v2 model
+`scripts/policy_observation_digests_v2.py` (`e1ba63d9…`, at harness-onion `f9882c1a`) and admission v4's model
+`scripts/admission_semantics_v4.py` (`4da5a71d…`, at `675daccb`) are pinned by digest in PROVENANCE beside VPO
+(`bbd1048a…`), read as specification only, never imported or run. Its rules are R176-R183.
+
+### Points taken from the pinned model (P1-P7 against the v2 model)
+
+P1-P7 (the HE-004-I01B1 section) hold against the v2 model at `e1ba63d9…` [I4D-12]: the functions they cite
+(`projection`, `enforcement`, `document_bound` with VPC's `_bounded`, `refusal_texts`, `UNREACHABLE`, `_frozen_i06`,
+`_capture`, `required_slots`, `capture_gate`, `observed`, `check_observation_digests`) are each defined in it under the
+same name (checked as text), and the v2 model is v1's edited in eight places outside them (the contract v2's README
+section 0; DOSSIER-I01B4 F2.1-F2.2). None moved, so none is re-cited. The model's three new `_check_complete` checks are
+R179's.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R176 | Scope. `contracts/i01-digests-v2/{definitions.json, vectors.json, README.md}`, `contracts/admission-v4/{README.md, vectors.json, admission-manifests/planeon-a2.json}` and `contracts/i01-v2/proxy-profile-v2-vectors.json` are edge record v11's rows 73-79 (sha256 `9188980f…`, read by exact path at `f9882c1a`; its first 72 rows equal edge record v10's), byte for byte, mode 100644, each row compared key by key before any byte was copied (I4D-5); all seven were copied with `git show f9882c1a:<providerPath>`, and rows 76-79's bytes equal `675daccb`'s, their `providerCommit`. Contracts: 63; none is embedded (`OBSERVER_EMBEDDED_CONTRACTS` stays at five). VPO is re-pinned at `f9882c1a` (`bbd1048a…`, replacing `3ac03636…`, whose PROVENANCE line stays as written): only the packet list changed (against `675daccb`, as against `2043cc27`, only line 147 and the summary print at line 187 differ, and `:86-88` and `:128` read the same), and VPO stays pinned by digest (Q-I01B4-8). The held files and their readers [I4D-14]: v1's three digest files (rows 69-71), no crate test (v1's replays are retired, Q-I01B4-2), held by G-I01B-2 and the gate self-tests, and `vectors.json` also by the zero-bill test (Q-I01B4D-2 (a)); the proxy-contract vectors (row 72), no crate test, held by G-I01B-2 and the gate self-tests; admission v3's `vectors.json` (edge row 41), ADM-4's tests, the contract-bytes test and the zero-bill test; its `README.md` (row 42), the contract-bytes test; its `planeon-a2.json` (row 43), ADM-4's tests, the contract-bytes test, the zero-bill test and the render replay's v3 → v4 diff (R180). Profile v1 stays the wire's profile until W1-W4 land (profile v2's README; Q-LPK1-R2-1). R-B3-PIN in I01B4 [I4D-12]: no guarded file changes; the pins are R174's, each of the six `I01B_GUARDED_PINS` files and the two `OBSERVER_HOME_PINS` socket files `cmp`-equal to `a5d07979`, and `i01_answer.rs` has no directory entry | DESIGN-I01B4 §1, §6; Q-I01B4-2, Q-I01B4-8; I4D-5, I4D-6, I4D-12, I4D-14 |
+| R177 | The render on admission v4 (§2.1; Q-I01B4-11: in place, no second module). `validations`' Pod arm changes in exactly two places: A2-POD-PULL-POLICY's two `'Always'` read `'Never'`, and a last row is appended to the Pod arm, every emptyDir bounded, `!has(object.spec.volumes) \|\| object.spec.volumes.all(v, !has(v.emptyDir) \|\| (has(v.emptyDir.sizeLimit) && !has(v.emptyDir.medium)))` (A2-POD-EMPTYDIR), each `{expression, message, reason: "Forbidden"}` as admission v4's model writes them (`:463-466`): 18 CEL rows, the Pod policy 10. The doc comments that named admission v3, its model or `2043cc27` as the rendering's source name admission v4, its model at `675daccb` and the v2 README. `render`, `manifest_file_bytes`, `a2_objects`, `SealedAdmission`, `sealed_admission` and the constants are unchanged, as are G-I01B-1's form and G-I01B-7's set. The file is re-pinned in the zero-bill allowlist (R183), so R-TEXT applies: the PR review reads it whole | DESIGN-I01B4 §2.1; Q-I01B4-11 |
+| R178 | The v2 port (§3). `SCHEMA_VERSION` is `planeon.internal.policy-observation-digests/v2`; `CLOSURE_VERSION` stays `planeon.internal.policy-observation-rbac-closure/v1`, as v2's model keeps it. `i01_digest.rs`'s doc comments name the v2 README (harness-onion `f9882c1a`, edge record v11's row 75), the v2 model by digest, and admission v4's render and sealed values; "the I01 v1 answer" stays, since the wire is still I01 v1. No projection, digest, gate rule, refusal text or vector id changes: the module's diff is the constant and comment lines. `i01_gate.rs` changes in comments only, exactly I4D-11's three: the README path at :3 (`contracts/i01-digests-v2/README.md`, whose section 3.3 is still the capture gate) and "at `2043cc27`" → "at `f9882c1a`" at :30 and :34, each citation on one line and once in the file; G-I01B-8's citation strings and `I01B_LITERAL_PINS` are unchanged | DESIGN-I01B4 §3; I4D-11 |
+| R179 | The digest replay on v2 (`observer_i01_digest_replay`, 4 tests; §4.1). Its inputs are rows 73-75 and 79 (`ROWS`, each sha256 and size), and its header and pin test say edge record v11's rows 73-75 and 79 [I4D-8]. The vectors' `schemaVersion` is `planeon.internal.policy-observation-digests-vectors/v2`, their `contract.path` is `architecture/policy-observation-digests-v2/definitions.json` and `contract.canonicalSha256` is `5f170f30…`, the definitions' canonical digest; the port's `SCHEMA_VERSION` is the definitions' `schemaVersion`; 90 refusal texts. The 16 helper vectors and 152 vectors replay with the v4 render handed in. The complete positive is on `qual` with 6 checks, v1's five and the sealed-namespace equality (the snapshot's `qualificationNamespace` is `planeon-qual`, the v2 model's `SEALED_NAMESPACE`, `:63`); its `binding.profileDigest` is `sha256:c212b038…` and its `request.bindingDigest` and `observation.bindingDigest` are `sha256:6e745318…`. The tally (Q-I01B4-5): (projections, enforcements, relations) = (119, 45, 51), (gates, answers, complete) = (69, 12, 6), B1's earlier refusals 2 (R172, unchanged in v2), (compared, refused earlier) = (319, 2), and 321 = 16 + 1 + 298 + 6. Outside the 321, R10-defined: profile v2's positive (row 79) equals the complete positive's profile in every member but exactly ten, the seven `policy.*Digest` and the three `capacityEntries.preexistingResourceRefs[0..2].observedDigest`, each present on both sides and differing, the members the positive's `replaced` list names for the profile; that gives row 79 its one reader (row 72 had only a pin table). Not run in R10 (the contract v2's README section 11, MON-I01S-C2-1-WORDING): the profile-schema load (`_profile_schema`), profile v2's `validate` and `precondition`, and the frozen-model file pins (`_frozen`'s FROZEN_MODELS loop, `scripts/proxy_profile_v2.py` included); so of the model's 323 checks R10's replay counts 321, and of `_check_complete`'s eight it runs six. Also not mirrored, as under v1: the model's uncounted FROZEN_INPUTS digest loop and I06 identity check (R10 embeds those bytes, G-D2-2) and its DESIGN_TEXTS coverage check; the v2 layer test's W1 assertions (VPO, profile v2 validate and precondition, P10) are harness-side (HO README section 10) | DESIGN-I01B4 §4.1; Q-I01B4-2, Q-I01B4-5; I4D-1, I4D-8 |
+| R180 | The render replay on v4 (`observer_i01_render_replay`, 5 tests; §4.2). Every assertion of I01B1's v3 replay is kept with v4's values [I4D-9]: the pins (rows 77, 78 and 74, and the held v3 sealed file, `1096b3cc…`, 8,126 bytes); the render fits `i01_digest`'s render argument; the render of admission v4's sealed values {`planeon-qual`, IPv4, `10.96.0.0/12`, 300} is the vendored `planeon-a2.json` byte for byte, its hash is the pinned `manifestDirectoryHash`, H01's and H02's (`sha256:9b1ddc10…`), and its 8 objects are the file's items, 4 policies and 4 bindings; another sealed value renders other bytes and another hash; each of v4's 11 `objects` vectors (S01, S02, S03, S03b, S03c, S04, S05, S06, S06b, S06c, S06d) differs from the render; the contract v2's 2 fence digests (P-UNIT, AF-01) and 3 `sealedObjects` documents (P-UNIT, AP-09, AP-11) hold the render; the `unit` fixture's `pinnedManifestHash` and `adm4LoadedHash` are the render at `unit-namespace` (`sha256:8004085f…`), and, new, the `qual` fixture's are the render at `planeon-qual` (`9b1ddc10…`). The head layer's analogue: v4's `sealed.namespace` and `pinned.namespace` are both `planeon-qual`, the literal R179's sixth check uses. Test 5, the edit's extent: the v4 render differs from the held v3 file only in the Pod policy's validations (every other item, and every other member of the Pod policy, equal; its first 9 rows v3's, except that A2-POD-PULL-POLICY's two `'Always'` read `'Never'`; its tenth A2-POD-EMPTYDIR). Test 5 documents §2.1's extent against pinned data; it is not an independent check of the render [I4D-9] | DESIGN-I01B4 §4.2; I4D-9 |
+| R181 | W3 (`observer_i01_pv_replay`, 8 tests; §4.3; Q-I01B4-4): R10-defined, with no harness-onion vector set and no edge record v12. The source is S1's complete triple (`complete` in row 74's file, pinned by its sha256 and size; HO vectors.json:23910-24559), whose `now`, `previous` (null), scope window, nonces and challenge are PV's. The derivation rule: for each of PV's negatives 6-27 (`document` observation or binding), the derived case is the triple with exactly that negative's one change, its `value` at its `path` in its `document`; nothing is recomputed, as PV's own negatives are the positive with one change and as `request_negatives` builds the request cases; the label stays PV's, and the rule label, checker and packet stay `PV_CASES`' row. The 22 derived cases are the table below. Structure checks only in I01B4 (one test): the derived cases are exactly `PV_CASES`' 22 labels, in order; each path exists in the triple's document; each value differs from the triple's value there; each derived document equals the triple's but at that one path. That each derived case still breaks the same VPO rule, and only it, is not shown: that would be harness-onion's VPO proof (Q-I01B4-4's (a), not chosen). No derived case runs against a checker in I01B4, because none exists yet. Carried [I4D-3]: W3's derived cases (R181): negative-27 is replayed against the load-time check (status 13) in HE-004-I01B2, and the 18 rows whose packet is HE-004-I01B3 against their checkers in HE-004-I01B3, each as the derived case on S1's v2 triple (row 74), with the derivation rule unchanged; each packet's design section states it and whether PV's v1 cases are also replayed. The request side (Q-I01B4D-1 (a), with I4D-4's rationale): the triple's request equals PV's positive request except at `bindingDigest` (`6e745318…` against PV's `e10d89fd…`); it passes framing, the schema, a fresh chain and `binding_gate` with the test binding built from the triple's binding (its canonical digest `6e745318…`, and the scope's `runNonce`), and PV's own test binding refuses it at the gate; PV's five request negatives, applied to the triple by the same rule, each have a value other than the triple's, and each refuses at its own step: the operation at the schema, `runNonce` and `bindingDigest` at `binding_gate`, the sequence and the previous digest at the chain. R10's canonical digest of the v2 binding is already asserted by R179's check 5; this adds framing, the schema, the chain and `binding_gate` on the triple's request | DESIGN-I01B4 §4.3, §8; Q-I01B4-4, Q-I01B4D-1 (a); I4D-3, I4D-4, I4D-13 |
+| R182 | Gate rules (`tools/gate.py`). G-I01B-2's I01B4 set: `I01B_EDGE_V11_ROWS` (rows 73-79, in `I01B_EDGE_V10_ROWS`' tuple form); `check_i01b_contracts` holds both tables' files, each refusal naming its record (v10 or v11) and row, the embedding refusal covering both, and returns 11; its say line names both records; `CONTRACTS` holds 63. `I01B_DEFINITIONS` is `contracts/i01-digests-v2/definitions.json`: the section's own choice, which the rulings do not name, so that G-I01B-8 reads the file the port now reads; it changes no outcome, since v2's `refusalTexts`, `captureGate` and eleven keys equal v1's (checked), so G-I01B-8's counts stay 90 and 90,000 [I4D-10]. G-I01B4-1, the absence clause (Q-I01B4-5; I4D-1, I4D-2), `check_i01b4_replay_scope`, run right after `check_i01b_contracts` and printing its count: (a) no CONTRACTS path and no file or directory under `contracts/` has the basename `profile.schema.json` (casefolded), and no CONTRACTS digest and no file under `contracts/` is profile v2's schema by its sha256 (`e5ef3c3d…`, the v2 model's `PROFILE_SCHEMA`, `:150-151`); every `.rs` file under `crates/*/src` and `crates/*/tests` is read without comments, literals kept, and one the reader cannot lex refuses; (b) its `include_bytes!`/`include_str!` literals resolve as `check_i01b_contracts` resolves them (`posixpath.normpath` against the source's directory): exactly one, in `crates/observer/tests/observer_i01_digest_replay.rs`, resolves to row 79's file, and none in another source; row 79's file name occurs in the digest replay only in that literal, and in no other source (a `concat!` form or a runtime read included); (c) no `fn` or `mod` is named `validate_profile` or `precondition`, or has `profile_v2` in its name; (c1) no `fn`, `mod`, `struct`, `enum`, `trait`, `type`, `const`, `static` or `macro_rules` identifier, a leading `r#` stripped, casefolded with underscores removed, is `validateprofile`, `precondition` or `preconditions`, or contains `proxyprofilev2`; (c2) no part of a source's path below its crate (each directory, and the file's stem), read the same way with hyphens also removed, contains `profilev2` unless it also contains `nativeprofile`; (c3) no source but the digest replay holds one of row 79's 28 distinct negative `expect` texts (read from the vendored file) or the schema's sha256. The real tree passes all of (a), (b), (c) and (c1)-(c3), and section 4.1's new test names hold no `profile_v2`. Self-tests: `I01bContractFileTests` over the eleven files (its seven `== 4` read 11; the row-number and provider-path assertions gain v11's; its docstring); the six 56 → 63 assertions with their comments; `I01B_V11_CONTRACTS`; `D2ContractCountTests` over the seven, with the v2 model as the unregistered file beside the contract v2's own; the three new prefix dicts; and `I01b4ReplayScopeTests`, 5 tests (the tree and the real files pass; the schema by name, by a CONTRACTS digest and by bytes; row 79's one reader, the include removed, doubled or beside a runtime read, and a `concat!` form; clause (c) in a src and a tests file and I4D-1's forms (1)-(5); clause (c3)). gate.py's module docstring gains an HE-004-I01B4 paragraph [I4D-10] | DESIGN-I01B4 §5; Q-I01B4-5; I4D-1, I4D-2, I4D-10 |
+| R183 | The zero-bill allowlist (owner decision Q-I01B4-ZB, "Exact entries (Recommended)"), in Q-I01B1-ZB's form. `ci/zero_bill_scan.py`'s `CONTRACT_ALLOWLIST` gains, by exact path and sha256, `host-enforcement/contracts/i01-digests-v2/vectors.json` (`68eab470…`), `host-enforcement/contracts/admission-v4/vectors.json` (`5706b1a8…`) and `host-enforcement/contracts/admission-v4/admission-manifests/planeon-a2.json` (`92c21612…`), and the render's entry is re-pinned to its edited bytes (`fe856578…`, was `2e23e488…`). v1's and admission v3's entries stay while those files are held: seven entries. Each is exempt from the scan's two service-type patterns only (each of the three new files names both; v2's definitions and row 79's file name neither, and READMEs are not scanned): every other pattern still applies, and a changed byte, or the same bytes at another path, fails as before. The comment above the allowlist cites Q-I01B4-ZB beside Q-HE4B1-ZB and Q-I01B1-ZB and keeps the rule that any later edit of the render re-pins its entry in the same packet. Its test, `tests/verify/test_zero_bill_scan.py` (Q-I01B4D-2 (a)): `CONTRACTS` lists all seven files (admission v3's two first, so `CONTRACTS[1]` stays the file the exemption test rewrites; then v1's vectors, the render at its re-pinned bytes and the three new files), each passing at its pinned bytes and refusing a changed byte with both patterns; the `admission-v4/vectors.json` path with v3's bytes stays as a cross-entry case, beside the new `admission-v5/vectors.json` path no entry names [I4D-14]. It is the packet's one `ci/` change, and its transport and merge take the owner's approvals | Q-I01B4-ZB; Q-I01B4D-2 (a); I4D-14 |
+
+### W3's derived cases (R181)
+
+Each derived case is S1's triple with PV's one change. Digests are shortened to their first eight hex digits; `"x"×64`
+is a text of 64 letters x.
+
+| # | Label | Document: path | PV's value | The triple's value | PV_CASES' rule label (not a VPO result) | Checker | Packet |
+|---|---|---|---|---|---|---|---|
+| 6 | negative-6-observation-challenge | observation: challenge | `"c"×64` | `"a"×64` | response substitution | R10: i01_answer's self-check | HE-004-I01B3 |
+| 7 | negative-7-observation-runNonce | observation: runNonce | `"other-run"` | `"unit-nonce"` | response substitution | R10: i01_answer's self-check | HE-004-I01B3 |
+| 8 | negative-8-observation-bindingDigest | observation: bindingDigest | `"sha256:"` + `"0"×64` | `"sha256:6e745318…"` | response substitution | R10: i01_answer's self-check | HE-004-I01B3 |
+| 9 | negative-9-observation-sequence | observation: sequence | `2` | `1` | response substitution | R10: i01_answer's self-check | HE-004-I01B3 |
+| 10 | negative-10-observation-previousObservationDigest | observation: previousObservationDigest | `"sha256:"` + `"1"×64` | `"sha256:"` + `"0"×64` | response substitution | R10: i01_answer's self-check | HE-004-I01B3 |
+| 11 | negative-11-observation-observedAt | observation: observedAt | `"2026-09-08T00:00:03Z"` | `"2026-09-08T00:00:01Z"` | stale or future | R10: self-check window | HE-004-I01B3 |
+| 12 | negative-12-observation-expiresAt | observation: expiresAt | `"2026-09-08T00:00:02Z"` | `"2026-09-08T00:00:05Z"` | stale or future | R10: self-check window | HE-004-I01B3 |
+| 13 | negative-13-observation-expiresAt | observation: expiresAt | `"2026-09-08T00:00:07Z"` | `"2026-09-08T00:00:05Z"` | freshness window | R10: self-check window | HE-004-I01B3 |
+| 14 | negative-14-observation-namespace.uid | observation: namespace.uid | `"other-uid"` | `"unit-namespace-uid"` | observed namespace | R10: snapshot comparison and self-check | HE-004-I01B3 |
+| 15 | negative-15-observation-projections.resourceQuota.projectionDigest | observation: projections.resourceQuota.projectionDigest | `"sha256:"` + `"0"×64` | `"sha256:7be2919c…"` | observed identity or digest | R10: snapshot comparison and self-check | HE-004-I01B3 |
+| 16 | negative-16-observation-projections.rbac.uid | observation: projections.rbac.uid | `"other"` | `"0510ce35…"` | observed identity or digest | R10: snapshot comparison and self-check | HE-004-I01B3 |
+| 17 | negative-17-observation-quota.used.configMaps | observation: quota.used.configMaps | `3` | `0` | used <= hard | R10: self-check | HE-004-I01B3 |
+| 18 | negative-18-observation-quota.hard.configMaps | observation: quota.hard.configMaps | `0` | `1` | requested <= hard - used | HE-008, profile-side | `-` |
+| 19 | negative-19-observation-quota.used.cpuMillis | observation: quota.used.cpuMillis | `true` | `0` | shape | R10: self-check shape | HE-004-I01B3 |
+| 20 | negative-20-observation-quota.hard.cpuMillis | observation: quota.hard.cpuMillis | `9007199254740992` | `500` | shape | R10: self-check shape | HE-004-I01B3 |
+| 21 | negative-21-observation-enforcement.policyGeneration | observation: enforcement.policyGeneration | `"c"×64` | `"b"×64` | enforcement proof mismatch | R10: self-check | HE-004-I01B3 |
+| 22 | negative-22-observation-enforcement.hostPreflightDigest | observation: enforcement.hostPreflightDigest | `"sha256:"` + `"0"×64` | `"sha256:7d39e768…"` | enforcement proof mismatch | R10: self-check, and the snapshot comparison | HE-004-I01B3 |
+| 23 | negative-23-binding-scope.tenantId | binding: scope.tenantId | `"other-tenant"` | `"unit-tenant"` | profile scope | HE-008, profile-side | `-` |
+| 24 | negative-24-binding-profileDigest | binding: profileDigest | `"sha256:"` + `"0"×64` | `"sha256:c212b038…"` | profile digest | HE-008, profile-side | `-` |
+| 25 | negative-25-binding-namespace.uid | binding: namespace.uid | `"other"` | `"unit-namespace-uid"` | namespace binding | R10: the snapshot comparison; HE-008 holds the profile-side half | HE-004-I01B3 |
+| 26 | negative-26-binding-projections.serviceAccount.uid | binding: projections.serviceAccount.uid | `"other"` | `"unit-service-account-uid"` | policy identity | R10: the snapshot comparison; HE-008 holds the profile-side half | HE-004-I01B3 |
+| 27 | negative-27-binding-scope.namespace | binding: scope.namespace | `"other"` | `"planeon-qual"` | namespace binding | R10: load-time check (status 13) | HE-004-I01B2 |
+
+Cases 18, 23 and 24 have packet column `-` (checker: HE-008, profile-side) and are never replayed in R10 [I4D-13]. The
+rule column is `PV_CASES`' label, not a VPO result. For negative-27, VPO's first failing check is the scope rule at
+VPO:92 (`binding["scope"] == scope`, "independent profile scope"), in PV and in the derived case alike. As for PV's own
+cases 23-27, a derived binding case changes the binding's digest, so a request naming the triple's digest fails the
+gate; that is not counted as the case's checker.
+
+### Points settled at build (inside DESIGN-I01B4's intent)
+
+- **G-I01B4-1's readings (R182), each stricter than I4D-1's and I4D-2's text, never looser:** the schema's basename is
+  casefolded; a path part drops hyphens as well as underscores, and each directory below the crate counts beside the
+  file's stem (a `tests/<name>/main.rs` test root); the digest replay holds row 79's file name only in its one include
+  literal, so its pin table names that file `i01-v2/, row 79`; test sources are lexed by `rust_code` as src sources are.
+- **I4D-1's five forms (R182):** the self-tests plant, for form (1), `tests/profile_v2_check.rs` holding
+  `fn validate(profile: &Value) -> Vec<String>` (clause (c2)), and the same under `tests/proxy-profile-v2/main.rs` and
+  `src/ProfileV2.rs`; for form (2), `fn preconditions` (c1); for form (3), `fn r#precondition` (clause (c), the `r#`
+  stripped); for form (4), `struct ProxyProfileV2` with `impl ProxyProfileV2 { fn validate(..) }` (c1); for form (5),
+  `macro_rules! validate_profile` (c1); and `enum PRE_CONDITIONS` (c1). Not refused, as I4D-1 words the clause
+  (equality for the precondition names, `proxyprofilev2` for the substring), and so stated as tripwire limits in
+  R-TEXT's class: `fn check_precondition`, `fn validate_proxy_profile`, a bare `struct ProfileV2`, and a
+  `let validate_profile = |..| ..;` closure, which is no item. The review chose equality so that today's
+  `LOOP_MODEL_PRECONDITION` and `events_outside_the_preconditions_change_nothing` pass; the fixture holds both.
+- **The schema-bytes self-test (R182):** R10 holds no copy of profile v2's schema (it is not registered), so the test
+  patches `PROFILE_V2_SCHEMA_SHA256` to a planted file's digest and refuses that file.
+- **The render replay's pins (R180):** `PINS` holds the held v3 sealed file beside rows 77, 78 and 74, for test 5.
+- **The PV replay's request steps (R181):** one function, `refuses_at_its_own_step`, holds a request negative to its own
+  step, with the same assertions PV's test made inline; PV's and the triple's request negatives both call it, and
+  `request_negatives_on` applies PV's request negatives to either request.
+- **W3's structure test (R181)** also asserts that the triple's `now`, `previous`, scope window (`validFrom`,
+  `expiresAt`), nonces (`runNonce`, `capacityNonce`) and the request's and observation's `challenge` are PV's
+  (DOSSIER-I01B4 F5.6).
+- **`check_i01b_contracts`' count (R182)** is the number of distinct files in its two tables, 11.
+
+### Evidence
+
+At build, `python3 -I -B` text checks: the base check (edge record v11's sha256 `9188980f…` and size, rows 73-79 key
+by key against DESIGN-I01B4 section 1.1, each size against README-v11's table and the bytes, the first 72 rows equal
+to v10's), before any byte was copied; the seven files' sha256, sizes and modes after, and rows 76-79's bytes equal at
+`675daccb`; the two models' and VPO's digests and VPO's line diff; v1's and v2's definitions (`refusalTexts`,
+`captureGate` and the eleven keys equal); the v3 and v4 sealed files (R180's extent); the v2 vectors (the complete
+positive's digests and `replaced` list, row 79's ten differing members and 28 negative texts); W3's 22 paths and values
+and the request side; each allowlisted file against both service-type patterns; and the word check (no email address,
+absolute local path or legacy term in any added line outside the vendored contract files).
+
+The heavy evidence, through `capped.zsh` at `-j 2`, one step at a time, on the final tree (U4's head `dba40dbb` with
+U5's edits): `cargo test` 741 passed, 0 failed, in 112 binaries (the base: 737 in 112; the digest replay 3 → 4 tests,
+the render replay 4 → 5, the PV replay 6 → 8), with only the vendored ring warnings; both musl release builds
+(planeon-observer `d3b07259…` on x86_64 and `e61b7f02…` on aarch64, planeon-gate `f534bd63…` and `2d62ef0a…`);
+`he-gate: passed`, with 63 contracts, G-I01B4-1 over 202 crate sources, and no symbol of the three I01 modules among
+planeon-observer's 2740 (x86_64) and 2822 (aarch64) symbols, the counts I01B1 recorded; the gate's self-test, 368 tests
+(the base's 363 and `I01b4ReplayScopeTests`' 5), OK; the zero-bill scan passed; `tests/verify`, 13 tests, OK. The
+first gate run refused the word `include` in a digest-replay comment (`check_included_code`, which reads comments
+too); the comment now names `include_bytes!`, and the sequence was re-run from `cargo test`. The span check reads
+commits, so it runs on the head that holds U5; its first run, on U4's head, found three 8-word spans in the render
+replay (A2-POD-EMPTYDIR's rule id written next to its CEL text, as admission v4's model writes the row), and the two are
+now separate constants. The sim, the verify and their timings are the author's.
+
+### Code and audit
+
+- `contracts/i01-digests-v2/`, `contracts/admission-v4/` and `contracts/i01-v2/proxy-profile-v2-vectors.json` (seven
+  files, new) with PROVENANCE's section; `crates/observer/src/i01_admission_render.rs` (R177),
+  `i01_digest.rs` (`SCHEMA_VERSION` and comments, R178) and `i01_gate.rs` (three comment edits, R178);
+  `crates/observer/tests/observer_i01_digest_replay.rs`, `observer_i01_render_replay.rs` and
+  `observer_i01_pv_replay.rs` (R179-R181); `tools/gate.py` and `tools/test_gate.py` (R182); `ci/zero_bill_scan.py` and
+  `tests/verify/test_zero_bill_scan.py` (R183); this section; the packet YAML (the author's). No guarded file, no
+  `lib.rs`, `main.rs`, `observe.rs` or `capture.rs`, no `observer_admission.rs`, `observer_contracts.rs` or `c_support/`,
+  no held v1 or admission v3 file, no manifest or lock, no `vendor/` or `licenses/` change, and no other `ci/` change.
+
+### Stated residuals
+
+- **R-TEXT** applies to the one re-pinned file I01B4 has, the render (R177, R183): the PR review reads
+  `i01_admission_render.rs` whole, not only its diff. The guarded files keep R174's pins (R176).
+- **G-I01B4-1's textual limits (R182):** the names and forms the clause does not read (above) stay code review's; the
+  guarantee that R10 runs no profile v2 validator is the replay scope itself, R179's tally and the PR review.
+
+### Carried
+
+- **ADM-4's loaded hash.** It stays admission v3's (`5aa2cdec…`) in `observer_admission.rs` and `c_support`. Once
+  HE-004-I01B3 makes the render live, `admissionPolicy` refuses "rendered hash differs" against a directory still loaded
+  at v3 until M1 or M3 (DOSSIER-I01B4 F3.9). HE-004-I01B3's section and HE-008 carry the activation.
+- **The three HE-008 cases** (18, 23 and 24) and HE-008's profile-side checks.
+- **W3's derived cases [I4D-3]:** W3's derived cases (R181): negative-27 is replayed against the load-time check (status
+  13) in HE-004-I01B2, and the 18 rows whose packet is HE-004-I01B3 against their checkers in HE-004-I01B3, each as the
+  derived case on S1's v2 triple (row 74), with the derivation rule unchanged; each packet's design section states it
+  and whether PV's v1 cases are also replayed.
+- **R1-6 now reads v2 [I4D-12]:** HE-004-I01B3 drives the 12 answer lists and the complete positive (on `qual`, six
+  checks) through `i01_answer`.
+- **The contract v2's README section 12, carried items [I4D-12]**, quoted from
+  HO:architecture/policy-observation-digests-v2/README.md:657-661:
+  - "D3-1 and C1-7 (the capture gate's inputs) and Q-CB-11 (a) (no record digest in the capture verdicts) go to the
+    HE-004-I01B family (R10), whose v2-file consumer is HE-004-I01B4, unchanged in substance, since the capture gate is
+    v1's." They go to HE-004-I01B3, with the capture gate's inputs, unchanged in substance.
+  - "Section 6's configuration successor goes to HE-004-I01B and HE-008, with HE-008 computing the three sealed
+    admission values with this (v2) model at enrollment." It goes to HE-004-I01B2 and HE-008 (MON-I01B4-FAMILY).
+- **W4:** its own step (Q-I01B4-10).
+- **C1 and C2** gate ACTIVE, not the sealed bytes (DOSSIER-I01B4 F7.4).
+- **MON-I01B4-FAMILY:** HE-004-I01B2 and HE-004-I01B3 keep the live parts, against v2's files; where DESIGN-I01B's text
+  names v1 or admission v3 for them (DIB:182, DIB:716), their own sections read v2 and v4.
+- **The vendored status lines:** the three vendored READMEs' status lines lag their `status.json` (DOSSIER-I01B4 F2.15,
+  F9.6); they are vendored as they are, since the edge binds bytes.
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-25)
+
+> - **Q-1:** I01B4 next, before I01B3.
+> - **Q-2:** keep v1's files held and pinned, and retire the v1 digest and render replays. Admission v3 stays for ADM-4.
+> - **Q-3:** one packet.
+> - **Q-4:** R10 derives W3's cases in test code from S1's triple, records them R10-defined in MODEL_DEFINED, and replays each in the packet that builds its checker. No harness-onion vector set or edge v12 for now.
+> - **Q-5:** the tally assertion (compared, refused earlier) = (319, 2), plus the absence clause for profile.schema.json and any profile v2 validator.
+> - **Q-6:** measure at the heavy checkpoint against I01B1's 737/112 and 201 s.
+> - **Q-7, OWNER:** "Exact entries (Recommended)". ci/zero_bill_scan.py gains exact-bytes entries for contracts/i01-digests-v2/vectors.json, contracts/admission-v4/vectors.json and contracts/admission-v4/admission-manifests/planeon-a2.json, plus the render's re-pin, in Q-I01B1-ZB's form. Each is exempt from the two service-type patterns only, and the v1 and v3 entries stay while those files are held. Ref Q-I01B4-ZB. Record it verbatim.
+> - **Q-8:** (a) re-pin VPO at f9882c1a (bbd1048a…), stating that only the packet list changed. The standing rule is unchanged: keep pinning VPO by digest. Stopping is a policy change I won't make in passing.
+> - **Q-9:** the family reading. Record it as monitor note MON-I01B4-FAMILY.
+> - **Q-10:** W4 is out of I01B4. MON-I01S-D3's note now reads "S3 with W3".
+> - **Q-11:** edit the Pod rows in place, with no second module.
+> - **Q-12:** a DESIGN-I01B4 section in DESIGN-I01B1's form, with its own design review through me.
+> - **Every brief from now on** carries MON-I01B-DOSSIER-LIST's "no `git grep -l -e ''` listing" rule.
+> - **I01B4 is gate material in R10,** because ci/zero_bill_scan.py is touched, so the owner's per-PR merge applies.
+
+**MON-I01B4-FAMILY (monitor note, Q-9):** README section 11's live-port duties (`HO:architecture/policy-observation-digests-v2/README.md`)
+are the I01B family's as a whole, as v1's README was read: I01B4 takes the v2 files, the v4 render and the replays;
+I01B2 (configuration v3 and the binding) and I01B3 (the answer and the send) keep the live parts.
+
+> - Q-I01B4D-1: (a). Also replay, now, the v2 triple's request and PV's 5 request negatives against I01A's existing checks.
+> - Q-I01B4D-2: (a). The zero-bill test covers all 7 allowlist entries, including I01B1's two.
+
+> - Q-I01B4D-1 stands as (a) with I4D-4's corrected rationale. The digest replay's complete check 5 already asserts R10's canonical digest of the v2 binding. What (a) adds is framing, the schema, the chain and binding_gate on a request that differs from PV's positive only in bindingDigest. It carries both extra assertions: (1) the triple's request equals PV's positive request except bindingDigest; (2) each of the 5 derived values differs from the triple's.
+> - Q-I01B4D-2 (a) is unchanged.
+
+> Note for later: i01_gate.rs is gate material even for comment-only edits, so the merge stays the owner's head-bound approval.
+
+The complete messages, and the section review's I4D-1 to I4D-14 (`reviews/design-review-I01B4-round1.json`,
+`e2d0c558…`), are recorded in the operator's `tools/w03/he004/` files.

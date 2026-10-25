@@ -57,13 +57,13 @@ const SEALED_NAMESPACE: &str = "planeon-qual";
 /// Admission v4's directory hash (the pinned value, H01's and H02's), and the render's at `unit-namespace`.
 const V4_HASH: &str = "sha256:9b1ddc1096ff0d35fb4cd5a9e5e6b4248fefc5b75b5a06f862c59d85e028ca60";
 const UNIT_HASH: &str = "sha256:8004085f93b447942e2aeffd00856e7dc485a063445a40c3518c60d6bd3c503f";
-/// The Pod policy, the row v4 changes and the row v4 appends, as admission v4's model writes it (harness-onion
-/// `scripts/admission_semantics_v4.py:463-466`).
+/// The Pod policy, the row v4 changes, and the row v4 appends (its rule id, then its CEL expression, as admission v4's
+/// model writes the row: harness-onion `scripts/admission_semantics_v4.py:463-466`).
 const POD_POLICY: &str = "planeon-a2-pod.static.k8s.io";
 const PULL_POLICY: &str = "A2-POD-PULL-POLICY";
-const EMPTYDIR: (&str, &str) = ("A2-POD-EMPTYDIR",
-                                "!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.emptyDir) || \
-                                 (has(v.emptyDir.sizeLimit) && !has(v.emptyDir.medium)))");
+const EMPTYDIR_RULE: &str = "A2-POD-EMPTYDIR";
+const EMPTYDIR_EXPRESSION: &str = "!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.emptyDir) || \
+                                   (has(v.emptyDir.sizeLimit) && !has(v.emptyDir.medium)))";
 
 fn from_utf8(raw: &[u8]) -> &str {
     std::str::from_utf8(raw).expect("the vendored file is UTF-8")
@@ -270,7 +270,7 @@ fn the_v4_render_differs_from_the_held_v3_file_only_in_the_pod_rows() {
         let last = new_rows.last().expect("the tenth row");
         assert_eq!(names(last), ["expression", "message", "reason"]);
         assert_eq!((text(last, "message"), text(last, "expression"), text(last, "reason")),
-                   (EMPTYDIR.0, EMPTYDIR.1, "Forbidden"));
+                   (EMPTYDIR_RULE, EMPTYDIR_EXPRESSION, "Forbidden"));
     }
     assert_eq!(pod_policies, 1);
 }
