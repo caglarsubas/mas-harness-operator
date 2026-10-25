@@ -322,6 +322,63 @@ HE-004-I01A2 section above. Neither is imported or run by R10.
 - `scripts/policy_observation_digests.py`, sha256 `01298fb5c6acdae3248174265bbe576dd553eeb19bce1a48cb1e2734972c09c5`, 83711 bytes
 - `scripts/validate_policy_observation.py`, sha256 `3ac03636013f2386deb53af741aa67856e7c52f9c0270da854cfbd5415ea4662`, 13005 bytes
 
+## The I01 digest contract v2, admission v4 and profile v2's vectors, the observer's v2 re-vendor (HE-004-I01B4)
+
+LPK-1's step S3 with W3 (DESIGN-I01B4 rev 2; the monitor's Q-I01B4-1..12 and MON-I01B4-FAMILY, the owner's
+Q-I01B4-ZB, and the HE-004-I01B4 build GO): the seven rows edge registry record v11 adds, rows 73 to 79 of
+`architecture/artifact-edges/operator-harness-engineering-v11.json` (sha256
+`9188980f0ce211e2939d431d900a7aff77262de3a973009666ed13f3ef3cbd77`, 41534 bytes; harness-onion MET-ENFORCE-042, merged
+at `f9882c1a`, read by exact path at harness-onion main `f9882c1a`), consumer packet HE-004-I01B4, status
+REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer paths exactly these. Its first 72 rows equal edge
+record v10's, in order, so rows 41 to 43 and 69 to 72 stand as the sections above record them.
+
+- Rows 73 to 75 are the I01 digest contract v2's three data files. MET-ENFORCE-042 publishes them itself, so they carry
+  a null `providerCommit` and `providerPacket` MET-ENFORCE-042; each was copied with `git show f9882c1a:<providerPath>`
+  (harness-onion `f9882c1a4d0c2576e773841fe96e1f2e5958473f`, that packet's merge and each file's last change).
+- Rows 76 to 79 are admission v4's README, vectors and sealed `planeon-a2.json`, and profile v2's vectors, already on
+  harness-onion main at `providerCommit` `675daccbc8a060d88245f79bf124f0cc6c59d0c2` (each file's last change, so no
+  provider packet). Each was copied with `git show f9882c1a:<providerPath>`, the commit actually used; the build checked
+  that those bytes equal `git show 675daccb:<providerPath>`'s.
+
+Before any byte was copied, each row was compared key by key with DESIGN-I01B4 section 1.1 (relation, status, mode,
+consumer packet and path, provider path, sha256, provider commit, provider packet, and no other key) and each size with
+README-v11's table; after, each file's sha256, length and mode were checked against its row. None is embedded:
+`crates/observer/src/contracts.rs` is unchanged and `OBSERVER_EMBEDDED_CONTRACTS` stays at its five files. The tests
+alone read them: the contract v2's three files drive `crates/observer/tests/observer_i01_digest_replay.rs`, which also
+ties profile v2's positive (row 79) to the complete positive's profile; admission v4's vectors and sealed file drive
+`crates/observer/tests/observer_i01_render_replay.rs`; and the contract v2's complete triple is W3's source in
+`crates/observer/tests/observer_i01_pv_replay.rs`. `tools/gate.py` holds the seven files to these rows and lines
+(G-I01B-2, 63 registered files). The I01 digest contract v1's files and the proxy-contract vectors (rows 69 to 72) and
+admission v3's files (rows 41 to 43) stay held and pinned (Q-I01B4-2); no file is removed.
+
+- `contracts/i01-digests-v2/definitions.json` from `architecture/policy-observation-digests-v2/definitions.json`, sha256 `fef08fddfb94e06eeff5bc4bdaf37246f9142fd072dd6427f629350c8d5cb2f2`, 36135 bytes
+- `contracts/i01-digests-v2/vectors.json` from `architecture/policy-observation-digests-v2/vectors.json`, sha256 `68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594`, 602663 bytes
+- `contracts/i01-digests-v2/README.md` from `architecture/policy-observation-digests-v2/README.md`, sha256 `fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090`, 60473 bytes
+- `contracts/admission-v4/README.md` from `architecture/admission-semantics-v4/README.md`, sha256 `f7794aa857aa50800f05b651f7b0a56eda7407f67855bc2f0437b27b3fe297fa`, 40789 bytes
+- `contracts/admission-v4/vectors.json` from `architecture/admission-semantics-v4/vectors.json`, sha256 `5706b1a8df5cabd978caa219400b40a9c4ef6cbdbca8ea2f7c6f69b69474301c`, 316811 bytes
+- `contracts/admission-v4/admission-manifests/planeon-a2.json` from `architecture/admission-semantics-v4/admission-manifests/planeon-a2.json`, sha256 `92c21612304cb704d13b506c1ae885d62a47c01f0ed0d284affe563aa1868e32`, 8322 bytes
+- `contracts/i01-v2/proxy-profile-v2-vectors.json` from `architecture/proxy-profile-v2/vectors.json`, sha256 `011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc`, 62297 bytes
+
+The models are pinned by digest, not copied, and read as specification only where the contract's README and vectors
+are silent (`crates/effect-gate/MODEL_DEFINED.md`, the HE-004-I01B4 section, R176-R183): the v2 model at harness-onion
+`f9882c1a` (its last change), and admission v4's model at `675daccb` (its last change; the same bytes at `f9882c1a`).
+Neither is imported or run by R10.
+
+- `scripts/policy_observation_digests_v2.py`, sha256 `e1ba63d9e5ab8c27d4c509b2a0f2293921c681b74be7b9a8a4df2a63a75f40a3`, 85606 bytes
+- `scripts/admission_semantics_v4.py`, sha256 `4da5a71dfd4c9a3e46709ea8a754a58f48b76fe51bc2a526bfe07c40bc13b547`, 40783 bytes
+
+VPO is re-pinned here (Q-I01B4-8): its bytes at `f9882c1a` (its last change), below, replace the `3ac03636…` pin of
+the HE-004-I01B1 section above, whose line stays as it was written. Only the packet list changed: against `675daccb`,
+as against `2043cc27`, only line 147 (the packet list) and line 187 (the summary print) differ. The lines R10's literal
+pins cite read the same at `f9882c1a`: `:86-88`, the 65,536 observation bound, and `:128`, the freshness window. VPO
+stays pinned by digest, Q-I01B4-8's standing rule. It is not imported or run by R10.
+
+- `scripts/validate_policy_observation.py`, sha256 `bbd1048a9688793b4f8b3a2ee341504e5882bc7f140a299ae8f805623831b192`, 13119 bytes
+
+Not registered and not vendored (edge record v11's notes): profile v2's `profile.schema.json`, `README.md` and
+`status.json`; admission v4's `allowlists.json` and `status.json`; and `scripts/proxy_profile_v2.py`. R10 runs no
+profile v2 validator (G-I01B4-1).
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

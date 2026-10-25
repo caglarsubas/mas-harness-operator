@@ -1,0 +1,1006 @@
+{
+ "schemaVersion": "planeon.internal.policy-observation-digests/v2",
+ "contract": "DIGEST-CONTRACT",
+ "evidenceClass": "DATA_CHECK_ONLY",
+ "nativeAcceptance": false,
+ "wirePins": {
+  "CS": {
+   "path": "architecture/policy-observation-inputs/channel.schema.json",
+   "sha256": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e"
+  },
+  "PV": {
+   "path": "architecture/policy-observation-inputs/vectors.json",
+   "sha256": "1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124"
+  },
+  "RD": {
+   "path": "docs/alpha-2/POLICY_OBSERVATION_READINESS.md",
+   "sha256": "65778040919c5eb7335f2c104d983ca920b877b1b123f961556a6bcae36d232c"
+  }
+ },
+ "model": {
+  "path": "scripts/policy_observation_digests_v2.py",
+  "functions": [
+   "projection_document",
+   "projection_digest",
+   "enforcement_digests",
+   "capture_gate",
+   "check_observation_digests",
+   "check_vectors",
+   "main"
+  ]
+ },
+ "sharedHelpers": {
+  "path": "scripts/validate_proxy_contract.py",
+  "functions": [
+   "canonical",
+   "digest",
+   "_bounded"
+  ],
+  "import": "by name, as the other validators import them",
+  "pinnedBy": "the helper vectors in vectors.json (canonical bytes, digests and bounds), not the file's sha256: its packet list changes with every packet"
+ },
+ "frozenModels": [
+  {
+   "path": "scripts/admission_semantics_v4.py",
+   "sha256": "4da5a71dfd4c9a3e46709ea8a754a58f48b76fe51bc2a526bfe07c40bc13b547",
+   "lastChange": "675daccbc8a060d88245f79bf124f0cc6c59d0c2"
+  },
+  {
+   "path": "scripts/proxy_profile_v2.py",
+   "sha256": "509a4435e8bc1b8ab94efcb6fcc99e355ef27574ef0499bc4b6e89edef63fefa",
+   "lastChange": "675daccbc8a060d88245f79bf124f0cc6c59d0c2"
+  },
+  {
+   "path": "scripts/i06_backend_profile.py",
+   "sha256": "bea3c953573478be5b03ab81b4ebd859da62d1eaa2a1be8f361b9dd39a98555e",
+   "lastChange": "fe50b57c0e6b6d5e5732b1b346bbad8727959a6f"
+  },
+  {
+   "path": "scripts/i06_backend_profile_v3.py",
+   "sha256": "dfb00e90199d436ae63b79261f2e04870d7861cb0f7a424971657a4d777754de",
+   "lastChange": "887cbe7a005f6c7c813623dce5072e1c75f1fe58"
+  },
+  {
+   "path": "scripts/i06_backend_profile_v4.py",
+   "sha256": "7f97acfe9060e79c101f264f5bf61610bf421326c689216cbaf41df7e38e6d2a",
+   "lastChange": "29c84b36dad2f6f9822b71cd959064f0202d9868"
+  },
+  {
+   "path": "scripts/native_qualification_v4.py",
+   "sha256": "f7c718072d1ffbb9b8bbc310e6141d476ea5f25296f70ff8c1bc9ada3db02387",
+   "lastChange": "887cbe7a005f6c7c813623dce5072e1c75f1fe58"
+  }
+ ],
+ "frozenInputs": [
+  {
+   "name": "closure",
+   "path": "architecture/i06-backend-profile/identity-closure.json",
+   "sha256": "0a9b82ffa2d63bf48a8850574cdf3ece02bf1913f33a72cbb96ed30a40f1f3bb"
+  },
+  {
+   "name": "inventory",
+   "path": "architecture/i06-backend-profile/writer-inventory.json",
+   "sha256": "8e6b3b7565cfc93a61162b84d740cffb2871eb66ab85e8c4e80ac813f1af3077"
+  },
+  {
+   "name": "bootstrap",
+   "path": "architecture/i06-backend-profile/upstream-bootstrap-rbac-v1.37.1.json",
+   "sha256": "7529c2a713af2fb90163175924c264d95f4242d7e0c26b1452c77febb13ed50e"
+  }
+ ],
+ "projectionForm": {
+  "members": [
+   "apiVersion",
+   "kind",
+   "metadata",
+   "spec"
+  ],
+  "metadata": [
+   "name",
+   "namespace",
+   "uid"
+  ],
+  "identity": "apiVersion and kind are the contract's for each key, never a served item's; no identity member is read from the binding"
+ },
+ "canonical": {
+  "bytes": "json.dumps(value, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False, allow_nan=False), UTF-8 (VPC's canonical)",
+  "values": "the apiserver's exact JSON values; a float refuses; VPC's _bounded: exact builtins, depth at most 16, its size budget, |integer| at most 2^53 - 1 (a negative integer within the bound is accepted)",
+  "sortedSets": [
+   "sealedObjects by (kind, metadata.name)",
+   "RBAC subjects by (kind, name), one entry each",
+   "each RBAC subject's rules by canonical bytes, deduplicated",
+   "networkPolicies by canonical bytes"
+  ],
+  "otherLists": "served order"
+ },
+ "digest": {
+  "form": "sha256:<64 lowercase hex>",
+  "rule": "\"sha256:\" + digest(canonical(document))"
+ },
+ "syntheticUid": "digest(canonical({apiVersion, kind, name, namespace})) over the fixed identity: 64 lowercase hex characters",
+ "snapshot": {
+  "members": [
+   "resourceVersion",
+   "lists",
+   "configuration",
+   "adm4LoadedHash",
+   "record"
+  ],
+  "lists": [
+   "namespaces",
+   "resourceQuotas",
+   "limitRanges",
+   "serviceAccounts",
+   "networkPolicies",
+   "roles",
+   "roleBindings",
+   "clusterRoles",
+   "clusterRoleBindings",
+   "validatingAdmissionPolicies",
+   "validatingAdmissionPolicyBindings"
+  ],
+  "configuration": [
+   "qualificationNamespace",
+   "pinnedManifestHash",
+   "sealedAdmission: {ipFamily, serviceCIDR, defaultTolerationSeconds}"
+  ],
+  "rule": "every projection and digest from one read at one resourceVersion, computed before the lists are dropped; a real projection's resourceVersion is the object's own, a synthetic one's the read's"
+ },
+ "projections": {
+  "admissionPolicy": {
+   "identity": {
+    "apiVersion": "admissionregistration.k8s.io/v1",
+    "kind": "ValidatingAdmissionPolicy",
+    "name": "admissionpolicy",
+    "namespace": null,
+    "uid": "DERIVED"
+   },
+   "source": "synthetic: the four sealed values rendered by admission v4 (a2_objects, manifest_file_bytes under the file name planeon-a2.json, manifest_directory_hash), and the qualification Namespace's Pod Security labels",
+   "spec": {
+    "sealedObjects": "the eight rendered objects (four ValidatingAdmissionPolicies, four bindings), sorted by (kind, metadata.name)",
+    "podSecurityLabels": "the qualification Namespace's labels whose key starts with pod-security.kubernetes.io/, as an object; {} when there are none"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "v1 namespaces",
+     "admissionregistration.k8s.io/v1 validatingadmissionpolicies",
+     "admissionregistration.k8s.io/v1 validatingadmissionpolicybindings"
+    ],
+    "configurationValues": [
+     "qualificationNamespace",
+     "pinnedManifestHash",
+     "sealedAdmission.ipFamily",
+     "sealedAdmission.serviceCIDR",
+     "sealedAdmission.defaultTolerationSeconds"
+    ],
+    "observedValues": [
+     "ADM-4's loaded hash (adm4LoadedHash)"
+    ],
+    "bindingValues": [],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "the rendered directory hash equals the signed pinnedManifestHash and ADM-4's loaded hash",
+    "every listed ValidatingAdmissionPolicy is one of the four rendered policy names and every listed binding one of the four rendered binding names, over (kind, name)"
+   ],
+   "order": [
+    "sealed values: exactness and shape",
+    "rendered hash",
+    "unknown admission objects",
+    "qualification Namespace listed",
+    "document exactness"
+   ],
+   "refusals": [
+    "admissionPolicy: malformed input",
+    "admissionPolicy: float refused",
+    "admissionPolicy: integer out of range",
+    "admissionPolicy: document bound exceeded",
+    "admissionPolicy: rendered hash differs",
+    "admissionPolicy: unknown admission object",
+    "admissionPolicy: qualification namespace not listed"
+   ],
+   "residuals": [
+    "R-ADM-LIST",
+    "R-PSA-CONFIG"
+   ]
+  },
+  "resourceQuota": {
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "ResourceQuota",
+    "name": "LIVE",
+    "namespace": "LIVE",
+    "uid": "LIVE"
+   },
+   "source": "the ResourceQuotas list (R10:obs/inputs.rs:104)",
+   "spec": {
+    "spec": "the served spec"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "v1 resourcequotas"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [
+     "projections.resourceQuota.name"
+    ],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "exactly one ResourceQuota in the qualification namespace",
+    "its name is the binding's"
+   ],
+   "order": [
+    "shape",
+    "count",
+    "name",
+    "document exactness"
+   ],
+   "refusals": [
+    "resourceQuota: malformed input",
+    "resourceQuota: float refused",
+    "resourceQuota: integer out of range",
+    "resourceQuota: document bound exceeded",
+    "resourceQuota: count is not one",
+    "resourceQuota: name differs from the binding"
+   ],
+   "residuals": [
+    "R-DEFAULTS"
+   ]
+  },
+  "limitRange": {
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "LimitRange",
+    "name": "LIVE",
+    "namespace": "LIVE",
+    "uid": "LIVE"
+   },
+   "source": "the LimitRanges list (R10:obs/inputs.rs:102)",
+   "spec": {
+    "spec": "the served spec"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "v1 limitranges"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [
+     "projections.limitRange.name"
+    ],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "exactly one LimitRange in the qualification namespace",
+    "its name is the binding's"
+   ],
+   "order": [
+    "shape",
+    "count",
+    "name",
+    "document exactness"
+   ],
+   "refusals": [
+    "limitRange: malformed input",
+    "limitRange: float refused",
+    "limitRange: integer out of range",
+    "limitRange: document bound exceeded",
+    "limitRange: count is not one",
+    "limitRange: name differs from the binding"
+   ],
+   "residuals": [
+    "R-DEFAULTS"
+   ]
+  },
+  "serviceAccount": {
+   "identity": {
+    "apiVersion": "v1",
+    "kind": "ServiceAccount",
+    "name": "LIVE",
+    "namespace": "LIVE",
+    "uid": "LIVE"
+   },
+   "source": "the ServiceAccounts list (R10:obs/inputs.rs:105)",
+   "spec": {
+    "automountServiceAccountToken": "the served top-level member, when present (never null for an absent one)",
+    "imagePullSecrets": "the served top-level member, when present (never null for an absent one)",
+    "secrets": "the served top-level member, when present (never null for an absent one)"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "v1 serviceaccounts"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [
+     "scope.serviceAccountSubject",
+     "projections.serviceAccount.name"
+    ],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "exactly one ServiceAccount by the subject's name in the qualification namespace",
+    "its name is the binding's",
+    "no kubernetes.io/enforce-mountable-secrets annotation"
+   ],
+   "order": [
+    "shape",
+    "count by name",
+    "name",
+    "annotation",
+    "document exactness"
+   ],
+   "refusals": [
+    "serviceAccount: malformed input",
+    "serviceAccount: float refused",
+    "serviceAccount: integer out of range",
+    "serviceAccount: document bound exceeded",
+    "serviceAccount: count is not one",
+    "serviceAccount: name differs from the binding",
+    "serviceAccount: enforce-mountable-secrets annotation"
+   ],
+   "residuals": [
+    "R-DEFAULTS"
+   ]
+  },
+  "rbac": {
+   "identity": {
+    "apiVersion": "planeon.internal/v1",
+    "kind": "EffectiveRbac",
+    "name": "rbac",
+    "namespace": "QUALIFICATION_NAMESPACE",
+    "uid": "DERIVED"
+   },
+   "source": "synthetic: the four RBAC lists and the ServiceAccounts list, under B1's rules",
+   "spec": {
+    "subjects": "one entry {kind, name, exists, effectiveRules} per subject named by a RoleBinding in the qualification namespace or by any ClusterRoleBinding, sorted by (kind, name); the subject's rules whose scope is the qualification namespace or CLUSTER, sorted and deduplicated by canonical bytes"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "rbac.authorization.k8s.io/v1 clusterroles",
+     "rbac.authorization.k8s.io/v1 clusterrolebindings",
+     "rbac.authorization.k8s.io/v1 roles",
+     "rbac.authorization.k8s.io/v1 rolebindings",
+     "v1 serviceaccounts"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "B1's refusals, in B1's order, before either RBAC document"
+   ],
+   "order": [
+    "B1's refusals",
+    "document exactness"
+   ],
+   "refusals": [
+    "rbac: malformed input",
+    "rbac: document bound exceeded",
+    "rbac: aggregated role reaches the namespace",
+    "rbac: role does not exist",
+    "rbac: loopback user bound to a non-resource rule",
+    "rbac: malformed metadata",
+    "rbac: malformed rules",
+    "rbac: malformed rule",
+    "rbac: malformed rule list",
+    "rbac: malformed rule (non-resource URLs beside resources)",
+    "rbac: malformed subjects",
+    "rbac: malformed subject",
+    "rbac: malformed subject name",
+    "rbac: malformed subject kind",
+    "rbac: malformed subject namespace",
+    "rbac: malformed roleRef",
+    "rbac: malformed roleRef apiGroup",
+    "rbac: malformed roleRef kind",
+    "rbac: malformed roleRef name"
+   ],
+   "residuals": [
+    "R-RBAC-COMPLETE"
+   ]
+  },
+  "networkPolicy": {
+   "identity": {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "name": "LIVE",
+    "namespace": "LIVE",
+    "uid": "LIVE"
+   },
+   "source": "the NetworkPolicies list (R10:obs/inputs.rs:106)",
+   "spec": {
+    "spec": "the served spec, in v1's selector-free form"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "networking.k8s.io/v1 networkpolicies"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [
+     "projections.networkPolicy.name"
+    ],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "exactly one NetworkPolicy in the qualification namespace",
+    "its name is the binding's",
+    "selector-free: podSelector {}, peers by ipBlock alone, integer port and endPort (an entry with no port is admitted), only the NetworkPolicy v1 API's members"
+   ],
+   "order": [
+    "shape",
+    "count",
+    "name",
+    "selector-free form",
+    "document exactness"
+   ],
+   "refusals": [
+    "networkPolicy: malformed input",
+    "networkPolicy: float refused",
+    "networkPolicy: integer out of range",
+    "networkPolicy: document bound exceeded",
+    "networkPolicy: count is not one",
+    "networkPolicy: name differs from the binding",
+    "networkPolicy: selector form outside v1"
+   ],
+   "residuals": [
+    "R-DEFAULTS",
+    "R-NET-DATAPATH"
+   ]
+  },
+  "mutationBroker": {
+   "identity": {
+    "apiVersion": "planeon.internal/v1",
+    "kind": "MutationBroker",
+    "name": "mutationbroker",
+    "namespace": "QUALIFICATION_NAMESPACE",
+    "uid": "DERIVED"
+   },
+   "source": "synthetic: the enrolled native-qualification/v4 record's BROKER row (never the broker binding)",
+   "spec": {
+    "executable": "the row's member",
+    "executableLabel": "the row's member",
+    "artifactDigest": "the row's member",
+    "uid": "the row's member",
+    "gid": "the row's member",
+    "processLabel": "the row's member",
+    "cgroup": "the row's cgroup without its inode",
+    "seccompMode": "the row's member",
+    "seccompDefaultAction": "the row's member",
+    "seccompFilterDigest": "the row's member",
+    "noNewPrivs": "the row's member",
+    "capabilities": "the row's member",
+    "listenEndpointIds": "the row's member",
+    "outboundEndpointIds": "the row's member"
+   },
+   "inputs": {
+    "requestSpecs": [],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "bindingValues": [],
+    "recordFields": [
+     "roles.BROKER.executable",
+     "roles.BROKER.executableLabel",
+     "roles.BROKER.artifactDigest",
+     "roles.BROKER.interpreterPath",
+     "roles.BROKER.interpreterLabel",
+     "roles.BROKER.uid",
+     "roles.BROKER.gid",
+     "roles.BROKER.processLabel",
+     "roles.BROKER.namespaceInodes",
+     "roles.BROKER.cgroup",
+     "roles.BROKER.seccompMode",
+     "roles.BROKER.seccompDefaultAction",
+     "roles.BROKER.seccompFilterDigest",
+     "roles.BROKER.noNewPrivs",
+     "roles.BROKER.rlimitCore",
+     "roles.BROKER.capabilities",
+     "roles.BROKER.filePaths",
+     "roles.BROKER.bpfPrograms",
+     "roles.BROKER.listenEndpointIds",
+     "roles.BROKER.outboundEndpointIds"
+    ],
+    "captureSlots": [
+     "role/BROKER"
+    ]
+   },
+   "gates": [
+    "the BROKER row carries its 20 members and its cgroup its 7",
+    "at every answer, the capture gate over role/BROKER"
+   ],
+   "order": [
+    "broker row",
+    "document exactness",
+    "capture gate (at the answer)"
+   ],
+   "refusals": [
+    "mutationBroker: malformed input",
+    "mutationBroker: float refused",
+    "mutationBroker: integer out of range",
+    "mutationBroker: document bound exceeded",
+    "mutationBroker: broker row incomplete",
+    "mutationBroker: broker capture not passed",
+    "mutationBroker: capture set too old"
+   ],
+   "residuals": [
+    "R-BROKER-LIVE"
+   ]
+  }
+ },
+ "enforcementDigests": {
+  "admissionFenceDigest": {
+   "source": "manifest_directory_hash over the rendered sealed directory (admission v4), already in sha256:<hex> form",
+   "document": null,
+   "inputs": {
+    "requestSpecs": [],
+    "configurationValues": [
+     "qualificationNamespace",
+     "pinnedManifestHash",
+     "sealedAdmission"
+    ],
+    "observedValues": [
+     "ADM-4's loaded hash (adm4LoadedHash)"
+    ],
+    "recordFields": [],
+    "captureSlots": []
+   },
+   "gates": [
+    "the rendered hash equals the signed pinnedManifestHash and ADM-4's loaded hash"
+   ],
+   "refusals": [
+    "admissionFenceDigest: malformed input",
+    "admissionFenceDigest: float refused",
+    "admissionFenceDigest: integer out of range",
+    "admissionFenceDigest: document bound exceeded",
+    "admissionPolicy: rendered hash differs"
+   ],
+   "residuals": []
+  },
+  "rbacClosureDigest": {
+   "source": "the cluster-wide closure value of every subject named by any RoleBinding or ClusterRoleBinding",
+   "document": {
+    "schemaVersion": "planeon.internal.policy-observation-rbac-closure/v1",
+    "subjects": "entries {kind, name, exists, effectiveRules} with every rule at every scope, non-resource entries with their binding's scope, sorted and deduplicated; subjects sorted by (kind, name)"
+   },
+   "inputs": {
+    "requestSpecs": [
+     "rbac.authorization.k8s.io/v1 clusterroles",
+     "rbac.authorization.k8s.io/v1 clusterrolebindings",
+     "rbac.authorization.k8s.io/v1 roles",
+     "rbac.authorization.k8s.io/v1 rolebindings",
+     "v1 serviceaccounts"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "recordFields": [],
+    "captureSlots": [],
+    "frozenInputs": [
+     "bootstrap",
+     "closure",
+     "inventory"
+    ],
+    "callerSupplied": {
+     "i06": "{closure, inventory, bootstrap}: each the parsed JSON of its frozenInputs file, pinned by path and sha256; a missing i06, or one without exactly those three members, refuses rbacClosureDigest: malformed input"
+    }
+   },
+   "gates": [
+    "B1's refusals",
+    "I06's closure check and I06 v4's role pin (i06_backend_profile_v4.check_observer_snapshot) over B1's snapshot and the same read's ClusterRoles, ClusterRoleBindings and RoleBindings"
+   ],
+   "refusals": [
+    "rbacClosureDigest: malformed input",
+    "rbacClosureDigest: document bound exceeded",
+    "rbacClosureDigest: I06 closure check not passed",
+    "rbac: aggregated role reaches the namespace",
+    "rbac: role does not exist",
+    "rbac: loopback user bound to a non-resource rule",
+    "rbac: malformed input",
+    "rbac: malformed metadata",
+    "rbac: malformed rules",
+    "rbac: malformed rule",
+    "rbac: malformed rule list",
+    "rbac: malformed rule (non-resource URLs beside resources)",
+    "rbac: malformed subjects",
+    "rbac: malformed subject",
+    "rbac: malformed subject name",
+    "rbac: malformed subject kind",
+    "rbac: malformed subject namespace",
+    "rbac: malformed roleRef",
+    "rbac: malformed roleRef apiGroup",
+    "rbac: malformed roleRef kind",
+    "rbac: malformed roleRef name"
+   ],
+   "residuals": [
+    "R-RBAC-COMPLETE"
+   ]
+  },
+  "networkEnforcementDigest": {
+   "source": "the qualification namespace's NetworkPolicy documents and the enrolled record's network policy agent",
+   "document": {
+    "networkPolicies": "the NetworkPolicy documents in the projection form, selector-free, sorted by canonical bytes (v1: exactly one)",
+    "agent": {
+     "executable": "backendComponents.NETWORK_POLICY_AGENT.executable",
+     "executableLabel": "backendComponents.NETWORK_POLICY_AGENT.executableLabel",
+     "artifactDigest": "backendComponents.NETWORK_POLICY_AGENT.artifactDigest",
+     "processLabel": "backendComponents.NETWORK_POLICY_AGENT.processLabel",
+     "apiIdentities": "backendComponents.NETWORK_POLICY_AGENT.apiIdentities"
+    }
+   },
+   "inputs": {
+    "requestSpecs": [
+     "networking.k8s.io/v1 networkpolicies"
+    ],
+    "configurationValues": [
+     "qualificationNamespace"
+    ],
+    "observedValues": [],
+    "recordFields": [
+     "backendComponents.NETWORK_POLICY_AGENT.executable",
+     "backendComponents.NETWORK_POLICY_AGENT.executableLabel",
+     "backendComponents.NETWORK_POLICY_AGENT.artifactDigest",
+     "backendComponents.NETWORK_POLICY_AGENT.processLabel",
+     "backendComponents.NETWORK_POLICY_AGENT.apiIdentities",
+     "backendProfile.componentKeys"
+    ],
+    "captureSlots": [
+     "backend/NETWORK_POLICY_AGENT"
+    ]
+   },
+   "gates": [
+    "the networkPolicy rules (count, selector-free form)",
+    "NETWORK_POLICY_AGENT in backendComponents and in backendProfile.componentKeys",
+    "at every answer, the capture gate over backend/NETWORK_POLICY_AGENT"
+   ],
+   "refusals": [
+    "networkEnforcementDigest: malformed input",
+    "networkEnforcementDigest: float refused",
+    "networkEnforcementDigest: integer out of range",
+    "networkEnforcementDigest: document bound exceeded",
+    "networkPolicy: malformed input",
+    "networkPolicy: float refused",
+    "networkPolicy: integer out of range",
+    "networkPolicy: document bound exceeded",
+    "networkPolicy: count is not one",
+    "networkPolicy: selector form outside v1",
+    "networkEnforcementDigest: no network policy agent",
+    "networkEnforcementDigest: agent capture not passed",
+    "networkEnforcementDigest: capture set too old"
+   ],
+   "residuals": [
+    "R-NET-AGENT",
+    "R-NET-DATAPATH",
+    "R-DEFAULTS"
+   ]
+  },
+  "hostPreflightDigest": {
+   "source": "\"sha256:\" and the sha256 of the enrolled native-qualification/v4 record's canonical bytes (the value of configuration v2's qualificationRecord.sha256)",
+   "document": null,
+   "inputs": {
+    "requestSpecs": [],
+    "configurationValues": [],
+    "observedValues": [],
+    "recordFields": [
+     "the whole record"
+    ],
+    "captureSlots": [
+     "role/SERVER",
+     "role/OBSERVER",
+     "role/BROKER",
+     "role/WORKER",
+     "role/EFFECT_GATE",
+     "lifecycle",
+     "backend/<every backendComponents key>"
+    ]
+   },
+   "gates": [
+    "at every answer, the capture gate over every role, the lifecycle and every backend component of the record"
+   ],
+   "refusals": [
+    "hostPreflightDigest: malformed input",
+    "hostPreflightDigest: float refused",
+    "hostPreflightDigest: integer out of range",
+    "hostPreflightDigest: document bound exceeded",
+    "hostPreflightDigest: capture set not passed",
+    "hostPreflightDigest: capture set too old"
+   ],
+   "residuals": []
+  }
+ },
+ "captureGate": {
+  "gated": [
+   "mutationBroker",
+   "networkEnforcementDigest",
+   "hostPreflightDigest"
+  ],
+  "boundMs": 90000,
+  "bound": {
+   "cycleMs": 60000,
+   "scrapeToSetMs": 5000,
+   "setBudgetMs": 25000,
+   "anchors": [
+    "R10:obs/observe.rs:99 CYCLE",
+    "R10:obs/capture.rs:55 SCRAPE_TO_SET",
+    "R10:obs/capture.rs:53 SET_BUDGET"
+   ]
+  },
+  "dataShape": {
+   "sets": [
+    {
+     "scheduledMonotonicMs": "integer 0..2^53-1: the set's own scheduled start on the monotonic clock, recorded with the set",
+     "startedWallMs": "integer 0..2^53-1: the wall clock at the set's start (set_started_ms)",
+     "completed": "boolean",
+     "slots": {
+      "<slot>": "TAKEN | <any other state>"
+     }
+    }
+   ],
+   "answer": {
+    "monotonicMs": "integer 0..2^53-1: the answer's reading of the monotonic clock of the scheduled starts",
+    "wallMs": "integer 0..2^53-1: a millisecond reading of the same wall clock as set_started_ms, handed to the I01 service with the view"
+   }
+  },
+  "slots": {
+   "roles": [
+    "role/SERVER",
+    "role/OBSERVER",
+    "role/BROKER",
+    "role/WORKER",
+    "role/EFFECT_GATE"
+   ],
+   "lifecycle": "lifecycle",
+   "backends": "backend/<backendComponents key>"
+  },
+  "requiredSlots": {
+   "mutationBroker": [
+    "role/BROKER"
+   ],
+   "networkEnforcementDigest": [
+    "backend/NETWORK_POLICY_AGENT"
+   ],
+   "hostPreflightDigest": [
+    "role/SERVER",
+    "role/OBSERVER",
+    "role/BROKER",
+    "role/WORKER",
+    "role/EFFECT_GATE",
+    "lifecycle",
+    "backend/<every backendComponents key of the record>"
+   ]
+  },
+  "rule": [
+   "the latest completed set is the last entry of sets whose completed is true; none: the value's own text",
+   "every required slot of that set is TAKEN, else the value's own text",
+   "monotonic age = answer.monotonicMs - scheduledMonotonicMs and wall age = answer.wallMs - startedWallMs are both within 0..90000 ms, else <key>: capture set too old",
+   "the start is the set's own, never the epoch's current cycle; an Expired view is a set whose slots are EXPIRED"
+  ],
+  "refusals": [
+   "mutationBroker: broker capture not passed",
+   "networkEnforcementDigest: agent capture not passed",
+   "hostPreflightDigest: capture set not passed",
+   "mutationBroker: capture set too old",
+   "networkEnforcementDigest: capture set too old",
+   "hostPreflightDigest: capture set too old",
+   "mutationBroker: malformed input",
+   "networkEnforcementDigest: malformed input",
+   "hostPreflightDigest: malformed input"
+  ]
+ },
+ "b1Refusals": {
+  "anchor": "R10:obs/rbac.rs",
+  "rows": [
+   {
+    "refusal": "rbac: malformed subject namespace",
+    "rule": "a ClusterRoleBinding ServiceAccount subject without a namespace (an empty namespace is absent)",
+    "lines": ":207, :212-214"
+   },
+   {
+    "refusal": "rbac: malformed subject kind",
+    "rule": "a subject kind other than User, Group or ServiceAccount",
+    "lines": ":192-197"
+   },
+   {
+    "refusal": "rbac: malformed subject name",
+    "rule": "a missing or empty subject name",
+    "lines": ":189-191"
+   },
+   {
+    "refusal": "rbac: malformed roleRef apiGroup",
+    "rule": "a roleRef outside the RBAC group",
+    "lines": ":229-231"
+   },
+   {
+    "refusal": "rbac: malformed roleRef kind",
+    "rule": "a ClusterRoleBinding naming a Role, or another kind",
+    "lines": ":232-236"
+   },
+   {
+    "refusal": "rbac: malformed roleRef name",
+    "rule": "a missing or empty roleRef name",
+    "lines": ":237-239"
+   },
+   {
+    "refusal": "rbac: role does not exist",
+    "rule": "a binding whose roleRef names no listed role",
+    "lines": ":313-315"
+   },
+   {
+    "refusal": "rbac: malformed rule (non-resource URLs beside resources)",
+    "rule": "a rule with nonResourceURLs beside resources",
+    "lines": ":141-143"
+   },
+   {
+    "refusal": "rbac: loopback user bound to a non-resource rule",
+    "rule": "a role holding a non-resource rule bound directly to User system:apiserver",
+    "lines": ":319-322"
+   },
+   {
+    "refusal": "rbac: aggregated role reaches the namespace",
+    "rule": "a ClusterRole with an aggregationRule key bound by a RoleBinding in the qualification namespace or by any ClusterRoleBinding",
+    "lines": ":316-318"
+   },
+   {
+    "refusal": "rbac: malformed <field>",
+    "rule": "any other malformed RBAC or ServiceAccount object (metadata, rules, rule, rule list, subjects, subject, roleRef)",
+    "lines": ":109-147, :178-241, :258-292"
+   }
+  ],
+  "nonResourceRule": "a rule with a non-empty nonResourceURLs list (R10:obs/rbac.rs:133, :139); its entry is {nonResourceURLs, verbs, scope}, scope CLUSTER through a ClusterRoleBinding and the binding's namespace through a RoleBinding",
+  "exists": "true for User and Group; for a ServiceAccount, whether that ServiceAccount is listed (R10:obs/rbac.rs:272-278, :325-328)",
+  "subjectKey": "system:serviceaccount:<namespace>:<name> for a ServiceAccount, a RoleBinding's subject without a namespace taking the binding's (R10:obs/rbac.rs:202-219)",
+  "order": "ClusterRoles, Roles, ServiceAccounts, binding metadata, then bindings sorted (ClusterRoleBindings by name, then RoleBindings by namespace and name), each: roleRef, subjects, role resolution, aggregation, loopback"
+ },
+ "comparison": {
+  "text": "<key>: differs from the signed value",
+  "rule": "each projection's identity and digest, and each enforcement digest, equals the HE-008-signed binding's; nothing is echoed"
+ },
+ "refusalTexts": [
+  "admissionFenceDigest: differs from the signed value",
+  "admissionFenceDigest: document bound exceeded",
+  "admissionFenceDigest: float refused",
+  "admissionFenceDigest: integer out of range",
+  "admissionFenceDigest: malformed input",
+  "admissionPolicy: differs from the signed value",
+  "admissionPolicy: document bound exceeded",
+  "admissionPolicy: float refused",
+  "admissionPolicy: integer out of range",
+  "admissionPolicy: malformed input",
+  "admissionPolicy: qualification namespace not listed",
+  "admissionPolicy: rendered hash differs",
+  "admissionPolicy: unknown admission object",
+  "hostPreflightDigest: capture set not passed",
+  "hostPreflightDigest: capture set too old",
+  "hostPreflightDigest: differs from the signed value",
+  "hostPreflightDigest: document bound exceeded",
+  "hostPreflightDigest: float refused",
+  "hostPreflightDigest: integer out of range",
+  "hostPreflightDigest: malformed input",
+  "limitRange: count is not one",
+  "limitRange: differs from the signed value",
+  "limitRange: document bound exceeded",
+  "limitRange: float refused",
+  "limitRange: integer out of range",
+  "limitRange: malformed input",
+  "limitRange: name differs from the binding",
+  "mutationBroker: broker capture not passed",
+  "mutationBroker: broker row incomplete",
+  "mutationBroker: capture set too old",
+  "mutationBroker: differs from the signed value",
+  "mutationBroker: document bound exceeded",
+  "mutationBroker: float refused",
+  "mutationBroker: integer out of range",
+  "mutationBroker: malformed input",
+  "networkEnforcementDigest: agent capture not passed",
+  "networkEnforcementDigest: capture set too old",
+  "networkEnforcementDigest: differs from the signed value",
+  "networkEnforcementDigest: document bound exceeded",
+  "networkEnforcementDigest: float refused",
+  "networkEnforcementDigest: integer out of range",
+  "networkEnforcementDigest: malformed input",
+  "networkEnforcementDigest: no network policy agent",
+  "networkPolicy: count is not one",
+  "networkPolicy: differs from the signed value",
+  "networkPolicy: document bound exceeded",
+  "networkPolicy: float refused",
+  "networkPolicy: integer out of range",
+  "networkPolicy: malformed input",
+  "networkPolicy: name differs from the binding",
+  "networkPolicy: selector form outside v1",
+  "rbac: aggregated role reaches the namespace",
+  "rbac: differs from the signed value",
+  "rbac: document bound exceeded",
+  "rbac: loopback user bound to a non-resource rule",
+  "rbac: malformed input",
+  "rbac: malformed metadata",
+  "rbac: malformed roleRef",
+  "rbac: malformed roleRef apiGroup",
+  "rbac: malformed roleRef kind",
+  "rbac: malformed roleRef name",
+  "rbac: malformed rule",
+  "rbac: malformed rule (non-resource URLs beside resources)",
+  "rbac: malformed rule list",
+  "rbac: malformed rules",
+  "rbac: malformed subject",
+  "rbac: malformed subject kind",
+  "rbac: malformed subject name",
+  "rbac: malformed subject namespace",
+  "rbac: malformed subjects",
+  "rbac: role does not exist",
+  "rbacClosureDigest: I06 closure check not passed",
+  "rbacClosureDigest: differs from the signed value",
+  "rbacClosureDigest: document bound exceeded",
+  "rbacClosureDigest: malformed input",
+  "resourceQuota: count is not one",
+  "resourceQuota: differs from the signed value",
+  "resourceQuota: document bound exceeded",
+  "resourceQuota: float refused",
+  "resourceQuota: integer out of range",
+  "resourceQuota: malformed input",
+  "resourceQuota: name differs from the binding",
+  "serviceAccount: count is not one",
+  "serviceAccount: differs from the signed value",
+  "serviceAccount: document bound exceeded",
+  "serviceAccount: enforce-mountable-secrets annotation",
+  "serviceAccount: float refused",
+  "serviceAccount: integer out of range",
+  "serviceAccount: malformed input",
+  "serviceAccount: name differs from the binding"
+ ],
+ "residuals": {
+  "R-ADM-LIST": {
+   "cannotSee": "Whether the static admission objects appear in API lists, and with what uid and content; whether the apiserver refuses an API object named with the .static.k8s.io suffix. A listed object with a rendered (kind, name) is admitted by the unknown-object rule and rests on this check.",
+   "check": "T04 (owner)"
+  },
+  "R-PSA-CONFIG": {
+   "cannotSee": "PodSecurity's configured defaults and exemptions (usernames, runtimeClasses, namespaces) in the sealed admission configuration file (SC05, --admission-control-config-file)",
+   "check": "T04: the running PodSecurity configuration equals the enrolled file's, the record's APISERVER backendFiles row for the SC05 file"
+  },
+  "R-NET-DATAPATH": {
+   "cannotSee": "The live network datapath, including pod-IP behaviour for an ipBlock that overlaps the pod or Service ranges, and the running agent's flags against the sealed --fail-open=false and --disable-nri",
+   "check": "T04 (owner): the agent's programmed nftables ruleset enforces the namespace's NetworkPolicy; the flags are the sealed ones"
+  },
+  "R-NET-AGENT": {
+   "cannotSee": "The network agent's executableLabel, artifactDigest and apiIdentities, which its backend capture does not compare, and its running image (ENTRY_BOUND: domain entry plus the measured file, not the running image). Custody link: check_record requires artifactDigest to equal the sha256 of the executable's backendFiles row (R10:obs/record_check.rs:915, :592-594), and each set compares the live file's contentDigest and verity with that row (R10:obs/capture_check.rs:630-634), so the artifactDigest check concerns only the running image.",
+   "check": "T04-LABELS for executableLabel; T04: the running agent's executable content equals the record's artifactDigest; T04: the running agent's apiserver identities equal the record's apiIdentities; T04-ENTRYPOINT, T04-ENTRYPOINT-CENSUS and the matrix successor's execute_no_trans closure for the running image"
+  },
+  "R-DEFAULTS": {
+   "cannotSee": "Server defaulting of the real kinds' spec",
+   "check": "T04, per kind (ResourceQuota, LimitRange, ServiceAccount, NetworkPolicy): the spec HE-008 captured at enrollment equals the spec served after an apiserver restart on v1.37.1"
+  },
+  "R-RBAC-COMPLETE": {
+   "cannotSee": "Completeness by refusal, not expansion (aggregations, impersonation paths, indirect grants); the system:authenticated limit",
+   "check": "T04 (carried)"
+  },
+  "R-BROKER-LIVE": {
+   "cannotSee": "The BROKER document members its capture does not observe: the process image (LABEL_BOUND: bound by processLabel and the enrolled file's measurement); executableLabel (DECLARED_T04); seccompFilterDigest and seccompDefaultAction (DECLARED_T04, corroborated by the OBSERVED filter count); the cgroup's selinuxLabel (DECLARED_T04); listenEndpointIds and outboundEndpointIds (no class row; not compared by check_capture)",
+   "check": "T04-SECCOMP-INSTALLED for the seccomp members; T04-LABELS for executableLabel and the cgroup's selinuxLabel; T04-ENTRYPOINT and T04-ENTRYPOINT-CENSUS for the image's binding; HE-005 and T04 for the endpoints: the broker's bound and connected endpoints equal the record's listenEndpointIds and outboundEndpointIds, resolved through the record's endpointTuples; HE-005 for the broker's behaviour"
+  }
+ },
+ "scopeLimits": [
+  "one NetworkPolicy in the qualification namespace (v1); several take a List form for networkPolicy alone, through a contract revision",
+  "selector-free NetworkPolicies only (v1)",
+  "direct RBAC grants only: an aggregated ClusterRole that reaches the namespace refuses"
+ ]
+}

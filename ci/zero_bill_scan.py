@@ -16,6 +16,10 @@ errors: list[str] = []
 # Owner decision Q-I01B1-ZB, 2026-10-23 ("Two exact allowlist entries"): the I01 digest contract's vectors.json, which
 # carries that policy's rendered objects, and R10's i01_admission_render.rs, which renders the same policy text from the
 # sealed values. Any later edit of the render changes its bytes and must re-pin its entry here in the same packet.
+# Owner decision Q-I01B4-ZB, 2026-10-25 ("Exact entries (Recommended)"), in Q-I01B1-ZB's form: admission v4's
+# admission-manifests/planeon-a2.json and vectors.json, whose policy refuses the same service types, and the I01 digest
+# contract v2's vectors.json, which carries that policy's rendered objects; HE-004-I01B4's edit of the render re-pins its
+# entry. The v1 and admission-v3 entries stay while those files are held.
 # Exactly these paths with exactly these bytes are exempt from those two patterns only; every other pattern still applies
 # to them, and a changed byte, or the same bytes at another path, fails as before.
 SERVICE_TYPE_PATTERNS = (r"(?i)LoadBalancer", r"(?i)NodePort")
@@ -24,8 +28,14 @@ CONTRACT_ALLOWLIST = {
         "1096b3cc71c4fe6b5a17ed61e8bf8c17ee17fcf52b192503534d60aed9ce4741",
     "host-enforcement/contracts/admission-v3/vectors.json":
         "a3e2dc9818742ae2188e0e83cf91bb833be836115975b3fb23d5f280f6928cc1",
+    "host-enforcement/contracts/admission-v4/admission-manifests/planeon-a2.json":
+        "92c21612304cb704d13b506c1ae885d62a47c01f0ed0d284affe563aa1868e32",
+    "host-enforcement/contracts/admission-v4/vectors.json":
+        "5706b1a8df5cabd978caa219400b40a9c4ef6cbdbca8ea2f7c6f69b69474301c",
     "host-enforcement/contracts/i01-digests-v1/vectors.json":
         "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
+    "host-enforcement/contracts/i01-digests-v2/vectors.json":
+        "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
     "host-enforcement/crates/observer/src/i01_admission_render.rs":
         "2e23e488b241cf28c5070174c87790bbdb8e22807b7800de3333148939fdabae",
 }

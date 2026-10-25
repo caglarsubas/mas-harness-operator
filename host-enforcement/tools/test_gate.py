@@ -1084,10 +1084,12 @@ class ContractTests(unittest.TestCase):
     # unit U6 (DESIGN-I01A section 10): its two I06 v4 rows (50). HE-004-I01A2, unit U7 (DESIGN-I01A sections 3 and 7):
     # edge record v9's two I01 wire rows (52). HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's
     # four rows, the I01 digest contract's three files and the proxy-contract vectors beside the wire's two (56).
+    # HE-004-I01B4 (DESIGN-I01B4 rev 2 sections 1.2 and 5, G-I01B-2): edge record v11's seven rows, the contract v2's three
+    # files, admission v4's three and profile v2's vectors, beside the held v1 and admission v3 files (63).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 56)
+            self.assertEqual(len(gate.CONTRACTS), 63)
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/i01-v1/")}, {
                 "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
@@ -1101,6 +1103,23 @@ class ContractTests(unittest.TestCase):
                 "contracts/i01-digests-v1/vectors.json":
                     "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
                 "contracts/i01-digests-v1/README.md": "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae"})
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/i01-digests-v2/")}, {
+                "contracts/i01-digests-v2/definitions.json":
+                    "fef08fddfb94e06eeff5bc4bdaf37246f9142fd072dd6427f629350c8d5cb2f2",
+                "contracts/i01-digests-v2/vectors.json":
+                    "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
+                "contracts/i01-digests-v2/README.md": "fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090"})
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/admission-v4/")}, {
+                "contracts/admission-v4/README.md": "f7794aa857aa50800f05b651f7b0a56eda7407f67855bc2f0437b27b3fe297fa",
+                "contracts/admission-v4/vectors.json": "5706b1a8df5cabd978caa219400b40a9c4ef6cbdbca8ea2f7c6f69b69474301c",
+                "contracts/admission-v4/admission-manifests/planeon-a2.json":
+                    "92c21612304cb704d13b506c1ae885d62a47c01f0ed0d284affe563aa1868e32"})
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/i01-v2/")}, {
+                "contracts/i01-v2/proxy-profile-v2-vectors.json":
+                    "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/i06-v4/")}, {
                 "contracts/i06-v4/criteria.json": "10aa3a8fe08a930e3a4a13f7a11b38404cd82bd1a12164a40ef13141af37d09a",
@@ -5011,8 +5030,9 @@ class ObserverNativeProfileTests(Tree):
     def test_the_tree_passes(self):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
         # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50; unit U7's
-        # two I01 wire files (HE-004-I01A2, edge record v9) 52; HE-004-I01B1's four (edge record v10, none embedded) 56.
-        self.assertEqual(len(gate.CONTRACTS), 56)
+        # two I01 wire files (HE-004-I01A2, edge record v9) 52; HE-004-I01B1's four (edge record v10, none embedded) 56;
+        # HE-004-I01B4's seven (edge record v11, none embedded) 63.
+        self.assertEqual(len(gate.CONTRACTS), 63)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5529,6 +5549,11 @@ I01_V9_CONTRACTS = ("contracts/i01-v1/channel.schema.json", "contracts/i01-v1/ve
 # HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four rows 69-72.
 I01B_V10_CONTRACTS = ("contracts/i01-digests-v1/definitions.json", "contracts/i01-digests-v1/vectors.json",
                       "contracts/i01-digests-v1/README.md", "contracts/i01-v1/proxy-contract-vectors.json")
+# HE-004-I01B4 (DESIGN-I01B4 rev 2 sections 1.1 and 5, G-I01B-2): edge record v11's seven rows 73-79.
+I01B_V11_CONTRACTS = ("contracts/i01-digests-v2/definitions.json", "contracts/i01-digests-v2/vectors.json",
+                      "contracts/i01-digests-v2/README.md", "contracts/admission-v4/README.md",
+                      "contracts/admission-v4/vectors.json", "contracts/admission-v4/admission-manifests/planeon-a2.json",
+                      "contracts/i01-v2/proxy-profile-v2-vectors.json")
 
 
 class D2ContractCountTests(unittest.TestCase):
@@ -5537,7 +5562,9 @@ class D2ContractCountTests(unittest.TestCase):
     edge record v9's two I01 wire rows are checked the same way (52 files), and the readiness document, which edge record
     v9 leaves unregistered (Q-EV9-1b (a)), refuses if held. HE-004-I01B1: edge record v10's four rows are checked the same
     way (56 files); the proxy-contract vectors are registered now (row 72), so the digest contract's reference model,
-    which no record registers, is the unregistered file held beside them."""
+    which no record registers, is the unregistered file held beside them. HE-004-I01B4: edge record v11's seven rows are
+    checked the same way (63 files), and the contract v2's model, which no record registers, is the unregistered file held
+    beside the contract v2's own."""
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -5553,14 +5580,15 @@ class D2ContractCountTests(unittest.TestCase):
     def test_the_forty_six_files_pass(self):
         # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48; unit U6
         # (section 10): its two I06 v4 files make 50; unit U7 (HE-004-I01A2, sections 3 and 7): edge record v9's two
-        # I01 wire files make 52; HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four make 56.
-        self.assertEqual(len(gate.CONTRACTS), 56)
-        self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS)
-                        <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 56)
+        # I01 wire files make 52; HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four make 56;
+        # HE-004-I01B4 (DESIGN-I01B4 rev 2 section 1.2, G-I01B-2): edge record v11's seven make 63.
+        self.assertEqual(len(gate.CONTRACTS), 63)
+        self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS
+                            + I01B_V11_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 63)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
-        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS:
+        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS + I01B_V11_CONTRACTS:
             path = self.base / rel
             data = path.read_bytes()
             path.unlink()
@@ -5576,14 +5604,17 @@ class D2ContractCountTests(unittest.TestCase):
                     # proxy-contract vectors (row 72), so the digest contract's reference model, which no record
                     # registers, takes their place as the unregistered file beside the contract's own.
                     "contracts/i01-v1/POLICY_OBSERVATION_READINESS.md",
-                    "contracts/i01-digests-v1/policy_observation_digests.py"):
+                    "contracts/i01-digests-v1/policy_observation_digests.py",
+                    # HE-004-I01B4: the contract v2's model, which no record registers (edge record v11's notes), in
+                    # the same place beside the contract v2's own files.
+                    "contracts/i01-digests-v2/policy_observation_digests_v2.py"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 56)
+        self.assertEqual(gate.check_contracts(self.base), 63)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -6750,10 +6781,13 @@ class I01bContractFileTests(Tree):
     the tree and the real host-enforcement pass; a changed byte, a wrong mode (an execute bit), a symlink, a missing
     file, an embedded file (an include_bytes! or include_str! literal in a crate source, or the file in
     OBSERVER_EMBEDDED_CONTRACTS), a missing, changed or doubled PROVENANCE.md line and a CONTRACTS digest other than the
-    row's each refuse."""
+    row's each refuse. HE-004-I01B4 (DESIGN-I01B4 rev 2 section 5): the tree also holds edge record v11's seven files,
+    and every case runs over the eleven, each refusal naming its record (v10 or v11) and row."""
 
     RULE = "G-I01B-2"
-    COPIED = I01B_V10_CONTRACTS + ("contracts/PROVENANCE.md", gate.OBSERVER_CONTRACTS)
+    COPIED = I01B_V10_CONTRACTS + I01B_V11_CONTRACTS + ("contracts/PROVENANCE.md", gate.OBSERVER_CONTRACTS)
+    # HE-004-I01B4: each of the eleven files with the edge record its refusals name.
+    RECORDS = tuple((rel, "v10") for rel in I01B_V10_CONTRACTS) + tuple((rel, "v11") for rel in I01B_V11_CONTRACTS)
 
     def setUp(self):
         super().setUp()
@@ -6768,7 +6802,7 @@ class I01bContractFileTests(Tree):
             gate.check_i01b_contracts(self.base)
 
     def test_the_tree_and_the_real_files_pass(self):
-        self.assertEqual(len(gate.CONTRACTS), 56)
+        self.assertEqual(len(gate.CONTRACTS), 63)
         self.assertEqual(tuple(gate.I01B_EDGE_V10_ROWS), I01B_V10_CONTRACTS)
         self.assertEqual([row[0] for row in gate.I01B_EDGE_V10_ROWS.values()], [69, 70, 71, 72])
         self.assertEqual([row[1] for row in gate.I01B_EDGE_V10_ROWS.values()],
@@ -6776,26 +6810,36 @@ class I01bContractFileTests(Tree):
                           "architecture/policy-observation-digests/vectors.json",
                           "architecture/policy-observation-digests/README.md",
                           "architecture/proxy-contract-inputs/vectors.json"])
-        for rel, (_, _, digest) in gate.I01B_EDGE_V10_ROWS.items():
+        self.assertEqual(tuple(gate.I01B_EDGE_V11_ROWS), I01B_V11_CONTRACTS)
+        self.assertEqual([row[0] for row in gate.I01B_EDGE_V11_ROWS.values()], [73, 74, 75, 76, 77, 78, 79])
+        self.assertEqual([row[1] for row in gate.I01B_EDGE_V11_ROWS.values()],
+                         ["architecture/policy-observation-digests-v2/definitions.json",
+                          "architecture/policy-observation-digests-v2/vectors.json",
+                          "architecture/policy-observation-digests-v2/README.md",
+                          "architecture/admission-semantics-v4/README.md",
+                          "architecture/admission-semantics-v4/vectors.json",
+                          "architecture/admission-semantics-v4/admission-manifests/planeon-a2.json",
+                          "architecture/proxy-profile-v2/vectors.json"])
+        for rel, (_, _, digest) in list(gate.I01B_EDGE_V10_ROWS.items()) + list(gate.I01B_EDGE_V11_ROWS.items()):
             self.assertEqual(gate.CONTRACTS[rel], digest)
             self.assertEqual(hashlib.sha256((gate.HE / rel).read_bytes()).hexdigest(), digest)
             self.assertNotIn(rel, gate.OBSERVER_EMBEDDED_CONTRACTS)
         self.assertEqual(len(gate.OBSERVER_EMBEDDED_CONTRACTS), 5)
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
-        self.assertEqual(gate.check_i01b_contracts(gate.HE), 4)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
+        self.assertEqual(gate.check_i01b_contracts(gate.HE), 11)
 
     def test_a_changed_byte_refuses(self):
-        for rel in I01B_V10_CONTRACTS:
+        for rel, record in self.RECORDS:
             path = self.base / rel
             data = path.read_bytes()
             for changed in (data[:-1] + bytes([data[-1] ^ 1]), bytes([data[0] ^ 1]) + data[1:], data + b"\n", data[:-1]):
                 path.write_bytes(changed)
-                self.refuses("%s differs from edge record v10's row" % re.escape(rel))
+                self.refuses("%s differs from edge record %s's row" % (re.escape(rel), record))
             path.write_bytes(data)
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
     def test_a_wrong_mode_a_symlink_or_a_missing_file_refuses(self):
-        for rel in I01B_V10_CONTRACTS:
+        for rel in I01B_V10_CONTRACTS + I01B_V11_CONTRACTS:
             path = self.base / rel
             for mode in (0o755, 0o744, 0o654, 0o645):
                 path.chmod(mode)
@@ -6812,12 +6856,12 @@ class I01bContractFileTests(Tree):
             self.refuses("%s is missing or a symlink" % re.escape(rel))
             path.write_bytes(data)
             path.chmod(0o644)
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
     def test_an_embedded_file_refuses(self):
         contracts_rs = self.base / gate.OBSERVER_CONTRACTS
         good = contracts_rs.read_text(encoding="utf-8")
-        for rel in I01B_V10_CONTRACTS:
+        for rel in I01B_V10_CONTRACTS + I01B_V11_CONTRACTS:
             literal = "../../../" + rel
             contracts_rs.write_text(good + "pub const DIGESTS: &[u8] = include_bytes!(\"%s\");\n" % literal,
                                     encoding="utf-8")
@@ -6831,12 +6875,12 @@ class I01bContractFileTests(Tree):
                 self.refused(gate.check_i01b_contracts, source, text, self.RULE)
             with mock.patch.object(gate, "OBSERVER_EMBEDDED_CONTRACTS", gate.OBSERVER_EMBEDDED_CONTRACTS + (rel,)):
                 self.refuses("%s is embedded" % re.escape(rel))
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
     def test_the_provenance_line_is_required(self):
         path = self.base / "contracts/PROVENANCE.md"
         good = path.read_text(encoding="utf-8")
-        for rel, (_, provider, digest) in gate.I01B_EDGE_V10_ROWS.items():
+        for rel, (_, provider, digest) in list(gate.I01B_EDGE_V10_ROWS.items()) + list(gate.I01B_EDGE_V11_ROWS.items()):
             lines = [line for line in good.splitlines() if line.startswith("- `%s` from " % rel)]
             self.assertEqual(len(lines), 1, rel)
             line = lines[0]
@@ -6851,16 +6895,18 @@ class I01bContractFileTests(Tree):
         path.unlink()
         self.refuses("contracts/PROVENANCE.md is missing or a symlink")
         path.write_text(good, encoding="utf-8")
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
     def test_a_digest_other_than_the_row_refuses(self):
-        for rel, (row, _, _) in gate.I01B_EDGE_V10_ROWS.items():
-            with mock.patch.dict(gate.CONTRACTS, {rel: "0" * 64}):
-                self.refuses("%s is not registered at edge record v10's row %d sha256" % (re.escape(rel), row))
-            with mock.patch.dict(gate.CONTRACTS):
-                del gate.CONTRACTS[rel]
-                self.refuses("%s is not registered at edge record v10's row %d sha256" % (re.escape(rel), row))
-        self.assertEqual(gate.check_i01b_contracts(self.base), 4)
+        for record, rows in (("v10", gate.I01B_EDGE_V10_ROWS), ("v11", gate.I01B_EDGE_V11_ROWS)):
+            for rel, (row, _, _) in rows.items():
+                message = "%s is not registered at edge record %s's row %d sha256" % (re.escape(rel), record, row)
+                with mock.patch.dict(gate.CONTRACTS, {rel: "0" * 64}):
+                    self.refuses(message)
+                with mock.patch.dict(gate.CONTRACTS):
+                    del gate.CONTRACTS[rel]
+                    self.refuses(message)
+        self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
 
 I01B1_LIB = ("#![forbid(unsafe_code)]\n// i01_digest and i01_gate in a comment\npub mod capture;\npub mod i01_admission_render;\n"

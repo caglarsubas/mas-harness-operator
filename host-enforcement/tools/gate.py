@@ -159,6 +159,17 @@ guarded name and an inline module in place of a guarded one; and no use declarat
 module, re-exports through one, names a scope root alone or globs one outside a crate root (B3-1, G-I01B-6 (e); PR
 review round 1, R1-2). The casefold clause reads a directory listing, so its self-test runs on any file system (R1-4).
 
+HE-004-I01B4 (LPK-1's S3 with W3, the I01 digest contract v2 re-vendor; DESIGN-I01B4 rev 2 sections 1, 5 and 11; the
+monitor's Q-I01B4-1..12 and the owner's Q-I01B4-ZB) registers edge record v11's seven rows, the contract v2's
+definitions, vectors and README, admission v4's README, vectors and sealed planeon-a2.json, and profile v2's vectors
+(G-I01B-2 over both records' rows, 63 files, none embedded); v1's four files and admission v3's three stay held and
+pinned. G-I01B-8 reads the contract v2's definitions, whose texts and bound equal v1's. G-I01B4-1, the absence clause
+(Q-I01B4-5; I4D-1, I4D-2): no registered or held contract file is profile v2's schema, by name or by bytes; row 79's file
+is included only by the digest replay, exactly once, and named in no other crate source; and no crate source declares
+a profile v2 validator (validate_profile, precondition or a proxy_profile_v2 item), names a file after profile v2, or
+holds row 79's negative texts or the schema's digest outside the digest replay. R-B3-PIN is unchanged: I01B4 changes
+no guarded file.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -245,7 +256,12 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # and vectors at providerCommit 108e6195), read by the tests only (the request replay), 52. HE-004-I01B1 (DESIGN-I01B rev
 # 3 section 2, G-I01B-2; Q-I01B-26 (a)): edge record v10's four rows 69-72 (I01B_EDGE_V10_ROWS: the I01 digest contract's
 # definitions, vectors and README, published by MET-ENFORCE-041 and merged at 2043cc27, and the proxy-contract vectors at
-# providerCommit 33de300c), read by the tests only (the digest replay), none embedded, 56.
+# providerCommit 33de300c), read by the tests only (the digest replay), none embedded, 56. HE-004-I01B4 (DESIGN-I01B4
+# rev 2 sections 1.1 and 1.2, G-I01B-2; Q-I01B4-2 and Q-I01B4-3): edge record v11's seven rows 73-79
+# (I01B_EDGE_V11_ROWS: the I01 digest contract v2's definitions, vectors and README, published by MET-ENFORCE-042 and
+# merged at f9882c1a, and admission v4's README, vectors and sealed planeon-a2.json and profile v2's vectors at
+# providerCommit 675daccb), read by the tests only (the digest, render and PV replays); v10's rows 69-72 and admission
+# v3's rows 41-43 stay held and pinned; none embedded, 63.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -310,6 +326,15 @@ CONTRACTS = {
     "contracts/i01-digests-v1/vectors.json": "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
     "contracts/i01-digests-v1/README.md": "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae",
     "contracts/i01-v1/proxy-contract-vectors.json": "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7",
+    "contracts/i01-digests-v2/definitions.json": "fef08fddfb94e06eeff5bc4bdaf37246f9142fd072dd6427f629350c8d5cb2f2",
+    "contracts/i01-digests-v2/vectors.json": "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
+    "contracts/i01-digests-v2/README.md": "fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090",
+    "contracts/admission-v4/README.md": "f7794aa857aa50800f05b651f7b0a56eda7407f67855bc2f0437b27b3fe297fa",
+    "contracts/admission-v4/vectors.json": "5706b1a8df5cabd978caa219400b40a9c4ef6cbdbca8ea2f7c6f69b69474301c",
+    "contracts/admission-v4/admission-manifests/planeon-a2.json":
+        "92c21612304cb704d13b506c1ae885d62a47c01f0ed0d284affe563aa1868e32",
+    "contracts/i01-v2/proxy-profile-v2-vectors.json":
+        "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc",
 }
 # HE-004-I01B1 DESIGN-I01B rev 3 sections 2 and 6 (G-I01B-2): edge record v10's rows 69-72, each file's row, provider
 # path and sha256 (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004-I01B).
@@ -326,6 +351,32 @@ I01B_EDGE_V10_ROWS = {
     "contracts/i01-v1/proxy-contract-vectors.json":
         (72, "architecture/proxy-contract-inputs/vectors.json",
          "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7"),
+}
+# HE-004-I01B4 DESIGN-I01B4 rev 2 sections 1.1 and 5 (G-I01B-2, the I01B4 set): edge record v11's rows 73-79, in
+# I01B_EDGE_V10_ROWS' form (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet
+# HE-004-I01B4).
+I01B_EDGE_V11_ROWS = {
+    "contracts/i01-digests-v2/definitions.json":
+        (73, "architecture/policy-observation-digests-v2/definitions.json",
+         "fef08fddfb94e06eeff5bc4bdaf37246f9142fd072dd6427f629350c8d5cb2f2"),
+    "contracts/i01-digests-v2/vectors.json":
+        (74, "architecture/policy-observation-digests-v2/vectors.json",
+         "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594"),
+    "contracts/i01-digests-v2/README.md":
+        (75, "architecture/policy-observation-digests-v2/README.md",
+         "fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090"),
+    "contracts/admission-v4/README.md":
+        (76, "architecture/admission-semantics-v4/README.md",
+         "f7794aa857aa50800f05b651f7b0a56eda7407f67855bc2f0437b27b3fe297fa"),
+    "contracts/admission-v4/vectors.json":
+        (77, "architecture/admission-semantics-v4/vectors.json",
+         "5706b1a8df5cabd978caa219400b40a9c4ef6cbdbca8ea2f7c6f69b69474301c"),
+    "contracts/admission-v4/admission-manifests/planeon-a2.json":
+        (78, "architecture/admission-semantics-v4/admission-manifests/planeon-a2.json",
+         "92c21612304cb704d13b506c1ae885d62a47c01f0ed0d284affe563aa1868e32"),
+    "contracts/i01-v2/proxy-profile-v2-vectors.json":
+        (79, "architecture/proxy-profile-v2/vectors.json",
+         "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc"),
 }
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
@@ -3693,31 +3744,38 @@ def check_i01b_contracts(base: Path) -> int:
     section's form), with its row's provider path and sha256 and its length; and it is not embedded: it is not in
     OBSERVER_EMBEDDED_CONTRACTS, and
     no crate source under crates/*/src holds an include_bytes! or include_str! literal that resolves to it. The number of
-    files."""
+    files.
+
+    HE-004-I01B4 (DESIGN-I01B4 rev 2 section 5): the same rule over edge record v11's rows 73-79 (I01B_EDGE_V11_ROWS),
+    each refusal naming its record (v10 or v11) and row; the embedding refusal covers both tables. 4 + 7 = 11 files."""
     rule = "the I01 digest contract files, G-I01B-2"
     provenance_path = base / "contracts/PROVENANCE.md"
     require(provenance_path.is_file() and not provenance_path.is_symlink(),
             "contracts/PROVENANCE.md is missing or a symlink (%s)" % rule)
     provenance = provenance_path.read_text(encoding="utf-8")
-    for rel, (row, provider, expected) in I01B_EDGE_V10_ROWS.items():
-        require(CONTRACTS.get(rel) == expected,
-                "%s is not registered at edge record v10's row %d sha256 (%s)" % (rel, row, rule))
-        path = base / rel
-        require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (%s)" % (rel, rule))
-        require(not path.stat().st_mode & 0o111, "%s is not mode 100644 (%s)" % (rel, rule))
-        data = path.read_bytes()
-        require(sha256(data) == expected, "%s differs from edge record v10's row %d (%s)" % (rel, row, rule))
-        lines = re.findall(r"(?m)^- `%s` from `([^`]*)`, sha256 `([0-9a-f]{64})`, (\d+) bytes$" % re.escape(rel),
-                           provenance)
-        require(lines == [(provider, expected, str(len(data)))],
-                "%s has not exactly one PROVENANCE.md line with its provider path, sha256 and length (%s)" % (rel, rule))
-        require(rel not in OBSERVER_EMBEDDED_CONTRACTS, "%s is embedded (%s)" % (rel, rule))
+    tables = (("v10", I01B_EDGE_V10_ROWS), ("v11", I01B_EDGE_V11_ROWS))
+    for record, rows in tables:
+        for rel, (row, provider, expected) in rows.items():
+            require(CONTRACTS.get(rel) == expected,
+                    "%s is not registered at edge record %s's row %d sha256 (%s)" % (rel, record, row, rule))
+            path = base / rel
+            require(path.is_file() and not path.is_symlink(), "%s is missing or a symlink (%s)" % (rel, rule))
+            require(not path.stat().st_mode & 0o111, "%s is not mode 100644 (%s)" % (rel, rule))
+            data = path.read_bytes()
+            require(sha256(data) == expected, "%s differs from edge record %s's row %d (%s)" % (rel, record, row, rule))
+            lines = re.findall(r"(?m)^- `%s` from `([^`]*)`, sha256 `([0-9a-f]{64})`, (\d+) bytes$" % re.escape(rel),
+                               provenance)
+            require(lines == [(provider, expected, str(len(data)))],
+                    "%s has not exactly one PROVENANCE.md line with its provider path, sha256 and length (%s)"
+                    % (rel, rule))
+            require(rel not in OBSERVER_EMBEDDED_CONTRACTS, "%s is embedded (%s)" % (rel, rule))
+    held = {rel for _, rows in tables for rel in rows}
     for path in sorted((base / "crates").glob("*/src/**/*.rs")):
         source = path.relative_to(base).as_posix()
         for literal in OBSERVER_INCLUDE_FORM.findall(path.read_text(encoding="utf-8")):
             target = posixpath.normpath(posixpath.join(posixpath.dirname(source), literal))
-            require(target not in I01B_EDGE_V10_ROWS, "%s embeds %s (%s)" % (source, target, rule))
-    return len(I01B_EDGE_V10_ROWS)
+            require(target not in held, "%s embeds %s (%s)" % (source, target, rule))
+    return len(held)
 
 
 def casefold_siblings(directory: str, entries: list[str], names: set[str], rule: str) -> None:
@@ -4016,9 +4074,11 @@ MODULE_DECLARATION = re.compile(r"\bmod\s+([A-Za-z_]\w*)\s*([;{])")
 # HE-004-I01B1 G-I01B-8 (DESIGN-I01B rev 3 section 6; B2-7): each constant against its own source. The gate bound and
 # the three R10 constants it sums, from the vendored definitions.json (captureGate); G-I01B-8's three literal pins in
 # i01_gate.rs, each with the citation its doc comment must hold; and the refusal texts the three modules write, read
-# with literals kept, exactly definitions.json's refusalTexts.
+# with literals kept, exactly definitions.json's refusalTexts. HE-004-I01B4 (DESIGN-I01B4 rev 2 section 5, I4D-10; the
+# section's own choice, which the rulings do not name): the contract v2's definitions.json, the file the port now reads.
+# Its refusalTexts, captureGate and eleven keys equal v1's, so G-I01B-8's counts stay 90 and 90,000.
 I01_GATE_RS = "crates/observer/src/i01_gate.rs"
-I01B_DEFINITIONS = "contracts/i01-digests-v1/definitions.json"
+I01B_DEFINITIONS = "contracts/i01-digests-v2/definitions.json"
 I01B_GATE_BOUND = ("GATE_BOUND_MS", "u64")
 I01B_DURATION_PINS = (("crates/observer/src/observe.rs", "CYCLE", "cycleMs"),
                       ("crates/observer/src/capture.rs", "SCRAPE_TO_SET", "scrapeToSetMs"),
@@ -5280,9 +5340,11 @@ def main() -> int:
             % (check_observer_sys_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_SYS_PINS.items())))
         say("constructor home pins: %d files match their pinned sha256 (%s) (HE-004D2, owner decision Q-D2-END)"
             % (check_observer_home_pins(HE), ", ".join("%s %s" % item for item in OBSERVER_HOME_PINS.items())))
-        say("I01 digest contract files (HE-004-I01B1, G-I01B-2): %d files, %s, each at edge record v10's row sha256, "
-            "mode 100644, with its one PROVENANCE.md line, and none embedded (OBSERVER_EMBEDDED_CONTRACTS stays at %d)"
+        say("I01 digest contract files (HE-004-I01B1 and HE-004-I01B4, G-I01B-2): %d files, edge record v10's %s and "
+            "edge record v11's %s, each at its record's row sha256, mode 100644, with its one PROVENANCE.md line, and "
+            "none embedded (OBSERVER_EMBEDDED_CONTRACTS stays at %d)"
             % (check_i01b_contracts(HE), ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V10_ROWS.items()),
+               ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V11_ROWS.items()),
                len(OBSERVER_EMBEDDED_CONTRACTS)))
         say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 at their dd7422ed bytes, "
             "%s absent (no directory entry); no directory entry casefolds to a guarded name but itself, and each guarded "
