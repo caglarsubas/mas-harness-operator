@@ -1,9 +1,10 @@
-//! The A2 render (HE-004-I01B1; DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; the monitor's Q-I01B-15 (a)):
-//! admission v3's static ValidatingAdmissionPolicy objects and their bindings, rendered from the four sealed values,
-//! with the sealed directory's one file and its hash, as the I01 digest contract renders them
-//! (`contracts/i01-digests-v1/README.md` sections 4.1 and 5.1) with admission v3's frozen model (`a2_objects`,
+//! The A2 render (HE-004-I01B1; DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; the monitor's Q-I01B-15 (a)),
+//! moved to admission v4 in place by HE-004-I01B4 (DESIGN-I01B4 rev 2 section 2.1; the monitor's Q-I01B4-11):
+//! admission v4's static ValidatingAdmissionPolicy objects and their bindings, rendered from the four sealed values,
+//! with the sealed directory's one file and its hash, as the I01 digest contract v2 renders them
+//! (`contracts/i01-digests-v2/README.md` sections 4.1 and 5.1) with admission v4's frozen model (`a2_objects`,
 //! `manifest_file_bytes` and
-//! `manifest_directory_hash`, harness-onion `scripts/admission_semantics_v3.py` at `2043cc27`, read as text). A pure
+//! `manifest_directory_hash`, harness-onion `scripts/admission_semantics_v4.py` at `675daccb`, read as text). A pure
 //! logic module under the I01 logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no file is read, no system call
 //! beyond allocation, every function total, no panic, and no caller in the binary (G-I01B-1).
 //!
@@ -16,17 +17,21 @@
 //! - [`render`]: the objects and the directory's hash over that one file under its fixed name ([`MANIFEST_FILE`]),
 //!   reusing `admission::manifest_directory_hash`. It fits `i01_digest`'s render argument, so the digest's callers (the
 //!   tests in HE-004-I01B1) hand it in; `i01_digest` checks the sealed values before it and the two hashes after it.
-//! - The replay (`tests/observer_i01_render_replay.rs`) holds it to admission v3's vectors (the vendored
-//!   `planeon-a2.json` byte for byte) and to the contract's admission vectors.
+//! - The replay (`tests/observer_i01_render_replay.rs`) holds it to admission v4's vectors (the vendored
+//!   `planeon-a2.json` byte for byte) and to the contract v2's admission vectors.
+//!
+//! Admission v4 renders as admission v3 did, with the same kinds, names, file name, hashing and the three places the
+//! sealed values enter, except in the Pod policy: A2-POD-PULL-POLICY requires `'Never'` where v3 required `'Always'`,
+//! and A2-POD-EMPTYDIR is its last row (18 CEL rows in all; the Pod policy 10).
 
 use i05_protocol::json::Doc;
 
 use crate::admission::manifest_directory_hash;
 use crate::i01_digest::{Rendered, SealedAdmission};
 
-/// The sealed directory's one file (admission v3's `MANIFEST_FILE`).
+/// The sealed directory's one file (admission v4's `MANIFEST_FILE`, as v3's).
 pub const MANIFEST_FILE: &str = "planeon-a2.json";
-/// The static objects' name suffix and the bindings' name part (admission v3's `STATIC_SUFFIX`, `BINDING_SUFFIX`).
+/// The static objects' name suffix and the bindings' name part (admission v4's `STATIC_SUFFIX`, `BINDING_SUFFIX`).
 const STATIC_SUFFIX: &str = ".static.k8s.io";
 const BINDING_SUFFIX: &str = "-binding";
 /// The objects' API version and kinds.
@@ -175,9 +180,11 @@ fn echo_cel(field: &str, key: &str) -> String {
              object.spec.{field}.map(v, {render}).join(',') : '')")
 }
 
-/// A kind's validations in the model's order (the model's `_validations`), each `{expression, message, reason}`
+/// A kind's validations in the model's order (admission v4's `_validations`), each `{expression, message, reason}`
 /// with reason Forbidden: the ConfigMap rules (the publisher's one exception first), or the reserved-key rule then the
-/// Service or Pod rules. Each row is written as the manifest holds it: its CEL expression, then its rule id.
+/// Service or Pod rules, the Pod rules ending with A2-POD-PULL-POLICY (pulled `'Never'`) and A2-POD-EMPTYDIR (every
+/// emptyDir bounded), v4's two Pod rows. Each row is written as the manifest holds it: its CEL expression, then its
+/// rule id.
 fn validations(kind: &str, sealed: &SealedAdmission) -> Vec<Doc> {
     let publisher = format!("object.metadata.name == '{PUBLISHER_CONFIGMAP}'");
     let rows: Vec<(String, &str)> = match kind {
@@ -234,11 +241,15 @@ fn validations(kind: &str, sealed: &SealedAdmission) -> Vec<Doc> {
                   !has(object.spec.nodeName) && !has(object.spec.nodeSelector)"
                      .to_string(),
                  "A2-POD-PLACEMENT"),
-                ("object.spec.containers.all(c, c.imagePullPolicy == 'Always') && \
+                ("object.spec.containers.all(c, c.imagePullPolicy == 'Never') && \
                   (!has(object.spec.initContainers) || \
-                  object.spec.initContainers.all(c, c.imagePullPolicy == 'Always'))"
+                  object.spec.initContainers.all(c, c.imagePullPolicy == 'Never'))"
                      .to_string(),
                  "A2-POD-PULL-POLICY"),
+                ("!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.emptyDir) || \
+                  (has(v.emptyDir.sizeLimit) && !has(v.emptyDir.medium)))"
+                     .to_string(),
+                 "A2-POD-EMPTYDIR"),
             ]
         }
     };

@@ -1,10 +1,12 @@
 //! The I01 digest contract's port (HE-004-I01B1; DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; owner decision
-//! Q-HE4I1-2 and the monitor's Q-I01B-1..5 and Q-I01B-26): the seven projection documents and the four enforcement
-//! digests of the I01 v1 answer, derived from one snapshot as `contracts/i01-digests-v1/README.md` states them
-//! (DIGEST-CONTRACT, harness-onion `2043cc27`, edge record v10's row 71), with the pinned reference model
-//! `scripts/policy_observation_digests.py` read as text where the README is silent. A pure logic module under the I01
-//! logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no system call beyond allocation, every function total, no
-//! panic, and no caller in the binary (G-I01B-1).
+//! Q-HE4I1-2 and the monitor's Q-I01B-1..5 and Q-I01B-26), on the contract v2 since HE-004-I01B4 (DESIGN-I01B4 rev 2
+//! section 3.1): the seven projection documents and the four enforcement digests of the I01 v1 answer, derived from
+//! one snapshot as `contracts/i01-digests-v2/README.md` states them (the I01 digest contract v2, harness-onion
+//! `f9882c1a`, edge record v11's row 75), with the pinned reference model `scripts/policy_observation_digests_v2.py`
+//! (`e1ba63d9…`, pinned by digest in PROVENANCE) read as text where the README is silent. v2 changes no projection,
+//! digest, gate rule, refusal text or vector id of v1's. A pure logic module under the I01 logic whitelist
+//! (`tools/gate.py`, I01_LOGIC_PATHS): no system call beyond allocation, every function total, no panic, and no caller
+//! in the binary (G-I01B-1).
 //!
 //! - Canonical bytes are i05-protocol's encoder, which equals the contract's `canonical`; a digest is `sha256:` and the
 //!   lowercase hex SHA-256 of a document's canonical bytes. Every document passes the exactness rule ([`exactness`]):
@@ -17,7 +19,7 @@
 //! - RBAC: B1's producer runs first, so its refusals come first, in its order; the contract's two documents are a
 //!   second derivation over the same lists, which keeps the non-resource rules B1 drops. The closure digest exists only
 //!   after the closure check and the role pin pass on B1's snapshot, as `observe.rs` runs them.
-//! - The A2 render (admission v3's eight objects and the sealed directory's hash) is the caller's, handed in as a
+//! - The A2 render (admission v4's eight objects and the sealed directory's hash) is the caller's, handed in as a
 //!   function: this module checks the sealed values before it, and the two hashes, the admission lists and the
 //!   qualification Namespace after it.
 //! - Not here: the capture gate at each answer, the comparison with the signed values, and the answer itself.
@@ -36,7 +38,7 @@ use crate::rbac::{self, ProduceError, CLUSTER, SERVICE_ACCOUNT_PREFIX};
 use crate::snapshot::Closure;
 
 /// The contract's schema version and the RBAC closure document's (contract identifiers).
-pub const SCHEMA_VERSION: &str = "planeon.internal.policy-observation-digests/v1";
+pub const SCHEMA_VERSION: &str = "planeon.internal.policy-observation-digests/v2";
 pub const CLOSURE_VERSION: &str = "planeon.internal.policy-observation-rbac-closure/v1";
 /// The exactness rule's bounds (VPC's `_bounded`): the deepest node, the root being at depth 0 and a member name one
 /// deeper than its object; the size budget; the largest integer magnitude, 2^53 - 1.
@@ -338,7 +340,7 @@ pub struct DigestSnapshot<'a> {
     pub record: Option<&'a Value>,
 }
 
-/// The four sealed admission values admission v3's A2 render reads (README section 4.1), each checked: the
+/// The four sealed admission values admission v4's A2 render reads (README section 4.1), each checked: the
 /// qualification namespace, `ipFamily` and `serviceCIDR` as non-empty text, and `defaultTolerationSeconds` an exact
 /// integer.
 #[derive(Clone, Debug, PartialEq, Eq)]

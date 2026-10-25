@@ -1,0 +1,2423 @@
+{
+  "evidenceClass": "UNIT_VERIFICATION_ONLY",
+  "nativeAcceptance": false,
+  "profileId": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V2",
+  "caseCounts": {
+    "positive": 1,
+    "negative": 50,
+    "crossContract": 16,
+    "total": 67
+  },
+  "positive": {
+    "profileId": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V2",
+    "binding": {
+      "tenantId": "unit-tenant",
+      "environmentId": "unit-environment",
+      "runNonce": "unit-nonce",
+      "capacityNonce": "unit-capacity-nonce",
+      "endpointId": "unit-proxy",
+      "namespace": "planeon-qual",
+      "serviceAccountSubject": "system:serviceaccount:planeon-qual:campaign",
+      "validFrom": "2026-09-08T00:00:00Z",
+      "expiresAt": "2026-09-08T00:10:00Z",
+      "apiEndpointId": "unit-api-proxy"
+    },
+    "capacityEntries": {
+      "kubernetesApiRules": [
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "create",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "pods",
+          "namespace": "planeon-qual",
+          "name": "probe-pod",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "get",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "pods",
+          "namespace": "planeon-qual",
+          "name": "probe-pod",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "delete",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "pods",
+          "namespace": "planeon-qual",
+          "name": "probe-pod",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "create",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "planeon-qual",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "get",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "planeon-qual",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "delete",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "configmaps",
+          "namespace": "planeon-qual",
+          "name": "unit-fixture",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "create",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "services",
+          "namespace": "planeon-qual",
+          "name": "probe-svc",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "get",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "services",
+          "namespace": "planeon-qual",
+          "name": "probe-svc",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "verb": "delete",
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "resource": "services",
+          "namespace": "planeon-qual",
+          "name": "probe-svc",
+          "subresource": "",
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304
+        }
+      ],
+      "campaignProxyRules": [
+        {
+          "endpointId": "unit-proxy",
+          "namespace": "planeon-qual",
+          "service": "linux-baseline-probes",
+          "port": 9443,
+          "protocol": "HTTPS",
+          "methods": [
+            "POST"
+          ],
+          "paths": [
+            "/v1/linux-baseline/host-isolation-negatives",
+            "/v1/linux-baseline/linux-target-build",
+            "/v1/linux-baseline/full-predecessor-regression",
+            "/v1/linux-baseline/control-container-startup",
+            "/v1/linux-baseline/postgres-migration-and-rls",
+            "/v1/linux-baseline/durable-restart",
+            "/v1/linux-baseline/arbitrary-non-root-uid",
+            "/v1/linux-baseline/read-only-root-filesystem",
+            "/v1/linux-baseline/kubernetes-smoke",
+            "/v1/linux-baseline/default-deny-network"
+          ],
+          "requestMediaType": "application/json",
+          "responseMediaType": "application/json",
+          "requestMaxBytes": 16384,
+          "responseMaxBytes": 4194304,
+          "timeoutSeconds": 900
+        }
+      ],
+      "permittedGvksAndVerbs": [
+        {
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "verbs": [
+            "create",
+            "get",
+            "delete"
+          ],
+          "names": [
+            "probe-pod"
+          ]
+        },
+        {
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "kind": "ConfigMap",
+          "verbs": [
+            "create",
+            "get",
+            "delete"
+          ],
+          "names": [
+            "unit-fixture"
+          ]
+        },
+        {
+          "apiGroup": "",
+          "apiVersion": "v1",
+          "kind": "Service",
+          "verbs": [
+            "create",
+            "get",
+            "delete"
+          ],
+          "names": [
+            "probe-svc"
+          ]
+        }
+      ],
+      "preexistingResourceRefs": [
+        {
+          "apiVersion": "v1",
+          "kind": "ResourceQuota",
+          "namespace": "planeon-qual",
+          "name": "unit-quota",
+          "uid": "unit-quota-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "apiVersion": "v1",
+          "kind": "LimitRange",
+          "namespace": "planeon-qual",
+          "name": "unit-limits",
+          "uid": "unit-limit-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "apiVersion": "v1",
+          "kind": "ServiceAccount",
+          "namespace": "planeon-qual",
+          "name": "campaign",
+          "uid": "unit-service-account-uid",
+          "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ],
+      "preallocatedStorageRefs": [],
+      "preallocatedAcceleratorRefs": [],
+      "credentialIdentities": [
+        {
+          "endpointId": "unit-proxy",
+          "purpose": "CAMPAIGN_PROXY_CLIENT_MTLS",
+          "subject": "system:serviceaccount:planeon-qual:campaign",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "certificateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "clientSpkiDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        {
+          "endpointId": "unit-api-proxy",
+          "purpose": "KUBERNETES_PROXY_SERVER_MTLS",
+          "subject": "system:serviceaccount:planeon-qual:campaign",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "certificateDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "clientSpkiDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    },
+    "policy": {
+      "admissionPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "resourceQuotaDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "limitRangeDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "namespaceUid": "unit-namespace-uid",
+      "resourceQuotaUid": "unit-quota-uid",
+      "limitRangeUid": "unit-limit-uid",
+      "serviceAccountUid": "unit-service-account-uid",
+      "rbacDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "networkPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "mutationBrokerDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "maxConcurrentOperations": 1,
+      "serviceAccountDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "quota": {
+      "pods": 1,
+      "configMaps": 1,
+      "services": 1,
+      "cpuMillis": 500,
+      "memoryBytes": 268435456,
+      "ephemeralStorageBytes": 1073741824
+    },
+    "resources": [
+      {
+        "manifest": {
+          "apiVersion": "v1",
+          "kind": "Pod",
+          "metadata": {
+            "name": "probe-pod",
+            "namespace": "planeon-qual",
+            "labels": {
+              "planeon.ai/run-nonce": "unit-nonce",
+              "planeon.ai/tenant-id": "unit-tenant"
+            },
+            "annotations": {
+              "planeon.ai/a2-containers": "probe=registry.planeon.example/probe@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "planeon.ai/a2-init-containers": "",
+              "planeon.ai/a2-volumes": "scratch,results"
+            }
+          },
+          "spec": {
+            "restartPolicy": "Never",
+            "serviceAccountName": "campaign",
+            "automountServiceAccountToken": false,
+            "enableServiceLinks": false,
+            "containers": [
+              {
+                "name": "probe",
+                "image": "registry.planeon.example/probe@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "imagePullPolicy": "Never",
+                "resources": {
+                  "requests": {
+                    "cpu": "500m",
+                    "memory": "268435456",
+                    "ephemeral-storage": "1073741824"
+                  },
+                  "limits": {
+                    "cpu": "500m",
+                    "memory": "268435456",
+                    "ephemeral-storage": "1073741824"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "readOnlyRootFilesystem": true,
+                  "runAsNonRoot": true,
+                  "runAsUser": 10001,
+                  "seccompProfile": {
+                    "type": "RuntimeDefault"
+                  },
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "volumeMounts": [
+                  {
+                    "name": "scratch",
+                    "mountPath": "/work/scratch"
+                  },
+                  {
+                    "name": "results",
+                    "mountPath": "/work/results"
+                  }
+                ]
+              }
+            ],
+            "volumes": [
+              {
+                "name": "scratch",
+                "emptyDir": {
+                  "sizeLimit": "536870912"
+                }
+              },
+              {
+                "name": "results",
+                "emptyDir": {
+                  "sizeLimit": "268435456"
+                }
+              }
+            ]
+          }
+        },
+        "manifestDigest": "sha256:f82ad85ee1411c6fd97433a1a21a121f946eaf447b2274699c5f7426f3f604fb"
+      },
+      {
+        "manifest": {
+          "apiVersion": "v1",
+          "kind": "ConfigMap",
+          "metadata": {
+            "name": "unit-fixture",
+            "namespace": "planeon-qual",
+            "labels": {
+              "planeon.ai/run-nonce": "unit-nonce",
+              "planeon.ai/tenant-id": "unit-tenant"
+            }
+          },
+          "immutable": true,
+          "data": {
+            "fixture.json": "{}"
+          }
+        },
+        "manifestDigest": "sha256:179515418dbad519a6affe24cb1b012d6743560d9250390975484665398ca9d8"
+      },
+      {
+        "manifest": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "probe-svc",
+            "namespace": "planeon-qual",
+            "labels": {
+              "planeon.ai/run-nonce": "unit-nonce",
+              "planeon.ai/tenant-id": "unit-tenant"
+            }
+          },
+          "spec": {
+            "type": "ClusterIP",
+            "selector": {
+              "planeon.ai/run-nonce": "unit-nonce",
+              "planeon.ai/tenant-id": "unit-tenant"
+            },
+            "ports": [
+              {
+                "name": "probe",
+                "protocol": "TCP",
+                "port": 9443,
+                "targetPort": 9443
+              }
+            ]
+          }
+        },
+        "manifestDigest": "sha256:5b27e07afdb69d22097335dc603927301172b2e17f6c186c3e9f46f728bb7f1a"
+      }
+    ],
+    "localImages": [
+      "registry.planeon.example/probe@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
+  "negative": [
+    {
+      "id": "V01",
+      "intent": "a foreign annotation",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "provider"
+          ],
+          "value": "billable"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V02",
+      "intent": "a missing echo key",
+      "ops": [
+        {
+          "op": "delete",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-volumes"
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V03",
+      "intent": "a containers echo naming another image",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-containers"
+          ],
+          "value": "probe=registry.planeon.example/probe@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "rehash": true,
+      "expect": "P30 the containers echo differs from probe=<image>"
+    },
+    {
+      "id": "V04",
+      "intent": "a volumes echo in another order",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-volumes"
+          ],
+          "value": "results,scratch"
+        }
+      ],
+      "rehash": true,
+      "expect": "P32 the volumes echo differs from the volume names"
+    },
+    {
+      "id": "V05",
+      "intent": "an init-containers echo that is not empty",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-init-containers"
+          ],
+          "value": "setup=registry.planeon.example/probe@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V06",
+      "intent": "a volume without sizeLimit",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0,
+            "emptyDir"
+          ],
+          "value": {}
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V07",
+      "intent": "a memory-backed volume",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0,
+            "emptyDir",
+            "medium"
+          ],
+          "value": "Memory"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V08",
+      "intent": "a hostPath volume",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0
+          ],
+          "value": {
+            "name": "scratch",
+            "hostPath": {
+              "path": "/var/lib"
+            }
+          }
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V09",
+      "intent": "a persistent volume claim",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0
+          ],
+          "value": {
+            "name": "scratch",
+            "persistentVolumeClaim": {
+              "claimName": "c"
+            }
+          }
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V10",
+      "intent": "five volumes",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes"
+          ],
+          "value": [
+            {
+              "name": "v0",
+              "emptyDir": {
+                "sizeLimit": "1"
+              }
+            },
+            {
+              "name": "v1",
+              "emptyDir": {
+                "sizeLimit": "1"
+              }
+            },
+            {
+              "name": "v2",
+              "emptyDir": {
+                "sizeLimit": "1"
+              }
+            },
+            {
+              "name": "v3",
+              "emptyDir": {
+                "sizeLimit": "1"
+              }
+            },
+            {
+              "name": "v4",
+              "emptyDir": {
+                "sizeLimit": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V11",
+      "intent": "a duplicate volume name",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            1,
+            "name"
+          ],
+          "value": "scratch"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-volumes"
+          ],
+          "value": "scratch,scratch"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts",
+            1
+          ],
+          "value": {
+            "name": "scratch",
+            "mountPath": "/work/scratch"
+          }
+        }
+      ],
+      "rehash": true,
+      "expect": "P35 duplicate volume names"
+    },
+    {
+      "id": "V12",
+      "intent": "an unmounted volume",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts"
+          ],
+          "value": [
+            {
+              "name": "scratch",
+              "mountPath": "/work/scratch"
+            }
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P33 a volume not mounted exactly once at /work/<name>, or a mount of an undeclared volume"
+    },
+    {
+      "id": "V13",
+      "intent": "a mount outside /work/",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts",
+            0,
+            "mountPath"
+          ],
+          "value": "/tmp/scratch"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V14",
+      "intent": "a mount at /work/<another name> (D2)",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts",
+            0,
+            "mountPath"
+          ],
+          "value": "/work/cache"
+        }
+      ],
+      "rehash": true,
+      "expect": "P33 a volume not mounted exactly once at /work/<name>, or a mount of an undeclared volume"
+    },
+    {
+      "id": "V15",
+      "intent": "the sizeLimits sum over the limit",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0,
+            "emptyDir",
+            "sizeLimit"
+          ],
+          "value": "900000000"
+        }
+      ],
+      "rehash": true,
+      "expect": "P34 the emptyDir sizeLimits exceed the container's ephemeral-storage limit"
+    },
+    {
+      "id": "V16",
+      "intent": "pull policy Always",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "imagePullPolicy"
+          ],
+          "value": "Always"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V17",
+      "intent": "pull policy IfNotPresent",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "imagePullPolicy"
+          ],
+          "value": "IfNotPresent"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V18",
+      "intent": "pull policy missing",
+      "ops": [
+        {
+          "op": "delete",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "imagePullPolicy"
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V19",
+      "intent": "an image not in localImages",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "image"
+          ],
+          "value": "registry.planeon.example/probe@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-containers"
+          ],
+          "value": "probe=registry.planeon.example/probe@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "rehash": true,
+      "expect": "P21 the Pod images differ from localImages"
+    },
+    {
+      "id": "V20",
+      "intent": "hostNetwork present, even false",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "hostNetwork"
+          ],
+          "value": false
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V21",
+      "intent": "a Pod name with a dot",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "name"
+          ],
+          "value": "probe.pod"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V22",
+      "intent": "a Pod name ending in -",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "name"
+          ],
+          "value": "probe-"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V23",
+      "intent": "a volume named like the token volume",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0,
+            "name"
+          ],
+          "value": "kube-api-access-x1"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-volumes"
+          ],
+          "value": "kube-api-access-x1,results"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts",
+            0
+          ],
+          "value": {
+            "name": "kube-api-access-x1",
+            "mountPath": "/work/kube-api-access-x1"
+          }
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V24",
+      "intent": "requests differ from limits",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "resources",
+            "requests",
+            "cpu"
+          ],
+          "value": "250m"
+        }
+      ],
+      "rehash": true,
+      "expect": "P17 unequal requests and limits"
+    },
+    {
+      "id": "V25",
+      "intent": "the profile v1 id",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "profileId"
+          ],
+          "value": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V1"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V26",
+      "intent": "an init container",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "initContainers"
+          ],
+          "value": []
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "V27",
+      "intent": "a ConfigMap name with a dot (v4 MC01 applies to every kind)",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            1,
+            "manifest",
+            "metadata",
+            "name"
+          ],
+          "value": "unit.fixture"
+        }
+      ],
+      "rehash": true,
+      "expect": "P00 the document does not match the closed profile v2 schema"
+    },
+    {
+      "id": "K01",
+      "intent": "a profile over the depth bound",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            1,
+            "manifest",
+            "data",
+            "fixture.json"
+          ],
+          "value": "x"
+        },
+        {
+          "op": "set",
+          "path": [
+            "extra"
+          ],
+          "value": [
+            [
+              [
+                [
+                  [
+                    [
+                      [
+                        [
+                          [
+                            [
+                              [
+                                [
+                                  [
+                                    [
+                                      [
+                                        [
+                                          [
+                                            [
+                                              1
+                                            ]
+                                          ]
+                                        ]
+                                      ]
+                                    ]
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P01 the profile holds a non-data value (any number parsed as a float, integral or not) or exceeds the depth, size-budget, integer-range or canonical-size bounds"
+    },
+    {
+      "id": "K01b",
+      "intent": "the positive with the Service port written as the integral float 9443.0 (schema-valid; VPC's _bounded refuses every float)",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            2,
+            "manifest",
+            "spec",
+            "ports",
+            0,
+            "port"
+          ],
+          "value": 9443.0
+        }
+      ],
+      "rehash": true,
+      "expect": "P01 the profile holds a non-data value (any number parsed as a float, integral or not) or exceeds the depth, size-budget, integer-range or canonical-size bounds"
+    },
+    {
+      "id": "K02",
+      "intent": "a binding window over 900 s",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "binding",
+            "expiresAt"
+          ],
+          "value": "2026-09-08T00:20:00Z"
+        }
+      ],
+      "rehash": true,
+      "expect": "P02 the binding window is not a canonical UTC window of at most 900 s"
+    },
+    {
+      "id": "K03",
+      "intent": "a subject outside the namespace",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "binding",
+            "serviceAccountSubject"
+          ],
+          "value": "system:serviceaccount:other:campaign"
+        }
+      ],
+      "rehash": true,
+      "expect": "P03 the service-account subject is outside the binding namespace"
+    },
+    {
+      "id": "K04",
+      "intent": "the API endpoint equal to the proxy endpoint",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "binding",
+            "apiEndpointId"
+          ],
+          "value": "unit-proxy"
+        }
+      ],
+      "rehash": true,
+      "expect": "P04 the API endpoint is missing, reused or unused"
+    },
+    {
+      "id": "K05",
+      "intent": "a credential with another purpose order",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "credentialIdentities",
+            0,
+            "purpose"
+          ],
+          "value": "KUBERNETES_PROXY_SERVER_MTLS"
+        }
+      ],
+      "rehash": true,
+      "expect": "P05 the credential inventory differs from the binding"
+    },
+    {
+      "id": "K06",
+      "intent": "a credential with another expiry",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "credentialIdentities",
+            0,
+            "expiresAt"
+          ],
+          "value": "2026-09-08T00:05:00Z"
+        }
+      ],
+      "rehash": true,
+      "expect": "P06 a credential's subject or expiry differs from the binding"
+    },
+    {
+      "id": "K07",
+      "intent": "client and server credentials reused",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "credentialIdentities",
+            1,
+            "certificateDigest"
+          ],
+          "value": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ],
+      "rehash": true,
+      "expect": "P07 the client and server credentials are reused"
+    },
+    {
+      "id": "K08",
+      "intent": "a proxy rule in another namespace",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "campaignProxyRules",
+            0,
+            "namespace"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P08 the fixed proxy rule differs"
+    },
+    {
+      "id": "K09",
+      "intent": "a foreign preexisting reference",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "preexistingResourceRefs",
+            0,
+            "namespace"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P09 a duplicate or foreign preexisting reference"
+    },
+    {
+      "id": "K10",
+      "intent": "a policy reference uid mismatch",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "policy",
+            "resourceQuotaUid"
+          ],
+          "value": "other-uid"
+        }
+      ],
+      "rehash": true,
+      "expect": "P10 the three policy references differ from the policy"
+    },
+    {
+      "id": "K11",
+      "intent": "a service-account reference with another name",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "preexistingResourceRefs",
+            2,
+            "name"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P11 the service-account reference name differs from the subject"
+    },
+    {
+      "id": "K12",
+      "intent": "a duplicate preexisting uid",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "preexistingResourceRefs",
+            1,
+            "uid"
+          ],
+          "value": "unit-quota-uid"
+        },
+        {
+          "op": "set",
+          "path": [
+            "policy",
+            "limitRangeUid"
+          ],
+          "value": "unit-quota-uid"
+        }
+      ],
+      "rehash": true,
+      "expect": "P12 a duplicate preexisting resource uid"
+    },
+    {
+      "id": "K13",
+      "intent": "a manifest digest mismatch",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifestDigest"
+          ],
+          "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "rehash": false,
+      "expect": "P13 a manifest digest or 16384-byte size mismatch"
+    },
+    {
+      "id": "K14",
+      "intent": "a resource in another namespace",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "namespace"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P14 a resource outside the binding scope or a duplicate logical identity"
+    },
+    {
+      "id": "K15",
+      "intent": "a resource taking over a preexisting one",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "preexistingResourceRefs"
+          ],
+          "value": [
+            {
+              "apiVersion": "v1",
+              "kind": "ResourceQuota",
+              "namespace": "planeon-qual",
+              "name": "unit-quota",
+              "uid": "unit-quota-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "LimitRange",
+              "namespace": "planeon-qual",
+              "name": "unit-limits",
+              "uid": "unit-limit-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "ServiceAccount",
+              "namespace": "planeon-qual",
+              "name": "campaign",
+              "uid": "unit-service-account-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "ConfigMap",
+              "namespace": "planeon-qual",
+              "name": "unit-fixture",
+              "uid": "unit-fixture-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P15 a resource takes over a preexisting resource"
+    },
+    {
+      "id": "K16",
+      "intent": "a Pod service account other than the subject's",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "serviceAccountName"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P16 the Pod service account differs from the subject"
+    },
+    {
+      "id": "K18",
+      "intent": "a Service selecting other labels",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            2,
+            "manifest",
+            "spec",
+            "selector",
+            "planeon.ai/run-nonce"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P18 a Service selector other than the binding labels"
+    },
+    {
+      "id": "K19",
+      "intent": "a GVK grant for another name",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "capacityEntries",
+            "permittedGvksAndVerbs",
+            0,
+            "names"
+          ],
+          "value": [
+            "other"
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P19 the GVK and name grants differ from the resources"
+    },
+    {
+      "id": "K20",
+      "intent": "API rules missing a verb",
+      "ops": [
+        {
+          "op": "delete",
+          "path": [
+            "capacityEntries",
+            "kubernetesApiRules",
+            0
+          ]
+        }
+      ],
+      "rehash": true,
+      "expect": "P20 the API rules differ from the resources"
+    },
+    {
+      "id": "K22",
+      "intent": "the quota exceeded",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "quota",
+            "ephemeralStorageBytes"
+          ],
+          "value": 1
+        }
+      ],
+      "rehash": true,
+      "expect": "P22 the quota is exceeded"
+    },
+    {
+      "id": "O01",
+      "intent": "two resources: the Pod's sizeLimits over its limit (P34) and the ConfigMap in another namespace (P14)",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            0,
+            "emptyDir",
+            "sizeLimit"
+          ],
+          "value": "900000000"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            1,
+            "manifest",
+            "metadata",
+            "namespace"
+          ],
+          "value": "other"
+        }
+      ],
+      "rehash": true,
+      "expect": "P34 the emptyDir sizeLimits exceed the container's ephemeral-storage limit"
+    },
+    {
+      "id": "O02",
+      "intent": "one Pod: a duplicate volume name (P35) and a containers echo naming another image (P30)",
+      "ops": [
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "volumes",
+            1,
+            "name"
+          ],
+          "value": "scratch"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-volumes"
+          ],
+          "value": "scratch,scratch"
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "spec",
+            "containers",
+            0,
+            "volumeMounts",
+            1
+          ],
+          "value": {
+            "name": "scratch",
+            "mountPath": "/work/scratch"
+          }
+        },
+        {
+          "op": "set",
+          "path": [
+            "resources",
+            0,
+            "manifest",
+            "metadata",
+            "annotations",
+            "planeon.ai/a2-containers"
+          ],
+          "value": "probe=registry.planeon.example/probe@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "rehash": true,
+      "expect": "P35 duplicate volume names"
+    }
+  ],
+  "crossContract": {
+    "sealedNamespace": "planeon-qual",
+    "admission": {
+      "v4": "architecture/admission-semantics-v4/vectors.json: sealed, server, campaignUser",
+      "v3": "architecture/admission-semantics-v3/vectors.json: sealed, server, campaignUser"
+    },
+    "rule": "After the ops and the rehash, each resource in order goes through check_manifest(kind, manifest, sealedNamespace); if that admits, through final_object(kind, manifest, server updated with serverFacts) and check_final(kind, object, sealed, campaignUser). The value is the signer's code, 'A2 admit', or 'A2 ' and the A2 code.",
+    "cases": [
+      {
+        "id": "X01",
+        "intent": "the profile v2 positive: Pod, ConfigMap and Service",
+        "ops": [],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "valid",
+          "precondition": "met",
+          "v4": {
+            "Pod": "A2 admit",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X02",
+        "intent": "hostNetwork present (false)",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "hostNetwork"
+            ],
+            "value": false
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC30",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC30",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X03",
+        "intent": "Pod name with a dot",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "name"
+            ],
+            "value": "probe.pod"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC01",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC01",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X04",
+        "intent": "Pod name ending in -",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "name"
+            ],
+            "value": "probe-"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC01",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC01",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X05",
+        "intent": "binding namespace other than the sealed one (profile-valid)",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "binding",
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "binding",
+              "serviceAccountSubject"
+            ],
+            "value": "system:serviceaccount:run-ns-one:campaign"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              0,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              1,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              2,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              3,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              4,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              5,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              6,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              7,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "kubernetesApiRules",
+              8,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "campaignProxyRules",
+              0,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "preexistingResourceRefs",
+              0,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "preexistingResourceRefs",
+              1,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "preexistingResourceRefs",
+              2,
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "credentialIdentities",
+              0,
+              "subject"
+            ],
+            "value": "system:serviceaccount:run-ns-one:campaign"
+          },
+          {
+            "op": "set",
+            "path": [
+              "capacityEntries",
+              "credentialIdentities",
+              1,
+              "subject"
+            ],
+            "value": "system:serviceaccount:run-ns-one:campaign"
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              1,
+              "manifest",
+              "metadata",
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              2,
+              "manifest",
+              "metadata",
+              "namespace"
+            ],
+            "value": "run-ns-one"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "valid",
+          "precondition": "P40 the binding namespace is not the sealed qualification namespace",
+          "v4": {
+            "Pod": "MC02",
+            "ConfigMap": "MC02",
+            "Service": "MC02"
+          },
+          "v3": {
+            "Pod": "MC02",
+            "ConfigMap": "MC02",
+            "Service": "MC02"
+          }
+        }
+      },
+      {
+        "id": "X06",
+        "intent": "volume named kube-api-access-x1",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "volumes",
+              0,
+              "name"
+            ],
+            "value": "kube-api-access-x1"
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "annotations",
+              "planeon.ai/a2-volumes"
+            ],
+            "value": "kube-api-access-x1,results"
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "containers",
+              0,
+              "volumeMounts",
+              0
+            ],
+            "value": {
+              "name": "kube-api-access-x1",
+              "mountPath": "/work/kube-api-access-x1"
+            }
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC36",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X07",
+        "intent": "requests differ from limits",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "containers",
+              0,
+              "resources",
+              "requests",
+              "cpu"
+            ],
+            "value": "250m"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P17 unequal requests and limits",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC34",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X08",
+        "intent": "pull policy Always",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "containers",
+              0,
+              "imagePullPolicy"
+            ],
+            "value": "Always"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "A2 admit",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X09",
+        "intent": "emptyDir without sizeLimit",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "volumes",
+              0,
+              "emptyDir"
+            ],
+            "value": {}
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC42",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X10",
+        "intent": "sizeLimits over the limit",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "volumes",
+              0,
+              "emptyDir",
+              "sizeLimit"
+            ],
+            "value": "900000000"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P34 the emptyDir sizeLimits exceed the container's ephemeral-storage limit",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC42",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X11",
+        "intent": "medium Memory",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "volumes",
+              0,
+              "emptyDir",
+              "medium"
+            ],
+            "value": "Memory"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC42",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X12",
+        "intent": "containers echo mismatch",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "annotations",
+              "planeon.ai/a2-containers"
+            ],
+            "value": "probe=registry.planeon.example/probe@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P30 the containers echo differs from probe=<image>",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC37",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X13",
+        "intent": "volumes echo mismatch",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "annotations",
+              "planeon.ai/a2-volumes"
+            ],
+            "value": "results,scratch"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P32 the volumes echo differs from the volume names",
+          "precondition": "met",
+          "v4": {
+            "Pod": "MC37",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X14",
+        "intent": "AlwaysPullImages enabled despite the pin (profile-valid)",
+        "ops": [],
+        "rehash": true,
+        "serverFacts": {
+          "alwaysPullImages": true
+        },
+        "expect": {
+          "profileV2": "valid",
+          "precondition": "met",
+          "v4": {
+            "Pod": "A2 A2-POD-PULL-POLICY",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X15",
+        "intent": "ConfigMap name with a dot",
+        "ops": [
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              1,
+              "manifest",
+              "metadata",
+              "name"
+            ],
+            "value": "unit.fixture"
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "P00 the document does not match the closed profile v2 schema",
+          "precondition": "met",
+          "v4": {
+            "Pod": "A2 admit",
+            "ConfigMap": "MC01",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "MC01",
+            "Service": "A2 admit"
+          }
+        }
+      },
+      {
+        "id": "X16",
+        "intent": "a profile v2 Pod with no volumes and no mounts",
+        "ops": [
+          {
+            "op": "delete",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "volumes"
+            ]
+          },
+          {
+            "op": "delete",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "spec",
+              "containers",
+              0,
+              "volumeMounts"
+            ]
+          },
+          {
+            "op": "set",
+            "path": [
+              "resources",
+              0,
+              "manifest",
+              "metadata",
+              "annotations",
+              "planeon.ai/a2-volumes"
+            ],
+            "value": ""
+          }
+        ],
+        "rehash": true,
+        "serverFacts": {},
+        "expect": {
+          "profileV2": "valid",
+          "precondition": "met",
+          "v4": {
+            "Pod": "A2 admit",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          },
+          "v3": {
+            "Pod": "MC33",
+            "ConfigMap": "A2 admit",
+            "Service": "A2 admit"
+          }
+        }
+      }
+    ]
+  }
+}
