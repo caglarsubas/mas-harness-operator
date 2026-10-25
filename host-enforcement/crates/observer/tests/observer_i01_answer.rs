@@ -6,12 +6,23 @@
 //!   without comparing them (Q-I01B3D-1 (a)).
 //! - The `CaptureFacts` mapping to the capture gate: no completed set, an expired view, the slots and the two ages.
 //! - `refusals`: per key, in key order, the derivation's refusal, then the gate's, then the comparison; each text once.
+//! - `answer`: the complete positive under Q-I01B3D-3 (a') [I3D-2; I3E-9], exactly two members replaced; each step's
+//!   refusal in order (the binding in D-3's form, the answer list, the record digest, each window bound, the rollback,
+//!   the observation rules, the bound); a sequence-2 request not refused by the chain rules [I3D-1], and I3E-8's three
+//!   sequence-2 faults.
+//! - `self_check`: DIB section 8.1's continuation cases with `previous` given [I3D-6]; VPO's rule order, the shape's
+//!   generic text and the byte bound's label; VPC's `_time` reading (years 0001-9999).
 
 use i05_protocol::json::{self, JStr, Object, Value};
 use i05_protocol::sha256;
-use planeon_observer::i01_answer::{self, CaptureFacts, Derived, ANSWER_WINDOW_TEXT, INVALID_OBSERVATION_TEXT,
-                                   OBSERVED_NAMESPACE_TEXT, REQUEST_BINDING_TEXT};
+use planeon_observer::i01_answer::{self, CaptureFacts, Derived, ANSWER_ROLLBACK_TEXT, ANSWER_WINDOW_TEXT, CHAIN_GAP_TEXT,
+                                   CLOCK_ROLLBACK_TEXT, ENFORCEMENT_PROOF_TEXT, FRESHNESS_WINDOW_TEXT,
+                                   INITIAL_CHAIN_TEXT, INVALID_OBSERVATION_TEXT, OBSERVATION_BYTES_TEXT,
+                                   OBSERVED_IDENTITY_TEXT, OBSERVED_NAMESPACE_TEXT, QUOTA_HEADROOM_TEXT,
+                                   RECORD_DIGEST_TEXT, REQUEST_BINDING_TEXT, RESPONSE_SUBSTITUTION_TEXT, RESTART_TEXT,
+                                   STALE_OR_FUTURE_TEXT};
 use planeon_observer::i01_digest::{DigestKey, BROKER_ROW_INCOMPLETE};
+use planeon_observer::i01_request::{request_schema, I01Request, ZERO_DIGEST};
 use planeon_observer::inputs::{Inputs, ListBody, ListInput, Resource};
 use planeon_observer::kernel_text::utc_seconds;
 use planeon_observer::snapshot::Closure;
@@ -171,6 +182,45 @@ impl Case {
             record_digest: sha256::prefixed(&json::canonical(&self.record).expect("canonical bytes")),
         }
     }
+
+    /// The binding's `hostPreflightDigest` pin set to the record's digest, after a change to the record.
+    fn repin(&mut self) {
+        let digest = sha256::prefixed(&json::canonical(&self.record).expect("canonical bytes"));
+        set(&mut self.binding, &["enforcementPins"], "hostPreflightDigest", Value::str(&digest));
+    }
+
+    /// The triple's request: sequence 1, the zero digest, the binding's digest and nonce.
+    fn request(&self) -> I01Request {
+        request_schema(self.complete_member("request")).expect("the triple's request has the schema's form")
+    }
+
+    /// The triple's request naming `derived`'s signed binding (after a change to the binding).
+    fn request_for(&self, derived: &Derived) -> I01Request {
+        I01Request { binding_digest: derived.bound_digest().to_string(), run_nonce: derived.bound_nonce().to_string(),
+                     ..self.request() }
+    }
+
+    /// The triple's observation.
+    fn observation(&self) -> Value {
+        self.complete_member("observation").clone()
+    }
+}
+
+/// The milliseconds of a canonical UTC text, the wall reading `answer` takes.
+fn millis(text: &str) -> u64 {
+    utc_seconds(text).expect("a canonical UTC text") * 1000
+}
+
+/// An observation parsed from `answer`'s bytes.
+fn parsed(bytes: &[u8]) -> Value {
+    parse(bytes)
+}
+
+/// `value` with its member `name` (at the top level or the object at `path`) set to `new`.
+fn with(value: &Value, path: &[&str], name: &str, new: Value) -> Value {
+    let mut copy = value.clone();
+    set(&mut copy, path, name, new);
+    copy
 }
 
 #[test]
@@ -422,4 +472,281 @@ fn refusals_compose_derivation_then_gate_then_comparison_each_text_once() {
     let mut case = Case::complete();
     set(&mut case.snapshot, &["lists"], "networkPolicies", Value::Array(Vec::new()));
     assert_eq!(i01_answer::refusals(&case.derived(), &facts), ["networkPolicy: count is not one"]);
+}
+
+// ------------------------------------------------------------------------------------------- answer and self_check
+
+/// The triple's observedAt, the wall reading of the complete positive's answer.
+const OBSERVED_AT: &str = "2026-09-08T00:00:01Z";
+
+/// `sha256:` and the hex SHA-256 of a value's canonical bytes.
+fn digest_of(value: &Value) -> String {
+    sha256::prefixed(&json::canonical(value).expect("canonical bytes"))
+}
+
+/// `answer` over `case`, its request naming the case's binding, at `wall`, after `last`.
+fn answered(case: &Case, facts: &CaptureFacts, wall: &str, last: Option<u64>) -> Result<Vec<u8>, &'static str> {
+    let derived = case.derived();
+    i01_answer::answer(&derived, &case.request_for(&derived), facts, millis(wall), last)
+}
+
+#[test]
+fn the_complete_positive_is_answered_as_the_triples_observation_but_two_members() {
+    // Q-I01B3D-3 (a') [I3D-2; I3E-9]: derive and answer on the qual snapshot and the passing capture, with the triple's
+    // request and generation, the triple's quota pair and a configuration window that does not bind (stated inputs),
+    // and wall_ms the triple's observedAt.
+    let case = Case::complete();
+    let observation = case.observation();
+    assert_eq!(text(&observation, "observedAt"), OBSERVED_AT);
+    let bytes = i01_answer::answer(&case.derived(), &case.request(), &case.passing(), millis(OBSERVED_AT), None)
+        .expect("the complete positive is answered");
+    // Exactly two members replaced: observerBootId by the record's host.bootId (Q-I01B-10's source) and expiresAt by
+    // observedAt + 5 s; every other member byte-equal, the namespace's resourceVersion the read's.
+    let boot_id = member(member(&case.record, "host"), "bootId").clone();
+    let mut expected = with(&observation, &[], "observerBootId", boot_id);
+    set(&mut expected, &[], "expiresAt", Value::str("2026-09-08T00:00:06Z"));
+    assert_eq!(String::from_utf8(bytes.clone()).expect("UTF-8"),
+               String::from_utf8(json::canonical(&expected).expect("canonical bytes")).expect("UTF-8"));
+    let answer = parsed(&bytes);
+    let mut differing: Vec<&str> = observation.as_object().expect("an object").iter()
+        .map(|(name, _)| name.as_str().expect("a text name"))
+        .filter(|name| !json::json_eq(member(&answer, name), member(&observation, name)))
+        .collect();
+    differing.sort_unstable();
+    assert_eq!(differing, ["expiresAt", "observerBootId"]);
+    assert_eq!(answer.as_object().map(Object::len), Some(14));
+    assert_eq!(text(member(&answer, "namespace"), "resourceVersion"), text(&case.snapshot, "resourceVersion"));
+    // The public self_check passes on the answer, with the triple's now and previous null, as on the triple's own.
+    let now = utc_seconds(text(member(&case.vectors, "complete"), "now")).expect("the triple's now");
+    assert!(case.complete_member("previous").is_null());
+    assert_eq!(i01_answer::self_check(&answer, &case.request(), &case.binding, now, None), Ok(()));
+    assert_eq!(i01_answer::self_check(&observation, &case.request(), &case.binding, now, None), Ok(()));
+}
+
+#[test]
+fn answer_refuses_at_each_step_in_order() {
+    let case = Case::complete();
+    let (derived, facts, request) = (case.derived(), case.passing(), case.request());
+    let wall = millis(OBSERVED_AT);
+    assert!(i01_answer::answer(&derived, &request, &facts, wall, None).is_ok());
+    // 1. The binding [B3-6 (3)]: a request naming another nonce or digest (D-3's form), or a changed binding.
+    for other in [I01Request { run_nonce: "other-nonce".to_string(), ..request.clone() },
+                  I01Request { binding_digest: ZERO_DIGEST.to_string(), ..request.clone() }] {
+        assert_eq!(i01_answer::answer(&derived, &other, &facts, wall, None), Err(REQUEST_BINDING_TEXT));
+    }
+    let mut changed = Case::complete();
+    set(&mut changed.binding, &["scope"], "tenantId", Value::str("another-tenant"));
+    assert_eq!(i01_answer::answer(&changed.derived(), &request, &facts, wall, None), Err(REQUEST_BINDING_TEXT));
+    // 2. The answer list's first text.
+    let late = CaptureFacts { completed: false, ..facts.clone() };
+    assert_eq!(i01_answer::answer(&derived, &request, &late, wall, None), Err(NOT_PASSED[0]));
+    let mut changed = Case::complete();
+    set(&mut changed.binding, &["projections", "rbac"], "uid", Value::str("another-uid"));
+    set(&mut changed.binding, &["projections", "limitRange"], "uid", Value::str("another-uid"));
+    assert_eq!(answered(&changed, &facts, OBSERVED_AT, None), Err("limitRange: differs from the signed value"));
+    // 3. The capture set's record digest: the derived and signed hostPreflightDigest.
+    for digest in ["", ZERO_DIGEST] {
+        let other = CaptureFacts { record_digest: digest.to_string(), ..facts.clone() };
+        assert_eq!(i01_answer::answer(&derived, &request, &other, wall, None), Err(RECORD_DIGEST_TEXT));
+    }
+    // 4. The windows at one reading: each start, then each end of expiresAt's minimum.
+    assert_eq!(i01_answer::answer(&derived, &request, &facts, millis("2026-09-07T23:59:59Z"), None),
+               Err(ANSWER_WINDOW_TEXT));
+    let expiry = |change: &dyn Fn(&mut Case)| -> Result<String, &'static str> {
+        let mut case = Case::complete();
+        change(&mut case);
+        answered(&case, &case.passing(), OBSERVED_AT, None).map(|bytes| text(&parsed(&bytes), "expiresAt").to_string())
+    };
+    let at = |text: &str| Value::str(text);
+    assert_eq!(expiry(&|_| ()), Ok("2026-09-08T00:00:06Z".to_string()));
+    assert_eq!(expiry(&|case| set(&mut case.binding, &["scope"], "validFrom", at("2026-09-08T00:00:02Z"))),
+               Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(expiry(&|case| {
+        set(&mut case.record, &["scope"], "validFrom", at("2026-09-08T00:00:02Z"));
+        case.repin();
+    }), Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(expiry(&|case| case.not_before = millis("2026-09-08T00:00:02Z") / 1000), Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(expiry(&|case| set(&mut case.binding, &["scope"], "expiresAt", at("2026-09-08T00:00:03Z"))),
+               Ok("2026-09-08T00:00:03Z".to_string()));
+    assert_eq!(expiry(&|case| set(&mut case.binding, &["scope"], "expiresAt", at("2026-09-08T00:00:01Z"))),
+               Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(expiry(&|case| {
+        set(&mut case.record, &["scope"], "expiresAt", at("2026-09-08T00:00:05Z"));
+        case.repin();
+    }), Ok("2026-09-08T00:00:02Z".to_string()));
+    assert_eq!(expiry(&|case| {
+        set(&mut case.record, &["scope"], "expiresAt", at("2026-09-08T00:00:04Z"));
+        case.repin();
+    }), Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(expiry(&|case| case.not_after = millis("2026-09-08T00:00:04Z") / 1000),
+               Ok("2026-09-08T00:00:04Z".to_string()));
+    assert_eq!(expiry(&|case| case.not_after = millis("2026-09-08T00:00:01Z") / 1000), Err(ANSWER_WINDOW_TEXT));
+    // 5. The rollback, in whole seconds [I3D-9 (b)].
+    let now = wall / 1000;
+    assert_eq!(i01_answer::answer(&derived, &request, &facts, wall, Some(now + 1)), Err(ANSWER_ROLLBACK_TEXT));
+    assert!(i01_answer::answer(&derived, &request, &facts, wall, Some(now)).is_ok());
+    assert!(i01_answer::answer(&derived, &request, &facts, wall + 999, Some(now)).is_ok());
+    // 7. VPO's observation rules on the assembled members: the namespace is compared only here (I3D-5); used <= hard;
+    // the shape (a negative count, a boot id not a UUID, a generation not 64 hex digits).
+    let rules = |change: &dyn Fn(&mut Case)| -> Result<Vec<u8>, &'static str> {
+        let mut case = Case::complete();
+        change(&mut case);
+        answered(&case, &case.passing(), OBSERVED_AT, None)
+    };
+    assert_eq!(rules(&|case| set(&mut case.binding, &["namespace"], "uid", at("another-namespace-uid"))),
+               Err(OBSERVED_NAMESPACE_TEXT));
+    assert_eq!(rules(&|case| set(&mut case.quota, &["used"], "pods", Value::int(2))), Err(QUOTA_HEADROOM_TEXT));
+    assert_eq!(rules(&|case| set(&mut case.quota, &["used"], "pods", Value::int(-1))), Err(INVALID_OBSERVATION_TEXT));
+    assert_eq!(rules(&|case| {
+        set(&mut case.record, &["host"], "bootId", at("not-a-uuid"));
+        case.repin();
+    }), Err(INVALID_OBSERVATION_TEXT));
+    assert_eq!(rules(&|case| case.generation = "b".repeat(63)), Err(INVALID_OBSERVATION_TEXT));
+    // 8. The bound: an answer over 65,536 canonical bytes, refused with VPO:77's label (the shape's byte bound in
+    // step 7 meets it first, with the same text).
+    assert_eq!(rules(&|case| set(&mut case.quota, &["hard"], "padding", Value::str(&"a".repeat(70_000)))),
+               Err(OBSERVATION_BYTES_TEXT));
+}
+
+#[test]
+fn a_sequence_2_request_is_not_refused_by_the_chain_rules() {
+    // I3D-1: answer runs VPO's observation rules without "initial chain", "chain gap" and "restart, drift or reused
+    // challenge"; the session's chain is I01B5's, and the rollback is step 5.
+    let case = Case::complete();
+    let (derived, facts) = (case.derived(), case.passing());
+    let first = i01_answer::answer(&derived, &case.request(), &facts, millis(OBSERVED_AT), None).expect("answered");
+    let second = I01Request { sequence: 2, previous_digest: sha256::prefixed(&first), challenge: "b".repeat(64),
+                              ..case.request() };
+    let wall = millis("2026-09-08T00:00:02Z");
+    let bytes = i01_answer::answer(&derived, &second, &facts, wall, Some(wall / 1000 - 1)).expect("a continuation");
+    let answer = parsed(&bytes);
+    assert_eq!(member(&answer, "sequence").as_int().and_then(|int| int.to_u64()), Some(2));
+    assert_eq!(text(&answer, "previousObservationDigest"), second.previous_digest);
+    // Neither a zero previous digest nor a reused challenge is answer's to refuse.
+    for request in [I01Request { previous_digest: ZERO_DIGEST.to_string(), ..second.clone() },
+                    I01Request { challenge: case.request().challenge, ..second.clone() }] {
+        assert!(i01_answer::answer(&derived, &request, &facts, wall, None).is_ok());
+    }
+    // I3E-8: a sequence-2 request with one non-chain fault each, refused with its own text.
+    let other = I01Request { run_nonce: "other-nonce".to_string(), ..second.clone() };
+    assert_eq!(i01_answer::answer(&derived, &other, &facts, wall, None), Err(REQUEST_BINDING_TEXT));
+    assert_eq!(i01_answer::answer(&derived, &second, &facts, millis("2026-09-07T23:59:59Z"), None),
+               Err(ANSWER_WINDOW_TEXT));
+    assert_eq!(i01_answer::answer(&derived, &second, &facts, wall, Some(wall / 1000 + 1)), Err(ANSWER_ROLLBACK_TEXT));
+}
+
+#[test]
+fn self_check_keeps_vpos_chain_rules_with_previous_given() {
+    // DIB section 8.1's continuation cases at self_check's level [I3D-6]: VPO:116-125 with previous given.
+    let case = Case::complete();
+    let (derived, facts) = (case.derived(), case.passing());
+    let first_request = case.request();
+    let first = i01_answer::answer(&derived, &first_request, &facts, millis(OBSERVED_AT), None).expect("answered");
+    let previous = parsed(&first);
+    let request = I01Request { sequence: 2, previous_digest: sha256::prefixed(&first), challenge: "b".repeat(64),
+                               ..first_request.clone() };
+    let wall = millis("2026-09-08T00:00:02Z");
+    let current = parsed(&i01_answer::answer(&derived, &request, &facts, wall, None).expect("answered"));
+    let now = wall / 1000 + 1;
+    let check = |observation: &Value, request: &I01Request, previous: Option<&Value>| {
+        i01_answer::self_check(observation, request, &case.binding, now, previous)
+    };
+    // A correct continuation; previous null makes it no initial chain; previous is shaped first.
+    assert_eq!(check(&current, &request, Some(&previous)), Ok(()));
+    assert_eq!(check(&current, &request, None), Err(INITIAL_CHAIN_TEXT));
+    assert_eq!(check(&current, &request, Some(&with(&previous, &[], "extra", Value::Null))),
+               Err(INVALID_OBSERVATION_TEXT));
+    // A chain gap: the next sequence skipped, another previous digest, a previous of another run nonce.
+    let skipped = I01Request { sequence: 3, ..request.clone() };
+    assert_eq!(check(&with(&current, &[], "sequence", Value::int(3)), &skipped, Some(&previous)), Err(CHAIN_GAP_TEXT));
+    let other = I01Request { previous_digest: ZERO_DIGEST.to_string(), ..request.clone() };
+    assert_eq!(check(&with(&current, &[], "previousObservationDigest", Value::str(ZERO_DIGEST)), &other, Some(&previous)),
+               Err(CHAIN_GAP_TEXT));
+    let renonced = with(&previous, &[], "runNonce", Value::str("other-nonce"));
+    let linked = I01Request { previous_digest: digest_of(&renonced), ..request.clone() };
+    let pointed = with(&current, &[], "previousObservationDigest", Value::str(&linked.previous_digest));
+    assert_eq!(check(&pointed, &linked, Some(&renonced)), Err(CHAIN_GAP_TEXT));
+    // Restart, drift or reused challenge: the previous challenge again, a changed boot id, a changed generation.
+    let reused = I01Request { challenge: first_request.challenge.clone(), ..request.clone() };
+    assert_eq!(check(&with(&current, &[], "challenge", Value::str(&reused.challenge)), &reused, Some(&previous)),
+               Err(RESTART_TEXT));
+    let rebooted = with(&current, &[], "observerBootId", Value::str("52345678-1234-1234-1234-123456789000"));
+    assert_eq!(check(&rebooted, &request, Some(&previous)), Err(RESTART_TEXT));
+    assert_eq!(check(&with(&current, &[], "generation", Value::str(&"c".repeat(64))), &request, Some(&previous)),
+               Err(RESTART_TEXT));
+    // A clock rollback: the previous observed after the current; an equal observedAt is none (VPO's >=).
+    for (previous_at, want) in [("2026-09-08T00:00:03Z", Err(CLOCK_ROLLBACK_TEXT)), ("2026-09-08T00:00:02Z", Ok(()))] {
+        let moved = with(&previous, &[], "observedAt", Value::str(previous_at));
+        let linked = I01Request { previous_digest: digest_of(&moved), ..request.clone() };
+        let pointed = with(&current, &[], "previousObservationDigest", Value::str(&linked.previous_digest));
+        assert_eq!(check(&pointed, &linked, Some(&moved)), want, "{previous_at}");
+    }
+}
+
+#[test]
+fn self_check_runs_vpos_rules_in_vpos_order() {
+    let case = Case::complete();
+    let (observation, request) = (case.observation(), case.request());
+    let now = utc_seconds("2026-09-08T00:00:02Z").expect("a canonical UTC text");
+    let check = |observation: &Value| i01_answer::self_check(observation, &request, &case.binding, now, None);
+    assert_eq!(check(&observation), Ok(()));
+    // The shape (VPO:74-79): `_bounded` (a float), `_ascii_fields` (a line end, a non-ASCII letter), the byte bound
+    // with its own label before the schema, then the schema (a missing member, an extra one, a boolean sequence,
+    // another schema version, a resourceVersion with a space). Each but the bound is VPO's generic text.
+    let float = json::parse("1.5").expect("a float");
+    let invalid = [with(&observation, &["quota", "hard"], "pods", float),
+                   with(&observation, &["namespace"], "name", Value::str("planeon-qual\n")),
+                   with(&observation, &["namespace"], "name", Value::str("plan\u{e9}on-qual")),
+                   with(&observation, &[], "extra", Value::Null),
+                   with(&observation, &[], "sequence", Value::Bool(true)),
+                   with(&observation, &[], "schemaVersion", Value::str("planeon.internal.policy-observation/v2")),
+                   with(&observation, &["namespace"], "resourceVersion", Value::str("1 0")),
+                   with(&observation, &["projections", "rbac"], "kind", Value::str("E")),
+                   with(&observation, &["projections", "rbac"], "namespace", Value::int(0))];
+    for (index, changed) in invalid.iter().enumerate() {
+        assert_eq!(check(changed), Err(INVALID_OBSERVATION_TEXT), "shape case {index}");
+    }
+    let mut missing = observation.clone();
+    remove(&mut missing, &[], "quota");
+    assert_eq!(check(&missing), Err(INVALID_OBSERVATION_TEXT));
+    assert_eq!(check(&with(&observation, &[], "padding", Value::str(&"a".repeat(70_000)))), Err(OBSERVATION_BYTES_TEXT));
+    // Then each rule's label, in VPO's order; where two rules fail, the earlier one's.
+    let rbac_uid = with(&observation, &["projections", "rbac"], "uid", Value::str("another-uid"));
+    assert_eq!(check(&rbac_uid), Err(OBSERVED_IDENTITY_TEXT));
+    assert_eq!(check(&with(&rbac_uid, &["namespace"], "uid", Value::str("another-uid"))), Err(OBSERVED_IDENTITY_TEXT));
+    assert_eq!(check(&with(&observation, &["namespace"], "uid", Value::str("another-uid"))), Err(OBSERVED_NAMESPACE_TEXT));
+    let renonced = I01Request { run_nonce: "other-nonce".to_string(), ..request.clone() };
+    let echoed = with(&observation, &[], "runNonce", Value::str("other-nonce"));
+    assert_eq!(i01_answer::self_check(&echoed, &renonced, &case.binding, now, None), Err(REQUEST_BINDING_TEXT));
+    assert_eq!(check(&with(&observation, &[], "challenge", Value::str(&"c".repeat(64)))),
+               Err(RESPONSE_SUBSTITUTION_TEXT));
+    let second = I01Request { sequence: 2, ..request.clone() };
+    assert_eq!(i01_answer::self_check(&with(&observation, &[], "sequence", Value::int(2)), &second, &case.binding, now,
+                                      None), Err(INITIAL_CHAIN_TEXT));
+    assert_eq!(check(&with(&observation, &[], "observedAt", Value::str("2026-09-08T00:00:03Z"))),
+               Err(STALE_OR_FUTURE_TEXT));
+    assert_eq!(check(&with(&observation, &[], "expiresAt", Value::str("2026-09-08T00:00:07Z"))),
+               Err(FRESHNESS_WINDOW_TEXT));
+    assert_eq!(check(&with(&observation, &["enforcement"], "policyGeneration", Value::str(&"c".repeat(64)))),
+               Err(ENFORCEMENT_PROOF_TEXT));
+    assert_eq!(check(&with(&observation, &["quota", "used"], "configMaps", Value::int(2))), Err(QUOTA_HEADROOM_TEXT));
+    // A time in the pattern's form that `_time` does not read raises: VPO's generic text.
+    assert_eq!(check(&with(&observation, &[], "observedAt", Value::str("2026-02-30T00:00:01Z"))),
+               Err(INVALID_OBSERVATION_TEXT));
+}
+
+#[test]
+fn self_check_reads_times_as_vpcs_time_does() {
+    // VPC's `_time` reads every canonical UTC text from year 0001 to 9999, so a scope starting before 1970 is VPO's
+    // pass, and self_check's (VPO's decision, exactly); a day that does not exist raises.
+    let case = Case::complete();
+    let now = utc_seconds("2026-09-08T00:00:02Z").expect("a canonical UTC text");
+    for (from, want) in [("1969-12-31T00:00:00Z", Ok(())), ("0001-01-01T00:00:00Z", Ok(())),
+                         ("1900-02-29T00:00:00Z", Err(INVALID_OBSERVATION_TEXT))] {
+        let binding = with(&case.binding, &["scope"], "validFrom", Value::str(from));
+        let digest = digest_of(&binding);
+        let request = I01Request { binding_digest: digest.clone(), ..case.request() };
+        let observation = with(&case.observation(), &[], "bindingDigest", Value::str(&digest));
+        assert_eq!(i01_answer::self_check(&observation, &request, &binding, now, None), want, "{from}");
+    }
 }

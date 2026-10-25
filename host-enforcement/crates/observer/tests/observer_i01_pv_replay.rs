@@ -55,11 +55,33 @@
 //!   one) are replayed in no R10 packet. HE-004-I01B2 replayed negative-27 (Q-I01B2D-3 (a)): PV's own case and W3's
 //!   derived case on S1's triple, each as a v3 document refused at the namespace check, status 13
 //!   (`observer_config_v3`); the 18 HE-004-I01B3 rows stay carried.
+//!
+//! HE-004-I01B3 (DESIGN-I01B3 rev 4 section 7; the monitor's Q-I01B3-3 (a); I3D-5), the carried replay done: each of
+//! the 18 rows whose packet is HE-004-I01B3 runs as W3's derived case on S1's triple, the derivation rule unchanged,
+//! against its checker (`I01B3_ROWS`), and refuses with its expected text:
+//! - rows 6-13, 17 and 19-21: `i01_answer::self_check` over the derived observation, with the triple's request,
+//!   binding and `now` and `previous` null (VPO's label, or VPO's generic text for the shape rows 19 and 20);
+//! - rows 14-16 and 22: `self_check`'s text, and for 15, 16 and 22 the snapshot comparison's half, the changed value
+//!   applied to the binding's corresponding member (`projections.<key>.<member>`, `enforcementPins.<digest>`) and
+//!   `i01_answer::refusals` over the `qual` snapshot giving exactly the contract's differs text; the namespace has no
+//!   differs text, so row 14's half is `self_check`'s only;
+//! - row 25: `self_check` with the derived binding ("observed namespace"); row 26: `refusals` with the derived binding
+//!   ("serviceAccount: differs from the signed value").
+//!
+//! PV's v1 cases are also replayed for the document-level rows (6-13, 17, 19-21), each on PV's own positive, with the
+//! same checker and text. They are not replayed for the snapshot-comparison rows (14-16, 22, 25, 26), whose v1
+//! positive has no snapshot fixture. Cases 18, 23 and 24 stay HE-008's.
 
-use i05_protocol::json::{self, JStr, Value};
+use i05_protocol::json::{self, JStr, Object, Value};
 use i05_protocol::sha256;
+use planeon_observer::i01_answer::{self, CaptureFacts, ENFORCEMENT_PROOF_TEXT, FRESHNESS_WINDOW_TEXT,
+                                   INVALID_OBSERVATION_TEXT, OBSERVED_IDENTITY_TEXT, OBSERVED_NAMESPACE_TEXT,
+                                   QUOTA_HEADROOM_TEXT, RESPONSE_SUBSTITUTION_TEXT, STALE_OR_FUTURE_TEXT};
 use planeon_observer::i01_request::{binding_gate, check_request, frame, request_schema, Chain, I01Binding, I01Request,
                                     RequestRefusal, MAX_INTEGER, MEMBERS, OBSERVE_POLICY, REQUEST_SCHEMA, ZERO_DIGEST};
+use planeon_observer::inputs::{Inputs, ListBody, ListInput, Resource};
+use planeon_observer::kernel_text::utc_seconds;
+use planeon_observer::snapshot::Closure;
 
 const PV: &str = include_str!("../../../contracts/i01-v1/vectors.json");
 const CS: &str = include_str!("../../../contracts/i01-v1/channel.schema.json");
@@ -112,6 +134,48 @@ const PV_CASES: [(&str, &str, &str, &str); 22] = [
     ("negative-26-binding-projections.serviceAccount.uid", "policy identity",
      "R10: the snapshot comparison; HE-008 holds the profile-side half", "HE-004-I01B3"),
     ("negative-27-binding-scope.namespace", "namespace binding", "R10: load-time check (status 13)", "HE-004-I01B2"),
+];
+/// HE-004-I01B3 (DESIGN-I01B3 rev 4 section 7; Q-I01B3-3 (a); I3D-5): the 18 rows' checkers and expected texts, each as
+/// (case, `self_check`'s text, `refusals`' text). `self_check` checks the observation's half (VPO's label, or VPO's
+/// generic text for the shape rows) and row 25's derived binding; `refusals` checks the snapshot comparison's half,
+/// the changed value applied to the binding's corresponding member, and row 26's derived binding. The namespace has no
+/// differs text, so row 14 is `self_check`'s only.
+const I01B3_ROWS: [(&str, Option<&str>, Option<&str>); 18] = [
+    ("negative-6-observation-challenge", Some(RESPONSE_SUBSTITUTION_TEXT), None),
+    ("negative-7-observation-runNonce", Some(RESPONSE_SUBSTITUTION_TEXT), None),
+    ("negative-8-observation-bindingDigest", Some(RESPONSE_SUBSTITUTION_TEXT), None),
+    ("negative-9-observation-sequence", Some(RESPONSE_SUBSTITUTION_TEXT), None),
+    ("negative-10-observation-previousObservationDigest", Some(RESPONSE_SUBSTITUTION_TEXT), None),
+    ("negative-11-observation-observedAt", Some(STALE_OR_FUTURE_TEXT), None),
+    ("negative-12-observation-expiresAt", Some(STALE_OR_FUTURE_TEXT), None),
+    ("negative-13-observation-expiresAt", Some(FRESHNESS_WINDOW_TEXT), None),
+    ("negative-14-observation-namespace.uid", Some(OBSERVED_NAMESPACE_TEXT), None),
+    ("negative-15-observation-projections.resourceQuota.projectionDigest", Some(OBSERVED_IDENTITY_TEXT),
+     Some("resourceQuota: differs from the signed value")),
+    ("negative-16-observation-projections.rbac.uid", Some(OBSERVED_IDENTITY_TEXT),
+     Some("rbac: differs from the signed value")),
+    ("negative-17-observation-quota.used.configMaps", Some(QUOTA_HEADROOM_TEXT), None),
+    ("negative-19-observation-quota.used.cpuMillis", Some(INVALID_OBSERVATION_TEXT), None),
+    ("negative-20-observation-quota.hard.cpuMillis", Some(INVALID_OBSERVATION_TEXT), None),
+    ("negative-21-observation-enforcement.policyGeneration", Some(ENFORCEMENT_PROOF_TEXT), None),
+    ("negative-22-observation-enforcement.hostPreflightDigest", Some(ENFORCEMENT_PROOF_TEXT),
+     Some("hostPreflightDigest: differs from the signed value")),
+    ("negative-25-binding-namespace.uid", Some(OBSERVED_NAMESPACE_TEXT), None),
+    ("negative-26-binding-projections.serviceAccount.uid", None, Some("serviceAccount: differs from the signed value")),
+];
+/// The contract's eleven snapshot lists and B1's closed-set entry for each (the `qual` snapshot's list inputs).
+const LISTS: [(&str, Resource); 11] = [
+    ("namespaces", Resource::Namespaces),
+    ("resourceQuotas", Resource::ResourceQuotas),
+    ("limitRanges", Resource::LimitRanges),
+    ("serviceAccounts", Resource::ServiceAccounts),
+    ("networkPolicies", Resource::NetworkPolicies),
+    ("roles", Resource::Roles),
+    ("roleBindings", Resource::RoleBindings),
+    ("clusterRoles", Resource::ClusterRoles),
+    ("clusterRoleBindings", Resource::ClusterRoleBindings),
+    ("validatingAdmissionPolicies", Resource::ValidatingAdmissionPolicies),
+    ("validatingAdmissionPolicyBindings", Resource::ValidatingAdmissionPolicyBindings),
 ];
 
 fn parse(text: &str) -> Value {
@@ -517,4 +581,141 @@ fn the_positive_request_in_other_encodings_refuses_at_framing() {
                    Err(RequestRefusal::Bytes), "{form}");
     }
     assert!(check_request(encoded.as_bytes(), false, &mut Chain::default(), Some(&bound)).is_ok());
+}
+
+/// A row's packet in `PV_CASES`.
+fn packet(label: &str) -> &'static str {
+    PV_CASES.iter().find(|row| row.0 == label).map(|row| row.3).unwrap_or_else(|| panic!("{label} is not a PV case"))
+}
+
+/// Whether a row's R10 checker is the self-check alone (a document-level row), not the snapshot comparison.
+fn document_level(label: &str) -> bool {
+    PV_CASES.iter().any(|row| row.0 == label && row.3 == "HE-004-I01B3" && !row.2.contains("snapshot comparison"))
+}
+
+/// B1's list inputs for a snapshot's lists, each as the apiserver serves it under its closed-set request.
+fn list_inputs(lists: &Value) -> Vec<ListInput> {
+    LISTS
+        .iter()
+        .filter_map(|&(name, resource)| {
+            let items = lists.get(name)?;
+            let (kind, api_version) = resource.list_kind();
+            let mut list = Object::new();
+            list.insert(JStr::new("kind"), Value::str(&kind));
+            list.insert(JStr::new("apiVersion"), Value::str(&api_version));
+            list.insert(JStr::new("metadata"), Value::Object(Object::new()));
+            list.insert(JStr::new("items"), items.clone());
+            Some(ListInput { spec: resource.spec(), body: ListBody::Served(Value::Object(list)) })
+        })
+        .collect()
+}
+
+/// The `passing` capture as `CaptureFacts`: its one completed set, every slot taken, its two ages at the answer.
+fn passing(capture: &Value) -> CaptureFacts {
+    let set = member(capture, "sets").as_array().and_then(|sets| sets.first()).expect("one set");
+    let answer = member(capture, "answer");
+    let count = |value: &Value, name: &str| member(value, name).as_int().and_then(|int| int.to_i64()).expect("a count");
+    let slots = member(set, "slots").as_object().expect("the slots").iter()
+        .map(|(slot, state)| (slot.as_str().expect("a slot name").to_string(), state.as_str() == Some("TAKEN")))
+        .collect();
+    CaptureFacts {
+        completed: true,
+        expired: false,
+        scheduled_after_now: false,
+        slots,
+        mono_age_ms: u64::try_from(count(answer, "monotonicMs") - count(set, "scheduledMonotonicMs")).expect("an age"),
+        wall_age_ms: count(answer, "wallMs") - count(set, "startedWallMs"),
+        record_digest: String::new(),
+    }
+}
+
+/// The snapshot comparison (HE-004-I01B3): `i01_answer::derive` over the triple's `qual` snapshot, the enrolled record
+/// and I06's closure with `binding`, then `refusals` with the `passing` capture; the answer list.
+fn refused_by_the_snapshot(digests: &Value, binding: &Value) -> Vec<&'static str> {
+    let fixtures = member(digests, "fixtures");
+    let complete = member(digests, "complete");
+    let snapshot = member(member(fixtures, "snapshots"), text(complete, "snapshot"));
+    let lists = Inputs::new(list_inputs(member(snapshot, "lists"))).expect("the qual snapshot's lists");
+    let closure = Closure::embedded().expect("the embedded closure reads");
+    let derived = i01_answer::derive(&lists, member(snapshot, "resourceVersion"), member(snapshot, "configuration"),
+                                     member(snapshot, "adm4LoadedHash"), member(fixtures, "record"), &closure, binding,
+                                     &Value::Null, "", 0, u64::MAX)
+        .unwrap_or_else(|refusal| panic!("the qual snapshot's derivations are built: {refusal}"));
+    i01_answer::refusals(&derived, &passing(member(member(fixtures, "captures"), text(complete, "capture"))))
+}
+
+/// The binding member an observation path's value is compared with: a projection's member in `projections`, an
+/// enforcement digest in `enforcementPins`.
+fn binding_path(path: &[Value]) -> Vec<Value> {
+    let mut steps = path.to_vec();
+    if steps.first().and_then(Value::as_str) == Some("enforcement") {
+        steps[0] = Value::str("enforcementPins");
+    }
+    steps
+}
+
+#[test]
+fn w3_s_18_rows_refuse_at_their_checkers() {
+    // HE-004-I01B3 (Q-I01B3-3 (a); I3D-5): each row as W3's derived case on S1's triple, against its checker.
+    let (vectors, digests) = (vectors(), digest_vectors());
+    let triple = triple(&digests);
+    let request = request_schema(member(triple, "request")).expect("the triple's request has the schema's form");
+    let now = utc_seconds(text(triple, "now")).expect("the triple's now");
+    let (binding, observation) = (member(triple, "binding"), member(triple, "observation"));
+    // The triple itself passes both checkers.
+    assert!(member(triple, "previous").is_null());
+    assert_eq!(i01_answer::self_check(observation, &request, binding, now, None), Ok(()));
+    assert_eq!(refused_by_the_snapshot(&digests, binding), Vec::<&str>::new());
+    let cases = derived_cases(&vectors, triple);
+    let rows: Vec<&Derived> = cases.iter().filter(|case| packet(case.label) == "HE-004-I01B3").collect();
+    let labels: Vec<&str> = rows.iter().map(|case| case.label).collect();
+    assert_eq!(labels, I01B3_ROWS.map(|row| row.0));
+    let (mut by_self_check, mut by_refusals) = (0, 0);
+    for (case, (label, self_checked, refused)) in rows.iter().zip(I01B3_ROWS) {
+        let (checked, signed) = match case.document {
+            "observation" => (&case.derived, binding),
+            _ => (observation, &case.derived),
+        };
+        if let Some(want) = self_checked {
+            assert_eq!(i01_answer::self_check(checked, &request, signed, now, None), Err(want), "{label}");
+            by_self_check += 1;
+        }
+        if let Some(want) = refused {
+            let changed = match case.document {
+                "observation" => with_value(binding, &binding_path(case.path), case.value),
+                _ => case.derived.clone(),
+            };
+            assert_eq!(refused_by_the_snapshot(&digests, &changed), [want], "{label}");
+            by_refusals += 1;
+        }
+    }
+    // 17 rows through self_check (all but 26), 4 through refusals (15, 16, 22 and 26).
+    assert_eq!((by_self_check, by_refusals), (17, 4));
+}
+
+#[test]
+fn pv_s_v1_document_rows_refuse_at_self_check() {
+    // PV's own cases for the document-level rows (6-13, 17, 19-21), on PV's v1 positive; the snapshot-comparison rows
+    // have no v1 snapshot fixture.
+    let vectors = vectors();
+    let positive = positive(&vectors);
+    let request = request_schema(member(positive, "request")).expect("PV's request has the schema's form");
+    let now = utc_seconds(text(positive, "now")).expect("PV's now");
+    let (binding, observation) = (member(positive, "binding"), member(positive, "observation"));
+    assert_eq!(i01_answer::self_check(observation, &request, binding, now, None), Ok(()));
+    let cases = member(&vectors, "negative").as_array().expect("the negatives are an array");
+    let mut replayed = 0;
+    for (label, self_checked, _) in I01B3_ROWS {
+        if !document_level(label) {
+            continue;
+        }
+        let case = cases.iter().find(|case| text(case, "label") == label).expect("the row's PV case");
+        assert_eq!(text(case, "document"), "observation", "{label}");
+        let path = member(case, "path").as_array().expect("a path");
+        let changed = with_value(observation, path, member(case, "value"));
+        let want = self_checked.expect("a document-level row's self-check text");
+        assert_eq!(i01_answer::self_check(&changed, &request, binding, now, None), Err(want), "{label}");
+        replayed += 1;
+    }
+    assert_eq!(replayed, 12);
 }
