@@ -6909,6 +6909,145 @@ class I01bContractFileTests(Tree):
         self.assertEqual(gate.check_i01b_contracts(self.base), 11)
 
 
+# --- HE-004-I01B4 (DESIGN-I01B4 rev 2 section 5; the section review's I4D-1 and I4D-2) ------------------------------------
+
+I01B4_READER = gate.I01B4_ROW79_READER
+I01B4_LITERAL = "../../../contracts/i01-v2/proxy-profile-v2-vectors.json"
+I01B4_INCLUDE = 'const PROXY_VECTORS: &[u8] = include_bytes!("%s");\n' % I01B4_LITERAL
+I01B4_SCOPE_TREE = {
+    # The digest replay, row 79's one reader; the file name in a comment is not read.
+    I01B4_READER: ("//! The digest replay (proxy-profile-v2-vectors.json in a comment passes).\n" + I01B4_INCLUDE
+                   + "#[test]\nfn row_79s_positive_is_the_complete_positives_profile_but_ten_members() {}\n"),
+    "crates/observer/src/lib.rs": "pub mod i01_digest;\n",
+    "crates/observer/src/i01_digest.rs":
+        'pub const SCHEMA_VERSION: &str = "planeon.internal.policy-observation-digests/v2";\n',
+    # Names that exist at a5d07979 and pass: the word precondition inside a longer name, in a const and in a test fn.
+    "crates/effect-gate/src/gate.rs": ("pub const LOOP_MODEL_PRECONDITION: u8 = 30;\n// proxy-profile-v2-vectors.json\n"
+                                       "#[cfg(test)]\nmod tests {\n    #[test]\n"
+                                       "    fn events_outside_the_preconditions_change_nothing() {}\n}\n"),
+    # A native-profile v2 reader: clause (c2)'s exemption, and no proxyprofilev2 for clause (c1).
+    "crates/observer/tests/observer_native_profile_v2.rs":
+        'const NATIVE_PROFILE_V2: &str = "contracts/native-profile-v2/vectors.json";\n',
+}
+
+
+class I01b4ReplayScopeTests(Tree):
+    """HE-004-I01B4 G-I01B4-1, the absence clause (DESIGN-I01B4 rev 2 section 5; Q-I01B4-5; I4D-1, I4D-2), over a tree
+    holding row 79's file, the digest replay's one include and names that exist at a5d07979: the tree and the real
+    host-enforcement pass. Each of these refuses:
+    - (a) CONTRACTS registering a profile.schema.json, or any path at profile v2's schema sha256; a file of that name
+      under contracts/; a file under contracts/ with the schema's bytes (the constant patched to the planted file's
+      digest, since R10 holds no copy of the schema);
+    - (b) row 79's file included by an observer src file or by another test; the digest replay's include removed or
+      doubled, or the file read at run time there; a concat! form in another test;
+    - (c) fn validate_profile, fn precondition and mod proxy_profile_v2, each planted in a src and a tests file;
+    - I4D-1's five forms: (1) a test crate root named after profile v2 (tests/profile_v2_check.rs, and a directory so
+      named); (2) fn preconditions; (3) fn r#precondition; (4) struct ProxyProfileV2 with an impl; (5) macro_rules!
+      validate_profile;
+    - (c3) one of row 79's negative texts, or the schema's sha256, in another source; the digest replay may hold
+      them."""
+
+    RULE = "G-I01B4-1"
+    TREE = I01B4_SCOPE_TREE
+
+    def setUp(self):
+        super().setUp()
+        path = self.base / gate.I01B4_ROW79
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((gate.HE / gate.I01B4_ROW79).read_bytes())
+
+    def refuses(self, rel, text, message):
+        self.refused(gate.check_i01b4_replay_scope, rel, text, "%s.*%s" % (message, self.RULE))
+
+    def declares(self, rel, text, item, clause):
+        self.refused(gate.check_i01b4_replay_scope, rel, text,
+                     re.escape("%s declares %s, a profile v2 validator's name (the replay scope, G-I01B4-1, clause %s)"
+                               % (rel, item, clause)))
+
+    def test_the_tree_and_the_real_files_pass(self):
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+        crates = gate.HE / "crates"
+        sources = len(list(crates.glob("*/src/**/*.rs"))) + len(list(crates.glob("*/tests/**/*.rs")))
+        self.assertEqual(gate.check_i01b4_replay_scope(gate.HE), sources)
+        vectors = json.loads((gate.HE / gate.I01B4_ROW79).read_text(encoding="utf-8"))
+        self.assertEqual(len({row["expect"] for row in vectors["negative"]}), gate.I01B4_ROW79_TEXTS)
+        self.assertEqual(gate.I01B4_ROW79_TEXTS, 28)
+
+    def test_profile_v2_s_schema_refuses_by_name_or_bytes(self):
+        for rel in ("contracts/i01-v2/profile.schema.json", "contracts/proxy-profile-v2/Profile.Schema.JSON"):
+            with mock.patch.dict(gate.CONTRACTS, {rel: "0" * 64}):
+                with self.assertRaisesRegex(gate.GateError, "CONTRACTS registers %s, profile v2's schema by name .*%s"
+                                            % (re.escape(rel), self.RULE)):
+                    gate.check_i01b4_replay_scope(self.base)
+        with mock.patch.dict(gate.CONTRACTS, {"contracts/i01-v2/schema.json": gate.PROFILE_V2_SCHEMA_SHA256}):
+            with self.assertRaisesRegex(gate.GateError, "CONTRACTS registers contracts/i01-v2/schema.json at profile v2's "
+                                        "schema sha256 .*%s" % self.RULE):
+                gate.check_i01b4_replay_scope(self.base)
+        for rel in ("contracts/i01-v2/profile.schema.json", "contracts/other/profile.schema.json"):
+            self.refuses(rel, "{}", "%s is profile v2's schema by name" % re.escape(rel))
+        # By bytes: R10 holds no copy of the schema, so the constant is patched to the planted file's digest.
+        text = '{"title": "a schema under another name"}\n'
+        with mock.patch.object(gate, "PROFILE_V2_SCHEMA_SHA256", hashlib.sha256(text.encode()).hexdigest()):
+            self.refuses("contracts/i01-v2/renamed.json", text, "contracts/i01-v2/renamed.json holds profile v2's schema bytes")
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+
+    def test_row_79_s_file_has_one_reader(self):
+        include = 'const RAW: &[u8] = include_bytes!("%s");\n' % I01B4_LITERAL
+        for rel in ("crates/observer/src/i01_digest.rs", "crates/observer/tests/observer_i01_pv_replay.rs",
+                    "crates/observer/tests/nested/deeper.rs"):
+            text = include.replace("../../../", "../../../../") if "nested" in rel else include
+            self.refuses(rel, text, "%s includes %s, which only" % (re.escape(rel), re.escape(gate.I01B4_ROW79)))
+        # The digest replay's include removed, doubled, or the file read at run time beside it.
+        once = re.escape("%s does not include %s exactly once" % (I01B4_READER, gate.I01B4_ROW79))
+        self.refuses(I01B4_READER, "fn other() {}\n", once)
+        self.refuses(I01B4_READER, I01B4_INCLUDE + I01B4_INCLUDE.replace("PROXY_VECTORS", "AGAIN"), once)
+        self.refuses(I01B4_READER, I01B4_INCLUDE + 'fn read() { let _ = std::fs::read("%s"); }\n' % I01B4_LITERAL,
+                     "names proxy-profile-v2-vectors.json other than in its include literal")
+        # A concat! form, or the name in any literal, in another test.
+        self.refuses("crates/observer/tests/observer_other.rs",
+                     'const RAW: &[u8] = include_bytes!(concat!("../../../contracts/i01-v2/", '
+                     '"proxy-profile-v2-vectors.json"));\n',
+                     "crates/observer/tests/observer_other.rs names proxy-profile-v2-vectors.json")
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+
+    def test_a_profile_v2_validator_s_name_refuses(self):
+        # Clause (c), each in a src and a tests file.
+        for item, text in (("fn validate_profile", "pub fn validate_profile() {}\n"),
+                           ("fn precondition", "fn precondition() {}\n"),
+                           ("mod proxy_profile_v2", "mod proxy_profile_v2 {}\n")):
+            for rel in ("crates/observer/src/planted.rs", "crates/effect-gate/tests/planted.rs"):
+                self.declares(rel, text, item, "(c)")
+        # I4D-1's forms (2)-(5): clause (c1) (form (3)'s r# stripped meets clause (c) first).
+        rel = "crates/observer/tests/planted.rs"
+        self.declares(rel, "fn preconditions() {}\n", "fn preconditions", "(c1)")
+        self.declares(rel, "fn r#precondition() {}\n", "fn precondition", "(c)")
+        self.declares(rel, "pub struct ProxyProfileV2;\nimpl ProxyProfileV2 {\n    pub fn validate(&self) {}\n}\n",
+                      "struct ProxyProfileV2", "(c1)")
+        self.declares(rel, "macro_rules! validate_profile {\n    () => {};\n}\n", "macro_rules validate_profile", "(c1)")
+        self.declares("crates/observer/src/planted.rs", "pub enum PRE_CONDITIONS { A }\n", "enum PRE_CONDITIONS", "(c1)")
+        # I4D-1's form (1): a test crate root named after profile v2 needs no mod line; clause (c2) reads its path.
+        validate = "use i05_protocol::json::Value;\n\nfn validate(profile: &Value) -> Vec<String> {\n    Vec::new()\n}\n"
+        for rel in ("crates/observer/tests/profile_v2_check.rs", "crates/observer/tests/proxy-profile-v2/main.rs",
+                    "crates/observer/src/ProfileV2.rs"):
+            self.refused(gate.check_i01b4_replay_scope, rel, validate,
+                         re.escape("%s is named after profile v2 (the replay scope, G-I01B4-1, clause (c2))" % rel))
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+
+    def test_row_79_s_texts_or_the_schema_digest_elsewhere_refuse(self):
+        vectors = json.loads((gate.HE / gate.I01B4_ROW79).read_text(encoding="utf-8"))
+        texts = sorted({row["expect"] for row in vectors["negative"]})
+        for text in (texts[0], texts[5], texts[-1]):
+            for rel in ("crates/observer/tests/observer_i01_pv_replay.rs", "crates/observer/src/i01_digest.rs"):
+                self.refuses(rel, "const TEXT: &str = %s;\n" % json.dumps(text),
+                             re.escape("%s holds row 79's negative text %r" % (rel, text)))
+        self.refuses("crates/observer/src/i01_digest.rs", 'const SCHEMA: &str = "%s";\n' % gate.PROFILE_V2_SCHEMA_SHA256,
+                     "crates/observer/src/i01_digest.rs holds profile v2's schema sha256")
+        # The digest replay may hold them.
+        self.write(I01B4_READER, I01B4_SCOPE_TREE[I01B4_READER] + "const TEXT: &str = %s;\nconst SCHEMA: &str = \"%s\";\n"
+                   % (json.dumps(texts[0]), gate.PROFILE_V2_SCHEMA_SHA256))
+        self.assertEqual(gate.check_i01b4_replay_scope(self.base), 5)
+
+
 I01B1_LIB = ("#![forbid(unsafe_code)]\n// i01_digest and i01_gate in a comment\npub mod capture;\npub mod i01_admission_render;\n"
              "pub mod i01_digest;\npub mod i01_gate;\npub mod observe;\n")
 I01B1_DIGEST = ("//! An i01_digest fixture (`impl Other for DigestKey` and LatestSet in a comment pass).\n"

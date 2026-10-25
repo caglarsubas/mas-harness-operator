@@ -1,10 +1,11 @@
 //! HE-004-I01B1 (DESIGN-I01B rev 3 section 2 and DESIGN-I01B1 rev 2; owner decision Q-HE4I1-2 and the monitor's
-//! Q-I01B-26 (a), MON-I01B1-A (a) and MON-I01B1-B (a)): the I01 digest contract's vectors
-//! (`contracts/i01-digests-v1/vectors.json`, edge record v10's row 70) replayed against `i01_digest`, with
-//! `i01_admission_render`'s render handed in and `i01_gate`'s capture gate, each vector's own expectations compared one
-//! by one.
+//! Q-I01B-26 (a), MON-I01B1-A (a) and MON-I01B1-B (a)), moved to the I01 digest contract v2 by HE-004-I01B4
+//! (DESIGN-I01B4 rev 2 section 4.1; the monitor's Q-I01B4-2 and Q-I01B4-5; I4D-1, I4D-8): the contract v2's vectors
+//! (`contracts/i01-digests-v2/vectors.json`, edge record v11's row 74) replayed against `i01_digest`, with
+//! `i01_admission_render`'s admission v4 render handed in and `i01_gate`'s capture gate, each vector's own expectations
+//! compared one by one. v1's replay is retired; v1's files stay held and pinned (Q-I01B4-2).
 //!
-//! - The four vendored files are edge record v10's rows 69-72 (each sha256 and size). `definitions.json` is the
+//! - The four vendored files are edge record v11's rows 73-75 and 79 (each sha256 and size). `definitions.json` is the
 //!   contract the vectors pin (their `contract.canonicalSha256`), and `i01_digest`'s refusal texts are its
 //!   `refusalTexts`, all 90.
 //! - The design's counts: 16 helper vectors (canonical bytes, digests, the exactness bounds) and 152 vectors. Each
@@ -18,19 +19,29 @@
 //!   with the vectors' ms values as the ages (a negative monotonic age is `scheduled_after_now`). R10's capture view is
 //!   typed, so capture data of another shape (the contract's malformed capture data) has no R10 form: the replay's
 //!   adapter checks the model's data shape and refuses such data as the key's malformed input before the gate.
-//! - The answer refusal lists (12) and the complete I01 positive (5 checks), as the model's `observed` and
-//!   `check_observation_digests` compose them: every value derived with the render, the three gated values gated at
-//!   the answer, each compared with the signed binding (the projection's identity without its resourceVersion, the
-//!   digest with `enforcementPins`), the texts once each, in key order. The comparison is the test's, the model's
-//!   composition over the port's values; HE-004-I01B3's answer logic is not built here.
+//! - The answer refusal lists (12) and the complete I01 positive (6 checks, over the `qual` snapshot: v1's five and
+//!   the sealed-namespace equality), as the model's `observed` and `check_observation_digests` compose them: every
+//!   value derived with the render, the three gated values gated at the answer, each compared with the signed binding
+//!   (the projection's identity without its resourceVersion, the digest with `enforcementPins`), the texts once each,
+//!   in key order. The comparison is the test's, the model's composition over the port's values; HE-004-I01B3's answer
+//!   logic is not built here.
 //! - One vector's lists never reach a digest: RB-17 deletes a ClusterRole's name, and B1's `Inputs::new` refuses the
 //!   lists (ItemShape, ClusterRoles item 1) before either RBAC value is derived. The vector pins the producer's text,
 //!   "rbac: malformed metadata", which the observer cannot reach; the replay asserts the earlier refusal for both of
-//!   its checks (MON-I01B1-A (a), R10-defined behaviour recorded in MODEL_DEFINED).
+//!   its checks (MON-I01B1-A (a), R10-defined behaviour recorded in MODEL_DEFINED; unchanged in v2).
+//! - R10-defined, outside the 321: profile v2's positive (row 79) is the complete positive's profile in every member
+//!   but exactly ten, the profile members the positive's `replaced` list re-derives (the seven `policy.*Digest` and
+//!   the three preexisting references' `observedDigest`). That gives row 79 its one reader.
+//! - Not run in R10 (the contract v2's README section 11, MON-I01S-C2-1-WORDING): the profile-schema load
+//!   (`_profile_schema`), profile v2's `validate` and `precondition`, and the frozen-model file pins (`_frozen`'s
+//!   FROZEN_MODELS loop, `scripts/proxy_profile_v2.py` included), since models are pinned, not copied. Also not
+//!   mirrored, as under v1: the model's uncounted FROZEN_INPUTS digest loop and I06 identity check (R10 embeds those
+//!   bytes, G-D2-2) and its DESIGN_TEXTS coverage check; the v2 layer test's W1 assertions (VPO, profile v2 validate
+//!   and precondition, P10) are harness-side (HO README section 10). `tools/gate.py`'s G-I01B4-1 holds the absence.
 //!
-//! Of the model's 320 checks (16 helper checks, the definitions pin, 120 projection, 46 enforcement, 69 gate, 12 answer
-//! and 51 relation checks, and the complete positive's 5), 318 are compared here and 2 are refused earlier by B1's
-//! inputs.
+//! Of the model's 323 checks (16 helper checks, the definitions pin, 120 projection, 46 enforcement, 69 gate, 12 answer
+//! and 51 relation checks, and the complete positive's 8), R10's replay counts 321, the complete positive's 6 among
+//! them (16 + 1 + 298 + 6): 319 are compared here and 2 are refused earlier by B1's inputs.
 
 mod b1_support;
 
@@ -46,27 +57,52 @@ use planeon_observer::i01_gate::{self, LatestSet};
 use planeon_observer::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use planeon_observer::snapshot::Closure;
 
-const DEFINITIONS: &[u8] = include_bytes!("../../../contracts/i01-digests-v1/definitions.json");
-const VECTORS: &[u8] = include_bytes!("../../../contracts/i01-digests-v1/vectors.json");
-const README: &[u8] = include_bytes!("../../../contracts/i01-digests-v1/README.md");
-const PROXY_VECTORS: &[u8] = include_bytes!("../../../contracts/i01-v1/proxy-contract-vectors.json");
-/// Edge record v10's rows 69-72: each vendored file's bytes, sha256 and size.
+const DEFINITIONS: &[u8] = include_bytes!("../../../contracts/i01-digests-v2/definitions.json");
+const VECTORS: &[u8] = include_bytes!("../../../contracts/i01-digests-v2/vectors.json");
+const README: &[u8] = include_bytes!("../../../contracts/i01-digests-v2/README.md");
+const PROXY_VECTORS: &[u8] = include_bytes!("../../../contracts/i01-v2/proxy-profile-v2-vectors.json");
+/// Edge record v11's rows 73-75 and 79: each vendored file's bytes, sha256 and size.
 const ROWS: [(&str, &[u8], &str, usize); 4] = [
-    ("i01-digests-v1/definitions.json", DEFINITIONS, "086692065cfc9da101f770fa39c50af2e2650a169595526e9860fc805478c2aa",
-     35_940),
-    ("i01-digests-v1/vectors.json", VECTORS, "bd9f04bd04fcccc584bcab341ec649bcead567fe349c57e30958eaaf2ea64f84",
-     468_843),
-    ("i01-digests-v1/README.md", README, "e393dd11c75f527829bb6522c5643cb593b6dc67e2788f5e280ce9de0f4166ae", 46_944),
-    ("i01-v1/proxy-contract-vectors.json", PROXY_VECTORS,
-     "edf32ddf992e06e8786fd331affdb4d2ecd5538ca874d52c37439386793a8eb7", 12_799),
+    ("i01-digests-v2/definitions.json", DEFINITIONS, "fef08fddfb94e06eeff5bc4bdaf37246f9142fd072dd6427f629350c8d5cb2f2",
+     36_135),
+    ("i01-digests-v2/vectors.json", VECTORS, "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
+     602_663),
+    ("i01-digests-v2/README.md", README, "fbb28445c5ec35bbf65bec5d852bd94de8b7c4acf8d2c239ee234e00c10d6090", 60_473),
+    // Row 79's file, named once in this source, by its include literal above (G-I01B4-1 (b)).
+    ("i01-v2/, row 79", PROXY_VECTORS, "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc", 62_297),
 ];
-/// The design's counts (DESIGN-I01B rev 3 section 1): 152 vectors and 16 helper vectors.
+/// The design's counts (DESIGN-I01B rev 3 section 1, unchanged in v2): 152 vectors and 16 helper vectors.
 const VECTOR_COUNT: usize = 152;
 const HELPER_COUNT: usize = 16;
-/// The complete I01 positive's checks (the model's `_check_complete`): the answer refuses nothing, the observed
-/// projections, the observed enforcement, `profileDigest`, and `bindingDigest` with the profile's digests and
-/// references.
-const COMPLETE_CHECKS: usize = 5;
+/// The complete I01 positive's checks R10 runs, six of the model's eight `_check_complete` checks: the answer refuses
+/// nothing, the observed projections, the observed enforcement, `profileDigest`, `bindingDigest` with the profile's
+/// digests and references, and the snapshot's qualification namespace is the sealed namespace. Profile v2's
+/// `validate` and `precondition` stay harness-side.
+const COMPLETE_CHECKS: usize = 6;
+/// The sealed namespace (the v2 model's `SEALED_NAMESPACE`, harness-onion `scripts/policy_observation_digests_v2.py:63`;
+/// the render replay ties it to admission v4's `sealed.namespace`).
+const SEALED_NAMESPACE: &str = "planeon-qual";
+/// The vectors' pin of the definitions (`contract.canonicalSha256`), and the complete positive's profile digest and
+/// binding digest.
+const DEFINITIONS_PIN: &str = "5f170f308ed32b7d10859c1d2f919d47eebd813c2f2588cff7cccbac8c653d7b";
+const PROFILE_DIGEST: &str = "sha256:c212b038a751ec4bf874bee6e18ceb721cd1050b475da5b1aa5fa763377e3761";
+const BINDING_DIGEST: &str = "sha256:6e745318b14b5c5e3139516bd581405cb9627303e804a15067888eff45e77b94";
+/// The ten members in which profile v2's positive (row 79) differs from the complete positive's profile, sorted:
+/// those the positive's `replaced` list names for the profile (`REPLACED_PROFILE`).
+const ROW_79_DIFFERS: [&str; 10] = [
+    "capacityEntries.preexistingResourceRefs[0].observedDigest",
+    "capacityEntries.preexistingResourceRefs[1].observedDigest",
+    "capacityEntries.preexistingResourceRefs[2].observedDigest",
+    "policy.admissionPolicyDigest",
+    "policy.limitRangeDigest",
+    "policy.mutationBrokerDigest",
+    "policy.networkPolicyDigest",
+    "policy.rbacDigest",
+    "policy.resourceQuotaDigest",
+    "policy.serviceAccountDigest",
+];
+const REPLACED_PROFILE: [&str; 2] =
+    ["profile.policy.*Digest", "profile.capacityEntries.preexistingResourceRefs[*].observedDigest"];
 /// The capture verdicts' data shape (`definitions.json` `captureGate.dataShape`), each member list sorted, and the
 /// largest count it admits (2^53 - 1).
 const CAPTURE_MEMBERS: [&str; 2] = ["answer", "sets"];
@@ -129,6 +165,36 @@ fn names(value: &Value) -> Vec<&str> {
 
 fn hex(data: &[u8]) -> String {
     sha256::hex(&sha256::digest(data))
+}
+
+/// The paths (`a.b[0].c`, members sorted) at which two values differ: a leaf whose values differ, and an array whose
+/// lengths differ, at its own path; a member held on one side only as its path and ` (one side)`.
+fn differences(left: &Value, right: &Value, at: &str, out: &mut Vec<String>) {
+    match (left, right) {
+        (Value::Object(ours), Value::Object(theirs)) => {
+            let mut keys: Vec<&str> =
+                ours.iter().chain(theirs.iter()).map(|(name, _)| name.as_str().expect("a text member name")).collect();
+            keys.sort_unstable();
+            keys.dedup();
+            for key in keys {
+                let path = if at.is_empty() { key.to_string() } else { format!("{at}.{key}") };
+                match (ours.get(key), theirs.get(key)) {
+                    (Some(one), Some(other)) => differences(one, other, &path, out),
+                    _ => out.push(format!("{path} (one side)")),
+                }
+            }
+        }
+        (Value::Array(ours), Value::Array(theirs)) if ours.len() == theirs.len() => {
+            for (index, (one, other)) in ours.iter().zip(theirs).enumerate() {
+                differences(one, other, &format!("{at}[{index}]"), out);
+            }
+        }
+        _ => {
+            if !json::json_eq(left, right) {
+                out.push(at.to_string());
+            }
+        }
+    }
 }
 
 /// Lowercase hexadecimal text as bytes.
@@ -462,10 +528,26 @@ struct Tally {
 }
 
 #[test]
-fn the_vendored_files_are_edge_record_v10s_rows() {
+fn the_vendored_files_are_edge_record_v11s_rows_73_to_75_and_79() {
     for (name, bytes, digest, size) in ROWS {
         assert_eq!((hex(bytes), bytes.len()), (digest.to_string(), size), "contracts/{name}");
     }
+}
+
+/// R10-defined, outside the 321 (DESIGN-I01B4 rev 2 section 4.1): row 79's positive is the complete positive's profile
+/// in every member but exactly the ten its `replaced` list names for the profile, each present on both sides and
+/// differing.
+#[test]
+fn row_79s_positive_is_the_complete_positives_profile_but_ten_members() {
+    let vectors = parse(VECTORS);
+    let complete = member(&vectors, "complete");
+    let row_79 = parse(PROXY_VECTORS);
+    let mut differing = Vec::new();
+    differences(member(complete, "profile"), member(&row_79, "positive"), "", &mut differing);
+    assert_eq!(differing, ROW_79_DIFFERS);
+    let replaced: Vec<&str> = array(complete, "replaced").iter().map(|item| item.as_str().expect("a text")).collect();
+    let profile_entries: Vec<&str> = replaced.iter().copied().filter(|entry| entry.starts_with("profile.")).collect();
+    assert_eq!(profile_entries, REPLACED_PROFILE);
 }
 
 #[test]
@@ -511,7 +593,7 @@ fn definitions_are_the_pinned_contract() {
 fn every_contract_vector_replays() {
     let vectors = parse(VECTORS);
     assert_eq!(names(&vectors), VECTOR_MEMBERS);
-    assert_eq!(text(&vectors, "schemaVersion"), "planeon.internal.policy-observation-digests-vectors/v1");
+    assert_eq!(text(&vectors, "schemaVersion"), "planeon.internal.policy-observation-digests-vectors/v2");
     assert_eq!(text(&vectors, "evidenceClass"), "UNIT_VERIFICATION_ONLY");
     assert_eq!(member(&vectors, "nativeAcceptance").as_bool(), Some(false));
     let mut ids = Vec::new();
@@ -519,8 +601,9 @@ fn every_contract_vector_replays() {
     // The definitions pin, after the helpers, as the model checks it.
     let contract = member(&vectors, "contract");
     assert_eq!(names(contract), ["canonicalSha256", "path"]);
-    assert_eq!(text(contract, "path"), "architecture/policy-observation-digests/definitions.json");
+    assert_eq!(text(contract, "path"), "architecture/policy-observation-digests-v2/definitions.json");
     assert_eq!(text(contract, "canonicalSha256"), hex(&json::canonical(&parse(DEFINITIONS)).expect("canonical bytes")));
+    assert_eq!(text(contract, "canonicalSha256"), DEFINITIONS_PIN);
     let fixtures = member(&vectors, "fixtures");
     assert_eq!(names(fixtures), ["bindings", "captures", "record", "snapshots"]);
     let closure = Closure::embedded().expect("the embedded closure reads");
@@ -617,27 +700,32 @@ fn every_contract_vector_replays() {
     assert_eq!(ids.len(), HELPER_COUNT + VECTOR_COUNT);
     assert_eq!(ids.iter().collect::<BTreeSet<_>>().len(), ids.len(), "unique vector ids");
     let complete = replay_complete(&vectors, &closure);
-    // The counts: 119 of 120 projection checks and 45 of 46 enforcement checks (RB-17's two refused earlier), every
-    // gate, answer and relation check, and the complete positive's.
+    // The counts (Q-I01B4-5): 119 of 120 projection checks and 45 of 46 enforcement checks (RB-17's two refused
+    // earlier), every gate, answer and relation check, and the complete positive's six.
     assert_eq!((tally.projections, tally.enforcements, tally.relations), (119, 45, 51), "{tally:?}");
-    assert_eq!((tally.gates, tally.answers, complete), (69, 12, COMPLETE_CHECKS), "{tally:?}");
+    assert_eq!((tally.gates, tally.answers, complete), (69, 12, 6), "{tally:?}");
+    assert_eq!(complete, COMPLETE_CHECKS);
     assert_eq!(tally.b1_inputs, 2, "{tally:?}");
     let compared = HELPER_COUNT + 1 + tally.projections + tally.enforcements + tally.gates + tally.answers
         + tally.relations + complete;
-    assert_eq!((compared, tally.b1_inputs), (318, 2));
-    assert_eq!(compared + tally.b1_inputs, 320);
+    assert_eq!((compared, tally.b1_inputs), (319, 2));
+    // 16 helper checks + the definitions pin + 298 vector checks (120 + 46 + 69 + 12 + 51) + the complete positive's 6.
+    assert_eq!(compared + tally.b1_inputs, 321);
+    assert_eq!(compared + tally.b1_inputs, HELPER_COUNT + 1 + (120 + 46 + 69 + 12 + 51) + COMPLETE_CHECKS);
 }
 
-/// The complete I01 positive (the model's `_check_complete`): PV's binding, request and observation and PPV's profile,
-/// with the values the model derives from the `closure` snapshot, the record and the passing capture. The answer over
-/// the fixture refuses nothing; its observed projections (each identity with its resourceVersion) and enforcement
-/// (each digest, with `policyGeneration` the observation's generation) are the observation's; `profileDigest` is the
-/// profile's digest; and `bindingDigest`, the profile's seven policy digests and its three preexisting references
-/// agree with the binding. The number of checks, the model's count.
+/// The complete I01 positive (the model's `_check_complete`, six of its eight checks): PV's binding, request and
+/// observation with profile v2's positive, re-derived for the sealed namespace, with the values the model derives from
+/// the `qual` snapshot, the record and the passing capture. The answer over the fixture refuses nothing; its observed
+/// projections (each identity with its resourceVersion) and enforcement (each digest, with `policyGeneration` the
+/// observation's generation) are the observation's; `profileDigest` is the profile's digest; `bindingDigest`, the
+/// profile's seven policy digests and its three preexisting references agree with the binding; and the snapshot's
+/// qualification namespace is the sealed namespace. Profile v2's `validate` and `precondition` are not run in R10. The
+/// number of checks R10 runs.
 fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     let complete = member(vectors, "complete");
     assert_eq!(names(complete), COMPLETE_MEMBERS, "the closed complete positive");
-    assert_eq!((text(complete, "snapshot"), text(complete, "capture")), ("closure", "passing"));
+    assert_eq!((text(complete, "snapshot"), text(complete, "capture")), ("qual", "passing"));
     let fixtures = member(vectors, "fixtures");
     let mut snapshot = member(member(fixtures, "snapshots"), text(complete, "snapshot")).clone();
     match &mut snapshot {
@@ -647,7 +735,7 @@ fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     let capture = member(member(fixtures, "captures"), text(complete, "capture"));
     let (binding, request) = (member(complete, "binding"), member(complete, "request"));
     let (observation, profile) = (member(complete, "observation"), member(complete, "profile"));
-    let lists = Inputs::new(list_inputs(member(&snapshot, "lists"))).expect("the closure snapshot's lists");
+    let lists = Inputs::new(list_inputs(member(&snapshot, "lists"))).expect("the qual snapshot's lists");
     let digest_view = view(&lists, &snapshot);
     // 1. The answer refuses nothing.
     let answer = check_observation(&digest_view, binding, capture, closure);
@@ -681,8 +769,10 @@ fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
     // 4. The binding's profileDigest is the profile's digest.
     let digest_of = |value: &Value| sha256::prefixed(&json::canonical(value).expect("canonical bytes"));
     assert_eq!(text(binding, "profileDigest"), digest_of(profile), "complete positive: profileDigest");
+    assert_eq!(text(binding, "profileDigest"), PROFILE_DIGEST);
     // 5. bindingDigest, the profile's policy digests and its preexisting references agree with the binding.
     let bound = digest_of(binding);
+    assert_eq!(bound, BINDING_DIGEST);
     assert_eq!((text(request, "bindingDigest"), text(observation, "bindingDigest")), (bound.as_str(), bound.as_str()),
                "complete positive: bindingDigest");
     let signed = member(binding, "projections");
@@ -701,5 +791,8 @@ fn replay_complete(vectors: &Value, closure: &Closure) -> usize {
                 && text(found[0], "uid") == text(entry, "uid"),
                 "complete positive: reference {}", key.name());
     }
+    // 6. The snapshot's qualification namespace is the sealed namespace (the v2 model's SEALED_NAMESPACE).
+    assert_eq!(text(member(&snapshot, "configuration"), "qualificationNamespace"), SEALED_NAMESPACE,
+               "complete positive: sealed namespace");
     COMPLETE_CHECKS
 }

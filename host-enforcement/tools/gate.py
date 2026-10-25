@@ -378,6 +378,24 @@ I01B_EDGE_V11_ROWS = {
         (79, "architecture/proxy-profile-v2/vectors.json",
          "011a650bcd2a11f2eaeba531693f3e7ee9c30c1f6ede2d5ecf87919f206affcc"),
 }
+# HE-004-I01B4 G-I01B4-1, the absence clause (DESIGN-I01B4 rev 2 section 5; Q-I01B4-5; I4D-1, I4D-2): profile v2's
+# schema by name and by file sha256 (the v2 model's PROFILE_SCHEMA, harness-onion
+# scripts/policy_observation_digests_v2.py:150-151, not registered and not vendored); row 79's file, its one reader
+# and the number of its distinct negative expect texts; and the names a profile v2 validator would take: clause (c)'s
+# fn and mod names, clause (c1)'s identifiers and clause (c2)'s file-name part, each read case-insensitively with
+# underscores removed (and hyphens, in a path).
+PROFILE_V2_SCHEMA_NAME = "profile.schema.json"
+PROFILE_V2_SCHEMA_SHA256 = "e5ef3c3d112bce97d94da4b465b52feb69935a144f26dd711440acd6c67ad592"
+I01B4_ROW79 = "contracts/i01-v2/proxy-profile-v2-vectors.json"
+I01B4_ROW79_READER = "crates/observer/tests/observer_i01_digest_replay.rs"
+I01B4_ROW79_TEXTS = 28
+I01B4_FN_MOD_NAMES = ("validate_profile", "precondition")
+I01B4_FN_MOD_PART = "profile_v2"
+I01B4_ITEM_NAMES = ("validateprofile", "precondition", "preconditions")
+I01B4_ITEM_PART = "proxyprofilev2"
+I01B4_PATH_PART, I01B4_PATH_EXEMPT = "profilev2", "nativeprofile"
+I01B4_ITEM = re.compile(r"\b(?:(fn|mod|struct|enum|trait|type|const|static)\s+(?:mut\s+)?|(macro_rules)\s*!\s*)"
+                        r"(?:r#)?([A-Za-z_]\w*)")
 # HE-004D2 DESIGN-D2 section 2 (G-D2-2): the registered files crates/observer/src/contracts.rs may embed (I06 v1's
 # closure, inventory and bootstrap RBAC, B1's; native-profile v4's schema, D1's, G-D1-16's one exempt span, now the record
 # validator's; native-profile v5's schema, unit B1's, the capture validators'). Every other registered file is read by
@@ -3778,6 +3796,89 @@ def check_i01b_contracts(base: Path) -> int:
     return len(held)
 
 
+def i01b4_folded(name: str) -> str:
+    """G-I01B4-1's reading of a name: casefolded, with underscores and hyphens removed."""
+    return name.casefold().replace("_", "").replace("-", "")
+
+
+def check_i01b4_replay_scope(base: Path) -> int:
+    """HE-004-I01B4 G-I01B4-1, the absence clause (DESIGN-I01B4 rev 2 section 5; Q-I01B4-5; the section review's I4D-1
+    and I4D-2): R10 replays the I01 digest contract v2's 321 checks and runs no profile v2 validator.
+    - (a) No CONTRACTS path and no file or directory under contracts/ has the basename profile.schema.json (casefolded),
+      and no CONTRACTS digest and no file under contracts/ is profile v2's schema by its sha256.
+    - Every .rs file under crates/*/src and crates/*/tests is read without comments, literals kept (rust_code; one it
+      cannot lex refuses).
+    - (b) Its include_bytes! and include_str! literals resolve against its directory (posixpath.normpath, as
+      check_i01b_contracts resolves them): exactly one, in the digest replay (I01B4_ROW79_READER), resolves to row
+      79's file, and none in any other source; row 79's file name occurs in the digest replay only in that literal,
+      and in no other source (a concat! form or a runtime read included).
+    - (c) No fn or mod is named validate_profile or precondition, or has profile_v2 in its name.
+    - (c1) No fn, mod, struct, enum, trait, type, const, static or macro_rules identifier, a leading r# stripped and
+      read with i01b4_folded, is validateprofile, precondition or preconditions, or contains proxyprofilev2.
+    - (c2) No part of a source's path below its crate (each directory, and the file's stem), read with i01b4_folded,
+      contains profilev2 unless it also contains nativeprofile.
+    - (c3) No source but the digest replay holds one of row 79's 28 distinct negative expect texts (read from the
+      vendored file) or profile v2's schema sha256.
+    The number of crate sources read."""
+    rule = "the replay scope, G-I01B4-1"
+    for rel, digest in CONTRACTS.items():
+        require(posixpath.basename(rel).casefold() != PROFILE_V2_SCHEMA_NAME,
+                "CONTRACTS registers %s, profile v2's schema by name (%s)" % (rel, rule))
+        require(digest != PROFILE_V2_SCHEMA_SHA256, "CONTRACTS registers %s at profile v2's schema sha256 (%s)" % (rel, rule))
+    for path in sorted((base / "contracts").rglob("*")):
+        rel = path.relative_to(base).as_posix()
+        require(path.name.casefold() != PROFILE_V2_SCHEMA_NAME, "%s is profile v2's schema by name (%s)" % (rel, rule))
+        if path.is_file():
+            require(sha256(path.read_bytes()) != PROFILE_V2_SCHEMA_SHA256,
+                    "%s holds profile v2's schema bytes (%s)" % (rel, rule))
+    try:
+        negatives = json.loads((base / I01B4_ROW79).read_text(encoding="utf-8"))["negative"]
+        texts = sorted({row["expect"] for row in negatives})
+    except (OSError, ValueError, KeyError, TypeError):
+        raise GateError("%s has no readable negative expect texts (%s)" % (I01B4_ROW79, rule)) from None
+    require(len(texts) == I01B4_ROW79_TEXTS and all(type(text) is str and text for text in texts),
+            "%s does not hold %d distinct negative expect texts (%s)" % (I01B4_ROW79, I01B4_ROW79_TEXTS, rule))
+    file_name = posixpath.basename(I01B4_ROW79)
+    sources = sorted((base / "crates").glob("*/src/**/*.rs")) + sorted((base / "crates").glob("*/tests/**/*.rs"))
+    reader_includes = 0
+    for path in sources:
+        rel = path.relative_to(base).as_posix()
+        try:
+            code = rust_code(path.read_text(encoding="utf-8"), literals=True)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        reader = rel == I01B4_ROW79_READER
+        targets = [posixpath.normpath(posixpath.join(posixpath.dirname(rel), literal))
+                   for literal in OBSERVER_INCLUDE_FORM.findall(code)]
+        includes = targets.count(I01B4_ROW79)
+        require(reader or not includes, "%s includes %s, which only %s may (%s)" % (rel, I01B4_ROW79, I01B4_ROW79_READER,
+                                                                                    rule))
+        if reader:
+            reader_includes = includes
+            require(code.count(file_name) == includes,
+                    "%s names %s other than in its include literal (%s)" % (rel, file_name, rule))
+        else:
+            require(file_name not in code, "%s names %s (%s)" % (rel, file_name, rule))
+        for kind, macro, name in I01B4_ITEM.findall(code):
+            kind = kind or macro
+            require(kind not in ("fn", "mod") or (name not in I01B4_FN_MOD_NAMES and I01B4_FN_MOD_PART not in name),
+                    "%s declares %s %s, a profile v2 validator's name (%s, clause (c))" % (rel, kind, name, rule))
+            folded = i01b4_folded(name)
+            require(folded not in I01B4_ITEM_NAMES and I01B4_ITEM_PART not in folded,
+                    "%s declares %s %s, a profile v2 validator's name (%s, clause (c1))" % (rel, kind, name, rule))
+        for part in rel.split("/")[2:]:
+            folded = i01b4_folded(part[:-3] if part.endswith(".rs") else part)
+            require(I01B4_PATH_PART not in folded or I01B4_PATH_EXEMPT in folded,
+                    "%s is named after profile v2 (%s, clause (c2))" % (rel, rule))
+        if not reader:
+            for text in texts:
+                require(text not in code, "%s holds row 79's negative text %r (%s, clause (c3))" % (rel, text, rule))
+            require(PROFILE_V2_SCHEMA_SHA256 not in code,
+                    "%s holds profile v2's schema sha256 (%s, clause (c3))" % (rel, rule))
+    require(reader_includes == 1, "%s does not include %s exactly once (%s)" % (I01B4_ROW79_READER, I01B4_ROW79, rule))
+    return len(sources)
+
+
 def casefold_siblings(directory: str, entries: list[str], names: set[str], rule: str) -> None:
     """HE-004-I01B1 R-B3-PIN, I1D-10's casefold clause over one directory's listing (entry names, so the clause is
     exercised on any file system; PR review round 1, R1-4): an entry whose casefold equals a guarded name's, other than
@@ -5346,6 +5447,12 @@ def main() -> int:
             % (check_i01b_contracts(HE), ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V10_ROWS.items()),
                ", ".join("%s (row %d)" % (rel, row[0]) for rel, row in I01B_EDGE_V11_ROWS.items()),
                len(OBSERVER_EMBEDDED_CONTRACTS)))
+        say("I01B4 replay scope (HE-004-I01B4, G-I01B4-1): %d crate sources; no registered or contracts/ file is profile "
+            "v2's %s, by name or by sha256 %s; %s is included exactly once, by %s, and named in no other source; no fn, "
+            "mod or other item takes a profile v2 validator's name (clauses (c), (c1)), no source path is named after "
+            "profile v2 (c2), and row 79's %d negative texts and the schema's sha256 occur in no other source (c3)"
+            % (check_i01b4_replay_scope(HE), PROFILE_V2_SCHEMA_NAME, PROFILE_V2_SCHEMA_SHA256, I01B4_ROW79,
+               I01B4_ROW79_READER, I01B4_ROW79_TEXTS))
         say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 at their dd7422ed bytes, "
             "%s absent (no directory entry); no directory entry casefolds to a guarded name but itself, and each guarded "
             "module is declared once, in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"

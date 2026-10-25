@@ -1,6 +1,6 @@
 //! The I01 capture gate (HE-004-I01B1; DESIGN-I01B rev 3 sections 2 and 6 and DESIGN-I01B1 rev 2; owner decision
 //! Q-HE4I1-2 and the monitor's Q-I01B-13, Q-I01B-14 and Q-I01B-21): at each I01 answer, it decides if a value under
-//! the capture gate is admitted into it, exactly the contract's rule (`contracts/i01-digests-v1/README.md` section
+//! the capture gate is admitted into it, exactly the contract's rule (`contracts/i01-digests-v2/README.md` section
 //! 3.3, `definitions.json` `captureGate`, the pinned reference model's `capture_gate` and `required_slots`), over
 //! plain data. A pure logic module under the I01 logic whitelist (`tools/gate.py`, I01_LOGIC_PATHS): no clock, no
 //! capture view, no system call beyond allocation, every function total, no panic, and no caller in the binary
@@ -27,11 +27,11 @@ use crate::i01_digest::DigestKey;
 pub const GATE_BOUND_MS: u64 = 90_000;
 
 /// G-I01B-8's literal pin: an answer's canonical bytes are at most 65,536 (VPO's `_shape` of the observation,
-/// harness-onion `scripts/validate_policy_observation.py:86-88` at `2043cc27`; VPO pinned by digest in PROVENANCE).
+/// harness-onion `scripts/validate_policy_observation.py:86-88` at `f9882c1a`; VPO pinned by digest in PROVENANCE).
 pub const ANSWER_LIMIT: usize = 65_536;
 
 /// G-I01B-8's literal pin: an answer's `expiresAt` is at most 5 s after its `observedAt` (VPO's freshness rule,
-/// harness-onion `scripts/validate_policy_observation.py:128` at `2043cc27`).
+/// harness-onion `scripts/validate_policy_observation.py:128` at `f9882c1a`).
 pub const FRESHNESS_WINDOW_SECONDS: u64 = 5;
 
 /// G-I01B-8's literal pin: no answer later than the request's receipt plus 2 s on the monotonic clock (the monitor's
