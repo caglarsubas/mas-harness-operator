@@ -11,13 +11,24 @@ ROOT = Path(__file__).resolve().parents[2]
 SCAN = ROOT / "ci/zero_bill_scan.py"
 # The scanned words are built at run time, so this file never matches the scan it tests.
 NODE_PORT, LOAD_BALANCER, KEY = "Node" + "Port", "Load" + "Balancer", "api" + "_key"
+# Every allowlisted file, admission v3's two first (CONTRACTS[1] is the file the exemption test rewrites); then the I01
+# digest contract v1's vectors and the render (Q-I01B1-ZB), the render at its HE-004-I01B4 bytes; then the three
+# HE-004-I01B4 files (Q-I01B4-ZB; Q-I01B4D-2 (a)).
 CONTRACTS = ("host-enforcement/contracts/admission-v3/admission-manifests/planeon-a2.json",
-             "host-enforcement/contracts/admission-v3/vectors.json")
+             "host-enforcement/contracts/admission-v3/vectors.json",
+             "host-enforcement/contracts/i01-digests-v1/vectors.json",
+             "host-enforcement/crates/observer/src/i01_admission_render.rs",
+             "host-enforcement/contracts/i01-digests-v2/vectors.json",
+             "host-enforcement/contracts/admission-v4/vectors.json",
+             "host-enforcement/contracts/admission-v4/admission-manifests/planeon-a2.json")
 
 
 class ZeroBillContractAllowlistTests(unittest.TestCase):
-    """The pinned admission-v3 contract files are exempt from the service-type patterns only with their exact bytes at
-    their exact paths (owner decision Q-HE4B1-ZB (a), 2026-10-18)."""
+    """The pinned contract files are exempt from the service-type patterns only with their exact bytes at their exact
+    paths (owner decisions Q-HE4B1-ZB (a), 2026-10-18; Q-I01B1-ZB, 2026-10-23; Q-I01B4-ZB, 2026-10-25). Every allowlisted
+    file passes at its pinned bytes, and a changed byte in any of them refuses with both service-type patterns
+    (Q-I01B4D-2 (a)); admission v3's vectors refuse at admission v4's entry, whose digest they do not match, and at a
+    path no entry names."""
 
     def tree(self, files: dict[str, bytes]) -> Path:
         base = Path(tempfile.mkdtemp(prefix="zero-bill-"))
@@ -50,10 +61,14 @@ class ZeroBillContractAllowlistTests(unittest.TestCase):
                               result.stderr)
 
     def test_the_same_bytes_at_another_path_are_refused(self) -> None:
-        moved = "host-enforcement/contracts/admission-v4/vectors.json"
-        result = self.scan(self.tree({moved: (ROOT / CONTRACTS[1]).read_bytes()}))
-        self.assertEqual(result.returncode, 1)
-        self.assertIn(moved + " contains prohibited executable configuration: (?i)" + NODE_PORT, result.stderr)
+        # admission-v4/vectors.json is an entry since HE-004-I01B4, so this is now a cross-entry case: admission v3's
+        # bytes do not match its digest. admission-v5/vectors.json is a path no entry names.
+        for moved in ("host-enforcement/contracts/admission-v4/vectors.json",
+                      "host-enforcement/contracts/admission-v5/vectors.json"):
+            with self.subTest(moved=moved):
+                result = self.scan(self.tree({moved: (ROOT / CONTRACTS[1]).read_bytes()}))
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(moved + " contains prohibited executable configuration: (?i)" + NODE_PORT, result.stderr)
 
     def test_the_exemption_covers_the_service_type_patterns_only(self) -> None:
         # A scan whose allowlist pins a file that names both service types and also carries a key assignment: the two

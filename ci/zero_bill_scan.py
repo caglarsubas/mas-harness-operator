@@ -37,7 +37,7 @@ CONTRACT_ALLOWLIST = {
     "host-enforcement/contracts/i01-digests-v2/vectors.json":
         "68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594",
     "host-enforcement/crates/observer/src/i01_admission_render.rs":
-        "2e23e488b241cf28c5070174c87790bbdb8e22807b7800de3333148939fdabae",
+        "fe856578980aa5ba54e160d5088ec690cceef75173346ca1998fd524701506bb",
 }
 
 
