@@ -23,13 +23,35 @@
 //!   test applies the framing rules to `PV`'s positive request in other encodings than its canonical one.
 //!
 //! Not replayed: `PV`'s 17 observation negatives and 5 binding negatives. Those cases also read the proxy profile,
-//! `architecture/proxy-contract-inputs/vectors.json`, which no edge record registers (edge record v9's replay-scope
-//! note), so replaying them in R10 needs a later record first; the observation side is I01b's.
+//! `architecture/proxy-contract-inputs/vectors.json`, which edge record v9 did not register (its replay-scope note;
+//! edge record v10's row 72 registered it for HE-004-I01B1); the observation side is I01b's.
 //!
 //! HE-004-I01B1 (DESIGN-I01B rev 3 section 8.1; the monitor's R-B1-13 (a)) adds those 22 cases' table as data
 //! (`PV_CASES`): each case's label, the VPO rule it breaks, its checker (an R10 check, or HE-008's profile-side one)
 //! and the packet that replays it. A test holds its labels to `PV`'s negatives 6-27, each once. No row is replayed in
 //! HE-004-I01B1.
+//!
+//! HE-004-I01B4, W3 (DESIGN-I01B4 rev 2 section 4.3; the monitor's Q-I01B4-4 and Q-I01B4D-1 (a); I4D-3, I4D-4, I4D-13):
+//! - The source is S1's complete triple, the one profile v2 wire triple that exists: `complete` inside the I01 digest
+//!   contract v2's vectors (`contracts/i01-digests-v2/vectors.json`, edge record v11's row 74, pinned by its sha256 and
+//!   size). Its `now`, `previous` (null), scope window, nonces and challenge are `PV`'s.
+//! - The derivation rule (R10-defined, MODEL_DEFINED R181): for each of `PV`'s negatives 6-27, the derived case is the
+//!   triple's binding or observation with exactly that negative's one change, its `value` at its `path`; nothing is
+//!   recomputed, as `PV`'s own negatives are its positive with one change. The label stays `PV`'s, and the rule label,
+//!   checker and packet stay `PV_CASES`' row (the rule column is a label, not a VPO result).
+//! - Checked here, structure only: the derived cases are exactly `PV_CASES`' 22 labels, in order; each path exists in
+//!   the triple's document; each value differs from the triple's value there; each derived document equals the
+//!   triple's but at that one path. That each derived case still breaks the same VPO rule, and only it, is not shown
+//!   (harness-onion's VPO proof, not chosen). No derived case is run against a checker here: none exists yet.
+//! - The request side (Q-I01B4D-1 (a)): the triple's request equals `PV`'s positive request but at `bindingDigest`; it
+//!   passes framing, the schema, a fresh chain and `binding_gate` with the test binding built from the triple's
+//!   binding; and `PV`'s five request negatives, applied to the triple by the same rule, each with a value other than
+//!   the triple's, refuse at their own steps.
+//! - Carried: W3's derived cases (R181): negative-27 is replayed against the load-time check (status 13) in
+//!   HE-004-I01B2, and the 18 rows whose packet is HE-004-I01B3 against their checkers in HE-004-I01B3, each as the
+//!   derived case on S1's v2 triple (row 74), with the derivation rule unchanged; each packet's design section states
+//!   it and whether PV's v1 cases are also replayed. Cases 18, 23 and 24 (packet `-`, checker HE-008's profile-side
+//!   one) are replayed in no R10 packet.
 
 use i05_protocol::json::{self, JStr, Value};
 use i05_protocol::sha256;
@@ -41,6 +63,11 @@ const CS: &str = include_str!("../../../contracts/i01-v1/channel.schema.json");
 /// Edge record v9's rows 67 and 68: the schema's and the vectors' sha256 and size.
 const CS_PIN: (&str, usize) = ("fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e", 41_771);
 const PV_PIN: (&str, usize) = ("1bfb46776636f800e38ab6a8f94a0989aa38513fb4a28ef18e61e732a115c124", 14_486);
+/// HE-004-I01B4 (W3): the I01 digest contract v2's vectors, S1's complete triple's file (edge record v11's row 74:
+/// its sha256 and size), and the triple's request `bindingDigest`, the canonical digest of its binding.
+const DIGEST_VECTORS: &[u8] = include_bytes!("../../../contracts/i01-digests-v2/vectors.json");
+const ROW_74_PIN: (&str, usize) = ("68eab4709431f73ce6f977aad7e5a087dccf9b5635c4ce04b8c08387bdce2594", 602_663);
+const TRIPLE_BINDING_DIGEST: &str = "sha256:6e745318b14b5c5e3139516bd581405cb9627303e804a15067888eff45e77b94";
 /// `PV`'s five request negatives, in file order.
 const REQUEST_NEGATIVES: [&str; 5] = ["negative-1-request-operation", "negative-2-request-runNonce",
                                       "negative-3-request-bindingDigest", "negative-4-request-sequence",
@@ -163,13 +190,57 @@ fn test_binding(positive: &Value) -> I01Binding {
 
 /// `PV`'s request negatives, each with its request: the positive's with the negative's one change.
 fn request_negatives(vectors: &Value) -> Vec<(String, Value)> {
-    let request = member(positive(vectors), "request");
+    request_negatives_on(vectors, member(positive(vectors), "request"))
+}
+
+/// `PV`'s request negatives applied to `request` (`PV`'s positive request, or HE-004-I01B4's triple's): each with
+/// `request` changed in the negative's one member.
+fn request_negatives_on(vectors: &Value, request: &Value) -> Vec<(String, Value)> {
     let cases = member(vectors, "negative").as_array().expect("the negatives are an array");
     cases.iter()
          .filter(|case| text(case, "document") == "request")
          .map(|case| {
              let path = member(case, "path").as_array().expect("a path");
              (text(case, "label").to_string(), with_value(request, path, member(case, "value")))
+         })
+         .collect()
+}
+
+/// The value at `path` (object member names) in `document`, if every step names a member.
+fn value_at<'a>(document: &'a Value, path: &[Value]) -> Option<&'a Value> {
+    path.iter().try_fold(document, |node, step| node.get(step.as_str()?))
+}
+
+/// HE-004-I01B4 (W3): row 74's file, and S1's complete triple in it.
+fn digest_vectors() -> Value {
+    parse(std::str::from_utf8(DIGEST_VECTORS).expect("the vendored file is UTF-8"))
+}
+
+fn triple(vectors: &Value) -> &Value {
+    member(vectors, "complete")
+}
+
+/// One of W3's derived cases: `PV`'s label, document, path and value, and the derived document.
+struct Derived<'a> {
+    label: &'a str,
+    document: &'a str,
+    path: &'a [Value],
+    value: &'a Value,
+    derived: Value,
+}
+
+/// W3's derivation rule (R10-defined, MODEL_DEFINED R181): each of `PV`'s negatives 6-27 (`document` observation or
+/// binding) applied to the triple, its one change, `value` at `path`, in the triple's `document`. Nothing is
+/// recomputed.
+fn derived_cases<'a>(vectors: &'a Value, triple: &Value) -> Vec<Derived<'a>> {
+    let cases = member(vectors, "negative").as_array().expect("the negatives are an array");
+    cases.iter()
+         .filter(|case| ["observation", "binding"].contains(&text(case, "document")))
+         .map(|case| {
+             let (document, path) = (text(case, "document"), member(case, "path").as_array().expect("a path"));
+             let value = member(case, "value");
+             Derived { label: text(case, "label"), document, path, value,
+                       derived: with_value(member(triple, document), path, value) }
          })
          .collect()
 }
@@ -299,6 +370,38 @@ fn pv_s_positive_request_passes_every_check_with_the_test_binding() {
     assert_eq!(check_request(&bytes, false, &mut Chain::default(), None), Err(RequestRefusal::Binding));
 }
 
+/// One request negative refuses at its own step (the rule `expected` names), with `bound` the positive's test binding.
+fn refuses_at_its_own_step(label: &str, request: &Value, bound: &I01Binding) {
+    let refusal = expected(label);
+    let bytes = canonical(request);
+    // Every request negative is well framed: it changes one member's value.
+    let framed = frame(&bytes, false).unwrap_or_else(|error| panic!("{label} frames: {error:?}"));
+    let schema = request_schema(&framed);
+    match refusal {
+        RequestRefusal::Schema(_) => assert_eq!(schema, Err(refusal), "{label}"),
+        RequestRefusal::Chain(_) => {
+            let checked = schema.unwrap_or_else(|error| panic!("{label} has the schema's form: {error:?}"));
+            assert_eq!(Chain::default().check(&checked), Err(refusal), "{label}");
+            // Its binding members are the positive's, so the gate alone would pass it.
+            assert_eq!(binding_gate(&checked, Some(bound)), Ok(()), "{label}");
+        }
+        RequestRefusal::Binding => {
+            let checked = schema.unwrap_or_else(|error| panic!("{label} has the schema's form: {error:?}"));
+            assert_eq!(Chain::default().check(&checked), Ok(()), "{label}");
+            assert_eq!(binding_gate(&checked, Some(bound)), Err(refusal), "{label}");
+            // The changed member is the refusal's cause: a binding naming it would pass the request.
+            let named = I01Binding { binding_digest: checked.binding_digest.clone(),
+                                     run_nonce: checked.run_nonce.clone() };
+            assert_ne!(&named, bound, "{label}");
+            assert_eq!(binding_gate(&checked, Some(&named)), Ok(()), "{label}");
+        }
+        other => panic!("{label}: no request negative refuses at {other:?}"),
+    }
+    // The whole check, in its order, with the test binding and without one (I01a's case): the same refusal.
+    assert_eq!(check_request(&bytes, false, &mut Chain::default(), Some(bound)), Err(refusal), "{label}");
+    assert_eq!(check_request(&bytes, false, &mut Chain::default(), None), Err(refusal), "{label}");
+}
+
 #[test]
 fn each_request_negative_refuses_at_its_own_step() {
     let vectors = vectors();
@@ -306,34 +409,86 @@ fn each_request_negative_refuses_at_its_own_step() {
     let negatives = request_negatives(&vectors);
     assert_eq!(negatives.len(), REQUEST_NEGATIVES.len());
     for (label, request) in &negatives {
-        let refusal = expected(label);
-        let bytes = canonical(request);
-        // Every request negative is well framed: it changes one member's value.
-        let framed = frame(&bytes, false).unwrap_or_else(|error| panic!("{label} frames: {error:?}"));
-        let schema = request_schema(&framed);
-        match refusal {
-            RequestRefusal::Schema(_) => assert_eq!(schema, Err(refusal), "{label}"),
-            RequestRefusal::Chain(_) => {
-                let checked = schema.unwrap_or_else(|error| panic!("{label} has the schema's form: {error:?}"));
-                assert_eq!(Chain::default().check(&checked), Err(refusal), "{label}");
-                // Its binding members are the positive's, so the gate alone would pass it.
-                assert_eq!(binding_gate(&checked, Some(&bound)), Ok(()), "{label}");
-            }
-            RequestRefusal::Binding => {
-                let checked = schema.unwrap_or_else(|error| panic!("{label} has the schema's form: {error:?}"));
-                assert_eq!(Chain::default().check(&checked), Ok(()), "{label}");
-                assert_eq!(binding_gate(&checked, Some(&bound)), Err(refusal), "{label}");
-                // The changed member is the refusal's cause: a binding naming it would pass the request.
-                let named = I01Binding { binding_digest: checked.binding_digest.clone(),
-                                         run_nonce: checked.run_nonce.clone() };
-                assert_ne!(named, bound, "{label}");
-                assert_eq!(binding_gate(&checked, Some(&named)), Ok(()), "{label}");
-            }
-            other => panic!("{label}: no request negative refuses at {other:?}"),
-        }
-        // The whole check, in its order, with the test binding and without one (I01a's case): the same refusal.
-        assert_eq!(check_request(&bytes, false, &mut Chain::default(), Some(&bound)), Err(refusal), "{label}");
-        assert_eq!(check_request(&bytes, false, &mut Chain::default(), None), Err(refusal), "{label}");
+        refuses_at_its_own_step(label, request, &bound);
+    }
+}
+
+#[test]
+fn w3_s_derived_cases_are_pv_cases_22_rows_on_s1_s_triple() {
+    // HE-004-I01B4, W3 (DESIGN-I01B4 rev 2 section 4.3): structure only, no checker.
+    assert_eq!((hex(DIGEST_VECTORS), DIGEST_VECTORS.len()), (ROW_74_PIN.0.to_string(), ROW_74_PIN.1));
+    let (vectors, digests) = (vectors(), digest_vectors());
+    let (positive, triple) = (positive(&vectors), triple(&digests));
+    // The triple's now, previous, scope window, nonces and challenge are PV's.
+    assert!(json::json_eq(member(triple, "now"), member(positive, "now")));
+    assert!(member(triple, "previous").is_null() && member(positive, "previous").is_null());
+    let (scope, pv_scope) = (member(member(triple, "binding"), "scope"), member(member(positive, "binding"), "scope"));
+    for name in ["validFrom", "expiresAt", "runNonce", "capacityNonce"] {
+        assert_eq!(text(scope, name), text(pv_scope, name), "scope.{name}");
+    }
+    assert_eq!(text(member(triple, "request"), "challenge"), text(member(positive, "request"), "challenge"));
+    assert_eq!(text(member(triple, "observation"), "challenge"), text(member(positive, "observation"), "challenge"));
+    let cases = derived_cases(&vectors, triple);
+    let labels: Vec<&str> = cases.iter().map(|case| case.label).collect();
+    let table: Vec<&str> = PV_CASES.iter().map(|&(label, _, _, _)| label).collect();
+    assert_eq!(labels, table);
+    for case in &cases {
+        let label = case.label;
+        let original = member(triple, case.document);
+        // The path exists in the triple's document, and the negative's value differs from the triple's there.
+        let held = value_at(original, case.path).unwrap_or_else(|| panic!("{label}: the path is in the triple"));
+        assert!(!json::json_eq(held, case.value), "{label}: the value differs from the triple's");
+        // The derived document holds the value there, and equals the triple's document but at that one path.
+        assert!(value_at(&case.derived, case.path).is_some_and(|got| json::json_eq(got, case.value)), "{label}");
+        assert!(!json::json_eq(&case.derived, original), "{label}");
+        assert!(json::json_eq(&with_value(&case.derived, case.path, held), original), "{label}: one change only");
+    }
+    let count = |document: &str| cases.iter().filter(|case| case.document == document).count();
+    assert_eq!((cases.len(), count("observation"), count("binding")), (22, 17, 5));
+}
+
+#[test]
+fn s1_s_triple_request_passes_and_pv_s_request_negatives_refuse_on_it() {
+    // HE-004-I01B4, the request side (Q-I01B4D-1 (a), with I4D-4's two assertions).
+    let (vectors, digests) = (vectors(), digest_vectors());
+    let triple = triple(&digests);
+    let (request, pv_request) = (member(triple, "request"), member(member(&vectors, "positive"), "request"));
+    // (1) The triple's request is PV's positive request but at bindingDigest.
+    let differing: Vec<&str> = request.as_object().expect("the request is an object").iter()
+        .map(|(name, _)| name.as_str().expect("a text name"))
+        .filter(|name| !pv_request.get(name).is_some_and(|theirs| json::json_eq(member(request, name), theirs)))
+        .collect();
+    assert_eq!(differing, ["bindingDigest"]);
+    assert_eq!(request.as_object().map(|object| object.len()), pv_request.as_object().map(|object| object.len()));
+    // Framing, the schema, a fresh chain and binding_gate, with the test binding built from the triple's binding (its
+    // canonical digest is the request's bindingDigest, and the scope's runNonce).
+    let bound = test_binding(triple);
+    assert_eq!((bound.binding_digest.as_str(), bound.run_nonce.as_str()),
+               (TRIPLE_BINDING_DIGEST, text(request, "runNonce")));
+    assert_eq!(text(request, "bindingDigest"), TRIPLE_BINDING_DIGEST);
+    let bytes = canonical(request);
+    let checked = request_schema(&frame(&bytes, false).expect("the triple's request frames"))
+        .expect("the triple's request has the schema's form");
+    assert_eq!((checked.sequence, checked.previous_digest.as_str()), (1, ZERO_DIGEST));
+    assert_eq!(Chain::default().check(&checked), Ok(()));
+    assert_eq!(binding_gate(&checked, Some(&bound)), Ok(()));
+    assert_eq!(check_request(&bytes, false, &mut Chain::default(), Some(&bound)), Ok(checked));
+    // PV's binding does not name the triple's request.
+    assert_eq!(check_request(&bytes, false, &mut Chain::default(), Some(&test_binding(member(&vectors, "positive")))),
+               Err(RequestRefusal::Binding));
+    // PV's five request negatives, applied to the triple by the same rule: (2) each value differs from the triple's,
+    // and each refuses at its own step.
+    let negatives = request_negatives_on(&vectors, request);
+    let labels: Vec<&str> = negatives.iter().map(|(label, _)| label.as_str()).collect();
+    assert_eq!(labels, REQUEST_NEGATIVES);
+    let cases = member(&vectors, "negative").as_array().expect("the negatives are an array");
+    for case in cases.iter().filter(|case| text(case, "document") == "request") {
+        let path = member(case, "path").as_array().expect("a path");
+        let held = value_at(request, path).expect("the path is in the triple's request");
+        assert!(!json::json_eq(held, member(case, "value")), "{}: the value differs", text(case, "label"));
+    }
+    for (label, negative) in &negatives {
+        refuses_at_its_own_step(label, negative, &bound);
     }
 }
 
