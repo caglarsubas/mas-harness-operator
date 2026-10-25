@@ -2856,3 +2856,157 @@ I01B2 (configuration v3 and the binding) and I01B3 (the answer and the send) kee
 
 The complete messages, and the section review's I4D-1 to I4D-14 (`reviews/design-review-I01B4-round1.json`,
 `e2d0c558…`), are recorded in the operator's `tools/w03/he004/` files.
+
+## HE-004-I01B2: configuration v3 and the binding (`config.rs`, `i01_request.rs`, `i01_service.rs`, `observe.rs`, `main.rs`; five test binaries and `c_support`; `tools/gate.py`)
+
+The packet is DESIGN-I01B rev 3's section 1 item 2 and section 3 (`97bdefa6…`, closed under Q-I01B-CAP), built as
+DESIGN-I01B2 revision 3 states it (sha256 `020727f2…`): its section 2 carries round 3's B3-2, B3-3, B3-8, B3-9 (a) and
+B3-11 (a) and (c) verbatim, and its sections 13 and 14 carry the two section reviews' I2D-1 to I2D-14
+(`reviews/design-review-I01B2-round1.json`, `a9377d99…`) and I2E-1 to I2E-7 (`-round2.json`, `d7232e80…`) as binding
+build rules, with the monitor's Q-I01B2D-1..4, its rulings on both rounds and the build GO (the operator's
+`tools/w03/he004/OWNER_DECISIONS.md`, 2026-10-25). It is the first I01B packet that changes planeon-observer's reachable
+code, in five places: `serve` (the v3 parse and the one `from_config` statement), `config.rs` (configuration v3, its
+load-time checks and the private binding with its accessor), `i01_request.rs` (the closed binding), `i01_service.rs`
+(the service holding it, `NotAnswered`) and `observe::run` (its seventh argument). planeon-gate's sources are untouched,
+as are the I01 logic modules of I01B1 (G-I01B-1 keeps its I01B1 form). Every request still closes, and nothing is sent.
+Its rules are R184-R196.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R184 | Configuration v3 (`planeon.observer-config/v3`, `config::FORMAT_V3`), the observer configuration successor: v2's nine members and `sealedAdmission` and `binding`, eleven, closed; signed under the unchanged domain `planeon.observer-config/v1`. v2's members keep v2's checks (`fn members`, the record's reference as `parse_with_record` checks it), with `generation` narrowed to 64 lowercase hex (`is_generation_v3`, inside R19's store-name form). `binding` is the release-listed binding document inline; since the whole configuration must be its own canonical encoding, the member is byte for byte its canonical form. `ObserverConfig::parse_v3(document: &[u8]) -> Result<(ObserverConfig, FileRef), ConfigError>` (B3-11 (c)) is the only parse `serve` calls; v1 and v2 documents refuse there (Schema, status 13: their member sets and formats differ), and a v3 document refuses in `parse` and `parse_with_record`, which stay unchanged for their tests and leave the binding `Value::Null` and `sealed` `None`. HE-008 signs v3 with the binding's expected values and the three sealed admission values, which it computes with the v2 model at enrollment; R10 parses and checks them, and compares the values from HE-004-I01B3 on | DESIGN-I01B2 §3; DIB §3.1; B3-11 (c) |
+| R185 | The load-time checks, each status 13 with its own `ConfigError::Check` text (a pub constant, so a test attributes each refusal), in `parse_v3` after v2's checks and in this order, the namespaces first [I2D-8]: (1) `binding.scope.namespace` and `binding.namespace.name` both equal `qualificationNamespace` (a missing or non-text one refuses here too); (2) the binding against CS's `$defs.binding` (`contracts/i01-v1/channel.schema.json`): `config::BINDING_FORM`, a typed table written from CS's text (every object closed with each member required, the one constant `planeon.internal.policy-observation-binding/v1`, each text's code-point bounds and pattern, each projection's `namespace` a label text or null), the patterns written by hand (`TextPattern::matches`, `$` only at the end as in ECMA-262), the refusal naming the member; (3) `binding.scope.serviceAccountSubject` is `system:serviceaccount:<qualificationNamespace>:<name>`, the name of CS's class `[a-z0-9.-]+`; (4) the sealed values' forms [I2D-10], `sealedAdmission` closed: `ipFamily` exactly `IPv4` or `IPv6` (the two `ipFamilies` values the Service API has and A2-SVC-ALLOCATION compares, admission v4's model at `f9882c1a`, `:444-447`); `serviceCIDR` a network of that family in canonical text, `/` and a decimal prefix without a leading zero, every host bit zero (the v4 model's strict `ip_network`, `:346`): IPv4 as gate-sys's `parse_ipv4` reads four decimal octets without leading zeros, prefix 0..32; IPv6 in RFC 5952's lowercase compressed form, prefix 0..128, the text equal to the address's own rendering (no dotted tail); `defaultTolerationSeconds` an integer in 0..2^53-1 (the canonical subset already holds every integer there). R10-defined: the v2 model (`:282-283`, types only) and admission v4 state no form. The check names no `i01_digest` item (G-I01B-1) | DESIGN-I01B2 §4; Q-I01B2D-1 (a); I2D-8, I2D-10 |
+| R186 | The binding's provenance in config.rs [B2-11 (f), B3-2, I2D-1..3, I2D-13, I2E-3, I2E-7]: a private field `binding: Value` and `pub fn binding(&self) -> &Value`, whose body is exactly `&self.binding`; the one `ObserverConfig {` literal, in `fn members`, sets `binding: Value::Null` and `sealed: None`; in `parse_v3` the local `binding` is bound once, `let binding = match root.get("binding") { .. }`, from the checked member after every load-time check, and assigned once, `config.binding = binding;`, as statements of its outermost block; config.rs names no other field or method `binding`, the checks read the member, never `config.binding()`, and config.rs names no `Self`. `ObserverConfig` derives exactly `Clone, Debug` (I2D-2; i05-protocol's `Value` derives only those), and nothing compares whole configurations (the build compiled every test so). `pub sealed: Option<SealedValues>` (Q-I01B2D-2 (a)), `SealedValues { ip_family, service_cidr, default_toleration_seconds }` deriving `Clone, Debug, PartialEq, Eq` and never `Default`, set after the checks. `c_support::config_for` builds its configuration with `ObserverConfig::parse` over a v1 test document carrying the same values and lifetime | DESIGN-I01B2 §3; Q-I01B2D-2 (a) |
+| R187 | The closed binding (G-I01B-3): `#[derive(Debug, PartialEq, Eq)] pub struct I01Binding { signed_digest: String, signed_nonce: String }`, renamed from `binding_digest`/`run_nonce` (neither new word occurred in the observer before); one `impl I01Binding {` with `pub fn from_config(binding: &Value) -> Option<I01Binding>` (B3-11 (a)) and the getters `signed_digest()` and `signed_nonce()`. `from_config` gives `sha256:` and the hex SHA-256 of i05-protocol's canonical encoding of the member and its `scope.runNonce`, and `None` when the encoding fails or `scope.runNonce` is not text (status 13 in `serve`; it does not occur after R185, which requires that member). `binding_gate(request: &I01Request, binding: Option<&I01Binding>) -> Result<(), RequestRefusal>` and `check_request(bytes: &[u8], truncated: bool, chain: &mut Chain, binding: Option<&I01Binding>) -> Result<I01Request, RequestRefusal>` keep their signatures (B3-8; the `None` tests stay) and compare through the getters. `i01_request.rs` stays a logic module with its whitelist unchanged (`i05_protocol::sha256` was on it) | DESIGN-I01B2 §6; DIB §3.4; B3-8, B3-11 (a) |
+| R188 | The service: `I01Service` holds a private `binding: I01Binding`, `pub fn new(server: ServerIdentity, binding: I01Binding) -> I01Service`; the gate arm calls `check_request(bytes, false, &mut session.chain, Some(&self.binding))`: a refusal closes as `Closed::Request(refusal)`, as before, and a request that passes closes as the new `Closed::NotAnswered`. Nothing is answered or sent (no send path exists until HE-004-I01B3; G-I01-5 stands). `observe::run` takes `binding: I01Binding` seventh and hands it to `I01Service::new(server, binding)`. Q-I01A-3 (a)'s comment is replaced | DESIGN-I01B2 §6; B3-9 (a) |
+| R189 | `serve`'s wiring, fourteen calls in order: `signed_config::load(`, `ObserverConfig::parse_v3(`, `config::check_lifetime(`, `I01Binding::from_config(`, `credentials::observer_inputs(`, `client_config(`, `CaptureSchema::embedded(`, `enrolled::load_record(`, `Enrolled::new(`, `enrolled.server_identity(`, `LinuxWire::new(`, `LinuxCapture::new(`, `Closure::embedded(`, `observe::run(`. Call 1 is the statement `let document = match signed_config::load() { Ok(document) => document, Err(error) => return status::config_load(&error), };`, call 2 `let Ok((config, record_ref)) = ObserverConfig::parse_v3(&document) else { return status::CONFIG_CHECK };`, followed by `drop(document);`, and call 4 `let Some(binding) = I01Binding::from_config(config.binding()) else { return status::CONFIG_CHECK };`, each a statement of `serve`'s outermost block; `observe::run(wire, config, tls, closure, captures, server, binding)`; `serve` imports `planeon_observer::i01_request::I01Binding` | DESIGN-I01B2 §5; DIB §3.3; I2D-4 (1), I2E-1, I2E-2 |
+| R190 | Gate rule G-I01B-3, `check_i01b_binding` (6 clauses, each its own function, over the observer's non-test sources as `observer_code` reads them): (i) one `struct I01Binding` in i01_request.rs, its fields exactly the two private texts, its attributes exactly one derive of {Debug, PartialEq, Eq}; (iii) every impl header naming I01Binding is i01_request.rs's one `impl I01Binding {`, holding exactly `from_config` and the two getters with bodies `&self.signed_digest` and `&self.signed_nonce`, and no const, type or static; (ii) `\bI01Binding(?:::\s*<\s*>)?\s*\{` once outside the definition and the impl header, inside `fn from_config`, no `Self {` or `Self(` in i01_request.rs, and in no other source; (iv) outside that impl, `.signed_digest` and `.signed_nonce` only as getter calls; (v) no `as` rename and no `type` item naming it; (vi) the word six times, at `struct`, `impl`, and the three exact signatures (from_config's position 3, binding_gate's and check_request's positions 5 and 6) and the one literal. Its say line prints the count | DIB §6 G-I01B-3; B3-8, B3-11 (a) |
+| R191 | Gate rule G-I01B-4, `check_i01b_constructor` (13 clauses; each of (b1)-(b6) and (c1)-(c4) its own function, so that exactly one can be disabled): (a) the word `from_config` twice in the crate (`fn from_config(` inside `impl I01Binding {`; `serve`'s pinned statement, outermost); (b) in main.rs `\bserve\s*\(` twice (B2-10) and the word `serve` twice (B3-3), and `observe::run(`'s seven arguments (the fourteen calls, the refused v1 and v2 parses and the imports stay `check_observer_serve`'s and the seal-order grammar's); (b1) the pinned load statement once [I2E-1]; (b2) `document` 5 times: 3 in the outermost statement holding `signed_config::load(`, 1 in the outermost statement holding `parse_v3`, 1 in `drop(document);`, an outermost statement after it [I2E-2 (i)]; (b3) `config` not before `::` 5 times: once each in the outermost statement holding `parse_v3`, `config::check_lifetime(&config, `, the from_config statement's `config.binding()`, `credentials::observer_inputs(&config.credentials)` and `observe::run(`'s second argument [I2E-2 (ii)]; (b4) every match of the load and parse pins an outermost statement, load before parse [I2E-2 (iii)]; (b5) the pinned parse statement once [I2D-4 (1)]; (b6) `parse_v3` twice over every observer source with use declarations kept, its definition inside `impl ObserverConfig {` and once inside `serve` [I2E-2 (iv)]; (c) the private field, the accessor and its body, and `\bObserverConfig(?:::\s*<\s*>)?\s*\{` once outside the definition and impl headers, inside `fn members`, holding `binding: Value::Null` [B3-2]; (c1) no use declaration renames ObserverConfig with `as` and no `type` item at any nesting (associated types included) names it, crate-wide [I2D-1, I2E-5]; (c2) the dot form `\.\s*(?:r#)?binding\b` twice in config.rs, once in the accessor's body and once in `parse_v3`'s [I2D-13]; (c3) in `parse_v3`'s body the word `binding`, dot forms and `field:` names in struct expressions and patterns set aside, twice: the pattern of the one outermost `let binding = ..;` and the right side of the one outermost `config.binding = binding;` after it [I2D-3, I2E-3]; (c4) no word `Self` in config.rs [I2E-7]. Its say line prints the count | DIB §6 G-I01B-4; DESIGN-I01B2 §5, §7; B3-2, B3-3; I2D-1, I2D-3, I2D-4 (1), I2D-13; I2E-1..3, I2E-5, I2E-7 |
+| R192 | The self-tests (388, the base's 369 and 19): `I01BindingRuleTests` (18) over a fixture of main.rs's `serve`, config.rs's accessor and `parse_v3`, i01_request.rs's closed binding and the two sources that carry it: the fixture and the real sources pass; DIB §7.1's P3-1..P3-7, SR-2, N2-1, N2-1b and round 3's X3-1..X3-4 refuse under G-I01B-3; §7.2's P4-1..P4-6, N2-2, N2-2b, the two positives and the two wiring cases, and round 3's X4-1, X4-2, X4-3, X4-3b, X4-4, X4-5, X4-6 under G-I01B-4; the 35 NEW-n and H-n rows (`I01B2_ROWS`), one test per sub-clause, each refused with its own sub-clause's message (I2E-4); and the records' own spellings where a row departs from them. `ObserverServeV1ParseTests` gains the v2 parse's refusal (1). I2D-9's sites: `SERVE_STEPS` (fourteen, the wire step `SERVE_STEPS[10]`), the five `check_observer_serve(..) == 14`, the name list, `GOOD_OBSERVER_MAIN`'s parse line, from_config statement, `observe::run(` line and import, the v1 refusal, and `I01bGuardedPinTests`' digests. The mutation proof (the build's scratch `mutation_proof.py`, reading `I01B2_ROWS` and the fixture through `i01b2_tree`) shows each of the 35 refused by the full G-I01B-4 with its own sub-clause's message and passing with only that sub-clause's function a no-op | DESIGN-I01B2 §7; I2D-9, I2D-12; I2E-4 |
+| R193 | R-B3-PIN in I01B2: `config.rs` (`173b7adf…`), `i01_request.rs` (`e87c1e44…`) and `i01_service.rs` (`56a07477…`) are re-pinned in `I01B_GUARDED_PINS` at I01B2's bytes; effect-gate's `linux_os.rs` and `linux_net.rs`, `client.rs`, and `OBSERVER_HOME_PINS`' `linux_listen.rs` and `linux_net.rs` keep their pins and bytes; `i01_answer.rs` stays absent. R-TEXT: the PR review reads the three re-pinned files whole, and `serve` and `observe::run` whole beside them | DESIGN-I01B2 §1; R-B3-PIN; R-TEXT |
+| R194 | The cfg(test) correction (DIB §8.5, §3.4): test code inside `src/` lives only in strict `#[cfg(test)] mod tests` blocks, which `observer_code` blanks; any other `cfg(test)` item is read as non-test code, so a non-strict `#[cfg(test)] fn` calling `from_config` counts (P4-6), and a call in a strict block passes (the positive) | DESIGN-I01B2 §6, §9 |
+| R195 | PV case 27 replayed (Q-I01B2D-3 (a), `observer_config_v3`): PV's own case and W3's derived case on S1's v2 triple (row 74, R181's derivation rule unchanged: the triple's binding with PV's one change, `scope.namespace` → `"other"`), each as a v3 document for its qualification namespace (`unit-namespace`, `planeon-qual`): the unmutated document parses; the mutated one refuses with the namespace check's own text; with the form and the sealed values also broken, it still refuses there, and the same document unmutated refuses at the form (the namespaces first); each document's `qualificationNamespace` equals its binding's `namespace.name`, and the subject's namespace segment matches. `PV_CASES`' row stays; the PV replay's carried sentence says I01B2 replayed case 27. I01B4's carried obligation for negative-27 is discharged | DESIGN-I01B2 §8; Q-I01B2D-3 (a); I2D-8; R181 |
+| R196 | The sealed values fail closed (Q-I01B2D-2 (a), judged in round 1): a forged sealed value changes only the A2 render's hash, and HE-004-I01B3 accepts the render only if its hash equals both anchors, ADM-4's loaded hash (from the `Adm4Record`) and the binding's `enforcementPins.admissionFenceDigest` (now from the signed configuration through `config.binding()`); `pinnedManifestHash` is not an anchor, since it is a pub field. Nothing reads `config.sealed` in I01B2 | DESIGN-I01B2 §3; Q-I01B2D-2 (a); I2D-5 |
+
+### Superseded and discharged [I2D-11]
+
+- **R163 is superseded:** `I01Binding` is closed and no test builds it from fields; every binding comes from
+  `I01Binding::from_config`, and `serve` builds the production one from the signed configuration's checked member; the
+  service passes `Some(&self.binding)`, so a request naming the configuration's binding passes the gate and closes as
+  `NotAnswered`.
+- **HE-004-I01A2's PR review round 1, R1-4 is discharged:** the required I01Binding pin is G-I01B-3 and G-I01B-4 (R190,
+  R191). The chain-versus-binding order stays as recorded (unobservable from HE-004-I01B3).
+- **I01B4's other carried items stand** (ADM-4's loaded hash, the HE-008 cases, the 18 W3 rows, R1-6 on v2, W4, C1 and
+  C2, the vendored status lines). Of README section 11's live-port duties, MON-I01B4-FAMILY reads: "I01B2 (configuration
+  v3 and the binding) and I01B3 (the answer and the send) keep the live parts". I01B2 takes the configuration successor
+  (R184) and the binding's pin (R187-R191); the rest are I01B3's.
+
+### Points settled at build (inside DESIGN-I01B2's intent)
+
+- **The 35 rows' spellings (R192):** each row plants its record's form so that only its own sub-clause refuses it, as
+  the mutation proof requires; where the record's own spelling also breaks another place, the row keeps that place and
+  `test_the_review_records_own_spellings_refuse` holds the record's spelling refused by G-I01B-4: H1 keeps `Ok(document)`
+  and reads it once in the arm that returns the literal (the record's `Ok(_)` also drops a `document` word, (b2)); H2 and
+  H2b write `let mut document = document;` after the pinned load statement (the record's `let mut document = match ..`
+  also breaks the load pin, (b1)); H2c rewrites `Ok(mut document)` in a second match after the pinned load statement;
+  NEW-3a parses a literal chosen by `document.is_empty()` (the record's `parse_v3(b"..")` also drops a `document` word);
+  H10 wraps the pinned parse statement alone in a bare block (the record's `let (config, record_ref) = { .. }` also adds
+  `config` words, (b3)); NEW-4a is the helper alone and NEW-4b the rebinding alone (I2E-4). Some rows do not compile as
+  Rust; the rules are textual.
+- **The positional counts (R191):** (b2) and (b3) locate the load and parse statements as the outermost statements
+  holding `signed_config::load(` and `parse_v3`, so each count is independent of the pins (b1), (b5); with them, the five
+  places are the pinned ones. (b4) is vacuous for a pin that does not match, which (b1) or (b5) refuses.
+- **(c3)'s readings:** a `field:` name is a `binding` followed by one `:` and preceded by `{` or `,` (I2E-4); a `binding`
+  after a dot, with or without `r#`, is (c2)'s. A closure parameter after another, `|x, binding: T|`, reads as a field
+  name; it can only stand beside a nested assignment, which (c3)'s outermost-statement clause or (c2)'s count refuses.
+- **(c1)'s reading:** renames are read in use declarations crate-wide (`ObserverConfig as` in the use tree), type items at
+  any nesting; a qualified path `<T as Trait>` is not a rename.
+- **The table's keywords:** CS's `$defs.binding` uses nine keyword names (`type`, `additionalProperties`, `required`,
+  `properties`, `const`, `minLength`, `maxLength`, `pattern`, `oneOf`) and seven distinct patterns; `observer_config_v3`
+  holds the table to them all. The design's "eight keywords" reads `required` and `properties` as one closed object.
+- **G-I01B-3's order:** (i), (iii), (ii), (iv), (v), (vi), so an impl naming I01Binding in another file refuses at (iii)
+  (P3-3's message) before (ii) reads its header as a literal.
+- **N2-2b's second planting** (a second `config.binding = v;` outside `parse_v3`) refuses at (c2), the dot-form clause the
+  restated (c) splits out; its other two refuse at (c).
+- **I2D-3's test** asserts `from_config`'s digest and nonce from U2 on, when the closed binding exists; U1 asserted the
+  member's identity alone.
+- **`from_config` over a non-object, or without `scope.runNonce` text, gives `None`** (`observer_i01_request` holds five
+  such values).
+
+### Evidence
+
+At build, `python3 -I -B` text checks: the brief's and the design's digests; CS's `$defs.binding` (nine keyword names,
+seven patterns), PV's positive binding and negative 27, S1's triple's binding and admission v4's `sealed`, read before
+the test held them; the inventory (`git diff --stat 330e9d83` names exactly the fourteen paths of this section's code
+list); and the word check (no email address, absolute local path or legacy term in any of the packet's 2461 added
+lines, 2477 with this paragraph).
+
+The heavy evidence, through `capped.zsh` at `-j 2`, one step at a time, on U4's tree (U3's head `d651be4a` with this
+section): `cargo test` 753 passed, 0 failed, in 113 binaries (the base: 741 in 112; `observer_config_v3`'s 12 are new,
+and the `NotAnswered` case sits in an existing service test), 77 s (143 s at U2, with the compile), with only the
+vendored ring warnings; both musl release builds; `he-gate: passed`, with 63 contracts, G-I01B-3's 6 and G-I01B-4's 13
+clauses, the fourteen wiring calls, no symbol of the three I01 logic modules among planeon-observer's 2755 (x86_64) and
+2837 (aarch64) symbols (G-I01B-1), and G-D1-16's exempt span once on each target; planeon-observer `6a800325…` (x86_64)
+and `b2c37007…` (aarch64), planeon-gate `f534bd63…` and `2d62ef0a…`, the values I01B4 recorded; the gate's self-test,
+388 tests (the base's 369 and 19), OK; the mutation proof, 35 of 35 rows refused by the full G-I01B-4 with their own
+sub-clause's message and passing with only that sub-clause's function a no-op. The span check reads commits, so it runs
+on this unit's head, beside the zero-bill scan and `tests/verify`; their results are in the build record. The sim, the
+verify and their timings are the author's.
+
+### Code and audit
+
+- `crates/observer/src/config.rs` (R184-R186), `i01_request.rs` (R187), `i01_service.rs` and `observe.rs` (R188),
+  `main.rs` (R189); `crates/observer/tests/observer_config_v3.rs` (new, 12 tests), `observer_i01_request.rs`,
+  `observer_i01_pv_replay.rs`, `observer_i01_service.rs`, `observer_i01_wait.rs` and `c_support/mod.rs`;
+  `tools/gate.py` and `tools/test_gate.py` (R190-R193); this section. No other test file, no `lib.rs`, `capture.rs`,
+  `client.rs`, socket file or I01 logic module but `i01_request.rs`, no contract, no `ci/` path, no manifest or lock.
+  planeon-gate's sources are untouched.
+
+### Stated residuals
+
+- **R-TEXT** for the three re-pinned files and for `serve` and `observe::run`: the PR review reads them whole. H4e (the
+  one `let binding` bound from a value other than the member) is R-TEXT's and I2D-3's test's (I2E-6), and so is an
+  input-triggered substitution inside `parse_v3`.
+- **The textual rules' limits:** G-I01B-3 and G-I01B-4 read text, not Rust; what they do not read stays code review's in
+  R5-1's class, beside the whole-file pins.
+
+### Carried
+
+- **To HE-004-I01B3:** I2D-5's four conditions on the sealed values, verbatim: "(i) the sealed values reach only
+  i01_digest's rendered, through DigestSnapshot.configuration built in the pinned derive statement, and nothing else
+  reads config.sealed or calls sealed_admission; (ii) adm4_loaded_hash comes from the Adm4Record, never from config;
+  (iii) derive compares AdmissionFenceDigest with config.binding()'s enforcementPins.admissionFenceDigest; (iv) `sealed:
+  None` maps to an absent sealedAdmission member (malformed, refused), never to a default." Also the 18 W3 rows, B3-4..B3-7,
+  B3-9 (b) and (c), B3-10, B3-11 (b) and (d), SR-1, the SERVER-slot statement, the capture.rs entry, the sealed values'
+  use (DIB:306) and R1-6 on v2.
+- **To HE-008:** signing configuration v3, the binding's expected values and the three sealed values; cases 18, 23 and 24.
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-25)
+
+> Ruling, monitor under the owner's 2026-10-22 delegation; record it verbatim: **GO (a).** Write the DESIGN-I01B2 section yourself, in DESIGN-I01B1/I01B4's form, from:
+> - DIB rev 3 §2-§3;
+> - round 3's B3 texts, carried verbatim per I1D-9;
+> - I01B4's Carried list.
+
+> - **Q-I01B2D-1: (a).** A typed check in config.rs from CS's $defs.binding, held by a test to CS's text. No new embedded contract; G-D2-2 is unchanged.
+> - **Q-I01B2D-2: (a).** `pub sealed: Option<SealedValues>`, None in `fn members`, set in parse_v3. The review must judge your fail-closed argument explicitly: a forged value changes only the render hash, which fails closed. If it finds a path where a forged sealed value is accepted, that's MAJOR, and the choice comes back to me.
+> - **Q-I01B2D-3: (a).** Replay both PV's own case 27 and W3's derived case 27, each as a v3 document refused at 13.
+> - **Q-I01B2D-4: (a).** Gate material: the owner's per-PR, head-bound merge. On transport approval: if the verifier asks for the owner's approval on the PR head, as it did for #25 and #26, I'll put it to the owner then, whether or not ci/ changes.
+
+> - **I2D-1, I2D-2 and I2D-3 adopted as you recommend:**
+>   - the alias/`type` clause, with self-tests X4-7 and X4-8;
+>   - the derive is exactly `Clone, Debug`;
+>   - `binding` is bound once, with its test.
+> - **I2D-4: option (1).** Pin serve's parse statement whole (spacing free). The word parse_v3 occurs exactly twice in the non-test sources, and `document` and `config` are each bound once in serve's body, with self-tests for NEW-3 and NEW-4. It widens gate material by two clauses, which is in scope for this gate-material packet, and it closes an unsigned-binding route at the binary's root.
+> - **Q-D1:** add the reviewer's point. The test holds the check's whole table to CS's text, each pattern tested at its boundaries.
+> - **I2D-5..14:** fold them as build rules. I2D-14's drop is right; transport approval stays my call if the verifier asks.
+
+> - **I2E-1 and I2E-3:** adopted as written.
+> - **I2E-2:** the positional word-count form: (i) document 5, (ii) config-not-followed-by-:: 5 at the named places, (iii) both pinned statements outermost and in order, (iv) the parse_v3 count over observer_code with use declarations kept.
+> - **I2E-4..7:** folded as build rules. I2E-5: associated types count as type items, and renames are read crate-wide. I2E-7: "no Self" is a gate check in config.rs.
+> - **Self-tests:** every NEW-n and H-n form is a mandatory self-test, each refused with its own clause's message, in one row per sub-clause. Each one must also be proven to pass against the gate without its clause, as R1-1's test was, so every refusal is shown to come from its own clause. H4e stays with R-TEXT and I2D-3's test, as §13 says.
+
+> GO for the HE-004-I01B2 build.
+
+The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
