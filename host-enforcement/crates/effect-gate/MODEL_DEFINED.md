@@ -3010,3 +3010,191 @@ verify and their timings are the author's.
 > GO for the HE-004-I01B2 build.
 
 The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-004-I01B3: the answer logic, unreachable (`i01_answer.rs`, `lib.rs`; three test binaries; `tools/gate.py`)
+
+The packet is DESIGN-I01B rev 3's section 4 as the owner's Q-I01B3-SPLIT divides it: HE-004-I01B3 is `i01_answer` and the
+derivations, still unreachable, with the binary unchanged (I01B1's shape); HE-004-I01B5 is the pushes, the send path and
+the five re-pins (I01B2's shape). It is built as DESIGN-I01B3 revision 4 states it (sha256 `78a0ae38…`): its section 2
+carries round 3's B3-6 (3), B3-7's `Derived` half and the signature and fields B3-6 (1) and (2) will pin, and its
+sections 14-16 carry the three section reviews' I3D-1 to I3D-12 (`reviews/design-review-I01B3-round1.json`,
+`b6534197…`), I3E-1 to I3E-10 (`-round2.json`, `1fc81f5a…`) and I3F-1 to I3F-7 (`-round3.json`, `33e8fa97…`) as binding
+build rules, with the monitor's Q-I01B3-1..13, Q-I01B3D-1..3, its rulings on the three rounds and the build GO (the
+operator's `tools/w03/he004/OWNER_DECISIONS.md`, 2026-10-25). `i01_answer` is a pure logic module that nothing in `serve`
+reaches (G-I01B-1's I01B3 form); planeon-observer's reachable code and planeon-gate's sources are unchanged. Its rules are
+R197-R210.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R197 | `i01_answer`'s derivations and whitelist. `derive(inputs: &Inputs, resource_version: &Value, configuration: &Value, adm4_loaded_hash: &Value, record: &Value, closure: &Closure, binding: &Value, quota: &Value, generation: &str, not_before: u64, not_after: u64) -> Result<Derived, &'static str>` (Q-1c (a)) takes plain data, each input named from its live source in HE-004-I01B5's pinned statement; it builds one `DigestSnapshot` and derives every projection and enforcement digest (`i01_admission_render::render` handed in), each kept as its value or its refusal text, and compares nothing (Q-I01B3D-1 (a)). `Derived` also holds the namespace member `{name, uid, resourceVersion}` (the one Namespace that `configuration.qualificationNamespace` names, its metadata's name and uid, the read's resourceVersion text [I3D-9 (d)]); the signed binding with its digest (`sha256::prefixed` of its canonical bytes) and its `scope.runNonce`, computed as `I01Binding`'s constructor computes them without naming it (B3-6 (3), so G-I01B-4 (a) still counts that word twice); the record and its `host.bootId`; the quota pair; the generation; and the scope, record and configuration windows. `derive` refuses only a `Derived` it cannot build [I3D-9 (a)]: a binding without canonical bytes or a text `scope.runNonce` ("request binding"); a binding or record scope window missing or not canonical UTC text ("answer outside its windows"); a record without a text `host.bootId` (VPO's generic text, since no observation can be assembled); a namespace member that cannot be composed ("observed namespace"). The module's whitelist is `I01_LOGIC_PATHS` plus exactly `crate::kernel_text::utc_text` and `crate::kernel_text::utc_seconds` (Q-1e (a)), in its own `LOGIC_MODULES` entry; `I01_LOGIC_NAMES` does not gain it [I3D-9 (e)] | DESIGN-I01B3 §3, §3.1; Q-1c, Q-1e (a); Q-I01B3D-1 (a); I3D-9 |
+| R198 | `CaptureFacts { completed, expired, scheduled_after_now, slots, mono_age_ms, wall_age_ms, record_digest }` keeps DIB's fields for B3-6 (2)'s pin in I01B5, and is mapped to `i01_gate::capture_gate`'s input (Q-1 (a)): `completed` false gives `None`; `expired` gives a set whose slots are all not taken (the contract's README section 3.3); otherwise a `LatestSet` over the slots, `scheduled_after_now` and the two ages. The record `Value` is `Derived`'s. `record_digest` is no gate input (Q-CB-11 (a)); the answer compares it (R199) | §3.2; Q-1 (a) |
+| R199 | `refusals(derived: &Derived, facts: &CaptureFacts) -> Vec<&'static str>` is the one composition of the answer lists (Q-1d (a); R1-6), the model's `observed` followed by `check_observation_digests`: per key in key order, the derivation's refusal; else, for a gated key, the capture gate's; else "<key>: differs from the signed value" (the identity without `resourceVersion` against `projections`, Python equality; the digest against `enforcementPins`); each text once. `answer(derived: &Derived, checked: &I01Request, facts: &CaptureFacts, wall_ms: u64, last_observed: Option<u64>) -> Result<Vec<u8>, &'static str>` runs DIB section 4.3 step 6 in this order, each refusal closing: (1) `checked`'s `bindingDigest` and `runNonce` are `Derived`'s ("request binding"; B3-6 (3)); (2) the first text of `refusals`; (3) `facts.record_digest` is the derived `hostPreflightDigest`, which is the signed pin ("capture record digest differs"); (4) one reading `W` = `wall_ms` and `now` = `W` / 1000: `observedAt` = `utc_text(now)`, at or after the scope's, the record's and the configuration's starts, and `expiresAt` = min(`observedAt` + `i01_gate::FRESHNESS_WINDOW_SECONDS`, the scope's end, the record's end less `RECORD_EXPIRY_MARGIN_SECONDS`, the configuration's `notAfter`), after `observedAt` ("answer outside its windows"); `RECORD_EXPIRY_MARGIN_SECONDS` = 3 is R10-defined (DIB section 4.3 step 6's 3 s) [I3D-9 (c)]; (5) `observedAt` not before `last_observed`, both whole seconds ("answer clock rollback") [I3D-9 (b)]; (6) the 14 members, `schemaVersion` CS's const `planeon.internal.policy-observation/v1` [I3E-9], `observerBootId` the record's `host.bootId`, `policyGeneration` the generation; (7) VPO's observation rules without the chain rules (R200's rule function in `Skip` mode) on `Derived`'s signed binding at `now` [I3D-1, I3D-5, I3E-7]; (8) the canonical bytes, at most `i01_gate::ANSWER_LIMIT` ("observation bytes exceeded"). The chain is the session's in I01B5 (`Chain` plus `session.sent`): the skip covers "initial chain", "chain gap" and "restart, drift or reused challenge", and step 5 replaces "clock rollback". DIB section 4.3 step 7's pinned statement is unchanged for I01B5 | §3.3, §3.4; Q-1d (a); I3D-1, I3D-5, I3D-9, I3E-7..9 |
+| R200 | `self_check(observation: &Value, request: &I01Request, binding: &Value, now: u64, previous: Option<&Value>) -> Result<(), &'static str>` keeps VPO's decision and rule order exactly, for `previous` absent or given (the monitor's ruling on revision 3), over VPO's observation rules (`validate_messages`' observation side, harness-onion `scripts/validate_policy_observation.py:107-134` at `f9882c1a`). One private rule function, shared with `answer`, takes `(observation, request, binding, now, mode)`, its mode the private `ChainMode::Vpo(Option<&Value>)` or `ChainMode::Skip`. Its order: the shape in `_shape`'s order (VPC's `_bounded`, read as `i01_digest::exactness`, which decides as it does, floats refused; `_ascii_fields`; the canonical bytes at most 65,536, with that rule's label; `$defs.observation`, written by hand from CS, `format` unasserted as VPO's validator leaves it); "observed identity or digest"; "observed namespace"; "request binding"; "response substitution"; the chain rules by mode (`previous` shaped first, then "chain gap", "restart, drift or reused challenge" and "clock rollback"; or "initial chain"; or none); "stale or future"; "freshness window"; "enforcement proof mismatch"; the `used <= hard` half of "actual quota headroom". The binding's `scope` stands for VPO's profile scope, which VPO holds equal to it (:91-92); the profile-side rules (the `requested` half, the profile scope and digest, "policy identity", :90-106) stay HE-008's. VPO's public outcome for every failing rule is its generic text (VPC's `_require` raises `ValueError`, which `validate_messages` catches, :136-138); R10 returns the first failing rule's `_require` label (13 of the 14 texts), and VPO's generic text for every shape failure and every value VPO would fail to read (a missing member, a time `_time` does not read). The decision equals VPO's on every input whose binding, request and profile pass VPO's other rules: the signed binding is CS-checked at load (R185) and the request by its schema | §3.4; Q-I01B3D-2 (a); I3D-1, I3E-2, I3E-7; the monitor's rulings on revision 3 and round 3 |
+| R201 | The 17 texts (G-I01B-8; I3D-7, I3E-3), each a line-anchored `pub const <NAME>_TEXT: &str` in `i01_answer.rs` with its citation in the doc comment above it: VPO's 14, cited by their line ranges at `f9882c1a` (:77, :138 for the generic text, :107-108, :109, :110-111, :112-113, :114-115, :116-121, :122-124, :125, :126-127, :128, :129-130, :131-134); and three R10-defined texts, each with its reason: "capture record digest differs" (step 3: the capture set's record digest is not the derived and signed `hostPreflightDigest`); "answer outside its windows" (step 4: no instant lies inside every window, or a window cannot be read at derive); "answer clock rollback" (step 5: `observedAt` before the session's last one; distinct from VPO's "clock rollback", which needs `previous`) | §5; Q-I01B3D-2 (a); I3D-7, I3E-2, I3E-3 |
+| R202 | VPC's `_time` (`scripts/validate_proxy_contract.py:98-101`): `strptime` with the form `%Y-%m-%dT%H:%M:%SZ`, its `strftime` required to give the value back, reads every canonical UTC text of the years 0001 to 9999, before 1970 included. `kernel_text::utc_seconds` reads 1970 to 9999, so `i01_answer` reads an earlier year (1 to 1969) 2,000 years later with `utc_seconds` (five 400-year Gregorian cycles, 730,485 days, keep every date's validity and every difference) and moves it back; a time is i64 seconds from the epoch. Without it a scope or a previous observation dated before 1970 would be VPO's pass and R10's refusal, a decision difference the monitor's ruling makes MAJOR. `derive` reads the windows the same way | §3.4's decision rule; settled at build |
+| R203 | The key consts and the non-text literals [I3F-2, I3F-3]: 37 line-anchored `pub const KEY_<NAME>: &str`, each pinned with its value (`I01B3_KEY_CONSTS`): the observation's 14 members, the namespace member's and a projection's six, the quota pair's two and its six units, `policyGeneration`, the binding's `scope`, `validFrom` and `enforcementPins`, the record's `host` and `bootId`, the configuration's `qualificationNamespace`, a listed object's `metadata`, and `schemaVersion`'s value. The `sha256:` prefix comes only from `sha256::prefixed`, and the digest form from `crate::i01_request::ZERO_DIGEST`'s own bytes; the patterns' character classes are written with byte literals, no string. The stated limit [I3F-1]: a text that reaches a refusal through a local (a `KEY_` value, a slice or str method of a text, `Default::default()`) is R-TEXT's and the tests' expected texts; the PR review reads every refusal path whole and confirms each text is the pinned one | §5; I3F-1..3; the monitor's ruling on round 3 |
+| R204 | Gate rule G-I01B-9, `check_i01b_derived` (7 clauses, each its own function, over the observer's non-test sources as `observer_code` reads them, `r#<name>` read as `<name>`): (i) one `struct Derived {` at the top level, the brace directly after the name, its fields exactly `DERIVED_FIELDS` in order (`policy_values`, `digest_values`, `namespace_member`, `binding_member`, `bound_digest`, `bound_nonce`, `enrolled_record`, `boot_id`, `quota_pair`, `generation_hex`, `scope_window`, `record_window`, `config_window`, each distinct from every field of `I01Request`, `ProjectionValue`, `EnforcementValue`, `DigestSnapshot`, `CaptureFacts` and `LatestSet`) with no visibility or attribute, its attributes exactly `#[derive(Debug)]`; (ii) `\bDerived(?:::\s*<\s*>)?\s*\{` once outside the struct and impl headers, as `Ok(Derived { .. })`, the tail of `derive`'s outermost block (`outermost_statements`, `block_end`), no `Self {` or `Self(`, no `Derived(` call form (the struct header excluded), and no literal in another source; (iii) one `impl Derived {`, in `i01_answer.rs`, of one getter per field (body `&self.<field>` or `self.<field>`) and nothing else, and no other impl naming `Derived`; (iv) G-I01B-3 (iv)'s regex finds no `.<field>` outside that impl but a getter call; (v) no `as` rename and no type item naming it; (vi) the word six times, at the struct, the impl, the literal and the three exact signatures (`derive`'s return type, `refusals`' and `answer`'s `derived: &Derived`), each signature at brace depth 0; (vii) every impl in `i01_answer.rs` at its top level, and no module | §4; I3D-3, I3E-1, I3E-5, I3E-6, I3F-4..6 |
+| R205 | G-I01B-8's I01B3 checks, `check_i01b3_texts` (each its own function; run in the order (t1), (t6), (t2)-(t5), (t7), so that a key-prefixed literal, which only a const line can hold, refuses with (t6)'s message): (t1) `pinned_constant`, extended to `&str` (`STR_FORM`, printable ASCII without `"` or `\`), pins the 17 texts with their citations and the 37 key consts with their values; (t2) every const item of type `&str` or `&'static str`, at any depth, is a listed name, defined once, top-level and line-anchored, the values distinct, no key value a text or a contract refusal text, no R10 text a VPO or contract text; (t3) no `"` outside the pinned const lines, in the code read without comments with literals kept; (t4) none of `stringify!`, `concat!`, `include_str!`, `include_bytes!`, `env!`, `option_env!`, `format_args!`, `file!`, `module_path!`, `leak`, `from_utf8`, `from_utf8_unchecked`, `transmute`; (t5) every `Err(`, `ok_or(`, `ok_or_else(` and `map_err(` argument (a closure's body), the rule helper `require(`'s text argument and every `.push(` argument is one pinned text const, one lower-case binding, or one of `malformed`, `bound_exceeded` and `differs` (each `pub fn <name>(self) -> &'static str` in `i01_digest.rs`, read at check time) on a binding; (t6) no key-prefixed literal, an empty set checked on its own; (t7) no `static`, in `LINUX_OS_STATE`'s form | §5; I3D-7, I3E-3, I3F-1..3 |
+| R206 | G-I01B-1's I01B3 form, `check_i01b_isolation`, replacing the I01B1 form [I3D-4, I3E-4]: (a)-(d) are `module_isolation`'s union construction, unchanged, over `i01_digest`, `i01_admission_render`, `i01_gate` and `i01_answer`; (e), `i01b_direction`, its own function with its own message: the three I01B1 files name neither `i01_answer` nor a name of its type set (`Derived`, `CaptureFacts`, `ChainMode`), and each of the four files' impl headers names only a type that file defines. The symbol check (`check_i01b1_absent`) covers the four; it is corroboration, not proof (I3D-11): the design's proof that planeon-observer is unchanged is the sim's binary and SBOM lines against HE-004-I01B2's sim (DESIGN-I01B3 section 0; the build's own comparison is under Evidence); it retires in I01B5 (Q-8). G-I01B-7: six `i01_*` sources, lib.rs's 39 modules, and `i01_answer` on the logic and no-panic lists; G-I01-5's `I01_FILES` gains `i01_answer.rs`, so its refused words apply to it [I3D-10]. R-B3-PIN: `i01_answer.rs`'s absence becomes its pin in `I01B_GUARDED_PINS` at I01B3's bytes, with I1D-3's file form (lib.rs's one line-anchored `pub mod i01_answer;`, no inline `mod i01_answer {`) and I1D-10's casefold clause; effect-gate's `linux_os.rs` and `linux_net.rs`, `config.rs`, `i01_request.rs`, `i01_service.rs`, `client.rs` and `OBSERVER_HOME_PINS`' `linux_listen.rs` and `linux_net.rs` keep their pins and bytes. R-TEXT: the PR review reads `i01_answer.rs` whole | §0, §1, §6; Q-4, Q-8; I3D-4, I3D-10, I3D-11, I3E-4, I3F-7 |
+| R207 | The self-tests (398, the base's 388 and 10): `I01b1IsolationTests` in the I01B3 form, each I01B1 case kept, with DIB section 7.6's N2-9 forms, round 3's X1-1 and X1-2 and the section's two planted forms in observe.rs refused at (a), and (e)'s three union-only rows (`I01B3_DIRECTION_ROWS`), each refused by (e) alone; `I01b1SymbolTests`' planted `planeon_observer::i01_answer::` symbols; `I01SourceRuleTests`' 39 modules and six sources, P7-5's I01B1 five then I01B3 six, and `i01_answer` off either list; `I01bGuardedPinTests`' presence cases, the file form and the casefold sibling; `ObserverLogicTests`' whitelist rows (`crate::utc::`, `std::time::`, `crate::client::` and `crate::kernel_text::utc_millis` refused in `i01_answer.rs`, the two items refused in other I01 modules); G-I01-5's `i01_answer.rs` row turned into an allowance, keeping its intent; `AnswerModuleRuleTests` over G-I01B-9's 23 rows (`I01B3_DERIVED_ROWS`) and `I01b3TextTests` over G-I01B-8's 31 rows (`I01B3_TEXT_ROWS`), each refused with its own sub-clause's message. The mutation proof (the build's scratch `mutation_proof.py`, reading the three tables and their fixtures) records each row's actual refusing set: every set holds its named sub-clause, and every G-I01B-9 set equals section 4's; a one-member set passes with that sub-clause's function a no-op, and a larger set passes with all of its sub-clauses no-ops and is refused with each one's message when it alone is enabled ("each alone") | §8; I3E-1, I3F-5, I3F-7; the monitor's ruling on revision 3 |
+| R208 | R1-6 discharged on v2: `observer_i01_digest_replay`'s 12 answer lists and the complete positive's six checks run through `i01_answer::derive` and `refusals`; the test's own `observed` and `check_observation` composition is removed, and the tally (319, 2) = 321 is unchanged. W3's 18 rows replayed (Q-3 (a)), each as the derived case on S1's triple against its checker (`I01B3_ROWS`): rows 6-13, 17 and 19-21 by `self_check` (VPO's label, or the generic text for the shape rows 19 and 20); rows 14-16 and 22 by `self_check`'s text and, for 15, 16 and 22, the snapshot comparison's half, the changed value applied to the binding's member and `refusals` giving exactly the contract's differs text (the namespace has no differs text, so row 14's half is `self_check`'s alone); row 25 by `self_check` with the derived binding ("observed namespace"); row 26 by `refusals` ("serviceAccount: differs from the signed value"). PV's v1 cases are replayed for the 12 document-level rows on PV's own positive; the snapshot-comparison rows are not, since their v1 positive has no snapshot fixture. Cases 18, 23 and 24 stay HE-008's | §7; Q-3 (a); I3D-5; R171, R181 |
+| R209 | The complete positive through `answer`, Q-I01B3D-3 re-ruled to (a') [I3D-2, I3E-9]: `derive` and `answer` on the `qual` snapshot and the `passing` capture, with the triple's request and generation and `wall_ms` the triple's `observedAt`, give the triple's canonical observation with exactly two members replaced: `observerBootId` by the fixture record's `host.bootId` (Q-I01B-10's source; the triple's is PV v1's) and `expiresAt` by `observedAt` + 5 s, `2026-09-08T00:00:06Z` (the triple's `00:00:05Z` is PV v1's `observedAt` + 4 s). The configuration window (`00:00:00Z` to `00:10:00Z`) and the quota pair (the triple's `observation.quota`) are stated test inputs, so the quota's equality is by input: `derive`'s `quota` comes from `quotas.pairs` in I01B5, outside the whitelist, and the `qual` ResourceQuota's `spec.hard` is in Kubernetes quantities. The namespace's `resourceVersion` is the read's (`100`, not the Namespace object's `41`); `self_check` passes on the answer with the triple's `now` and `previous` null | §7; Q-I01B3D-3 (a'); I3D-2, I3E-9 |
+| R210 | The SERVER-slot statement (DIB section 8.2): "No separate SERVER-slot rule: `hostPreflightDigest`'s capture gate requires `role/SERVER` `TAKEN` in the latest completed set, within 90 s, at every answer." The ADM-4 activation (Q-12 (a)): once I01B5 makes the answer live, `admissionPolicy` refuses "rendered hash differs" against a directory still loaded at admission v3 until M1 or M3; the live answer fails closed there, and the activation is carried to HE-008 and T04 | §9; DIB §8.2; Q-12 (a) |
+
+### Superseded and discharged [I3D-5]
+
+- **DIB section 4.1's "derive compares"** and I2D-5 (iii)'s "derive compares AdmissionFenceDigest …" now read
+  "refusals compares at answer time" (Q-I01B3D-1 (a)). A differing value refuses at the answer, which closes the session:
+  every path from a mismatch ends refused, and no snapshot-time accept remains. The namespace's name and uid are compared
+  only by the observation rules, at `answer` step 7.
+- **R1-6 is discharged** on v2 (R208), and so are **W3's 18 carried rows** (R181, R208).
+- **G-I01B-1's I01B1 form is replaced** by its I01B3 form (R206), as the I01B1 form's own text said it would be.
+
+### Points settled at build (inside DESIGN-I01B3's intent)
+
+- **`_time`'s reading (R202):** VPO's decision rule needs every year `_time` reads. Python's `strptime` and `strftime`
+  read the years 0001 to 9999; whether VPO itself accepts the years 0001-0999 rests on CPython's `strftime` zero-padding
+  `%Y`, the reading R10 follows.
+- **`derive`'s refusal texts (R197):** the design names the cases, not their texts; each case takes the §5 text of the
+  rule it stands for.
+- **The getters** are `pub fn <field>(&self) -> ..`, as `I01Binding`'s are, so the tests read `Derived` through them.
+- **(t2)'s types:** "a type that names str" is read as the two str spellings, `&str` and `&'static str`; a const array
+  of texts is (t5)'s at the position it reaches, as round 3's route list places it.
+- **(t5)'s positions:** an `Err(` pattern constructs nothing and is not read; every `.push(` in the file is read (two,
+  both bindings), a superset of the answer list's one push; the rule helper is `require`, after VPC's `_require`.
+- **The rows' plantings (R207):** G-I01B-9's and G-I01B-8's rows plant into a copy of the real `i01_answer.rs`, so each
+  row changes the shipped text only at its own place; (e)'s rows plant into the I01B1 isolation fixture with a small
+  `i01_answer.rs`. Some rows do not compile as Rust; the rules are textual.
+
+### Evidence
+
+At build, `python3 -I -B` text checks: the brief's and the design's digests; VPO's rules and texts and VPC's `_time` and
+`_bounded` at `f9882c1a`, CS's `$defs.observation`, PV's and S1's fixtures, read before the tests held them; the (a')
+comparison (exactly `observerBootId` and `expiresAt` differ from the triple's observation); the quoted decisions below,
+each line found in the operator's record; the inventory (`git diff --stat 47522704` names exactly the eight paths of
+this section's code list); and the word check (no email address, absolute local path or legacy term in any of the
+packet's 3062 added lines before this paragraph).
+
+The heavy evidence, through the build's `heavy.zsh`, one step at a time, on U4's tree (U3's head `e24e8903` with this
+section): `cargo test` 767 passed, 0 failed, in 114 binaries (the base: 753 in 113; `observer_i01_answer`'s 12 are new
+and `observer_i01_pv_replay` gains its two I01B3 replays), 75 s (150 s at U2, with the compile), with only the vendored
+ring warnings; both musl release builds; `he-gate: passed`, with 63 contracts, G-I01B-9's 7 clauses, G-I01B-1's I01B3
+form over the four modules and their 14 type names, six `i01_` sources and 39 modules (G-I01B-7), G-I01B-8's 54 I01B3
+pins and 75 (t5) positions, the guarded pins' 7 entries, no symbol of the four I01 logic modules among
+planeon-observer's 2755 (x86_64) and 2837 (aarch64) symbols, and G-D1-16's exempt span once on each target; the gate's
+self-test, 398 tests (the base's 388 and 10), OK; the mutation proof, 57 of 57 rows holding (G-I01B-9's 23, each
+actual set equal to section 4's; G-I01B-8's 31; (e)'s 3), no stop. The span check reads commits, so it runs on this
+unit's head, beside the zero-bill scan and `tests/verify`; their results are in the build record. The sim, the verify
+and their timings are the author's.
+
+The binaries against HE-004-I01B2's sim (whose host-enforcement tree is the base's): planeon-gate `f534bd63…` (x86_64)
+and `2d62ef0a…` (aarch64), with their SBOMs, equal the sim's lines. planeon-observer does not: `a4fcaee5…` (x86_64) and
+`21117a26…` (aarch64) against the sim's `6a800325…` and `b2c37007…`, and both SBOMs differ. Its symbol counts, its
+capture symbols and the crate hashes in them are the sim's, and G-D1-16's span lies 16 bytes later on both targets
+(offset 306059 against 306043, 240933 against 240917). Section 0's expectation does not hold on the build's binaries;
+the cause is not established at build, and the point is open (Stated residuals).
+
+### Code and audit
+
+- `crates/observer/src/i01_answer.rs` (new; R197-R203) and `lib.rs`'s one line `pub mod i01_answer;`;
+  `crates/observer/tests/observer_i01_answer.rs` (new, 12 tests), `observer_i01_digest_replay.rs` and
+  `observer_i01_pv_replay.rs` (R208, R209); `tools/gate.py` and `tools/test_gate.py` (R204-R207); this section. No other
+  file: no guarded file but `i01_answer.rs`'s new pin, no I01B1 module, no contract, no `ci/` path, no manifest or lock.
+  planeon-gate's sources are untouched.
+
+### Stated residuals
+
+- **R-TEXT** for `i01_answer.rs`: the PR review reads it whole, and every refusal path in it (R203's stated limit).
+- **The textual rules' limits:** G-I01B-9, G-I01B-8 and G-I01B-1 read text, not Rust; what they do not read stays code
+  review's in R5-1's class, beside the whole-file pin.
+- **The profile-side half of VPO's rules** is HE-008's (R200); `self_check`'s decision is VPO's on inputs whose binding,
+  request and profile pass VPO's other rules.
+- **Section 0's binary expectation is open:** the build's planeon-observer differs from HE-004-I01B2's sim on both
+  targets, its symbols unchanged in count and its layout 16 bytes longer before the exempt span (Evidence). Whether the
+  author's sim shows the same, and what follows, is the monitor's.
+
+### Carried
+
+- **I01B2's R1-1 (Q-2):** at the next config.rs re-pin, tighten G-I01B-4 (c) so that `binding: Value::Null` counts only
+  as the field's own value, and promote I2E-7's "no other `binding` field in config.rs" to a gate check.
+- **R1-5:** HE-008's signer writes `serviceCIDR` in RFC 5952 text.
+- **To HE-004-I01B5:** the derive placement with ADM-4 moved up (Q-1b); the pinned derive and `CaptureFacts` statements
+  (B3-6 (1) and (2)); `CaptureView.scheduled: Option<Instant>` (Q-9); `CaptureCycle::record`; the pushes and the request
+  round with its minimum spacing (Q-13); `respond` and the send path; `Closed::NotServed` and `Answer` replacing
+  `NotAnswered` (Q-11); G-I01B-5; G-I01B-6 (a) and (c) (Q-7) with B3-4's extension (Q-6); G-I01-5's rewrite; B3-5,
+  B3-9 (b) and (c), B3-10, B3-11 (b) and (d); SR-1; the capture.rs entry; the five re-pins; and the symbol check's
+  retirement (Q-8). Also [I3D-8] the configuration `Value` writes the `u64` toleration as an exact i05 integer (bounded
+  0..2^53-1 at load), and `check_snapshot` gains the read's resourceVersion text; [I3D-12] in B3-6 (2)'s pin,
+  `scheduled_after_now` is exactly `scheduled > N`, and `mono_age_ms` is read only when it is false; [I3D-6] the
+  session-level continuation cases (`Chain`, `session.sent`, the answer through `respond`).
+- **To HE-008 and T04:** as DIB sections 8.3 and 8.4, with the ADM-4 activation (R210).
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-25)
+
+> **Owner decisions, 2026-10-25, verbatim via AskUserQuestion. Record them as owner decisions (Q-I01B3-SPLIT):**
+> - "Split (Recommended)": this changes Q-I01B-27's three-packet split.
+> - Naming "I01B3 + I01B5 (Recommended)":
+>   - HE-004-I01B3 = (i) i01_answer and the derivations, still unreachable, binary unchanged (I01B1's shape);
+>   - HE-004-I01B5 = (ii) the pushes, the send path and the five re-pins (I01B2's shape).
+>
+> **Monitor rulings, under the owner's 2026-10-22 delegation; record them verbatim:**
+> - **(1) The dossier is KEEP:** 0ad1ab59, 1080 lines, 0 path or user-name hits. Its disclosures are accepted as procedural.
+> - **(3) Q-1..Q-13 are all (a), adjusted to the split:**
+>   - Q-1, Q-1b, Q-1c, Q-1d, Q-1e, Q-3, Q-6, Q-7, Q-9, Q-10, Q-11, Q-12 and Q-13: (a) as recommended. Each lands in the packet that touches its code. ADM-4's move and the derive statement (Q-1b, Q-1c) and Closed::NotServed/Answer (Q-11) land in I01B5. CaptureFacts mapping, the refusal list and the whitelist (Q-1, Q-1d, Q-1e) land in I01B3.
+>   - **Q-2:** no config.rs change. R1-1 and R1-5 go into MODEL_DEFINED's carried list in I01B3, the next packet that edits it.
+>   - **Q-4:** I01B3 replaces i01_answer.rs's absence rule with its pin (I1D-3's file form), read whole. I01B5 re-pins client.rs, i01_service.rs, i01_request.rs, linux_listen.rs and linux_net.rs, each in the commit that changes it, each read whole.
+>   - **Q-8:** check_i01b1_absent retires in I01B5, which makes the modules reachable. I01B3 extends G-I01B-1's isolation to the fourth unreachable module, in a form the I01B3 design section defines.
+>   - **Q-5:** settled by the owner, above.
+
+> - **Q-I01B3D-1: (a).** Comparisons move to answer time, as the one composition (Q-1d (a)). derive errs only for an unbuildable Derived. The review must judge explicitly that a differing value can never reach an answered close: every path from a mismatch ends refused, and there is no snapshot-time "accept" left behind. Any fail-open path is MAJOR, and it comes back to me.
+> - **Q-I01B3D-2: (a).** self_check's VPO texts are literal pins with VPO line citations, in G-I01B-8's form.
+
+> - **(1) I3D-1: the reviewer's option.**
+>   - answer applies self_check's observation rules without the chain rules: initial chain, chain gap, and restart/drift/reused challenge.
+>   - The chain stays the session's in I01B5 (Chain plus session.sent), and the rollback is answer step 5.
+>   - The public self_check keeps VPO's semantics for previous None and Some.
+>   - One private rule function shares the texts.
+>   - Add a unit test: a sequence-2 request is not refused by the chain rules.
+>   - DIB §4.3 step 7's pinned statement stays unchanged for I01B5.
+> - **(2) Q-I01B3D-3 is re-ruled to (a').** This replaces (a), whose byte equality cannot hold because of fixture facts.
+>   - answer's bytes equal the triple's canonical observation with exactly two members replaced: observerBootId by the record's host.bootId (Q-I01B-10's source), and expiresAt by observedAt + 5 s (00:00:06Z).
+>   - The configuration window is a stated, non-binding test input, and the generation is the triple's.
+>   - Every other member is byte-equal, the namespace's resourceVersion is the read's, and §3.1 states that.
+>   - The public self_check passes on answer's output with the triple's `now` and previous null.
+>   - MODEL_DEFINED records the two replaced members and why.
+>   - Any further difference stops the build and comes to me.
+> - **(3) I3D-3..7 adopted, and I3D-8..12 folded as build rules,** with I3D-8 and I3D-12 on I01B5's carried list.
+>   - G-I01B-9 becomes the full construction, each sub-clause its own function, with forms (1)-(3) as rows. Every row gets the mutation proof, as in I01B2.
+>   - Q-I01B3D-2's pins carry VPO line ranges, a stated shape text, and "request binding" settled.
+
+> 1. **Adopt I3E-1..10 into rev 3.** For I3E-1, take both:
+>    - (a) the literal is a statement or tail of derive's outermost block (G-I01B-4 (c3)'s construction), and every impl in i01_answer.rs sits at the top level (R1-3's construction);
+>    - (b) a (vi) name count of Derived at the exact named places (G-I01B-3 (vi)'s construction);
+>
+>    each its own function and message. NEW-1, NEW-2, NEW-3 and NEW-10 become self-test rows with the mutation proof. X9-1 is re-planted with where clauses, and form (3) is split into 3a and 3b (I3E-5).
+>
+>    I3E-3's const form is adopted:
+>    - VPO and R10 texts as pinned `pub const &str`, cited;
+>    - pinned_constant extended to &str;
+>    - every refusal naming a const;
+>    - G-I01B-8 holding the const set exactly;
+>    - plus the empty-set key-prefixed clause.
+
+> - **The VPO fact check:** your reading is confirmed. "Keeps VPO's semantics" means VPO's decision and rule order, exactly: accept and refuse identical on every input. R10 returns the first failing rule's `_require` label, and shape failures return VPO's generic text. MODEL_DEFINED records the mapping. This is no change to the I3D-1 ruling, which bound the decision, not the outward text. If round 3 finds an input where R10's decision differs from VPO's, that is MAJOR.
+> - **The "each alone" mutation-proof variant is accepted.** Each row records its exact set of refusing sub-clauses. A one-member set takes the single-clause proof; a larger set passes with all of its clauses disabled and is refused with each one alone.
+
+> - **The widened (t5) limit is confirmed:** "any text that reaches a refusal through a local" stays with R-TEXT and the tests' expected texts, given:
+>   - the positive (t5) argument rule;
+>   - the no-static rule;
+>   - the pinned key consts;
+>   - (t3)'s no-`"` rule.
+>
+>   The PR review must name it as a check: read every refusal path whole and confirm each text is the pinned one.
+> - **The fact-check caveat is accepted.** 13 of 14 texts are `_require` labels, the shape text is :138's generic return, and the shape order follows VPO's `_shape`. The decision is unchanged.
+> - **I3F-3 non-text literals:** sourced from sha256::prefixed and ZERO_DIGEST only. Any other need stops the build and comes to me via you.
+
+> GO for the HE-004-I01B3 build. Rev 4 is verified: 78a0ae38, 1059 lines, rev 3 kept at ec0fc0c5. No decision changed, so the pre-ruled outcome applies.
+
+The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
