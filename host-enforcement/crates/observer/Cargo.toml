@@ -15,8 +15,11 @@ publish.workspace = true
 # test-only path edge for the parity tests (the answer reader and the ClientHello, D1-15); it is not linked. HE-004D1
 # DESIGN-D1 section 3 (owner decision Q-HE4D1-4 (a)): the kernel captures' raw reads are observer-sys's, a std-only path
 # crate only this one links; Cargo.lock gains that path package and the edge, and no registry or vendored package.
+# HE-005A0 (DESIGN-HE005 revision 5 section 4, step A0; owner decision Q-HE5-11 (a)): the seal's role-neutral helpers and
+# engine are role-seal's, a std-only path crate over gate-sys; Cargo.lock gains that path package and the edge.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
+role-seal = { path = "../role-seal" }
 observer-sys = { path = "../observer-sys" }
 i05-protocol = { path = "../i05-protocol" }
 rustls = { version = "=0.23.46", default-features = false, features = ["ring", "std"] }

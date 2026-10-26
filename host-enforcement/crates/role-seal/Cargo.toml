@@ -1,0 +1,13 @@
+[package]
+name = "role-seal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# HE-005A0 (DESIGN-HE005 revision 5 section 4, HE-005A step A0; owner decision Q-HE5-11 (a)): the role-neutral process
+# seal, moved out of the observer's seal.rs with no change of behaviour. Std only, with gate-sys's raw seal calls as its
+# one path dependency; no registry crate, build script or feature, and nothing embedded (each role's crate embeds its
+# own programs).
+[dependencies]
+gate-sys = { path = "../gate-sys" }
