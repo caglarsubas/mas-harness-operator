@@ -17,8 +17,9 @@ use std::time::{Duration, Instant};
 
 use gate_sys::inet::InetAddress;
 use i05_protocol::json::Doc;
-use planeon_observer::client::{AcceptResult, ConnId, Connecting, ExeLink, Interest, PeerCreds, PeerId, PeerOps, PeerRecv,
-                               PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, Woken};
+use planeon_observer::client::{AcceptResult, Availability, CaptureGate, ConnId, Connecting, ExeLink, Interest, PeerCreds, PeerId,
+                               PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService, PeerWatch, PollError,
+                               ProcIdentity, Ready, SnapshotView, Transfer, Wire, Woken};
 use planeon_observer::config::{FileRef, ObserverConfig, FORMAT};
 use planeon_observer::credentials::ObserverIdentity;
 use planeon_observer::inputs::Resource;
@@ -1232,4 +1233,69 @@ pub fn availability(trace: &[(Duration, Trace)]) -> Vec<(Duration, bool)> {
             _ => None,
         })
         .collect()
+}
+
+// ------------------------------------------------------------------------------------------ HE-004-I01B5: the pushes
+
+/// What a recording I01 service saw of the epoch's pushes, each at the rig's elapsed time (HE-004-I01B5).
+#[derive(Default)]
+pub struct Pushed {
+    /// Each snapshot view's phase, mark and derive's refusal (`None` when derive built the view).
+    pub views: Vec<(Duration, u64, u64, Option<&'static str>)>,
+    pub availability: Vec<(Duration, Availability)>,
+    pub gates: Vec<(Duration, CaptureGate)>,
+}
+
+/// An I01 service that serves no peer and records the epoch's pushes. It reports a pending receipt during each of its
+/// windows (`from` to `until`, from the rig's start), and its plan wakes the wait at each window's start, as a
+/// request's arrival would.
+pub struct PushRecorder {
+    lab: SharedLab,
+    windows: Vec<(Duration, Duration)>,
+    seen: Rc<RefCell<Pushed>>,
+}
+
+impl PushRecorder {
+    pub fn new(rig: &Rig, windows: &[(Duration, Duration)]) -> (PushRecorder, Rc<RefCell<Pushed>>) {
+        let seen = Rc::new(RefCell::new(Pushed::default()));
+        (PushRecorder { lab: rig.lab.clone(), windows: windows.to_vec(), seen: seen.clone() }, seen)
+    }
+
+    fn elapsed(&self) -> Duration {
+        self.lab.borrow().elapsed
+    }
+}
+
+impl PeerService for PushRecorder {
+    fn peer_plan(&self, _now: Instant) -> PeerPlan {
+        let (base, elapsed) = { let lab = self.lab.borrow(); (lab.base, lab.elapsed) };
+        let next = self.windows.iter().map(|(from, _)| *from).filter(|from| *from > elapsed).min();
+        PeerPlan { watch: PeerWatch::default(), deadline: next.map(|from| base + from) }
+    }
+
+    fn serve_peer_step(&mut self, _ops: &mut dyn PeerOps, _wall: Option<u64>, _now: Instant, _ready: PeerReady) -> PeerOutcome {
+        PeerOutcome::Served
+    }
+
+    fn serve_peer_deadlines(&mut self, _ops: &mut dyn PeerOps, _wall: Option<u64>, _now: Instant) {}
+
+    fn peer_snapshot_view(&mut self, view: SnapshotView) {
+        let at = self.elapsed();
+        self.seen.borrow_mut().views.push((at, view.phase, view.mark, view.derived.err()));
+    }
+
+    fn peer_availability(&mut self, availability: Availability) {
+        let at = self.elapsed();
+        self.seen.borrow_mut().availability.push((at, availability));
+    }
+
+    fn peer_capture_view(&mut self, gate: CaptureGate) {
+        let at = self.elapsed();
+        self.seen.borrow_mut().gates.push((at, gate));
+    }
+
+    fn peer_pending(&self) -> Option<Instant> {
+        let (base, elapsed) = { let lab = self.lab.borrow(); (lab.base, lab.elapsed) };
+        self.windows.iter().find(|(from, until)| *from <= elapsed && elapsed < *until).map(|(from, _)| base + *from)
+    }
 }

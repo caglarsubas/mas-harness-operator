@@ -33,6 +33,7 @@ use gate_sys::inet::InetAddress;
 use gate_sys::peer_wire::parse_control;
 use rustls::{ClientConfig, ClientConnection, ProtocolVersion};
 
+use crate::capture::{CaptureView, Slot};
 use crate::exposition::{Exposition, ExpositionError, ExpositionReader};
 use crate::http::{self, Answer, AnswerReader, Bounds, Progress, Request, StreamReader};
 use crate::tls::server_name;
@@ -265,6 +266,82 @@ pub enum PeerOutcome {
     ListenerFailed,
 }
 
+// ------------------------------------------------------------------------------------------ the pushes (HE-004-I01B5)
+
+/// One snapshot's view, pushed after `check_snapshot` returns `Ok` (DESIGN-I01B5 rev 5 section 3.1; B3-7): the epoch's
+/// watch phase, the snapshot's mark and freshness stamp, and `i01_answer::derive`'s result. It holds the derive result,
+/// so it derives none of `Clone`, `PartialEq` or `Eq`; `derive`'s refusal is the only unavailable view.
+#[derive(Debug)]
+pub struct SnapshotView {
+    pub phase: u64,
+    pub mark: u64,
+    pub fresh_stamp: Instant,
+    pub derived: Result<crate::i01_answer::Derived, &'static str>,
+}
+
+/// A request round that passed (DESIGN-I01B5 rev 5 section 3.3): its own monotonic start, its list's mark, and when it
+/// passed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Passed {
+    pub started: Instant,
+    pub mark: u64,
+    pub stamp: Instant,
+}
+
+/// A request round's outcome, as one availability push carries it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Round {
+    Passed(Passed),
+    Failed,
+}
+
+/// The epoch's availability at one watch-loop pass (DESIGN-I01B5 rev 5 section 3.4): the watch phase, whether every
+/// stream is established in it, whether the fresh mark is within the freshness bound, and the request round that ended
+/// at this push: `Passed` only in the push right after the round passed, `Failed` while the failed-round latch holds,
+/// `None` otherwise. Each push replaces the earlier one wholesale.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Availability {
+    pub phase: u64,
+    pub established: bool,
+    pub fresh: bool,
+    pub round: Option<Round>,
+}
+
+/// R10-defined (DESIGN-I01B5 rev 5 section 3.4; I5E-7): the capture slots' names as i01_gate.rs:37-45 names them
+/// (`ROLE_SLOTS`, `LIFECYCLE_SLOT`, `BACKEND_SLOT_PREFIX`), checked equal by gate.py; client.rs does not name i01_gate.
+pub const CAPTURE_ROLE_SLOTS: [&str; 5] = ["role/SERVER", "role/OBSERVER", "role/BROKER", "role/WORKER", "role/EFFECT_GATE"];
+/// R10-defined (I5E-7): the lifecycle slot's name, i01_gate.rs:37-45's `LIFECYCLE_SLOT`.
+pub const CAPTURE_LIFECYCLE_SLOT: &str = "lifecycle";
+/// R10-defined (I5E-7): the prefix of a backend component's slot, i01_gate.rs:37-45's `BACKEND_SLOT_PREFIX`.
+pub const CAPTURE_BACKEND_SLOT_PREFIX: &str = "backend/";
+
+/// The latest capture set as the service reads it at an answer (DESIGN-I01B5 rev 5 section 3.4; I5D-4): built only by
+/// [`CaptureGate::from_view`] from the engine's view and the epoch's expiry latch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CaptureGate {
+    pub scheduled: Option<Instant>,
+    pub set_started_ms: u64,
+    pub slots: Vec<(String, bool)>,
+    pub record_digest: String,
+    pub expired: bool,
+}
+
+impl CaptureGate {
+    /// The one constructor (I5D-4): `scheduled`, `set_started_ms` and `record_digest` copied; each slot named as
+    /// i01_gate names it (the five roles in the model's order, `lifecycle`, `backend/<component>`) and `true` only for
+    /// `Slot::Taken { .. }`; and the latch's `expired` (advisory: answer step 4's record window refuses from
+    /// `expiresAt - 3 s` on regardless, I5D-17).
+    pub fn from_view(view: &CaptureView, expired: bool) -> CaptureGate {
+        let taken = |slot: &Slot| matches!(slot, Slot::Taken { .. });
+        let mut slots: Vec<(String, bool)> =
+            CAPTURE_ROLE_SLOTS.iter().zip(view.roles.iter()).map(|(name, slot)| (name.to_string(), taken(slot))).collect();
+        slots.push((CAPTURE_LIFECYCLE_SLOT.to_string(), taken(&view.lifecycle)));
+        slots.extend(view.backends.iter().map(|(component, slot)| (format!("{CAPTURE_BACKEND_SLOT_PREFIX}{component}"), taken(slot))));
+        CaptureGate { scheduled: view.scheduled, set_started_ms: view.set_started_ms, slots,
+                      record_digest: view.record_digest.clone(), expired }
+    }
+}
+
 /// The I01 service the client's waits serve (`i01_service::I01Service`; DESIGN-I01A section 5). It holds session state
 /// only and is handed the peer operations at each call, so it has no tie to the wire.
 pub trait PeerService {
@@ -277,6 +354,14 @@ pub trait PeerService {
     /// Once per wake, after the steps: the deadlines that have come (a session's bounds and the record's window, the
     /// backoff's end).
     fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant);
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the latest snapshot view, replacing the earlier one.
+    fn peer_snapshot_view(&mut self, view: SnapshotView);
+    /// The latest availability, replacing the earlier one.
+    fn peer_availability(&mut self, availability: Availability);
+    /// The latest capture set, replacing the earlier one.
+    fn peer_capture_view(&mut self, gate: CaptureGate);
+    /// The pending request's receipt, on the monotonic clock.
+    fn peer_pending(&self) -> Option<Instant>;
 }
 
 /// The listener's backoff after a fault (DESIGN-I01A section 4).
@@ -673,6 +758,33 @@ impl<W: Wire + PeerOps> Client<W> {
     /// Whether a wait ended because the I01 listener failed persistently (status 35, not 95).
     pub fn listener_failed(&self) -> bool {
         self.listener_failed
+    }
+
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the epoch's snapshot view, forwarded to the attached service (none
+    /// takes the peer operations).
+    pub fn push_snapshot_view(&mut self, view: SnapshotView) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_snapshot_view(view);
+        }
+    }
+
+    /// The epoch's availability, forwarded to the attached service.
+    pub fn push_availability(&mut self, availability: Availability) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_availability(availability);
+        }
+    }
+
+    /// The latest capture set, forwarded to the attached service.
+    pub fn push_capture_view(&mut self, gate: CaptureGate) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_capture_view(gate);
+        }
+    }
+
+    /// The attached service's pending request's receipt (the epoch's request-round trigger).
+    pub fn pending_since(&self) -> Option<Instant> {
+        self.service.as_deref().and_then(|service| service.peer_pending())
     }
 
     /// The observer's one wire wait (DESIGN-I01A section 5; G-I01-2): `poll` and `pause` wait only through it. With an

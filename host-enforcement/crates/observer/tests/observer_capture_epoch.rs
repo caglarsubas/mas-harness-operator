@@ -28,6 +28,8 @@ use d1_support::{derive_scoped, enroll, host, list, vectors, with_worker_file_si
 use i05_protocol::json::Value;
 use planeon_observer::capture::{CaptureCycle, CaptureEngine, CaptureView, CaptureViewState, CgroupItem, ReadError, Slot};
 use planeon_observer::capture_schema::CaptureSchema;
+use planeon_observer::client::CaptureGate;
+use planeon_observer::i01_answer;
 use planeon_observer::inputs::Resource;
 use planeon_observer::kernel_text;
 use planeon_observer::observe::{Epoch, ObserverExit, Trace};
@@ -118,6 +120,10 @@ impl CaptureCycle for Recorder {
 
     fn view(&self) -> &CaptureView {
         self.inner.view()
+    }
+
+    fn record(&self) -> &Value {
+        self.inner.record()
     }
 }
 
@@ -227,6 +233,9 @@ fn one_set_per_cycle_right_after_the_scrape_worker_first() {
     let sets = sets(&setup);
     assert_eq!(sets.iter().map(|set| set.started).collect::<Vec<_>>(), (1..=9).map(|k| secs(60 * k)).collect::<Vec<_>>());
     assert!(sets.iter().all(|set| set.scheduled == set.started), "each set right after its on-time scrape");
+    // HE-004-I01B5 (Q-9 (a)): each view holds its own set's scheduled start, on the monotonic clock.
+    let base = setup.rig.lab.borrow().base;
+    assert!(sets.iter().all(|set| set.view.scheduled == Some(base + set.scheduled)), "the view's scheduled start");
     // Each Captures entry follows the cycle's ADM-4 record; none before the first cycle.
     let trace = epoch.trace();
     let first_cycle = trace.iter().position(|(_, entry)| *entry == Trace::Cycle).expect("a cycle");
@@ -682,4 +691,42 @@ fn without_captures_the_epoch_is_unchanged() {
     assert!(!epoch.trace().iter().any(|(_, entry)| matches!(entry, Trace::Captures { .. })));
     assert!(epoch.drains().is_empty());
     assert_eq!(epoch.capture_view(), None);
+}
+
+// ------------------------------------------------------------------------------------------------ the pushes
+
+/// HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.1 and 3.4; I5D-4, I5E-3): with an I01 service attached, each set's
+/// capture gate is pushed right after the set, built by `CaptureGate::from_view` (the five role slots, `lifecycle` and
+/// the backends, named as i01_gate names them, taken only for `Slot::Taken`), and the expiry latch pushes once more,
+/// expired, no slot taken. Each snapshot's view is pushed once, its phase counting the snapshots; with the capture
+/// engine attached it holds derive's own result (the rig's configuration has no signed binding, so "request binding").
+#[test]
+fn the_capture_gate_and_the_snapshot_view_are_pushed() {
+    let setup = prepare(0, 400);
+    let recorder = setup.recorder.borrow_mut().take().expect("a prepared recorder");
+    let (service, pushed) = PushRecorder::new(&setup.rig, &[]);
+    let mut epoch = setup.rig.epoch().with_captures(Box::new(recorder)).with_peer_service(Box::new(service));
+    let exit = epoch.run();
+    assert_eq!(exit, ObserverExit::ConfigExpired, "{}", epoch.reason());
+    let sets = sets(&setup);
+    let pushed = pushed.borrow();
+    assert_eq!(pushed.gates.len(), sets.len() + 1, "one push per set and one at the latch");
+    for ((at, gate), set) in pushed.gates.iter().zip(&sets) {
+        assert_eq!(*at, set.ended, "pushed right after its set");
+        assert_eq!(*gate, CaptureGate::from_view(&set.view, false));
+    }
+    let names: Vec<&str> = pushed.gates[1].1.slots.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(&names[..6], &["role/SERVER", "role/OBSERVER", "role/BROKER", "role/WORKER", "role/EFFECT_GATE", "lifecycle"]);
+    assert!(names.len() > 6 && names[6..].iter().all(|name| name.starts_with("backend/")), "{names:?}");
+    assert!(pushed.gates[1].1.slots.iter().all(|(_, taken)| *taken), "the second set took every slot");
+    assert!(!pushed.gates[0].1.slots[3].1, "the first set's WORKER slot (pending) is not taken");
+    let (at, last) = pushed.gates.last().expect("the latch's push");
+    assert_eq!(*at, secs(397));
+    assert!(last.expired && last.slots.iter().all(|(_, taken)| !taken), "{last:?}");
+    let snapshots = snapshots(epoch.trace());
+    assert_eq!(pushed.views.len(), snapshots.len());
+    for (index, ((_, phase, mark, refusal), (_, _, version))) in pushed.views.iter().zip(&snapshots).enumerate() {
+        assert_eq!((*phase, *mark), (index as u64 + 1, *version));
+        assert_eq!(*refusal, Some(i01_answer::REQUEST_BINDING_TEXT));
+    }
 }

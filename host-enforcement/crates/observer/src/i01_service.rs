@@ -31,8 +31,8 @@ use std::time::{Duration, Instant};
 use gate_sys::peer_wire::{label_matches, same_lines, FRAME_BUFFER_BYTES};
 
 use crate::capture::EXPIRY_MARGIN_MS;
-use crate::client::{AcceptResult, ListenerBackoff, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService,
-                    PeerWatch, ProcIdentity};
+use crate::client::{AcceptResult, Availability, CaptureGate, ListenerBackoff, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady,
+                    PeerRecv, PeerService, PeerWatch, ProcIdentity, SnapshotView};
 use crate::enrolled::{ServerClass, ServerIdentity};
 use crate::i01_request::{check_request, Chain, I01Binding, RequestRefusal};
 
@@ -89,6 +89,10 @@ pub struct I01Service {
     buffer: Vec<u8>,
     accepted: u64,
     last_closed: Option<Closed>,
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 4.1): the epoch's latest views, each replaced by its push.
+    snapshot: Option<SnapshotView>,
+    availability: Option<Availability>,
+    capture: Option<CaptureGate>,
 }
 
 fn after(now: Instant, by: Duration) -> Instant {
@@ -115,6 +119,9 @@ impl I01Service {
             buffer: vec![0u8; FRAME_BUFFER_BYTES],
             accepted: 0,
             last_closed: None,
+            snapshot: None,
+            availability: None,
+            capture: None,
         }
     }
 
@@ -306,5 +313,21 @@ impl PeerService for I01Service {
             None => self.session = Some(session),
             Some(why) => self.end(ops, session.peer, why),
         }
+    }
+
+    fn peer_snapshot_view(&mut self, view: SnapshotView) {
+        self.snapshot = Some(view);
+    }
+
+    fn peer_availability(&mut self, availability: Availability) {
+        self.availability = Some(availability);
+    }
+
+    fn peer_capture_view(&mut self, gate: CaptureGate) {
+        self.capture = Some(gate);
+    }
+
+    fn peer_pending(&self) -> Option<Instant> {
+        None
     }
 }
