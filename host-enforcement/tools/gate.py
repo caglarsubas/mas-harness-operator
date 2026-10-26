@@ -5536,6 +5536,16 @@ I01B5_FOUR = (
      "cycle.record(), &self.closure, self.config.binding(), &quota, &self.config.generation, self.config.not_before, "
      "self.config.not_after), None => Err(NO_CAPTURE_ENGINE_TEXT), };"))
 I01B5_DROP_INPUTS = "drop(inputs);"
+# The two observe.rs helpers the configuration and quota Values call (the crate's spelling of "one i05 JSON object" and
+# "from quotas.pairs with quota::UNITS' member names", I5D-12), each pinned whole.
+I01B5_HELPERS = (("object", "fn object<const N: usize>(members: [(&str, Option<Value>); N]) -> Value { let mut built = "
+                  "Object::new(); for (name, member) in members { if let Some(member) = member { built.insert("
+                  "JStr::new(name), member); } } Value::Object(built) }"),
+                 ("quota_side", "fn quota_side(pairs: &QuotaPairs, side: fn(&Pair) -> u64) -> Value { let ordered = "
+                  "[pairs.pods, pairs.config_maps, pairs.services, pairs.cpu_millis, pairs.memory_bytes, "
+                  "pairs.ephemeral_storage_bytes]; let mut built = Object::new(); for ((unit, _, _), pair) in "
+                  "quota::UNITS.iter().zip(ordered.iter()) { built.insert(JStr::new(unit), "
+                  "Value::Int(Int::from_u64(side(pair)))); } Value::Object(built) }"))
 # The SnapshotView literal (I5D-11), the capture push at its two sites (I5D-4, I5E-3), the round's start (I5F-2 (1)),
 # the Passed statement and the Availability push that carries it (I5E-3, I5F-2 (4)).
 I01B5_SNAPSHOT_LITERAL = "SnapshotView { phase: self.phase, mark, fresh_stamp: stamp, derived }"
@@ -5979,8 +5989,15 @@ def statements_s1_check_snapshot(codes: dict[str, str], kept: dict[str, str], ru
     configuration Value, the quota Value, the derive statement (I01B5_FOUR) and `drop(inputs);`, each matched whole;
     read with literals kept, the configuration Value's text occurs once in observe.rs, so its members are exactly
     qualificationNamespace, pinnedManifestHash and sealedAdmission's ipFamily, serviceCIDR and
-    defaultTolerationSeconds."""
+    defaultTolerationSeconds; and the two helpers those Values call, `fn object` and `fn quota_side`, are each defined
+    once and matched whole (I01B5_HELPERS)."""
     code = codes[OBSERVER_OBSERVE]
+    spans = function_spans(code)
+    for name, text in I01B5_HELPERS:
+        homes = [(start, end) for found, start, end in spans if found == name]
+        match = pinned_pattern(text).match(code, homes[0][0]) if len(homes) == 1 else None
+        require(match is not None and match.end() == homes[0][1], "%s's fn %s is not defined once, exactly as pinned "
+                "(%s (s1), I5D-12)" % (OBSERVER_OBSERVE, name, rule))
     statements = function_statements(code, "check_snapshot", rule)
     anchors = statement_indexes(code, statements, I01B5_QUOTA_MATCH)
     after = [statement_indexes(code, statements, text) for _, text in I01B5_FOUR + (("drop", I01B5_DROP_INPUTS),)]
@@ -7757,7 +7774,8 @@ def main() -> int:
             "at their fixed places (i)" % (check_i01b5_send(HE), OBSERVER_CRATE))
         say("I01B5 pinned statements (HE-004-I01B5, B3-6): %d clauses: check_snapshot's quota match, then ADM-4's "
             "statement, the configuration Value (its members read with literals kept), the quota Value and the derive "
-            "statement before drop(inputs) (s1); the SnapshotView literal (s2); the capture push at its two sites (s3); "
+            "statement before drop(inputs), and the object and quota_side helpers whole (s1); the SnapshotView literal "
+            "(s2); the capture push at its two sites (s3); "
             "the Passed statement and the push that carries it (s4); the round's start (s5); CaptureGate::from_view "
             "whole (s6); respond's freshness statement directly before its one clock statement (s7); the CaptureFacts "
             "literal (s8); serve_peer_deadlines' closing statement before its respond call (s9)"

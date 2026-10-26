@@ -9018,6 +9018,11 @@ I01B5_STATEMENT_ROWS = (
      ((_OBS, "&record.loaded_hash().map_or(Value::Null, Value::str)", "&Value::str(&self.config.pinned_manifest_hash)"),)),
     ("the no-engine branch with another text", "(s1)", None,
      ((_OBS, "None => Err(NO_CAPTURE_ENGINE_TEXT),", "None => Err(\"no capture engine\"),"),)),
+    ("I5D-12 the object helper adding a member", "(s1)", None,
+     ((_OBS, "            built.insert(JStr::new(name), member);\n", "            built.insert(JStr::new(name), member);\n"
+       "            built.insert(JStr::new(\"namespace\"), Value::Null);\n"),)),
+    ("I5D-12 the quota helper reading one side for both", "(s1)", None,
+     ((_OBS, "Value::Int(Int::from_u64(side(pair)))", "Value::Int(Int::from_u64(pair.hard))"),)),
     # (s2) [I5D-11].
     ("a changed SnapshotView initialiser", "(s2)", None,
      ((_OBS, "SnapshotView { phase: self.phase, mark, fresh_stamp: stamp, derived }",
@@ -9267,7 +9272,7 @@ class I01b5RuleTests(Tree):
 
     def test_the_tables(self):
         self.assertEqual(len(I01B5_SEND_ROWS), 43)
-        self.assertEqual(len(I01B5_STATEMENT_ROWS), 24)
+        self.assertEqual(len(I01B5_STATEMENT_ROWS), 26)
         self.assertEqual(len(I01B5_FOLD_ROWS), 13)
         self.assertEqual(len(I01B5_SNAPSHOT_ROWS), 5)
         self.assertEqual(len(I01B5_OWN_SCOPE_ROWS), 24)
