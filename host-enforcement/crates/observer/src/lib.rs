@@ -40,6 +40,7 @@ pub mod enrolled;
 pub mod exposition;
 pub mod http;
 pub mod i01_admission_render;
+pub mod i01_answer;
 pub mod i01_digest;
 pub mod i01_gate;
 pub mod i01_request;

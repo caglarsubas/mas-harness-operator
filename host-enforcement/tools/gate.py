@@ -936,10 +936,13 @@ I01B_GUARDED_PINS = {
     "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
     "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
     "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
+    # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1; Q-4): i01_answer.rs's absence becomes its pin, at I01B3's bytes, with
+    # I1D-3's file form and I1D-10's casefold clause; the other guarded files keep their pins and bytes.
+    "crates/observer/src/i01_answer.rs": "3ee5fb683bc6bcbc13a39db985782038915f4851d825a75f02c26f0409764736",
 }
-I01B_ABSENT = ("crates/observer/src/i01_answer.rs",)
+I01B_ABSENT = ()
 I01B_FILE_FORM = {"crates/observer/src/lib.rs": ("config", "i01_request", "i01_service", "client", "linux_listen",
-                                                 "linux_net"),
+                                                 "linux_net", "i01_answer"),
                   "crates/effect-gate/src/lib.rs": ("linux_os", "linux_net")}
 # HE-004-I01B1 B3-1 (G-I01B-6 (e); DESIGN-I01B1 rev 2 sections 2 and 6, I1D-1 and I1D-2): each crate's socket modules, the
 # scope roots a use path's head may hold, and the binary's library root (main.rs only).
@@ -1152,13 +1155,22 @@ D2_LOGIC_PATHS = (D1_LOGIC_PATHS + tuple(("crate", name) for name in D2_LOGIC_NA
 # whitelist gaining their crate:: and self:: paths; none reaches the capture engine, the epoch, the configuration, the
 # enrolled record's loader, the quota pair or std::time, and none is reachable from serve (G-I01B-1).
 I01B1_MODULES = ("i01_digest", "i01_admission_render", "i01_gate")
+# HE-004-I01B3 (DESIGN-I01B3 rev 4 sections 3 and 6; Q-1e (a); I3D-9 (e)): the answer logic, the fourth unreachable I01
+# module, joins I01_LOGIC_BUILT and I01_NO_PANIC_BUILT and takes its own LOGIC_MODULES entry, I01_LOGIC_PATHS plus
+# exactly kernel_text's two pure items utc_text and utc_seconds; I01_LOGIC_NAMES does not gain it, so no other
+# module's whitelist widens (and none may name crate::i01_answer).
+I01_ANSWER_NAME = "i01_answer"
+I01_ANSWER = "crates/observer/src/i01_answer.rs"
+I01B3_MODULES = I01B1_MODULES + (I01_ANSWER_NAME,)
 I01_LOGIC_NAMES = ("i01_request", "observer_rbac") + I01B1_MODULES
-I01_LOGIC_BUILT = ("i01_request", "observer_rbac") + I01B1_MODULES
+I01_LOGIC_BUILT = ("i01_request", "observer_rbac") + I01B3_MODULES
 I01_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in I01_LOGIC_BUILT)
 I01_LOGIC_PATHS = (OBSERVER_LOGIC_PATHS + tuple(("crate", name) for name in I01_LOGIC_NAMES)
                    + tuple(("self", name) for name in I01_LOGIC_NAMES))
+I01_ANSWER_PATHS = I01_LOGIC_PATHS + (("crate", "kernel_text", "utc_text"), ("crate", "kernel_text", "utc_seconds"))
 LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + tuple((rel, D1_LOGIC_PATHS) for rel in D1_LOGIC)
-                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC) + tuple((rel, I01_LOGIC_PATHS) for rel in I01_LOGIC))
+                 + tuple((rel, D2_LOGIC_PATHS) for rel in D2_LOGIC)
+                 + tuple((rel, I01_ANSWER_PATHS if rel == I01_ANSWER else I01_LOGIC_PATHS) for rel in I01_LOGIC))
 # G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
 D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
 PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
@@ -1197,7 +1209,8 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # item, an impl's runtime methods among them, so it stays and is scanned); an assert! anywhere else still refuses.
 # HE-004-I01a DESIGN-I01A section 12: the I01 listener joins it (unit U3); the I01 service, its request checks and
 # the role pin as their units add them (I01_NO_PANIC_BUILT). HE-004-I01B1 (G-I01B-7 (d)): the digest port's three.
-I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac") + I01B1_MODULES
+# HE-004-I01B3 (G-I01B-7 (d)): the answer logic too.
+I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac") + I01B3_MODULES
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
     "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
@@ -3938,7 +3951,8 @@ def check_i01b_guarded_pins(base: Path) -> int:
       <name>;` (a cfg attribute before it aside), and no source of either crate holds an inline `mod <name> {`, so no
       inline module can orphan a pinned file.
     The sources are read without comments, literal contents emptied and the whitespace around `::` removed. The number
-    of guarded entries (six pins and one absence)."""
+    of guarded entries (six pins and one absence in HE-004-I01B1 and I01B2; seven pins from HE-004-I01B3, whose
+    i01_answer.rs absence became its pin, so I01B_ABSENT is empty)."""
     rule = "guarded pin, R-B3-PIN"
     for rel, expected in I01B_GUARDED_PINS.items():
         path = base / rel
@@ -4486,15 +4500,210 @@ def check_i01b_constructor(base: Path) -> int:
     return 13
 
 
+# HE-004-I01B3 G-I01B-9, `Derived` closed (DESIGN-I01B3 rev 4 section 4; DIB section 6; I3D-3, I3E-1, I3E-5, I3E-6,
+# I3F-4..6), as G-I01B-3's construction: the field list the build chose (each name distinct from every field of
+# I01Request, ProjectionValue, EnforcementValue, DigestSnapshot, CaptureFacts and LatestSet), the literal's pattern, the
+# call form, and the three exact signatures that hold (vi)'s places 3, 5 and 6.
+DERIVED_FIELDS = ("policy_values", "digest_values", "namespace_member", "binding_member", "bound_digest", "bound_nonce",
+                  "enrolled_record", "boot_id", "quota_pair", "generation_hex", "scope_window", "record_window",
+                  "config_window")
+DERIVED_LITERAL = re.compile(r"\bDerived(?:::\s*<\s*>)?\s*\{")
+DERIVED_CALL = re.compile(r"\bDerived(?:::\s*<\s*>)?\s*\(")
+DERIVED_HEADER = re.compile(r"\b(?:struct|impl)\s+(Derived)\b")
+RAW_IDENTIFIER = re.compile(r"\br#(?=[A-Za-z_])")
+DERIVED_SIGNATURES = (
+    (re.compile(r"\bpub\s+fn\s+derive\s*\(\s*inputs\s*:\s*&\s*Inputs\s*,\s*resource_version\s*:\s*&\s*Value\s*,\s*"
+                r"configuration\s*:\s*&\s*Value\s*,\s*adm4_loaded_hash\s*:\s*&\s*Value\s*,\s*record\s*:\s*&\s*Value\s*,\s*"
+                r"closure\s*:\s*&\s*Closure\s*,\s*binding\s*:\s*&\s*Value\s*,\s*quota\s*:\s*&\s*Value\s*,\s*generation\s*:"
+                r"\s*&\s*str\s*,\s*not_before\s*:\s*u64\s*,\s*not_after\s*:\s*u64\s*\)\s*->\s*Result\s*<\s*(Derived)\s*,"
+                r"\s*&\s*'static\s+str\s*>\s*\{"),
+     "pub fn derive(inputs: &Inputs, resource_version: &Value, configuration: &Value, adm4_loaded_hash: &Value, record: "
+     "&Value, closure: &Closure, binding: &Value, quota: &Value, generation: &str, not_before: u64, not_after: u64) -> "
+     "Result<Derived, &'static str>"),
+    (re.compile(r"\bpub\s+fn\s+refusals\s*\(\s*derived\s*:\s*&\s*(Derived)\s*,\s*facts\s*:\s*&\s*CaptureFacts\s*\)\s*->"
+                r"\s*Vec\s*<\s*&\s*'static\s+str\s*>\s*\{"),
+     "pub fn refusals(derived: &Derived, facts: &CaptureFacts) -> Vec<&'static str>"),
+    (re.compile(r"\bpub\s+fn\s+answer\s*\(\s*derived\s*:\s*&\s*(Derived)\s*,\s*checked\s*:\s*&\s*I01Request\s*,\s*facts"
+                r"\s*:\s*&\s*CaptureFacts\s*,\s*wall_ms\s*:\s*u64\s*,\s*last_observed\s*:\s*Option\s*<\s*u64\s*>\s*\)\s*->"
+                r"\s*Result\s*<\s*Vec\s*<\s*u8\s*>\s*,\s*&\s*'static\s+str\s*>\s*\{"),
+     "pub fn answer(derived: &Derived, checked: &I01Request, facts: &CaptureFacts, wall_ms: u64, last_observed: "
+     "Option<u64>) -> Result<Vec<u8>, &'static str>"))
+
+
+def derived_i_struct(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (i) [I3E-6]: exactly one `struct Derived {` in i01_answer.rs, the brace directly after the name (no
+    generic parameter, where-clause, tuple or unit form), at its top level; its fields exactly DERIVED_FIELDS, in order,
+    each `<name>: <type>` with no visibility and no attribute; its attributes exactly one `#[derive(Debug)]` (no
+    cfg_attr, repr or other attribute)."""
+    code = codes[I01_ANSWER]
+    structs = list(re.finditer(r"\bstruct\s+Derived\b", code))
+    require(len(structs) == 1 and re.match(r"\s*\{", code[structs[0].end():]) is not None
+            and brace_depth(code, structs[0].start()) == 0,
+            "%s does not define one `struct Derived {` at its top level, the brace directly after the name (%s (i))"
+            % (I01_ANSWER, rule))
+    try:
+        fields = [re.sub(r"\s+", " ", field.strip()) for field in struct_fields(code, structs[0].end())]
+    except GateError:
+        raise GateError("%s's struct Derived cannot be read (%s (i))" % (I01_ANSWER, rule)) from None
+    named = [re.match(r"([A-Za-z_]\w*) ?:(?!:)", field) for field in fields]
+    require(all(named) and [found.group(1) for found in named] == list(DERIVED_FIELDS),
+            "%s's Derived fields are not exactly DERIVED_FIELDS, in order, each `<name>: <type>` with no visibility or "
+            "attribute (%s (i))" % (I01_ANSWER, rule))
+    start = re.search(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bstruct\s+Derived\b", code).start()
+    try:
+        attributes = [re.sub(r"\s+", "", attribute) for attribute in token_attributes(code, start)]
+    except GateError:
+        raise GateError("%s's struct Derived carries an attribute that cannot be read (%s (i))" % (I01_ANSWER, rule)) from None
+    require(attributes == ["#[derive(Debug)]"], "%s's struct Derived carries attributes other than exactly one "
+            "#[derive(Debug)] (%s (i))" % (I01_ANSWER, rule))
+
+
+def derived_ii_literal(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (ii) [I3E-1 (a), I3F-6]: outside the `struct Derived {` and `impl Derived {` headers, DERIVED_LITERAL
+    matches exactly once in i01_answer.rs, as the tail of fn derive's outermost block: its last outermost statement
+    (outermost_statements) begins `Ok(` and whitespace, the literal sits at that offset, and the literal's closing
+    brace (block_end) is followed only by whitespace and `)` to the statement's end. There is no `Self {` or `Self(`, no
+    `Derived(` or `Derived::<>(` call form (the `struct Derived` header excluded), and no other observer source matches
+    the pattern."""
+    code = codes[I01_ANSWER]
+    require(not SELF_LITERAL.search(code), "%s writes `Self{` or `Self(` (%s (ii))" % (I01_ANSWER, rule))
+    headers = {found.start(1) for found in DERIVED_HEADER.finditer(code)}
+    require(not [found for found in DERIVED_CALL.finditer(code) if found.start() not in headers],
+            "%s writes a `Derived(` call form (%s (ii))" % (I01_ANSWER, rule))
+    literals = [found for found in DERIVED_LITERAL.finditer(code) if found.start() not in headers]
+    span = function_span(code, "derive")
+    tail = False
+    if len(literals) == 1 and span is not None:
+        statements = outermost_statements(code, span[0], rule)
+        if statements:
+            start, end = statements[-1]
+            head = re.match(r"Ok\(\s*", code[start:end])
+            if head and start + head.end() == literals[0].start():
+                close = block_end(code, literals[0].end() - 1)
+                tail = close <= end and re.fullmatch(r"\s*\)\s*", code[close:end]) is not None
+    require(tail, "%s writes the Derived literal other than once, as `Ok(Derived { .. })`, the tail of fn derive's "
+            "outermost block (%s (ii))" % (I01_ANSWER, rule))
+    for rel, other in sorted(codes.items()):
+        if rel != I01_ANSWER:
+            require(not DERIVED_LITERAL.search(other), "%s writes the Derived literal; only %s's fn derive does (%s (ii))"
+                    % (rel, I01_ANSWER, rule))
+
+
+def derived_iii_impls(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (iii) [I3E-6], in G-I01B-3 (iii)'s form: every impl header in the observer whose tokens name Derived is
+    exactly `impl Derived {`, one, in i01_answer.rs; it holds only getters, one per DERIVED_FIELDS field, each `fn
+    <field>(&self) -> <type> { &self.<field> }` or `{ self.<field> }` (a `pub` visibility allowed), and no const, type,
+    static, `&mut self` or other item."""
+    homes = []
+    for rel, code in sorted(codes.items()):
+        for position, header in impl_headers(rel, code):
+            if "Derived" in header.split():
+                require(rel == I01_ANSWER and header == "impl Derived", "%s holds an impl naming Derived other than %s's "
+                        "one `impl Derived {` (%s (iii))" % (rel, I01_ANSWER, rule))
+                homes.append(position)
+    require(len(homes) == 1, "%s holds an impl naming Derived other than its one `impl Derived {` (%s (iii))"
+            % (I01_ANSWER, rule))
+    code = codes[I01_ANSWER]
+    opening = code.find("{", homes[0])
+    rest = code[opening + 1:block_end(code, opening) - 1]
+    require(not re.search(r"(?<!')\b(?:const|type|static)\b", rest), "%s's impl Derived holds a const, type or static "
+            "(%s (iii))" % (I01_ANSWER, rule))
+    for name in DERIVED_FIELDS:
+        getters = list(re.finditer(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bfn\s+%s\s*\(\s*&\s*self\s*\)\s*->\s*[^{;]+\{" % name,
+                                   rest))
+        body = rest[getters[0].end():block_end(rest, getters[0].end() - 1) - 1] if len(getters) == 1 else ""
+        require(len(getters) == 1 and re.sub(r"\s+", "", body) in ("&self.%s" % name, "self.%s" % name),
+                "%s's impl Derived does not hold the one getter `fn %s(&self) -> .. { &self.%s }` (%s (iii))"
+                % (I01_ANSWER, name, name, rule))
+        rest = rest[:getters[0].start()] + rest[block_end(rest, getters[0].end() - 1):]
+    require(not rest.strip(), "%s's impl Derived holds an item other than one getter per field (%s (iii))"
+            % (I01_ANSWER, rule))
+
+
+def derived_iv_fields(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (iv) [I3F-4]: G-I01B-3 (iv)'s regex, `\\.\\s*(?:r#)?(<fields>)\\b(?!\\s*\\()`, finds no match in
+    i01_answer.rs outside `impl Derived {`: every `.<field>` is a getter call, so no field is written, moved or reached
+    through `&mut`; the literal's own initialisers are (ii)'s."""
+    code = codes[I01_ANSWER]
+    impls = list(re.finditer(r"\bimpl\s+Derived\s*\{", code))
+    span = (impls[0].start(), block_end(code, impls[0].end() - 1)) if len(impls) == 1 else (0, 0)
+    for use in re.finditer(r"\.\s*(?:r#)?(%s)\b(?!\s*\()" % "|".join(DERIVED_FIELDS), code):
+        require(span[0] <= use.start() < span[1], "%s uses the Derived field %s other than through its getter (%s (iv))"
+                % (I01_ANSWER, use.group(1), rule))
+
+
+def derived_v_names(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (v): Derived is renamed with `as` nowhere in the observer and named by no `type` item (read to its `;` at
+    bracket depth 0, at any nesting, associated types included)."""
+    for rel, code in sorted(codes.items()):
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s (v))" % (rel, rule)) from None
+        require(not re.search(r"\bDerived\s+as\b|\bas\s+Derived\b", code)
+                and not any(re.search(r"\bDerived\b", text) for text in type_items),
+                "%s renames or aliases Derived (%s (v))" % (rel, rule))
+
+
+def derived_vi_name_count(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (vi) [I3E-1 (b), I3F-6], G-I01B-3 (vi)'s construction: in i01_answer.rs the word Derived occurs exactly
+    six times, at `struct Derived`, `impl Derived {`, derive's return type, the literal (the pattern's one match inside
+    derive's span), and the `derived: &Derived` parameter of refusals' and answer's exact signatures; each signature
+    matches once, at brace depth 0 (R1-3's brace_depth). A helper takes the getters' values, not a Derived."""
+    code = codes[I01_ANSWER]
+    positions = []
+    for pattern, signature in DERIVED_SIGNATURES:
+        found = list(pattern.finditer(code))
+        require(len(found) == 1 and brace_depth(code, found[0].start()) == 0, "%s does not hold `%s` exactly once, at its "
+                "top level (%s (vi))" % (I01_ANSWER, signature, rule))
+        positions.append(found[0].start(1))
+    words = [found.start() for found in re.finditer(r"\bDerived\b", code)]
+    span = function_span(code, "derive")
+    expected = set(positions) | {found.start(1) for found in DERIVED_HEADER.finditer(code)}
+    expected |= {found.start() for found in DERIVED_LITERAL.finditer(code) if span and span[0] < found.start() < span[1]}
+    require(len(words) == 6 and set(words) == expected, "%s names Derived %d times, not at its six places (%s (vi))"
+            % (I01_ANSWER, len(words), rule))
+
+
+def derived_vii_top_level(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-9 (vii) [I3E-1 (a)], R1-3's construction: every impl header in i01_answer.rs lies at its top level (brace
+    depth 0), and i01_answer.rs defines no module, inline or not."""
+    code = codes[I01_ANSWER]
+    require(not MODULE_ITEM.search(code), "%s defines a module (%s (vii))" % (I01_ANSWER, rule))
+    for position, header in impl_headers(I01_ANSWER, code):
+        require(brace_depth(code, position) == 0, "%s holds `%s` below its top level (%s (vii))"
+                % (I01_ANSWER, header, rule))
+
+
+def check_i01b_derived(base: Path) -> int:
+    """HE-004-I01B3 G-I01B-9, `Derived` closed (DESIGN-I01B3 rev 4 section 4; DIB section 6). crates/observer's non-test
+    sources are read as observer_code reads them (comments removed, literal contents emptied, the whitespace around `::`
+    removed, strict test blocks blanked), `r#<name>` read as `<name>`; each sub-clause is its own function with its own
+    message, so that any one can be disabled: (i) the struct, (ii) the literal as derive's tail, (iii) the impl of
+    getters, (iv) the fields only through the getters, (v) no rename or type item, (vi) the name count at six places,
+    (vii) every impl at the top level and no module. The number of clauses."""
+    rule = "Derived closed, G-I01B-9"
+    codes = {rel: RAW_IDENTIFIER.sub("", code) for rel, code in observer_code(base, rule).items()}
+    require(I01_ANSWER in codes, "%s is missing (%s)" % (I01_ANSWER, rule))
+    derived_i_struct(codes, rule)
+    derived_ii_literal(codes, rule)
+    derived_iii_impls(codes, rule)
+    derived_iv_fields(codes, rule)
+    derived_v_names(codes, rule)
+    derived_vi_name_count(codes, rule)
+    derived_vii_top_level(codes, rule)
+    return 7
+
+
 def check_i01b_sources(base: Path) -> int:
     """HE-004-I01B1 G-I01B-7 (a)-(d) (DESIGN-I01B rev 3 sections 2, 6 and 7.5; Q-I01B-28 amended; B1-4). Over
     crates/observer's sources, read as observer_code reads them (comments removed, literal contents emptied, the
     whitespace around `::` removed, strict test blocks blanked):
-    (a) the `src/**/i01_*.rs` files (rglob) are exactly I01_FILES_BUILT (five in I01B1);
+    (a) the `src/**/i01_*.rs` files (rglob) are exactly I01_FILES_BUILT (five in I01B1, six from HE-004-I01B3);
     (b) lib.rs's module declarations are exactly OBSERVER_LIB_MODULES, each once and in file form (`mod <name>;`), so a
         response module not named i01_* refuses too (HE-004-I01A PR review R1-4);
     (c) no other observer source declares a module item;
-    (d) I01_LOGIC_BUILT and I01_NO_PANIC_BUILT hold the three I01B1 modules.
+    (d) I01_LOGIC_BUILT and I01_NO_PANIC_BUILT hold the three I01B1 modules and, from HE-004-I01B3, i01_answer.
     The number of i01_ sources."""
     rule = "the i01_ sources, G-I01B-7"
     source = base / OBSERVER_CRATE / "src"
@@ -4510,15 +4719,17 @@ def check_i01b_sources(base: Path) -> int:
     for rel, code in sorted(codes.items()):
         if rel != OBSERVER_LIB:
             require(not MODULE_ITEM.search(code), "%s declares a module; only lib.rs does (%s)" % (rel, rule))
-    missing = [name for name in I01B1_MODULES if name not in I01_LOGIC_BUILT or name not in I01_NO_PANIC_BUILT]
+    missing = [name for name in I01B3_MODULES if name not in I01_LOGIC_BUILT or name not in I01_NO_PANIC_BUILT]
     require(not missing, "%s miss the logic or the no-panic rule (%s)" % (", ".join(missing), rule))
     return len(present)
 
 
-def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str, rule: str) -> tuple[int, list[str], int]:
+def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str,
+                    rule: str) -> tuple[int | str, list[str], int]:
     """HE-004-I01B1 G-I01B-8: the one line-anchored `pub const <name>: <kind> = <form>;` of a raw source, the only
     `const <name>` there: its value (the form's integer, underscores removed), the source's lines and the line's
-    index."""
+    index. HE-004-I01B3 (DESIGN-I01B3 rev 4 section 5; I3E-3): extended to `&str`, whose form is STR_FORM (printable
+    ASCII without `"` or `\\`, so no escape) and whose value is the text."""
     path = base / rel
     require(path.is_file(), "%s is missing (%s)" % (rel, rule))
     raw = path.read_text(encoding="utf-8")
@@ -4528,7 +4739,8 @@ def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str, rule:
     require(len(found) == 1 and len(re.findall(r"\bconst\s+%s\b" % re.escape(name), raw)) == 1,
             "%s does not define %s exactly once, as a line-anchored pub const (%s)" % (rel, name, rule))
     index, match = found[0]
-    return int(match.group(1).replace("_", "")), lines, index
+    value = match.group(1)
+    return (value if kind == "&str" else int(value.replace("_", ""))), lines, index
 
 
 def check_i01b_constants(base: Path) -> int:
@@ -4599,6 +4811,399 @@ def check_i01b_refusal_texts(base: Path) -> int:
     return len(pinned)
 
 
+# HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 section 5; I3D-7, I3E-3, I3F-1..3; the monitor's rulings on
+# round 3): every text self_check and answer write is a pinned `pub const <NAME>_TEXT: &str` in i01_answer.rs with its
+# citation; the JSON member names and schemaVersion's value are pinned `pub const KEY_<NAME>: &str`; the sha256: prefix
+# and the zero digest come only from sha256::prefixed and crate::i01_request::ZERO_DIGEST. Each check (t1)-(t7) is its
+# own function with its own message, called from check_i01b3_texts.
+STR_FORM = r'"([ !#-\[\]-~]*)"'
+VPO_CITATION = "scripts/validate_policy_observation.py:%s"
+R10_CITATION = "R10-defined, MODEL_DEFINED R201"
+I01B3_TEXT_PINS = (
+    ("OBSERVATION_BYTES_TEXT", "observation bytes exceeded", VPO_CITATION % "77"),
+    ("INVALID_OBSERVATION_TEXT", "invalid protected observation data", VPO_CITATION % "138"),
+    ("OBSERVED_IDENTITY_TEXT", "observed identity or digest", VPO_CITATION % "107-108"),
+    ("OBSERVED_NAMESPACE_TEXT", "observed namespace", VPO_CITATION % "109"),
+    ("REQUEST_BINDING_TEXT", "request binding", VPO_CITATION % "110-111"),
+    ("RESPONSE_SUBSTITUTION_TEXT", "response substitution", VPO_CITATION % "112-113"),
+    ("INITIAL_CHAIN_TEXT", "initial chain", VPO_CITATION % "114-115"),
+    ("CHAIN_GAP_TEXT", "chain gap", VPO_CITATION % "116-121"),
+    ("RESTART_TEXT", "restart, drift or reused challenge", VPO_CITATION % "122-124"),
+    ("CLOCK_ROLLBACK_TEXT", "clock rollback", VPO_CITATION % "125"),
+    ("STALE_OR_FUTURE_TEXT", "stale or future", VPO_CITATION % "126-127"),
+    ("FRESHNESS_WINDOW_TEXT", "freshness window", VPO_CITATION % "128"),
+    ("ENFORCEMENT_PROOF_TEXT", "enforcement proof mismatch", VPO_CITATION % "129-130"),
+    ("QUOTA_HEADROOM_TEXT", "actual quota headroom", VPO_CITATION % "131-134"),
+    ("RECORD_DIGEST_TEXT", "capture record digest differs", R10_CITATION),
+    ("ANSWER_WINDOW_TEXT", "answer outside its windows", R10_CITATION),
+    ("ANSWER_ROLLBACK_TEXT", "answer clock rollback", R10_CITATION),
+)
+I01B3_KEY_CONSTS = (
+    # The observation's 14 members (CS `$defs.observation`).
+    ("KEY_SCHEMA_VERSION", "schemaVersion"), ("KEY_BINDING_DIGEST", "bindingDigest"), ("KEY_RUN_NONCE", "runNonce"),
+    ("KEY_CHALLENGE", "challenge"), ("KEY_SEQUENCE", "sequence"), ("KEY_PREVIOUS_DIGEST", "previousObservationDigest"),
+    ("KEY_BOOT_ID", "observerBootId"), ("KEY_GENERATION", "generation"), ("KEY_OBSERVED_AT", "observedAt"),
+    ("KEY_EXPIRES_AT", "expiresAt"), ("KEY_NAMESPACE", "namespace"), ("KEY_PROJECTIONS", "projections"),
+    ("KEY_QUOTA", "quota"), ("KEY_ENFORCEMENT", "enforcement"),
+    # The namespace member's and a projection's members.
+    ("KEY_NAME", "name"), ("KEY_UID", "uid"), ("KEY_RESOURCE_VERSION", "resourceVersion"), ("KEY_API_VERSION", "apiVersion"),
+    ("KEY_KIND", "kind"), ("KEY_PROJECTION_DIGEST", "projectionDigest"),
+    # The quota pair's members and units, and the enforcement member's generation.
+    ("KEY_HARD", "hard"), ("KEY_USED", "used"), ("KEY_PODS", "pods"), ("KEY_CONFIG_MAPS", "configMaps"),
+    ("KEY_SERVICES", "services"), ("KEY_CPU_MILLIS", "cpuMillis"), ("KEY_MEMORY_BYTES", "memoryBytes"),
+    ("KEY_EPHEMERAL_STORAGE_BYTES", "ephemeralStorageBytes"), ("KEY_POLICY_GENERATION", "policyGeneration"),
+    # The signed binding's members (`$defs.binding`), the v4 record's host and boot id, the configuration's namespace and
+    # a listed object's metadata.
+    ("KEY_SCOPE", "scope"), ("KEY_VALID_FROM", "validFrom"), ("KEY_ENFORCEMENT_PINS", "enforcementPins"),
+    ("KEY_HOST", "host"), ("KEY_HOST_BOOT_ID", "bootId"), ("KEY_QUALIFICATION_NAMESPACE", "qualificationNamespace"),
+    ("KEY_METADATA", "metadata"),
+    # schemaVersion's value (`$defs.observation`'s const).
+    ("KEY_OBSERVATION_SCHEMA", "planeon.internal.policy-observation/v1"),
+)
+I01B3_R10_TEXTS = ("RECORD_DIGEST_TEXT", "ANSWER_WINDOW_TEXT", "ANSWER_ROLLBACK_TEXT")
+# (t4): the routes to a &'static str other than a pinned const, in OBSERVER_LOGIC_WORDS' form.
+I01B3_REFUSED_MACROS = re.compile(r"\b(?:stringify|concat|include_str|include_bytes|env|option_env|format_args|file|"
+                                  r"module_path)\s*!")
+I01B3_REFUSED_WORDS = re.compile(r"\b(?:leak|from_utf8|from_utf8_unchecked|transmute)\b")
+# (t5): the positions every refusal text passes through, each word called past an optional turbofish (call_opening;
+# PR review round 1's R1-1 (a)), and the I01B1 methods that return one contract refusal text (`pub fn <name>(self) ->
+# &'static str` in i01_digest.rs's impl DigestKey, read at check time).
+I01B3_REFUSAL_WORDS = re.compile(r"\b(Err|ok_or|ok_or_else|map_err)\b")
+I01B3_RULE_WORD = re.compile(r"(?<![\w.])require\b")
+I01B3_PUSH_WORD = re.compile(r"\.\s*push\b")
+# The positions whose argument is a closure, never a fn item: map_err( [R1-1 (d)] and ok_or_else( [R2-1].
+I01B3_CLOSURE_ONLY = ("map_err", "ok_or_else")
+I01B1_REFUSAL_METHODS = ("malformed", "bound_exceeded", "differs")
+I01B1_DIGEST_RS = "crates/observer/src/i01_digest.rs"
+# (t5)'s refusals' list [R1-1 (c), tightened by PR review round 2's R2-3]: its one declaration in fn refusals' outermost
+# block, and the only two methods it may be named with there, the write `.push(` and the read `.contains(`.
+I01B3_LIST_DECLARATION = re.compile(r"\blet\s+mut\s+([a-z_][a-z0-9_]*)\s*:\s*Vec\s*<\s*&\s*'static\s+str\s*>\s*=\s*"
+                                    r"Vec::new\(\s*\)\s*;")
+I01B3_LIST_METHODS = ("push", "contains")
+# (t8) [R1-1 (b)]: the words that occur only as a call, in OBSERVER_LOGIC_WORDS' form; (t2) and (t9) [R1-2 (a), (b)]:
+# str named as a word, parenthesized or not.
+I01B3_CALL_ONLY = tuple((re.compile(r"(?<![\w.])%s\b" % word if word == "require" else r"\b%s\b" % word), word)
+                        for word in ("Err", "require", "ok_or", "ok_or_else", "map_err"))
+I01B3_STR_WORD = re.compile(r"\bstr\b")
+
+
+def call_opening(code: str, index: int) -> int | None:
+    """R1-1 (a): the index of the `(` that calls the word ending at `index`, past whitespace and an optional turbofish
+    `::<..>` (DERIVED_LITERAL's `(?:::\\s*<..>)?` style, its angle brackets balanced, a `>` after `-` closing none and a
+    `;`, `{` or `}` ending the search); None when the word is not called there."""
+    at = index + len(code[index:]) - len(code[index:].lstrip())
+    if code.startswith("::", at):
+        at += 2
+        at += len(code[at:]) - len(code[at:].lstrip())
+        if not code.startswith("<", at):
+            return None
+        depth = 0
+        while at < len(code):
+            char = code[at]
+            if char == "<":
+                depth += 1
+            elif char == ">" and code[at - 1] != "-":
+                depth -= 1
+                if depth == 0:
+                    break
+            elif char in ";{}":
+                return None
+            at += 1
+        else:
+            return None
+        at += 1
+        at += len(code[at:]) - len(code[at:].lstrip())
+    return at if code.startswith("(", at) else None
+
+
+def answer_source(base: Path, rule: str) -> tuple[str, str, str]:
+    """i01_answer.rs's raw text, its code without comments with literals kept (rust_code), and its code without comments
+    with literal contents emptied and the whitespace around `::` removed."""
+    path = base / I01_ANSWER
+    require(path.is_file(), "%s is missing (%s)" % (I01_ANSWER, rule))
+    raw = path.read_text(encoding="utf-8")
+    try:
+        return raw, rust_code(raw, literals=True), PATH_SPACE.sub("::", rust_code(raw))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (I01_ANSWER, error, rule)) from None
+
+
+def answer_texts_t1_pins(base: Path, rule: str) -> int:
+    """(t1) The pins: pinned_constant (`&str`) holds each I01B3_TEXT_PINS const to its text with its citation in the
+    `///` doc comment directly above it, and each I01B3_KEY_CONSTS const to its value."""
+    for name, text, citation in I01B3_TEXT_PINS:
+        value, lines, index = pinned_constant(base, I01_ANSWER, name, "&str", STR_FORM, rule + " (t1)")
+        above = index
+        while above > 0 and lines[above - 1].startswith("///"):
+            above -= 1
+        documented = " ".join(line[3:].strip() for line in lines[above:index])
+        require(value == text and citation in documented, "%s does not pin %s to %r with its citation %s (%s (t1))"
+                % (I01_ANSWER, name, text, citation, rule))
+    for name, text in I01B3_KEY_CONSTS:
+        value, _, _ = pinned_constant(base, I01_ANSWER, name, "&str", STR_FORM, rule + " (t1)")
+        require(value == text, "%s does not pin %s to %r (%s (t1))" % (I01_ANSWER, name, text, rule))
+    return len(I01B3_TEXT_PINS) + len(I01B3_KEY_CONSTS)
+
+
+def answer_texts_t2_set(base: Path, rule: str) -> None:
+    """(t2) The set [I3F-2; PR review round 1's R1-2 (a)]: in i01_answer.rs read without comments, every const item
+    whose type text names str as a word (I01B3_STR_WORD: `&str`, `&'static str`, `&(str)`, `&'static (str)`, a const
+    array or Option of them), at any depth, is one of the 17 text names or a listed key name, each defined exactly
+    once, as a top-level, line-anchored `pub const <NAME>: &str = "<text>";`; their values are pairwise distinct; no
+    key value equals a text, a contract refusal text (definitions.json's refusalTexts, B1_MALFORMED's among them); no
+    R10 text equals a VPO text or a contract text. A str named through a `type` alias is (t9)'s."""
+    _, kept, code = answer_source(base, rule)
+    try:
+        refusals = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))["refusalTexts"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise GateError("%s has no readable refusalTexts (%s (t2))" % (I01B_DEFINITIONS, rule)) from None
+    texts = {name: text for name, text, _ in I01B3_TEXT_PINS}
+    keys = {name: text for name, text in I01B3_KEY_CONSTS}
+    defined: dict[str, int] = {}
+    for item in re.finditer(r"\bconst\s+([A-Za-z_]\w*)\s*:", code):
+        try:
+            declared = item_text(code, item.start(), "const")
+        except GateError:
+            raise GateError("%s holds a const item (t2) cannot read (%s (t2))" % (I01_ANSWER, rule)) from None
+        name, kind = item.group(1), declared[item.end() - item.start():].split("=", 1)[0]
+        if not I01B3_STR_WORD.search(kind):
+            continue
+        require(name in texts or name in keys, "%s defines the str const %s, neither a pinned text nor a listed key "
+                "(%s (t2))" % (I01_ANSWER, name, rule))
+        require(brace_depth(code, item.start()) == 0, "%s defines the str const %s below its top level (%s (t2))"
+                % (I01_ANSWER, name, rule))
+        defined[name] = defined.get(name, 0) + 1
+    values: dict[str, str] = {}
+    for line in kept.split("\n"):
+        form = re.fullmatch(r"pub const ([A-Z][A-Z0-9_]*): &str = %s;" % STR_FORM, line)
+        if form and (form.group(1) in texts or form.group(1) in keys):
+            values.setdefault(form.group(1), form.group(2))
+    listed = sorted(set(texts) | set(keys))
+    missing = [name for name in listed if name not in values or defined.get(name) != 1]
+    require(not missing, "%s does not define %s exactly once, as a top-level, line-anchored pub const (%s (t2))"
+            % (I01_ANSWER, ", ".join(missing), rule))
+    require(len(set(values.values())) == len(values), "%s holds two str consts with one value (%s (t2))" % (I01_ANSWER, rule))
+    text_values = {values[name] for name in texts}
+    for name in keys:
+        require(values[name] not in text_values and values[name] not in refusals, "%s's key const %s holds a refusal "
+                "text (%s (t2))" % (I01_ANSWER, name, rule))
+    vpo = {values[name] for name in texts if name not in I01B3_R10_TEXTS}
+    for name in I01B3_R10_TEXTS:
+        require(values[name] not in vpo and values[name] not in refusals, "%s's R10 text %s equals a VPO or contract text "
+                "(%s (t2))" % (I01_ANSWER, name, rule))
+
+
+def answer_texts_t3_no_other_string(base: Path, rule: str) -> None:
+    """(t3) No other string [I3F-3]: in i01_answer.rs read without comments and with literals kept, no `"` appears
+    outside the lines (t1)'s fullmatch accepts, the pinned text and key consts' lines; so no `"..."`, raw, byte or C
+    string (`r"`, `r#"`, `b"`, `br"`, `c"`, `cr"`), `format!` string or quote character is written."""
+    _, kept, _ = answer_source(base, rule)
+    pinned = {name for name, _, _ in I01B3_TEXT_PINS} | {name for name, _ in I01B3_KEY_CONSTS}
+    for number, line in enumerate(kept.split("\n"), 1):
+        if '"' not in line:
+            continue
+        form = re.fullmatch(r"pub const ([A-Z][A-Z0-9_]*): &str = %s;" % STR_FORM, line)
+        require(form is not None and form.group(1) in pinned, "%s writes a string outside its pinned const lines, at "
+                "code line %d (%s (t3))" % (I01_ANSWER, number, rule))
+
+
+def answer_texts_t4_routes(base: Path, rule: str) -> None:
+    """(t4) No other route to a `&'static str` [I3F-1]: i01_answer.rs, read as OBSERVER_LOGIC_WORDS reads a logic module,
+    names none of the macros stringify!, concat!, include_str!, include_bytes!, env!, option_env!, format_args!, file!
+    and module_path!, and none of the words leak, from_utf8, from_utf8_unchecked and transmute."""
+    _, _, code = answer_source(base, rule)
+    found = I01B3_REFUSED_MACROS.search(code) or I01B3_REFUSED_WORDS.search(code)
+    require(not found, "%s names %s, a route to a text other than a pinned const (%s (t4))"
+            % (I01_ANSWER, found.group(0) if found else "", rule))
+
+
+def answer_texts_t5_positions(base: Path, rule: str) -> int:
+    """(t5) Every refusal names a const, positively [I3F-1], read with call_arguments as G-I01B-4 (b) reads observe::run(:
+    the argument of every `Err(`, `ok_or(`, `ok_or_else(` and `map_err(` (for a closure, its body), the rule helper
+    `require(`'s text argument, and every `.push(` argument, each word called past an optional turbofish (call_opening,
+    PR review round 1's R1-1 (a)), is exactly one const named in I01B3_TEXT_PINS, one lower-case binding, or one
+    I01B1_REFUSAL_METHODS method called on a lower-case binding. A lower-case name counts as a binding only when no
+    `fn`, `const` or `static` item of i01_answer.rs has that name [R1-2 (c)], each item name read so that no qualifier
+    hides it (`\\bfn\\s+(name)` whatever precedes `fn`, as in `const fn`, `pub const fn`, `unsafe fn` or `async fn`, and
+    `\\b(?:const|static)\\s+(name)\\s*[:=]`; PR review round 2's R2-1); and the arguments of `map_err(` [R1-1 (d)] and
+    `ok_or_else(` [R2-1] are closures, never fn items. An `Err(` pattern (followed by `=>`, by `=` other than `==`, or
+    by `|` other than `||`) constructs nothing and is not read; a word that is not called is (t8)'s. Refusals' list
+    [R1-1 (c), tightened by R2-3; refusals_list_names]: fn refusals declares it once, in its outermost block, as
+    `let mut <list>: Vec<&'static str> = Vec::new();`, its tail is `<list>`, and in its body the list is named only
+    there and as the receiver of `.push(` (a position read above) or `.contains(`. Each listed method is
+    `pub fn <name>(self) -> &'static str` in i01_digest.rs. The number of positions read."""
+    _, _, code = answer_source(base, rule)
+    digest = base / I01B1_DIGEST_RS
+    require(digest.is_file(), "%s is missing (%s (t5))" % (I01B1_DIGEST_RS, rule))
+    digest_code = PATH_SPACE.sub("::", rust_code(digest.read_text(encoding="utf-8")))
+    for method in I01B1_REFUSAL_METHODS:
+        require(len(re.findall(r"\bpub\s+fn\s+%s\s*\(\s*self\s*\)\s*->\s*&\s*'static\s+str\s*\{" % method, digest_code)) == 1,
+                "%s does not define the refusal method %s returning one text (%s (t5))" % (I01B1_DIGEST_RS, method, rule))
+    texts = {name for name, _, _ in I01B3_TEXT_PINS}
+    items = (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
+             | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
+    method = re.compile(r"([a-z_][a-z0-9_]*)\s*\.\s*(?:%s)\s*\(\s*\)" % "|".join(I01B1_REFUSAL_METHODS))
+
+    def binding(name: str) -> bool:
+        return re.fullmatch(r"[a-z_][a-z0-9_]*", name) is not None and name not in items
+
+    def named(argument: str, closure_only: bool = False) -> bool:
+        closure = re.fullmatch(r"(?:move\s+)?\|[^|]*\|\s*(.*)", argument.strip(), re.S)
+        if closure_only and closure is None:
+            return False
+        argument = (closure.group(1) if closure else argument).strip()
+        receiver = method.fullmatch(argument)
+        return argument in texts or binding(argument) or (receiver is not None and binding(receiver.group(1)))
+
+    def refused(word: str, arguments: list[str]) -> str:
+        return ("%s's %s( argument(s) `%s` not one pinned text const, one lower-case binding that no item names, or one "
+                "I01B1 refusal method on such a binding%s (%s (t5))"
+                % (I01_ANSWER, word, " ".join(" ".join(arguments).split()), ", %s( taking a closure" % word
+                   if word in I01B3_CLOSURE_ONLY else "", rule))
+
+    read = 0
+    for word in I01B3_REFUSAL_WORDS.finditer(code):
+        opening = call_opening(code, word.end())
+        if opening is None:
+            continue
+        after = code[paren_end(code, opening):].lstrip()
+        if word.group(1) == "Err" and (after.startswith("=>") or re.match(r"=(?!=)", after) or re.match(r"\|(?!\|)", after)):
+            continue
+        arguments = call_arguments(code, opening)
+        require(len(arguments) == 1 and named(arguments[0], word.group(1) in I01B3_CLOSURE_ONLY),
+                refused(word.group(1), arguments))
+        read += 1
+    for word in I01B3_RULE_WORD.finditer(code):
+        opening = call_opening(code, word.end())
+        if opening is None or re.search(r"\bfn\s*$", code[:word.start()]):
+            continue
+        arguments = call_arguments(code, opening)
+        require(len(arguments) == 2 and named(arguments[1]), refused("require", arguments))
+        read += 1
+    for word in I01B3_PUSH_WORD.finditer(code):
+        opening = call_opening(code, word.end())
+        if opening is None:
+            continue
+        arguments = call_arguments(code, opening)
+        require(len(arguments) == 1 and named(arguments[0]), refused(".push", arguments))
+        read += 1
+    refusals_list_names(code, rule)
+    return read
+
+
+def refusals_list_names(code: str, rule: str) -> None:
+    """(t5)'s refusals' list [R1-1 (c)], as answer_texts_t5_positions states it. U6's refusals_list_positions,
+    tightened by PR review round 2's R2-3 and renamed, since it no longer returns positions: inside fn refusals the
+    list's name occurs only at its one declaration (in the outermost block), its tail, and as the receiver of `.push(`
+    (whose argument the push loop reads) or `.contains(`; `.extend(`, `.insert(`, `Vec::push(&mut <list>, ..)`, a
+    helper taking `&mut <list>` (a module fn named push included) and any other naming refuse. Outside fn refusals,
+    `.extend(` and `.insert(` stay legal (the shipped file uses both)."""
+    span = function_span(code, "refusals")
+    require(span is not None, "%s does not define fn refusals once (%s (t5))" % (I01_ANSWER, rule))
+    opening, end = span
+    declared = list(I01B3_LIST_DECLARATION.finditer(code, opening, end))
+    statements = outermost_statements(code, opening, rule)
+    outermost = {start for start, _ in statements}
+    require(len(declared) == 1 and declared[0].start() in outermost, "%s's fn refusals does not declare its list once, in "
+            "its outermost block, as `let mut <list>: Vec<&'static str> = Vec::new();` (%s (t5))" % (I01_ANSWER, rule))
+    name, declaration = declared[0].group(1), declared[0].start(1)
+    tail = statements[-1]
+    require(code[tail[0]:tail[1]].strip() == name, "%s's fn refusals does not return its list %s as its tail (%s (t5))"
+            % (I01_ANSWER, name, rule))
+    for found in re.finditer(r"\b%s\b" % name, code[:end]):
+        if found.start() < opening or found.start() in (declaration, tail[0]):
+            continue
+        call = re.match(r"\s*\.\s*(%s)\b" % "|".join(I01B3_LIST_METHODS), code[found.end():])
+        require(call is not None and call_opening(code, found.end() + call.end()) is not None,
+                "%s's fn refusals names its list %s other than at its declaration, its tail and the receivers of %s "
+                "(%s (t5))" % (I01_ANSWER, name, " and ".join(".%s(" % method for method in I01B3_LIST_METHODS), rule))
+
+
+def answer_texts_t6_key_prefixed(base: Path, rule: str) -> None:
+    """(t6) The key-prefixed clause [I3E-3]: i01_answer.rs writes no string literal, const values included, that starts
+    with one of the contract's eleven keys and `: `; an empty set, checked on its own, not as part of
+    check_i01b_refusal_texts' union."""
+    _, kept, _ = answer_source(base, rule)
+    try:
+        definitions = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))
+        keys = list(definitions["projections"]) + list(definitions["enforcementDigests"])
+    except (OSError, ValueError, KeyError, TypeError):
+        raise GateError("%s has no readable keys (%s (t6))" % (I01B_DEFINITIONS, rule)) from None
+    require(len(keys) == 11, "%s's keys are not readable (%s (t6))" % (I01B_DEFINITIONS, rule))
+    prefix = re.compile(r"(?:%s): " % "|".join(re.escape(key) for key in keys))
+    written = sorted({literal for literal in RUST_STRING.findall(kept) if prefix.match(literal)})
+    require(not written, "%s writes the key-prefixed text(s) %s; it writes none (%s (t6))" % (I01_ANSWER, written, rule))
+
+
+def answer_texts_t7_no_static(base: Path, rule: str) -> None:
+    """(t7) No static [I3F-1]: i01_answer.rs names no `static`, in LINUX_OS_STATE's form `(?<!')\\bstatic\\b`."""
+    _, _, code = answer_source(base, rule)
+    require(not re.search(r"(?<!')\bstatic\b", code), "%s names static (%s (t7))" % (I01_ANSWER, rule))
+
+
+def answer_texts_t8_calls_only(base: Path, rule: str) -> None:
+    """(t8) Calls only [PR review round 1's R1-1 (b)], in OBSERVER_LOGIC_WORDS' form (I01B3_CALL_ONLY): in i01_answer.rs
+    read without comments, each of the words Err, require (the rule helper), ok_or, ok_or_else and map_err occurs only
+    as a call, past an optional turbofish (call_opening). So `Err` or the rule helper as a function value
+    (`.map_or(Ok(()), Err)`, `let rule = require;`) is refused; an `Err(` pattern and `fn require(` are call-shaped and
+    pass."""
+    _, _, code = answer_source(base, rule)
+    for pattern, word in I01B3_CALL_ONLY:
+        for found in pattern.finditer(code):
+            require(call_opening(code, found.end()) is not None, "%s names %s other than as a call (%s (t8))"
+                    % (I01_ANSWER, word, rule))
+
+
+def answer_texts_t9_no_str_alias(base: Path, rule: str) -> None:
+    """(t9) No alias of str [PR review round 1's R1-2 (b)]: i01_answer.rs, read without comments, defines no `type` item
+    whose right side names str as a word (I01B3_STR_WORD: `type Text = str;`, `type Text = (str);`), so no const's type
+    names str without the word (t2) reads."""
+    _, _, code = answer_source(base, rule)
+    for item in re.finditer(r"\btype\s+([A-Za-z_]\w*)", code):
+        declared = code[item.end():].split(";", 1)[0]
+        right = declared.split("=", 1)[1] if "=" in declared else ""
+        require(not I01B3_STR_WORD.search(right), "%s defines the type %s, whose right side names str (%s (t9))"
+                % (I01_ANSWER, item.group(1), rule))
+
+
+def answer_texts_t10_refusals_no_return(base: Path, rule: str) -> None:
+    """(t10) No early exit from fn refusals [PR review round 2's R2-2]: in i01_answer.rs read without comments, the word
+    `return` occurs nowhere inside fn refusals' span (function_span, its closures included), so the answer list leaves
+    refusals only as its tail, the list (t5) pins; `return vec![..]` or `return Vec::from([..])` is refused."""
+    _, _, code = answer_source(base, rule)
+    span = function_span(code, "refusals")
+    require(span is not None, "%s does not define fn refusals once (%s (t10))" % (I01_ANSWER, rule))
+    require(not re.search(r"\breturn\b", code[span[0]:span[1]]), "%s's fn refusals returns early; its list leaves only "
+            "as its tail (%s (t10))" % (I01_ANSWER, rule))
+
+
+def check_i01b3_texts(base: Path) -> int:
+    """HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 section 5; I3D-7, I3E-3, I3F-1..3; PR review round 1's
+    R1-1 and R1-2), each its own function with its own message: (t1) the 17 text pins with their citations and the key
+    consts' pins; (t2) the str-const set, str read as a word; (t3) no `"` outside the pinned const lines; (t4) no other
+    route to a text; (t5) every refusal position, turbofish or not, names a pinned text, a binding no item names (item
+    names read past any qualifier) or an I01B1 refusal method, map_err( and ok_or_else( take a closure, and refusals'
+    list is named only at its declaration, its tail and the .push( and .contains( receivers; (t6) no key-prefixed
+    literal; (t7) no static; (t8) the refusal words only as calls; (t9) no `type` naming str; (t10) no `return` in fn
+    refusals. They run in the order (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), so that a key-prefixed
+    literal, which only a const line can hold, is refused with (t6)'s message, and a str const or alias reaching a
+    refusal with (t2)'s or (t9)'s. The stated limit (a text reaching a refusal through a local; a helper other than the
+    rule helper returning `Err(param)`; `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The
+    number of pins."""
+    rule = "constants and texts, G-I01B-8"
+    pins = answer_texts_t1_pins(base, rule)
+    answer_texts_t6_key_prefixed(base, rule)
+    answer_texts_t2_set(base, rule)
+    answer_texts_t9_no_str_alias(base, rule)
+    answer_texts_t3_no_other_string(base, rule)
+    answer_texts_t4_routes(base, rule)
+    answer_texts_t8_calls_only(base, rule)
+    answer_texts_t5_positions(base, rule)
+    answer_texts_t7_no_static(base, rule)
+    answer_texts_t10_refusals_no_return(base, rule)
+    return pins
+
+
 def check_native_profile_use(base: Path) -> int:
     """HE-004D1 DESIGN-D1 section 19 (G-D1-9, R2-5), generalised by HE-004D2 (DESIGN-D2 section 12, G-D2-3) to each of
     NATIVE_PROFILE_SCHEMAS: read without comments, the constant occurs in crates/observer's sources only as its definition
@@ -4650,18 +5255,19 @@ I01_SOCKET_NAME = "policy-observer.sock"
 I01_PATH_CONSTANT = re.compile(r'(?m)^[ \t]*const\s+I01_PATH\s*:\s*&\s*str\s*=\s*"%s"\s*;' % re.escape(I01_PATH))
 # G-I01-5: nothing leaves I01a. The i01_ sources as their units add them (U4: the service and its request checks;
 # U3 held none).
-# HE-004-I01B1 (G-I01B-7 (a); Q-I01B-28 amended): the digest port's three logic modules make five.
+# HE-004-I01B1 (G-I01B-7 (a); Q-I01B-28 amended): the digest port's three logic modules make five. HE-004-I01B3
+# (G-I01B-7 (a); G-I01-5, I3D-10): i01_answer.rs makes six, and G-I01-5's refused words apply to it.
 I01_FILES = ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs") + tuple(
-    "crates/observer/src/%s.rs" % name for name in I01B1_MODULES)
+    "crates/observer/src/%s.rs" % name for name in I01B3_MODULES)
 I01_FILES_BUILT = I01_FILES
 # HE-004-I01B1 G-I01B-7 (b) (DESIGN-I01B rev 3 section 6; B1-4; HE-004-I01A PR review R1-4's "a response module not named
-# i01_*"): the observer's lib.rs declares exactly these modules, each once and in file form: HE-004-I01A2's 35 and
-# I01B1's three (I01B3 adds i01_answer).
+# i01_*"): the observer's lib.rs declares exactly these modules, each once and in file form: HE-004-I01A2's 35, I01B1's
+# three and HE-004-I01B3's i01_answer, 39.
 OBSERVER_LIB_MODULES = ("admission", "capture", "capture_check", "capture_schema", "client", "composition", "config",
                         "contracts", "credentials", "enrolled", "exposition", "http", "i01_request", "i01_service",
                         "i06_evidence", "inputs", "kernel_text", "linux_capture", "linux_listen", "linux_net", "observe",
                         "observer_rbac", "operational", "qualification", "quota", "rbac", "record_check", "requests",
-                        "seal", "signed_config", "snapshot", "status", "tls", "utc", "watch") + I01B1_MODULES
+                        "seal", "signed_config", "snapshot", "status", "tls", "utc", "watch") + I01B3_MODULES
 MODULE_DECLARATION = re.compile(r"\bmod\s+([A-Za-z_]\w*)\s*([;{])")
 # HE-004-I01B1 G-I01B-8 (DESIGN-I01B rev 3 section 6; B2-7): each constant against its own source. The gate bound and
 # the three R10 constants it sums, from the vendored definitions.json (captureGate); G-I01B-8's three literal pins in
@@ -4817,8 +5423,8 @@ def check_observer_no_send(base: Path) -> int:
     read with source_uses, as the socket-item rule reads them, no use path imports `send` from gate_sys::channel
     (braced, renamed or not) and none renames the channel module; and no `channel::send` path occurs, with any prefix.
     The i01_ sources are exactly I01_FILES_BUILT (the I01 service and its request checks, and from HE-004-I01B1 the
-    digest port's three logic modules: no I01 response, observation or answer module), lib.rs declares exactly those
-    i01_ modules, and they name none of Wire, connect,
+    digest port's three logic modules, from HE-004-I01B3 the unreachable answer logic: no I01 response or observation
+    module), lib.rs declares exactly those i01_ modules, and they name none of Wire, connect,
     ConnId and Client. PeerOps is declared once, in client.rs, exactly as `pub trait PeerOps {` (no supertrait).
     HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): in the two socket files the use paths are read with
     the source's aliases followed (resolved_uses), so `use gate_sys as gs; use gs::channel::{send};` imports send and
@@ -5163,14 +5769,52 @@ def check_observer_d2_isolation(base: Path) -> int:
     return module_isolation(base, D2_LOGIC_NAMES, D2_LOGIC_BUILT, "D2", "D2 isolation, G-D2-5")
 
 
-def check_i01b1_isolation(base: Path) -> int:
-    """HE-004-I01B1 G-I01B-1, its I01B1 form (DESIGN-I01B rev 3 section 6; DESIGN-I01B1 rev 2 section 4, I1D-5): G-D2-5's
-    construction (module_isolation) over the digest port's three modules, i01_digest, i01_admission_render and
-    i01_gate: (a) their names occur outside their files only in lib.rs's line-anchored `pub mod <name>;`; (b) the type
-    set they define is named in no other observer source; (c) every impl header in them is `impl <a type of the set>
-    {`; (d) every `pub use` in them names only their own paths. So nothing in serve reaches them in I01B1; I01B3's form
-    (i01_answer) replaces this rule. The number of type names."""
-    return module_isolation(base, I01B1_MODULES, I01B1_MODULES, "I01B1", "I01B1 isolation, G-I01B-1")
+def i01b_direction(base: Path, rule: str) -> int:
+    """G-I01B-1 (e), the direction clause (DESIGN-I01B3 rev 4 section 6; I3D-4, I3E-4), its own function with its own
+    message, holding every per-module half beside module_isolation's union (a)-(d). The four modules' files are read as
+    module_isolation reads them (comments removed, literal contents emptied, the whitespace around `::` removed; strict
+    test blocks set aside for the type sets): the three I01B1 files name neither i01_answer nor any name of i01_answer's
+    own type set (its struct, enum, union, trait and type items, D2_TYPE_ITEM); and each of the four files' impl headers
+    is `impl <a type that file defines> {`. The number of i01_answer's type names."""
+    codes, own = {}, {}
+    for name in I01B3_MODULES:
+        rel = "crates/observer/src/%s.rs" % name
+        require((base / rel).is_file(), "%s is missing (%s (e))" % (rel, rule))
+        try:
+            codes[rel] = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
+        except GateError as error:
+            raise GateError("%s: %s (%s (e))" % (rel, error, rule)) from None
+        scanned = codes[rel]
+        for start, end in reversed(cfg_test_blocks(scanned)):
+            scanned = scanned[:start] + " " + scanned[end:]
+        own[rel] = {item.group(1) for item in D2_TYPE_ITEM.finditer(scanned)}
+    answer_names = sorted(own[I01_ANSWER])
+    words = re.compile(r"\b(?:%s)\b" % "|".join([I01_ANSWER_NAME] + [re.escape(name) for name in answer_names]))
+    for name in I01B1_MODULES:
+        rel = "crates/observer/src/%s.rs" % name
+        found = words.search(codes[rel])
+        require(not found, "%s names %s, i01_answer or a type it defines; no I01B1 module names them (%s (e))"
+                % (rel, found.group(0) if found else "", rule))
+    for rel, code in sorted(codes.items()):
+        for _, header in impl_headers(rel, code):
+            form = re.fullmatch(r"impl ([A-Za-z_]\w*)", header)
+            require(form is not None and form.group(1) in own[rel], "%s has the impl header `%s`; each of the four "
+                    "modules' impls is `impl <a type its own file defines> {` (%s (e))" % (rel, header, rule))
+    return len(answer_names)
+
+
+def check_i01b_isolation(base: Path) -> int:
+    """HE-004-I01B3 G-I01B-1, its I01B3 form (DESIGN-I01B3 rev 4 section 6; Q-8; I3D-4, I3E-4), replacing the I01B1 form
+    (HE-004-I01B1, DESIGN-I01B1 rev 2 section 4, I1D-5): (a)-(d) are module_isolation's union construction, unchanged
+    (G-D2-5's), over the four unreachable modules i01_digest, i01_admission_render, i01_gate and i01_answer: (a) their
+    names occur outside their files only in lib.rs's line-anchored `pub mod <name>;`; (b) the union type set they define
+    is named in no other observer source; (c) every impl header in them is `impl <a name of the union set> {`; (d)
+    every `pub use` in them names only the four modules' paths. Then (e), the direction clause (i01b_direction). So
+    nothing in serve reaches them in I01B3; I01B5 makes them reachable. The number of type names."""
+    rule = "I01B3 isolation, G-I01B-1"
+    names = module_isolation(base, I01B3_MODULES, I01B3_MODULES, "I01B3", rule)
+    i01b_direction(base, rule)
+    return names
 
 
 def check_observer_interpreter_tree(base: Path) -> int:
@@ -5209,13 +5853,14 @@ def check_d2_absent(names: set[str]) -> int:
 def check_i01b1_absent(names: set[str]) -> int:
     """HE-004-I01B1 G-I01B-1's corroboration (DESIGN-I01B rev 3 section 6, in G-D2-7's style; I1D-5): no symbol of
     planeon-observer's .symtab has an item path or a first-crate-root path beginning `planeon_observer::<one of the
-    digest port's three modules>`; a symbol that only mentions one passes. Build-time corroboration of G-I01B-1's I01B1
-    form, not its proof. The number of symbols read."""
+    unreachable modules>`; a symbol that only mentions one passes. HE-004-I01B3 (DESIGN-I01B3 rev 4 section 0; I3D-11):
+    extended to i01_answer, the four modules of G-I01B-1's I01B3 form; it retires in I01B5 (Q-8). Build-time
+    corroboration, not the proof: the sim's byte-identical binary lines are. The number of symbols read."""
     for name in names:
         for path in (item_path(name), symbol_path(name)[0]):
-            if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in I01B1_MODULES:
-                raise GateError("planeon-observer's symbol table holds %s, a symbol of the I01B1 module %s (G-I01B-1)"
-                                % (name, path[1]))
+            if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in I01B3_MODULES:
+                raise GateError("planeon-observer's symbol table holds %s, a symbol of the unreachable I01 module %s "
+                                "(G-I01B-1)" % (name, path[1]))
     return len(names)
 
 
@@ -5866,7 +6511,8 @@ def main() -> int:
                I05_JSON))
         say("observer logic: %d modules of %s (%s; HE-004D1, G-D1-10: %s, whose whitelist adds i05_protocol::schema and "
             "the three modules; HE-004D2, G-D2-4: %s, whose whitelist adds the four D2 modules; HE-004-I01a: %s, whose "
-            "whitelist adds the I01 logic modules) name only the whitelisted "
+            "whitelist adds the I01 logic modules, and HE-004-I01B3's i01_answer's exactly crate::kernel_text::utc_text "
+            "and crate::kernel_text::utc_seconds besides) name only the whitelisted "
             "path roots %s, no super:: or foreign self:: path, glob, renaming import, HashMap, HashSet, RandomState or "
             "include macro, and no panicking macro or call outside strict #[cfg(test)] blocks (lexical tripwire, HE-004B1)"
             % (check_observer_logic(HE), OBSERVER_CRATE, ", ".join(OBSERVER_LOGIC_NAMES), ", ".join(D1_LOGIC_NAMES),
@@ -5946,10 +6592,11 @@ def main() -> int:
             % (check_i01b4_replay_scope(HE), PROFILE_V2_SCHEMA_NAME, PROFILE_V2_SCHEMA_SHA256, I01B4_ROW79,
                I01B4_ROW79_READER, I01B4_ROW79_TEXTS))
         say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 (config.rs, i01_request.rs "
-            "and i01_service.rs re-pinned at HE-004-I01B2's bytes, the others at dd7422ed's), %s absent (no directory "
-            "entry); no directory entry casefolds to a guarded name but itself, and each guarded module is declared once, "
-            "in file form, in its crate's lib.rs and never inline (I1D-3, I1D-10)"
-            % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT)))
+            "and i01_service.rs re-pinned at HE-004-I01B2's bytes, i01_answer.rs's absence became its pin at "
+            "HE-004-I01B3's, the others at dd7422ed's), %s absent; no directory entry casefolds to a guarded name but "
+            "itself, and each guarded module is declared once, in file form, in its crate's lib.rs and never inline "
+            "(I1D-3, I1D-10)"
+            % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT) or "none"))
         say("I01Binding closed (HE-004-I01B2, G-I01B-3): %d clauses over %s's sources: %s defines struct I01Binding once, "
             "with only the private fields signed_digest and signed_nonce and the one derive of Debug, PartialEq and Eq "
             "(i); its one impl is `impl I01Binding {` with fn from_config and the two getters (iii); its one literal is "
@@ -5965,23 +6612,46 @@ def main() -> int:
             "literal in fn members (c), no rename or type item naming ObserverConfig (c1), the dot form .binding twice "
             "(c2), parse_v3's local binding bound once and assigned once (c3) and no Self (c4)"
             % (check_i01b_constructor(HE), ", ".join(OBSERVE_RUN_ARGUMENTS), I01B2_CONFIG))
+        say("Derived closed (HE-004-I01B3, G-I01B-9): %d clauses over %s's sources: %s defines one `struct Derived {` at "
+            "its top level, its fields exactly %s, its one attribute #[derive(Debug)] (i); its one literal is `Ok(Derived "
+            "{ .. })`, the tail of fn derive's outermost block, with no Self or Derived( form and no literal elsewhere (ii); "
+            "its one impl is `impl Derived {` of one getter per field (iii); the fields are read only through the getters "
+            "(iv); it is renamed and aliased nowhere (v); the word Derived occurs six times, at its struct, its impl, the "
+            "literal and derive's, refusals' and answer's top-level exact signatures (vi); every impl is at the top level "
+            "and no module is defined (vii)"
+            % (check_i01b_derived(HE), OBSERVER_CRATE, I01_ANSWER, ", ".join(DERIVED_FIELDS)))
         say("socket-module aliases (HE-004-I01B1, B3-1, G-I01B-6 (e)): %d sources of %s and %s; no use declaration "
             "targets a socket module (%s) itself, renamed or not, or globs one, no pub use names one, none names a "
             "scope root alone and none globs one outside a crate root; item imports through a socket module pass"
             % (check_socket_module_aliases(HE), EFFECT_GATE_CRATE, OBSERVER_CRATE,
                "; ".join("%s: %s" % (crate, ", ".join(modules)) for crate, modules in SOCKET_CRATE_MODULES.items())))
-        say("observer I01B1 isolation (HE-004-I01B1, G-I01B-1, its I01B1 form): the modules present are %s; outside them "
+        say("observer I01B3 isolation (HE-004-I01B3, G-I01B-1, its I01B3 form): the modules present are %s; outside them "
             "their names occur only as lib.rs's pub mod lines, none of the %d type names they define occurs in another %s "
-            "source, every impl in them is `impl <its own type> {` and none re-exports another item"
-            % (", ".join(I01B1_MODULES), check_i01b1_isolation(HE), OBSERVER_CRATE))
+            "source, every impl in them is `impl <a type of the set> {` and none re-exports another item ((a)-(d), "
+            "module_isolation unchanged); and the three I01B1 files name neither i01_answer nor its %d type names, and "
+            "each module's impls name only its own types ((e))"
+            % (", ".join(I01B3_MODULES), check_i01b_isolation(HE), OBSERVER_CRATE, i01b_direction(HE, "G-I01B-1 (e)")))
         say("observer i01_ sources (HE-004-I01B1, G-I01B-7): %d files, exactly %s; lib.rs declares exactly the %d "
-            "OBSERVER_LIB_MODULES, each once in file form, and no other source declares a module; the I01B1 modules take "
-            "the logic and no-panic rules" % (check_i01b_sources(HE), ", ".join(I01_FILES_BUILT), len(OBSERVER_LIB_MODULES)))
+            "OBSERVER_LIB_MODULES, each once in file form, and no other source declares a module; the I01B1 modules and "
+            "i01_answer take the logic and no-panic rules"
+            % (check_i01b_sources(HE), ", ".join(I01_FILES_BUILT), len(OBSERVER_LIB_MODULES)))
         say("I01B1 constants and texts (HE-004-I01B1, G-I01B-8): %d constants against their sources (GATE_BOUND_MS, CYCLE, "
             "SCRAPE_TO_SET and SET_BUDGET against %s's captureGate; %s as literal pins with their citations); the three "
             "modules' %d refusal texts are exactly its refusalTexts"
             % (check_i01b_constants(HE), I01B_DEFINITIONS, ", ".join(name for name, _, _, _ in I01B_LITERAL_PINS),
                check_i01b_refusal_texts(HE)))
+        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t10)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
+            "citations and its %d key consts with their values (t1); its consts whose type names str exactly those, each "
+            "once, top-level and line-anchored, the values distinct and no key or R10 text a refusal or VPO text (t2); no "
+            "string outside those lines (t3); no stringify!, concat!, include_str!, include_bytes!, env!, option_env!, "
+            "format_args!, file!, module_path!, leak, from_utf8 or transmute (t4); %d refusal positions, turbofish or "
+            "not, each naming a pinned text, a binding no item names or one of %s on such a binding, map_err( and "
+            "ok_or_else( taking a closure, and refusals' list named only at its declaration, its tail and the .push( and "
+            ".contains( receivers (t5); no key-prefixed text (t6); no static (t7); %s only as calls (t8); no type alias "
+            "naming str (t9); no return in fn refusals (t10)"
+            % (check_i01b3_texts(HE), I01_ANSWER, len(I01B3_TEXT_PINS), len(I01B3_KEY_CONSTS),
+               answer_texts_t5_positions(HE, "G-I01B-8 (t5)"), ", ".join(I01B1_REFUSAL_METHODS),
+               ", ".join(word for _, word in I01B3_CALL_ONLY)))
         say("observer never unlinks (HE-004-I01a, G-I01-1): %d sources of %s name no unlink, remove_file, remove_dir, "
             "remove_dir_all, rename or hard_link outside strict test blocks" % (check_observer_never_unlinks(HE), OBSERVER_CRATE))
         say("observer wait point (HE-004-I01a, G-I01-2): %d counted occurrences: wait once as the one wire wait inside "
@@ -6028,8 +6698,8 @@ def main() -> int:
                     say("%s planeon-observer capture symbols (G-D1-14): %s" % (target, ", ".join(check_capture_symbols(names))))
                     say("%s planeon-observer D2 symbols (G-D2-7): none of its %d symbols has a path in planeon_observer::%s"
                         % (target, check_d2_absent(names), ", ::".join(D2_LOGIC_NAMES)))
-                    say("%s planeon-observer I01B1 symbols (G-I01B-1): none of its %d symbols has a path in "
-                        "planeon_observer::%s" % (target, check_i01b1_absent(names), ", ::".join(I01B1_MODULES)))
+                    say("%s planeon-observer I01B3 symbols (G-I01B-1, corroboration): none of its %d symbols has a path in "
+                        "planeon_observer::%s" % (target, check_i01b1_absent(names), ", ::".join(I01B3_MODULES)))
                     say("%s planeon-observer exempt span (G-D1-16): the %d bytes of %s occur exactly once, at offset %d "
                         "(length %d); the host-path scan (%s, the build root and the home directory) reads the binary "
                         "with that one span blanked and finds none; HOST_PATHS is unchanged, and every other binary is "

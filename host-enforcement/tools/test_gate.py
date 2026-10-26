@@ -3367,6 +3367,30 @@ class ObserverLogicTests(Tree):
                 ("const X: &str = include_str! (\"x\");\n", "include_bytes! or include_str!")):
             self.refused(gate.check_observer_logic, rel, good + text, message)
 
+    def test_the_answer_logic_s_whitelist(self):
+        # HE-004-I01B3 (DESIGN-I01B3 rev 4 sections 3 and 8; Q-1e (a); I3D-9 (e)): i01_answer takes I01_LOGIC_PATHS plus
+        # exactly crate::kernel_text::utc_text and utc_seconds; the clock, the client and kernel_text's other items refuse.
+        rel = gate.I01_ANSWER
+        self.assertIn((rel, gate.I01_ANSWER_PATHS), gate.LOGIC_MODULES)
+        self.assertEqual(gate.I01_ANSWER_PATHS, gate.I01_LOGIC_PATHS + (("crate", "kernel_text", "utc_text"),
+                                                                       ("crate", "kernel_text", "utc_seconds")))
+        self.assertNotIn("i01_answer", gate.I01_LOGIC_NAMES)
+        good = self.TREE[rel]
+        self.write(rel, good + "use crate::kernel_text::{utc_seconds, utc_text};\n"
+                               "pub fn t(s: u64) -> Option<String> { crate::kernel_text::utc_text(s) }\n")
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
+        for text, message in (("pub fn n() -> u64 { crate::utc::wall_seconds() }\n", "names crate::utc::wall_seconds"),
+                              ("use std::time::SystemTime;\n", "imports std::time::SystemTime"),
+                              ("pub fn c(x: &crate::client::Client) {}\n", "names crate::client::Client"),
+                              ("use crate::kernel_text::utc_millis;\n", "imports crate::kernel_text::utc_millis"),
+                              ("pub fn m(t: &str) -> Option<u64> { crate::kernel_text::utc_millis(t) }\n",
+                               "names crate::kernel_text::utc_millis")):
+            self.refused(gate.check_observer_logic, rel, good + text, re.escape(rel) + " " + message)
+        # No other module's whitelist widens: kernel_text's two items stay outside i01_digest's and i01_request's.
+        for other in ("crates/observer/src/i01_digest.rs", "crates/observer/src/i01_request.rs"):
+            self.refused(gate.check_observer_logic, other, self.TREE[other] + "use crate::kernel_text::utc_text;\n",
+                         "imports crate::kernel_text::utc_text")
+
     def test_the_no_panic_tripwire(self):
         rel = "crates/observer/src/operational.rs"
         good = self.TREE[rel]
@@ -6428,9 +6452,9 @@ I01_LISTEN_TEXT = ("use gate_sys::channel::{self, ListenStep};\n"
 I01_OBSERVE = "crates/observer/src/observe.rs"
 I01_TREE = {gate.OBSERVER_CLIENT: I01_CLIENT_TEXT, gate.OBSERVER_LINUX_NET: I01_NET_TEXT,
             gate.OBSERVER_LINUX_LISTEN: I01_LISTEN_TEXT,
-            gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod client;\npub mod i01_admission_render;\npub mod i01_digest;\n"
-                              "pub mod i01_gate;\npub mod i01_request;\npub mod i01_service;\npub mod linux_listen;\n"
-                              "pub mod linux_net;\n",
+            gate.OBSERVER_LIB: "#![forbid(unsafe_code)]\npub mod client;\npub mod i01_admission_render;\npub mod i01_answer;\n"
+                              "pub mod i01_digest;\npub mod i01_gate;\npub mod i01_request;\npub mod i01_service;\n"
+                              "pub mod linux_listen;\npub mod linux_net;\n",
             I01_OBSERVE: "pub fn run() -> u8 { 0 }\n",
             # Unit U4: the two i01_ sources.
             gate.I01_FILES[0]: "use crate::client::{PeerOps, PeerService};\npub struct I01Service;\n",
@@ -6438,9 +6462,11 @@ I01_TREE = {gate.OBSERVER_CLIENT: I01_CLIENT_TEXT, gate.OBSERVER_LINUX_NET: I01_
             # HE-004-I01B1 (DESIGN-I01B1 rev 2 section 4, I1D-4): the digest port's three logic modules.
             gate.I01_FILES[2]: "pub fn digest(bytes: &[u8]) -> usize { bytes.len() }\n",
             gate.I01_FILES[3]: "pub fn render() -> u8 { 0 }\n",
-            gate.I01_FILES[4]: "pub const GATE_BOUND_MS: u64 = 90_000;\n"}
-# The I01 fixture's sources: client.rs, linux_net.rs, linux_listen.rs, lib.rs, observe.rs and the five i01_ sources.
-I01_TREE_COUNT = 10
+            gate.I01_FILES[4]: "pub const GATE_BOUND_MS: u64 = 90_000;\n",
+            # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 6, I3D-10): the answer logic.
+            gate.I01_FILES[5]: "pub fn answer() -> u8 { 0 }\n"}
+# The I01 fixture's sources: client.rs, linux_net.rs, linux_listen.rs, lib.rs, observe.rs and the six i01_ sources.
+I01_TREE_COUNT = 11
 
 
 class I01ListenerRuleTests(Tree):
@@ -6451,10 +6477,11 @@ class I01ListenerRuleTests(Tree):
 
     def test_the_fixture_passes(self):
         self.assertEqual(gate.I01_PATH, "/run/planeon/live-proxy/policy-observer.sock")
-        # HE-004-I01B1 (G-I01B-7 (a)): the service and its request checks, then the digest port's three modules.
+        # HE-004-I01B1 (G-I01B-7 (a)): the service and its request checks, then the digest port's three modules;
+        # HE-004-I01B3: then the answer logic.
         self.assertEqual(gate.I01_FILES, ("crates/observer/src/i01_service.rs", "crates/observer/src/i01_request.rs",
                                           "crates/observer/src/i01_digest.rs", "crates/observer/src/i01_admission_render.rs",
-                                          "crates/observer/src/i01_gate.rs"))
+                                          "crates/observer/src/i01_gate.rs", "crates/observer/src/i01_answer.rs"))
         self.assertEqual(gate.check_observer_never_unlinks(self.base), I01_TREE_COUNT)
         self.assertEqual(gate.check_observer_wait_point(self.base), 3)
         self.assertEqual(gate.check_observer_i01_path(self.base), 1)
@@ -6547,12 +6574,13 @@ class I01ListenerRuleTests(Tree):
             for rel in gate.I01_FILES[2:]:
                 self.refused(gate.check_observer_no_send, rel, self.TREE[rel] + "fn %s() {}\n" % word, "G-I01-5")
         # HE-004-I01B1 (DESIGN-I01B rev 3 section 8.5, I1D-4): src/i01_digest.rs, refused here before, is now built and
-        # allowed; I01B3's i01_answer.rs refuses until its packet, as the response and observation modules do.
-        self.write("crates/observer/src/i01_digest.rs", "pub fn answer() {}\n")
-        self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
-        self.write("crates/observer/src/i01_digest.rs", self.TREE["crates/observer/src/i01_digest.rs"])
-        for rel in ("crates/observer/src/i01_response.rs", "crates/observer/src/i01_answer.rs",
-                    "crates/observer/src/i01_observation.rs"):
+        # allowed; HE-004-I01B3 (DESIGN-I01B3 rev 4 section 6, I3D-10): so is i01_answer.rs, whose refusal row becomes an
+        # allowance, keeping its intent: an i01_ source no packet has built (a response or observation module) refuses.
+        for rel in ("crates/observer/src/i01_digest.rs", "crates/observer/src/i01_answer.rs"):
+            self.write(rel, "pub fn answer() {}\n")
+            self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
+            self.write(rel, self.TREE[rel])
+        for rel in ("crates/observer/src/i01_response.rs", "crates/observer/src/i01_observation.rs"):
             self.refused(gate.check_observer_no_send, rel, "pub fn answer() {}\n", "G-I01-5")
         self.refused(gate.check_observer_no_send, lib, self.TREE[lib] + "mod i01_observation;\n", "G-I01-5")
         self.refused(gate.check_observer_no_send, lib, self.TREE[lib].replace("pub mod i01_request;\n", ""), "G-I01-5")
@@ -7083,7 +7111,14 @@ class I01b4ReplayScopeTests(Tree):
 
 
 I01B1_LIB = ("#![forbid(unsafe_code)]\n// i01_digest and i01_gate in a comment\npub mod capture;\npub mod i01_admission_render;\n"
-             "pub mod i01_digest;\npub mod i01_gate;\npub mod observe;\n")
+             "pub mod i01_answer;\npub mod i01_digest;\npub mod i01_gate;\npub mod observe;\n")
+# HE-004-I01B3 (DESIGN-I01B3 rev 4 section 6): G-I01B-1's I01B3 form adds the fourth unreachable module, its type set
+# (Derived, CaptureFacts, ChainMode), named in no I01B1 file; it names the I01B1 types, which is allowed.
+I01B3_ANSWER = ("//! An i01_answer fixture (`impl DigestKey {`, i01_digest and DigestKey in a comment pass).\n"
+                "use crate::i01_digest::DigestKey;\n\n#[derive(Debug)]\npub struct Derived {\n    key: DigestKey,\n}\n\n"
+                "impl Derived {\n    pub fn key(&self) -> DigestKey {\n        self.key\n    }\n}\n\n"
+                "pub struct CaptureFacts {\n    pub completed: bool,\n}\n\nenum ChainMode {\n    Skip,\n}\n\n"
+                "pub fn derive(key: DigestKey) -> Option<Derived> {\n    Some(Derived { key })\n}\n")
 I01B1_DIGEST = ("//! An i01_digest fixture (`impl Other for DigestKey` and LatestSet in a comment pass).\n"
                 "pub enum DigestKey {\n    Rbac,\n}\n\nimpl DigestKey {\n    pub fn name(self) -> &'static str {\n"
                 "        \"rbac\"\n    }\n}\n\npub struct SealedAdmission {\n    pub namespace: String,\n}\n\n"
@@ -7096,6 +7131,7 @@ I01B1_ISOLATION_TREE = {
                                                    "    None\n}\n",
     "crates/observer/src/i01_gate.rs": "use crate::i01_digest::DigestKey;\npub struct LatestSet {\n    pub mono_age_ms: u64,\n}\n"
                                        "pub fn capture_gate(key: DigestKey) -> &'static str {\n    key.name()\n}\n",
+    gate.I01_ANSWER: I01B3_ANSWER,
     "crates/observer/src/observe.rs": "//! i01_digest, DigestKey and LatestSet in a comment.\n"
                                       "pub fn run() -> &'static str { \"i01_gate Rendered\" }\n",
     CAPTURE_RS: CAPTURE_TEXT,
@@ -7103,86 +7139,166 @@ I01B1_ISOLATION_TREE = {
 }
 
 
+# HE-004-I01B3 G-I01B-1 (e), the direction clause (DESIGN-I01B3 rev 4 sections 6 and 8; I3D-4, I3E-4, I3F-7): the three
+# union-only rows, each refused by (e) alone among G-I01B-1's own functions (module_isolation's (a)-(d), and (e)); the
+# build's mutation proof reads this table. Each row: (label, sub-clause, ((file, anchor, replacement), ..)).
+I01B3_DIGEST_ANCHOR = "pub struct Rendered;\n"
+I01B3_GATE_ANCHOR = "pub fn capture_gate(key: DigestKey) -> &'static str {\n"
+I01B3_ANSWER_ANCHOR = "pub fn derive(key: DigestKey) -> Option<Derived> {\n"
+I01B3_DIRECTION_ROWS = (
+    ("e-1 a re-export of i01_answer in an I01B1 file", "(e)",
+     (("crates/observer/src/i01_digest.rs", I01B3_DIGEST_ANCHOR,
+       I01B3_DIGEST_ANCHOR + "pub use crate::i01_answer::derive;\n"),)),
+    ("e-2 Derived named in an I01B1 file", "(e)",
+     (("crates/observer/src/i01_gate.rs", I01B3_GATE_ANCHOR,
+       "pub fn peek(derived: &crate::i01_answer::Derived) -> u8 {\n    0\n}\n" + I01B3_GATE_ANCHOR),)),
+    ("e-3 an impl on an I01B1 type inside i01_answer.rs", "(e)",
+     ((gate.I01_ANSWER, I01B3_ANSWER_ANCHOR,
+       "impl DigestKey {\n    pub fn answer_all(self) -> u8 {\n        0\n    }\n}\n\n" + I01B3_ANSWER_ANCHOR),)),
+)
+# G-I01B-1's own sub-clause functions, by the label the proof disables them under.
+I01B3_DIRECTION_FUNCTIONS = {"(a)-(d)": "module_isolation", "(e)": "i01b_direction"}
+
+
+def i01b3_isolation_tree(changes=()):
+    """I01B1_ISOLATION_TREE (with i01_answer.rs) with each (file, anchor, replacement) applied once."""
+    texts = dict(I01B1_ISOLATION_TREE)
+    for rel, old, new in changes:
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
 class I01b1IsolationTests(Tree):
-    """HE-004-I01B1 G-I01B-1, its I01B1 form (DESIGN-I01B1 rev 2 section 4, I1D-5), in D2IsolationTests' style: (a) a
-    module name outside its file (a `crate::i01_digest::` call in observe.rs, `use planeon_observer::i01_gate;` in
-    main.rs, `pub use i01_digest::x;` in lib.rs) refuses, and so does a pub mod line removed, doubled or written
-    `pub(crate) mod`; (b) a type of the set named in another observer source refuses; (c) an impl header other than
-    `impl <own type> {` refuses (a trait impl, a generic impl, an impl inside a fn); (d) a `pub use` or `pub(crate) use`
-    of another module's item in one of the three refuses. The fixture and the real sources pass. G-D2-5's own cases
-    are unchanged (D2IsolationTests): the construction is shared (module_isolation)."""
+    """HE-004-I01B1 G-I01B-1 (DESIGN-I01B1 rev 2 section 4, I1D-5), in D2IsolationTests' style, in its I01B3 form from
+    HE-004-I01B3 (DESIGN-I01B3 rev 4 section 6; I3D-4, I3E-4), each I01B1 case kept: (a) a module name outside its file
+    (a `crate::i01_digest::` call in observe.rs, `use planeon_observer::i01_gate;` in main.rs, `pub use i01_digest::x;`
+    in lib.rs) refuses, and so does a pub mod line removed, doubled or written `pub(crate) mod`; (b) a type of the union
+    set named in another observer source refuses; (c) an impl header other than `impl <a type of the set> {` refuses (a
+    trait impl, a generic impl, an impl inside a fn); (d) a `pub use` or `pub(crate) use` of another module's item in one
+    of the four refuses. The I01B3 rows: DIB section 7.6's N2-9 forms, round 3's X1-1 and X1-2, and a planted
+    `use crate::i01_answer::Derived;` and `crate::i01_answer::derive(` in observe.rs, each refused at (a); and (e)'s
+    three union-only rows, each refused by (e) alone. The fixture and the real sources pass. G-D2-5's own cases are
+    unchanged (D2IsolationTests): the construction is shared (module_isolation)."""
 
     TREE = I01B1_ISOLATION_TREE
     RULE = "G-I01B-1"
 
     def test_the_tree_and_the_real_sources_pass(self):
         self.assertEqual(gate.I01B1_MODULES, ("i01_digest", "i01_admission_render", "i01_gate"))
-        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
-        # The real sources: the eleven type names i01_digest and i01_gate define, each named only in the three files.
-        self.assertEqual(gate.check_i01b1_isolation(gate.HE), 11)
+        self.assertEqual(gate.I01B3_MODULES, ("i01_digest", "i01_admission_render", "i01_gate", "i01_answer"))
+        # The fixture's seven type names (the I01B1 files' four, i01_answer's three).
+        self.assertEqual(gate.check_i01b_isolation(self.base), 7)
+        self.assertEqual(gate.i01b_direction(self.base, self.RULE), 3)
+        # The real sources: the eleven type names i01_digest and i01_gate define and i01_answer's three, each named only
+        # in the four files.
+        self.assertEqual(gate.check_i01b_isolation(gate.HE), 14)
 
     def test_a_module_name_outside_its_file_refuses(self):
         for rel, extra in (("crates/observer/src/observe.rs", "pub fn f() -> u8 { crate::i01_digest::f() }\n"),
                            (gate.OBSERVER_MAIN, "use planeon_observer::i01_gate;\n"),
                            (gate.OBSERVER_LIB, "pub use i01_digest::x;\n"),
                            (CAPTURE_RS, "use crate::i01_admission_render as r;\n")):
-            self.refused(gate.check_i01b1_isolation, rel, self.TREE[rel] + extra, "names the I01B1 module .*" + self.RULE)
+            self.refused(gate.check_i01b_isolation, rel, self.TREE[rel] + extra, "names the I01B3 module .*" + self.RULE)
         lib = self.TREE[gate.OBSERVER_LIB]
-        for text in (lib.replace("pub mod i01_digest;\n", ""), lib + "pub mod i01_digest;\n",
-                     lib.replace("pub mod i01_digest;\n", "pub(crate) mod i01_digest;\n")):
-            self.refused(gate.check_i01b1_isolation, gate.OBSERVER_LIB, text, "does not declare `pub mod i01_digest;`")
+        for name in ("i01_digest", "i01_answer"):
+            for text in (lib.replace("pub mod %s;\n" % name, ""), lib + "pub mod %s;\n" % name,
+                         lib.replace("pub mod %s;\n" % name, "pub(crate) mod %s;\n" % name)):
+                self.refused(gate.check_i01b_isolation, gate.OBSERVER_LIB, text, "does not declare `pub mod %s;`" % name)
+
+    def test_the_answer_module_is_named_nowhere_else(self):
+        # DIB section 7.6's N2-9 (in I01B3 no other source may name i01_answer), round 3's X1-1 and X1-2, and the section's
+        # planted forms in observe.rs: each refused at (a).
+        observe, service = "crates/observer/src/observe.rs", "crates/observer/src/i01_service.rs"
+        for rel, extra in ((observe, "pub fn f() { let _ = crate::i01_answer::derive(k); }\n"),
+                           (observe, "pub fn f() { let _ = crate::i01_answer::answer(d, c, f, 0, None); }\n"),
+                           (observe, "use crate::i01_answer::Derived;\n"),
+                           (gate.OBSERVER_MAIN, "use planeon_observer::i01_answer::Derived;\n"),
+                           (gate.OBSERVER_LIB, "pub use crate::i01_answer::Derived;\n"),
+                           (observe, "pub fn f() { let mint = crate::i01_answer::derive;\n    let _ = mint(k); }\n"),
+                           (service, "pub fn g() { let _ = crate::i01_answer::capture_gate(k); }\n")):
+            self.refused(gate.check_i01b_isolation, rel, self.TREE.get(rel, "") + extra,
+                         "%s names the I01B3 module i01_answer .*%s" % (re.escape(rel), self.RULE))
+        # X1-2's other half, the re-export inside i01_answer.rs, passes (d): it names one of the four modules' paths.
+        self.write(gate.I01_ANSWER, I01B3_ANSWER + "pub use crate::i01_gate::capture_gate;\n")
+        self.assertEqual(gate.check_i01b_isolation(self.base), 7)
 
     def test_a_type_of_the_set_elsewhere_refuses(self):
         for rel, extra in ((gate.OBSERVER_MAIN, "fn f(key: DigestKey) {}\n"),
                            (CAPTURE_RS, "pub fn f() -> LatestSet { x() }\n"),
                            ("crates/observer/src/observe.rs", "type R = Rendered;\n"),
-                           ("crates/observer/src/observe.rs", "pub struct SealedAdmission;\n")):
-            self.refused(gate.check_i01b1_isolation, rel, self.TREE[rel] + extra, "a type the I01B1 module .*" + self.RULE)
-        # Two of the three defining one name refuse.
-        self.refused(gate.check_i01b1_isolation, "crates/observer/src/i01_gate.rs",
+                           ("crates/observer/src/observe.rs", "pub struct SealedAdmission;\n"),
+                           ("crates/observer/src/observe.rs", "pub fn f(facts: CaptureFacts) {}\n"),
+                           (CAPTURE_RS, "fn f() -> ChainMode { x() }\n")):
+            self.refused(gate.check_i01b_isolation, rel, self.TREE[rel] + extra, "a type the I01B3 module .*" + self.RULE)
+        # Two of the four defining one name refuse.
+        self.refused(gate.check_i01b_isolation, "crates/observer/src/i01_gate.rs",
                      self.TREE["crates/observer/src/i01_gate.rs"] + "pub struct Rendered;\n", "defines Rendered, which")
+        self.refused(gate.check_i01b_isolation, gate.I01_ANSWER, I01B3_ANSWER + "pub struct LatestSet;\n",
+                     "defines LatestSet, which")
 
     def test_impl_headers_and_re_exports_refuse(self):
         rel = "crates/observer/src/i01_digest.rs"
         for extra in ("impl std::fmt::Display for DigestKey {}\n", "impl Clone for Rendered {}\n", "impl<T> DigestKey {}\n",
                       "pub fn f() { impl Refusal {} }\n", "impl CaptureEngine {}\n"):
-            self.refused(gate.check_i01b1_isolation, rel, I01B1_DIGEST + extra, "impl header .*" + self.RULE)
+            self.refused(gate.check_i01b_isolation, rel, I01B1_DIGEST + extra, "impl header .*" + self.RULE)
         gate_rs = "crates/observer/src/i01_gate.rs"
         for extra, message in (("pub use crate::capture::KernelView;\n", "re-exports crate::capture::KernelView"),
                                ("pub(crate) use crate::observe::run;\n", "re-exports crate::observe::run")):
-            self.refused(gate.check_i01b1_isolation, gate_rs, self.TREE[gate_rs] + extra, message + ".*" + self.RULE)
+            self.refused(gate.check_i01b_isolation, gate_rs, self.TREE[gate_rs] + extra, message + ".*" + self.RULE)
         # A re-export of the set's own item passes.
         self.write(gate_rs, self.TREE[gate_rs] + "pub use crate::i01_digest::Rendered;\n")
-        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
+        self.assertEqual(gate.check_i01b_isolation(self.base), 7)
 
-    def test_the_present_modules_are_the_three(self):
-        for rel in ("crates/observer/src/i01_gate.rs", "crates/observer/src/i01_admission_render.rs"):
+    def test_the_direction_clause_refuses_the_three_union_only_rows(self):
+        # (e) [I3D-4, I3E-4]: each row passes module_isolation's union (a)-(d) and is refused by (e) alone.
+        for label, clause, changes in I01B3_DIRECTION_ROWS:
+            self.assertEqual(clause, "(e)")
+            for rel, text in i01b3_isolation_tree(changes).items():
+                self.write(rel, text)
+            self.assertEqual(gate.module_isolation(self.base, gate.I01B3_MODULES, gate.I01B3_MODULES, "I01B3", self.RULE),
+                             7, label)
+            with self.assertRaisesRegex(gate.GateError, re.escape("(I01B3 isolation, G-I01B-1 (e))")):
+                gate.check_i01b_isolation(self.base)
+            for rel, text in i01b3_isolation_tree().items():
+                self.write(rel, text)
+        # (e) refuses nothing legitimate: i01_answer naming the I01B1 types passes.
+        self.assertEqual(gate.check_i01b_isolation(self.base), 7)
+
+    def test_the_present_modules_are_the_four(self):
+        for rel in ("crates/observer/src/i01_gate.rs", "crates/observer/src/i01_admission_render.rs", gate.I01_ANSWER):
             (self.base / rel).unlink()
-            with self.assertRaisesRegex(gate.GateError, "the I01B1 modules present .* not exactly those"):
-                gate.check_i01b1_isolation(self.base)
+            with self.assertRaisesRegex(gate.GateError, "the I01B3 modules present .* not exactly those"):
+                gate.check_i01b_isolation(self.base)
             self.write(rel, self.TREE[rel])
-        self.assertEqual(gate.check_i01b1_isolation(self.base), 4)
+        self.assertEqual(gate.check_i01b_isolation(self.base), 7)
 
 
 class I01b1SymbolTests(unittest.TestCase):
-    """HE-004-I01B1 G-I01B-1's corroboration (G-D2-7's style): no planeon-observer symbol has a path in one of the three
-    modules, by item path (legacy, v0, an inherent impl) or by its first crate root (a closure); a symbol that only
-    mentions one passes."""
+    """HE-004-I01B1 G-I01B-1's corroboration (G-D2-7's style): no planeon-observer symbol has a path in one of the
+    unreachable modules (the three, and from HE-004-I01B3 i01_answer, I3D-11), by item path (legacy, v0, an inherent
+    impl) or by its first crate root (a closure); a symbol that only mentions one passes."""
 
     REFUSED = ("_ZN16planeon_observer10i01_digest10projection17h0123456789abcdefE",
                "_RNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate",
                "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer10i01_digestNtB2_9DigestKey4name",
                "_ZN16planeon_observer20i01_admission_render6render17h0123456789abcdefE",
-               "_RNCNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate0B5_")
+               "_RNCNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate0B5_",
+               # HE-004-I01B3: a planted planeon_observer::i01_answer:: symbol, legacy, v0, an inherent impl.
+               "_ZN16planeon_observer10i01_answer6answer17h0123456789abcdefE",
+               "_RNvNtCs5pXa2Z9YbGW_16planeon_observer10i01_answer6derive",
+               "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer10i01_answerNtB2_7Derived7boot_id")
     PASSED = ("_RNvNtCs5pXa2Z9YbGW_16planeon_observer7capture10i01_digest",
               "_RINvNtCsifRdLFh1usa_4core3ptr13drop_in_placeNtNtCs5pXa2Z9YbGW_16planeon_observer10i01_digest9DigestKeyEB4_",
               "_ZN16planeon_observer7capture8i01_gate17h0123456789abcdefE",
-              "_ZN18planeon_observer_x10i01_digest1f17h0123456789abcdefE", "i01_digest", "main")
+              "_ZN18planeon_observer_x10i01_digest1f17h0123456789abcdefE", "i01_digest", "main",
+              "_ZN16planeon_observer7observe10i01_answer17h0123456789abcdefE", "i01_answer")
 
     def test_i01b1_symbols_refuse_and_mentions_pass(self):
         self.assertEqual(gate.check_i01b1_absent(set(self.PASSED)), len(self.PASSED))
         for name in self.REFUSED:
-            with self.assertRaisesRegex(gate.GateError, "a symbol of the I01B1 module .*G-I01B-1"):
+            with self.assertRaisesRegex(gate.GateError, "a symbol of the unreachable I01 module .*G-I01B-1"):
                 gate.check_i01b1_absent(set(self.PASSED) | {name})
 
 
@@ -7207,10 +7323,23 @@ class I01SourceRuleTests(Tree):
     RULE = "G-I01B-7"
 
     def test_p7_5_the_five_and_the_real_sources_pass(self):
-        self.assertEqual(len(gate.OBSERVER_LIB_MODULES), 38)
-        self.assertEqual(len(gate.I01_FILES_BUILT), 5)
-        self.assertEqual(gate.check_i01b_sources(self.base), 5)
-        self.assertEqual(gate.check_i01b_sources(gate.HE), 5)
+        # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 6; DIB section 7.5's P7-5): I01B1's five, then I01B3's six.
+        self.assertEqual(len(gate.OBSERVER_LIB_MODULES), 39)
+        self.assertEqual(len(gate.I01_FILES_BUILT), 6)
+        self.assertEqual(gate.check_i01b_sources(self.base), 6)
+        self.assertEqual(gate.check_i01b_sources(gate.HE), 6)
+        lib = self.TREE[gate.OBSERVER_LIB]
+        (self.base / gate.I01_ANSWER).unlink()
+        self.write(gate.OBSERVER_LIB, lib.replace("pub mod i01_answer;\n", ""))
+        with mock.patch.object(gate, "I01_FILES_BUILT", gate.I01_FILES[:5]), \
+                mock.patch.object(gate, "OBSERVER_LIB_MODULES", gate.OBSERVER_LIB_MODULES[:-1]):
+            self.assertEqual(gate.check_i01b_sources(self.base), 5)
+        # The I01B1 set over the I01B3 tree, or the I01B3 set without i01_answer.rs, refuses.
+        with self.assertRaisesRegex(gate.GateError, "the i01_ sources present .* are not exactly .*" + self.RULE):
+            gate.check_i01b_sources(self.base)
+        self.write(gate.I01_ANSWER, self.TREE[gate.I01_ANSWER])
+        self.write(gate.OBSERVER_LIB, lib)
+        self.assertEqual(gate.check_i01b_sources(self.base), 6)
 
     def test_p7_1_to_p7_4_refuse(self):
         lib = self.TREE[gate.OBSERVER_LIB]
@@ -7226,7 +7355,7 @@ class I01SourceRuleTests(Tree):
                      "client.rs declares a module; only lib.rs does .*" + self.RULE)
         self.refused(gate.check_i01b_sources, "crates/observer/src/client/i01_x.rs", "pub fn x() {}\n",
                      "the i01_ sources present .* are not exactly")
-        self.assertEqual(gate.check_i01b_sources(self.base), 5)
+        self.assertEqual(gate.check_i01b_sources(self.base), 6)
 
     def test_file_form_and_the_lists(self):
         lib = self.TREE[gate.OBSERVER_LIB]
@@ -7239,7 +7368,11 @@ class I01SourceRuleTests(Tree):
             with mock.patch.object(gate, listed, tuple(name for name in getattr(gate, listed) if name != "i01_gate")):
                 with self.assertRaisesRegex(gate.GateError, "i01_gate miss the logic or the no-panic rule"):
                     gate.check_i01b_sources(self.base)
-        self.assertEqual(gate.check_i01b_sources(self.base), 5)
+            # HE-004-I01B3 (G-I01B-7 (d)): i01_answer off either list refuses too.
+            with mock.patch.object(gate, listed, tuple(name for name in getattr(gate, listed) if name != "i01_answer")):
+                with self.assertRaisesRegex(gate.GateError, "i01_answer miss the logic or the no-panic rule"):
+                    gate.check_i01b_sources(self.base)
+        self.assertEqual(gate.check_i01b_sources(self.base), 6)
 
 
 class I01bConstantTests(Tree):
@@ -7314,9 +7447,10 @@ class I01bGuardedPinTests(Tree):
     """HE-004-I01B1 R-B3-PIN (DESIGN-I01B1 rev 2 section 1; I1D-3, I1D-10), over copies of the six guarded files and the
     two crates' lib.rs, in D2ConstructorHomePinTests' form: for each of the six, a changed, added and removed byte, the
     appended probes (B3-12's trait-item and generic-default forms in the two effect-gate files, X6-4's type alias in all
-    six), a missing file, a symlink to identical bytes and a rename refuse; i01_answer.rs present (empty, a directory or
-    a dangling symlink) refuses; a casefolded sibling of a guarded name refuses (on a case-sensitive file system; on a
-    case-insensitive one the sibling of the absent name is that name, which refuses as present); an inline module in
+    six), a missing file, a symlink to identical bytes and a rename refuse; HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1):
+    i01_answer.rs's absence became the seventh pin, so its absence cases became presence cases (the loop's cases, and an
+    empty file, a directory or a dangling symlink in its place); a casefolded sibling of a guarded name refuses (on a
+    case-sensitive file system; on a case-insensitive one the sibling of i01_answer.rs is that file, changed); an inline module in
     place of a guarded one (I1D-3's probes, `pub mod config { }` and `pub mod linux_os { }`), a doubled declaration and
     an inline `mod client {` elsewhere refuse; the copies and the real tree pass."""
 
@@ -7350,8 +7484,11 @@ class I01bGuardedPinTests(Tree):
             "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
             "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
             "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
-            "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741"})
-        self.assertEqual(gate.I01B_ABSENT, ("crates/observer/src/i01_answer.rs",))
+            "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
+            # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1; Q-4): the absence became the pin, at I01B3's bytes.
+            "crates/observer/src/i01_answer.rs": "3ee5fb683bc6bcbc13a39db985782038915f4851d825a75f02c26f0409764736"})
+        self.assertEqual(gate.I01B_ABSENT, ())
+        self.assertIn("i01_answer", gate.I01B_FILE_FORM[gate.OBSERVER_LIB])
         # linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS, unchanged.
         self.assertIn("crates/observer/src/linux_listen.rs", gate.OBSERVER_HOME_PINS)
         self.assertIn("crates/observer/src/linux_net.rs", gate.OBSERVER_HOME_PINS)
@@ -7382,17 +7519,22 @@ class I01bGuardedPinTests(Tree):
             self.write_bytes(rel, data)
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
 
-    def test_the_answer_module_stays_absent(self):
-        answer = self.base / "crates/observer/src/i01_answer.rs"
+    def test_the_answer_module_is_pinned(self):
+        # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1): the absence cases become presence cases. Beside the loop above (a
+        # changed, added and removed byte, the probes, a missing file, a symlink to identical bytes, a rename), an empty
+        # file, a directory and a dangling symlink in its place refuse.
+        rel = gate.I01_ANSWER
+        answer, data = self.base / rel, self.real[rel]
         answer.write_bytes(b"")
-        self.refuses("i01_answer.rs exists")
+        self.refuses("i01_answer.rs differs from its pinned bytes")
         answer.unlink()
         answer.mkdir()
-        self.refuses("i01_answer.rs exists")
+        self.refuses("i01_answer.rs is missing or a symlink")
         answer.rmdir()
         answer.symlink_to(self.base / "nowhere.rs")
-        self.refuses("i01_answer.rs exists")
+        self.refuses("i01_answer.rs is missing or a symlink")
         answer.unlink()
+        self.write_bytes(rel, data)
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
 
     def test_a_casefolded_sibling_refuses(self):
@@ -7400,10 +7542,13 @@ class I01bGuardedPinTests(Tree):
         probe.write_bytes(b"")
         sensitive = not (self.base / "CASE-PROBE").exists()
         probe.unlink()
+        # HE-004-I01B3: i01_answer.rs is pinned, so on a case-insensitive file system the sibling is that file, changed.
         sibling = self.base / "crates/observer/src/I01_answer.rs"
         sibling.write_bytes(b"")
-        self.refuses("I01_answer.rs casefolds to the guarded name i01_answer.rs" if sensitive else "i01_answer.rs exists")
+        self.refuses("I01_answer.rs casefolds to the guarded name i01_answer.rs" if sensitive
+                     else "i01_answer.rs differs from its pinned bytes")
         sibling.unlink()
+        self.write_bytes(gate.I01_ANSWER, self.real[gate.I01_ANSWER])
         if sensitive:
             for rel in ("crates/effect-gate/src/Linux_os.rs", "crates/observer/src/CONFIG.rs",
                         "crates/observer/src/Linux_Net.rs"):
@@ -7444,7 +7589,14 @@ class I01bGuardedPinTests(Tree):
                  "does not declare `pub mod linux_os;`"),
                 (gate.OBSERVER_LIB, b"pub mod client;\n", b"pub mod client;\npub mod client;\n",
                  "does not declare `pub mod client;`"),
-                (gate.OBSERVER_LIB, b"pub mod i01_service;\n", b"", "does not declare `pub mod i01_service;`")):
+                (gate.OBSERVER_LIB, b"pub mod i01_service;\n", b"", "does not declare `pub mod i01_service;`"),
+                # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1, I1D-3's file form): i01_answer as an inline module, twice,
+                # or not declared.
+                (gate.OBSERVER_LIB, b"pub mod i01_answer;\n", b"pub mod i01_answer { }\n",
+                 "does not declare `pub mod i01_answer;`"),
+                (gate.OBSERVER_LIB, b"pub mod i01_answer;\n", b"pub mod i01_answer;\npub mod i01_answer;\n",
+                 "does not declare `pub mod i01_answer;`"),
+                (gate.OBSERVER_LIB, b"pub mod i01_answer;\n", b"", "does not declare `pub mod i01_answer;`")):
             data = self.real[lib]
             self.assertEqual(data.count(old), 1, old)
             self.write_bytes(lib, data.replace(old, new))
@@ -7452,6 +7604,8 @@ class I01bGuardedPinTests(Tree):
             self.write_bytes(lib, data)
         self.write_bytes("crates/observer/src/observe.rs", b"mod client {\n    pub fn f() {}\n}\n")
         self.refuses("observe.rs holds an inline `mod client {`")
+        self.write_bytes("crates/observer/src/observe.rs", b"mod i01_answer {\n    pub fn derive() {}\n}\n")
+        self.refuses("observe.rs holds an inline `mod i01_answer {`")
         (self.base / "crates/observer/src/observe.rs").unlink()
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
 
@@ -8062,6 +8216,382 @@ class SocketModuleAliasTests(Tree):
                      "re-exports .*" + self.RULE)
         self.refused(gate.check_socket_module_aliases, gate.OBSERVER_LINUX_NET, self.TREE[gate.OBSERVER_LINUX_NET]
                      + "use crate::linux_listen::{1 + 1};\n", "cannot read .*" + self.RULE)
+
+
+# --- HE-004-I01B3 (DESIGN-I01B3 rev 4 sections 4, 5 and 8): G-I01B-9 and G-I01B-8's I01B3 checks -------------------------
+
+# The fixture: copies of the real i01_answer.rs, i01_digest.rs (the (t5) methods' home) and the contract v2's
+# definitions.json, and small observe.rs, client.rs and i01_service.rs, the other sources the rows plant into.
+I01B3_ANSWER_TEXT = (gate.HE / gate.I01_ANSWER).read_text(encoding="utf-8")
+I01B3_OBSERVE = "crates/observer/src/observe.rs"
+I01B3_SERVICE = "crates/observer/src/i01_service.rs"
+I01B3_OBSERVE_RUN = "pub fn run() -> u8 {\n    0\n}\n"
+I01B3_CLIENT_TEXT = "pub fn c() {}\n"
+I01B3_ANSWER_TREE = {
+    gate.I01_ANSWER: I01B3_ANSWER_TEXT,
+    gate.I01B1_DIGEST_RS: (gate.HE / gate.I01B1_DIGEST_RS).read_text(encoding="utf-8"),
+    gate.I01B_DEFINITIONS: (gate.HE / gate.I01B_DEFINITIONS).read_text(encoding="utf-8"),
+    I01B3_OBSERVE: ("//! An observe.rs fixture (`Derived {`, `impl Clone for Derived`, `type D = Derived;` and `static` in "
+                    "a comment pass).\n" + I01B3_OBSERVE_RUN),
+    gate.OBSERVER_CLIENT: I01B3_CLIENT_TEXT,
+    I01B3_SERVICE: "pub struct I01Service;\n",
+}
+# The real file's anchors the plantings use, each once in it.
+I01B3_STRUCT = re.search(r"pub struct Derived \{\n.*?\n\}\n", I01B3_ANSWER_TEXT, re.S).group(0)
+I01B3_TAIL = re.search(r"    Ok\(Derived \{\n.*?\n    \}\)\n", I01B3_ANSWER_TEXT, re.S).group(0)
+I01B3_DERIVE_FN = re.search(r"pub fn derive\(.*?\n    \}\)\n\}\n", I01B3_ANSWER_TEXT, re.S).group(0)
+I01B3_TOP = "// ------------------------------------------------------------------------------------------------ the answer list\n"
+I01B3_IN_ANSWER = "    // 8. The bound.\n"
+I01B3_DERIVE_LET = "    let generation_hex = generation.to_string();\n"
+I01B3_GETTER = "    pub fn binding_member(&self) -> &Value {\n        &self.binding_member\n    }\n"
+I01B3_STRUCT_ATTR = "#[derive(Debug)]\npub struct Derived {\n"
+I01B3_FIELD = "    bound_digest: String,\n"
+I01B3_NAMESPACE_DOC = ("/// VPO's observed namespace against the binding's (harness-onion scripts/validate_policy_observation.py:109 "
+                       "at\n/// f9882c1a).\n")
+I01B3_NAMESPACE_PIN = 'pub const OBSERVED_NAMESPACE_TEXT: &str = "observed namespace";\n'
+I01B3_KEY_UID = 'pub const KEY_UID: &str = "uid";\n'
+I01B3_LIST_LET = "    let mut list: Vec<&'static str> = Vec::new();\n"
+I01B3_LIST_TAIL = "    list\n}\n"
+I01B3_LIST_PUSH = "                list.push(text);\n"
+I01B3_X9_1 = ("impl Clone for Derived where Derived: Sized {\n    fn clone(&self) -> Self where Self: Sized {\n        forged()\n"
+              "    }\n}\n\n")
+I01B3_NEW_1 = ("    impl CaptureFacts {\n        pub fn mint(policy_values: Vec<u8>) -> Option<Derived> {\n"
+               "            Some(Derived { policy_values, ..forged() })\n        }\n    }\n"
+               "    CaptureFacts::mint(policy_values).ok_or(INVALID_OBSERVATION_TEXT)\n")
+_ANSWER = gate.I01_ANSWER
+# DESIGN-I01B3 rev 4 sections 4 and 8 [I3D-3, I3D-10, I3E-1, I3E-5, I3F-5, I3F-6]: G-I01B-9's rows, each with its named
+# sub-clause (the first of the set section 4 states, and the first of the actual set to refuse, the sub-clauses running
+# (i) to (vii)), section 4's stated set, and its plantings ((file, anchor, replacement), ..). The build's mutation proof
+# reads this table, records each row's actual refusing set and runs the single-clause or each-alone proof.
+I01B3_DERIVED_ROWS = (
+    # DIB section 7.6 (N2-8: module_isolation (b) also refuses it, outside G-I01B-9).
+    ("N2-8", "(ii)", ("(ii)",),
+     ((I01B3_OBSERVE, I01B3_OBSERVE_RUN, I01B3_OBSERVE_RUN + "pub fn forge() -> u8 {\n    let _ = crate::i01_answer::Derived { "
+                                         "..forged() };\n    0\n}\n"),
+      (gate.OBSERVER_CLIENT, I01B3_CLIENT_TEXT, I01B3_CLIENT_TEXT + "pub fn forge() {\n    let _ = Derived::<> { ..forged() };\n}\n"))),
+    ("N2-8b", "(ii)", ("(ii)", "(vi)"),
+     ((_ANSWER, I01B3_TOP, "fn expected(binding: &Value) -> Option<Derived> {\n    Some(Derived { ..forged(binding) })\n}\n\n"
+                           + I01B3_TOP),)),
+    # Round 3's X9 forms; X9-1 re-planted with where clauses [I3E-5], in both files.
+    ("X9-1 in i01_answer.rs", "(iii)", ("(iii)", "(vi)"), ((_ANSWER, I01B3_TOP, I01B3_X9_1 + I01B3_TOP),)),
+    ("X9-1 in observe.rs", "(iii)", ("(iii)",), ((I01B3_OBSERVE, I01B3_OBSERVE_RUN, I01B3_OBSERVE_RUN + I01B3_X9_1),)),
+    ("X9-2", "(i)", ("(i)",), ((_ANSWER, I01B3_STRUCT_ATTR, I01B3_STRUCT_ATTR.replace("Debug", "Debug, Clone")),)),
+    ("X9-3", "(i)", ("(i)",), ((_ANSWER, I01B3_FIELD, "    pub bound_digest: String,\n"),)),
+    ("X9-4", "(ii)", ("(ii)", "(vi)"),
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _forged = Derived::<> { ..forged() };\n" + I01B3_IN_ANSWER),)),
+    # Round 1's forms [I3D-3].
+    ("(1) cfg_attr Default", "(i)", ("(i)",),
+     ((_ANSWER, I01B3_STRUCT_ATTR, "#[cfg_attr(not(test), derive(Default))]\n" + I01B3_STRUCT_ATTR),)),
+    ("(2) a field write on an owned value in answer", "(iv)", ("(iv)",),
+     ((_ANSWER, I01B3_IN_ANSWER, "    let mut owned = rebuilt();\n    owned.boot_id = forged();\n" + I01B3_IN_ANSWER),)),
+    ("(3a) the tuple definition, its getters kept", "(i)", ("(i)",),
+     ((_ANSWER, I01B3_STRUCT, "pub struct Derived(Value, String);\n"),)),
+    ("(3b) a Derived( call, the brace struct kept", "(ii)", ("(ii)", "(vi)"),
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _forged = Derived(forged());\n" + I01B3_IN_ANSWER),)),
+    # I3D-3's rows.
+    ("a field write in derive before the tail, the tail kept", "(iv)", ("(iv)",),
+     ((_ANSWER, I01B3_DERIVE_LET, "    let mut other = template();\n    other.bound_nonce = forged();\n" + I01B3_DERIVE_LET),)),
+    ("a field write through &mut Derived in a helper", "(iv)", ("(iv)", "(vi)"),
+     ((_ANSWER, I01B3_TOP, "fn adjust(derived: &mut Derived, value: Value) {\n    derived.binding_member = value;\n}\n\n"
+                           + I01B3_TOP),)),
+    ("a &mut self getter", "(iii)", ("(iii)",),
+     ((_ANSWER, I01B3_GETTER, "    pub fn binding_member(&mut self) -> &mut Value {\n        &mut self.binding_member\n    }\n"),)),
+    ("a getter reading another field", "(iii)", ("(iii)",),
+     ((_ANSWER, I01B3_GETTER, I01B3_GETTER.replace("&self.binding_member", "&self.enrolled_record")),)),
+    # Round 2's [I3E-1].
+    ("NEW-1", "(ii)", ("(ii)", "(vi)", "(vii)"), ((_ANSWER, I01B3_TAIL, I01B3_NEW_1),)),
+    ("NEW-2", "(ii)", ("(ii)",),
+     ((_ANSWER, I01B3_TAIL, "    let make = |policy_values| Derived { policy_values, ..forged() };\n"
+                            "    Ok(make(policy_values))\n"),)),
+    ("NEW-3", "(ii)", ("(ii)", "(vi)"),
+     ((_ANSWER, I01B3_TAIL, "    fn make(policy_values: Vec<u8>) -> Derived {\n        Derived { policy_values, ..forged() }\n"
+                            "    }\n    Ok(make(policy_values))\n"),)),
+    ("NEW-10", "(i)", ("(i)", "(vi)"),
+     ((_ANSWER, "pub struct Derived {\n", "pub struct Derived<T = Value> {\n"),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _forged = Derived::<Value> { ..forged() };\n" + I01B3_IN_ANSWER))),
+    ("(vi) alone: a top-level helper naming Derived", "(vi)", ("(vi)",),
+     ((_ANSWER, I01B3_TOP, "fn peek(derived: &Derived) -> &str {\n    derived.boot_id()\n}\n\n" + I01B3_TOP),)),
+    ("(vii) alone: a nested impl in derive's body, a let after it", "(vii)", ("(vii)",),
+     ((_ANSWER, I01B3_DERIVE_LET, "    impl CaptureFacts {\n        fn mint(&self) -> bool {\n            self.completed\n"
+                                  "        }\n    }\n" + I01B3_DERIVE_LET),)),
+    # Round 3's [I3F-6].
+    ("H6", "(ii)", ("(ii)",), ((_ANSWER, I01B3_TAIL, "    Ok((|| Derived { policy_values, ..forged() })())\n"),)),
+    ("H7", "(vi)", ("(vi)",), ((_ANSWER, I01B3_DERIVE_FN, "impl CaptureFacts {\n" + I01B3_DERIVE_FN + "}\n"),)),
+)
+I01B3_DERIVED_FUNCTIONS = {"(i)": "derived_i_struct", "(ii)": "derived_ii_literal", "(iii)": "derived_iii_impls",
+                           "(iv)": "derived_iv_fields", "(v)": "derived_v_names", "(vi)": "derived_vi_name_count",
+                           "(vii)": "derived_vii_top_level"}
+# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review round 1's R1-1 and R1-2 (U6): G-I01B-8's I01B3
+# rows, (t1)-(t9), each with its named check (the first of its actual set to refuse, the checks running (t1), (t6),
+# (t2), (t9), (t3), (t4), (t8), (t5), (t7)), no stated set (section 4 states sets for G-I01B-9 only), and its plantings.
+I01B3_TEXT_ROWS = (
+    ("(t1) a changed VPO text", "(t1)", None,
+     ((_ANSWER, I01B3_NAMESPACE_PIN, I01B3_NAMESPACE_PIN.replace('"observed namespace"', '"observed namespaces"')),)),
+    ("(t1) a missing citation", "(t1)", None,
+     ((_ANSWER, I01B3_NAMESPACE_DOC, I01B3_NAMESPACE_DOC.replace("scripts/validate_policy_observation.py:109 at", "VPO at")),)),
+    ("(t1) a key const holding an invented value", "(t1)", None,
+     ((_ANSWER, I01B3_KEY_UID, I01B3_KEY_UID.replace('"uid"', '"uuid"')),)),
+    ("(t2) an unlisted R10 text", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, '/// R10-defined, MODEL_DEFINED R201.\npub const FORGED_TEXT: &str = "forged refusal";\n\n'
+                           + I01B3_TOP),)),
+    ("(t2) a second const with a text's value", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, 'pub const AGAIN_TEXT: &str = "observed namespace";\n\n' + I01B3_TOP),)),
+    ("(t2) a key const equal to a text", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, 'pub const KEY_FORGED: &str = "observed namespace";\n\n' + I01B3_TOP),)),
+    ("(t2) a fn-local const", "(t2)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, 'pub const MADE_UP_TEXT: &str = "made up";\n' + I01B3_IN_ANSWER),)),
+    ("(t2) a &'static str const outside the lists", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, "pub const OTHER: &'static str = KEY_SCOPE;\n\n" + I01B3_TOP),)),
+    ("(t2) a pinned line inside a block comment, the name redefined", "(t2)", None,
+     ((_ANSWER, I01B3_NAMESPACE_DOC + I01B3_NAMESPACE_PIN,
+       "/*\n" + I01B3_NAMESPACE_DOC + I01B3_NAMESPACE_PIN + "*/\npub static OBSERVED_NAMESPACE_TEXT: &str = KEY_NAMESPACE;\n"),)),
+    ("(t3) a bare Err literal", "(t3)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, '    if wall_ms == 0 {\n        return Err("observed namespace");\n    }\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a raw string", "(t3)", None, ((_ANSWER, I01B3_IN_ANSWER, '    let _raw = r"observed namespace";\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a raw string with hashes", "(t3)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, '    let _raw = r#"observed namespace"#;\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a byte string", "(t3)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, '    let _bytes = b"observed namespace";\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a raw byte string", "(t3)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, '    let _bytes = br"observed namespace";\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a C string", "(t3)", None, ((_ANSWER, I01B3_IN_ANSWER, '    let _c = c"observed namespace";\n' + I01B3_IN_ANSWER),)),
+    ("(t3) a raw C string", "(t3)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, '    let _c = cr"observed namespace";\n' + I01B3_IN_ANSWER),)),
+    ("(t4) stringify!", "(t4)", None, ((_ANSWER, I01B3_IN_ANSWER, "    let _made = stringify!(made up);\n" + I01B3_IN_ANSWER),)),
+    ("(t4) file!()", "(t4)", None, ((_ANSWER, I01B3_IN_ANSWER, "    let _made = file!();\n" + I01B3_IN_ANSWER),)),
+    ("(t4) module_path!()", "(t4)", None, ((_ANSWER, I01B3_IN_ANSWER, "    let _made = module_path!();\n" + I01B3_IN_ANSWER),)),
+    ("(t5) Default::default()", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(Default::default());\n    }\n" + I01B3_IN_ANSWER),)),
+    ("(t5) a slice of a pinned const", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(&OBSERVED_NAMESPACE_TEXT[9..]);\n    }\n"
+                                 + I01B3_IN_ANSWER),)),
+    ("(t5) an I01B1 non-refusal text, LIFECYCLE_SLOT", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(i01_gate::LIFECYCLE_SLOT);\n    }\n"
+                                 + I01B3_IN_ANSWER),)),
+    ("(t5) an I01B1 non-refusal text, DigestKey::name()", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(DigestKey::Rbac.name());\n    }\n"
+                                 + I01B3_IN_ANSWER),)),
+    # U3's (t5) row: since R1-2 (a), (t2) reads the array's `[&str; 1]` as a type naming str and refuses it first.
+    ("(t2) a const array of key consts", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, "const KEYS: [&str; 1] = [KEY_SCOPE];\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(KEYS[0]);\n    }\n" + I01B3_IN_ANSWER))),
+    ("(t5) a KEY_ const through the rule function", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    require(wall_ms != 1, KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("(t5) a KEY_ const through map_err", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = json::canonical(derived.binding_member()).map_err(|_| KEY_SCOPE)?;\n"
+                                 + I01B3_IN_ANSWER),)),
+    ("(t5) a KEY_ const through ok_or_else(move ||)", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or_else(move || KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("(t5) a KEY_ const as a braced argument", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err({ KEY_SCOPE });\n    }\n" + I01B3_IN_ANSWER),)),
+    ("(t6) a key-prefixed literal", "(t6)", None,
+     ((_ANSWER, I01B3_TOP, 'pub const KEY_FORGED: &str = "rbac: differs from the signed value";\n\n' + I01B3_TOP),)),
+    ("(t7) a static aliasing a key const", "(t7)", None,
+     ((_ANSWER, I01B3_TOP, "pub static ALIAS: &str = KEY_SCOPE;\n\n" + I01B3_TOP),)),
+    ("(t7) a fn-local static shadowing a pinned name", "(t7)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    static OBSERVED_NAMESPACE_TEXT: &str = KEY_SCOPE;\n" + I01B3_IN_ANSWER),)),
+    # PR review round 1's hunted forms H8-1 .. H8-10 (R1-1, R1-2; U6), in the spellings of the record's findings.
+    ("H8-1 Err turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err::<Vec<u8>, &'static str>(KEY_SCOPE);\n    }\n"
+                                 + I01B3_IN_ANSWER),)),
+    ("H8-2 ok_or turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or::<&'static str>(KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-3 map_err turbofish", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let _ = json::canonical(derived.binding_member())\n"
+                                 "        .map_err::<&'static str, _>(|_| KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-4 Err as a function value", "(t8)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    Some(KEY_SCOPE).filter(..).map_or(Ok(()), Err)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-5 the rule helper as a function value", "(t8)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let rule = require;\n    rule(.., KEY_SCOPE)?;\n" + I01B3_IN_ANSWER),)),
+    ("H8-6 a fn item as map_err's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "fn scope_text(_: json::Error) -> &'static str {\n    KEY_SCOPE\n}\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = json::canonical(derived.binding_member()).map_err(scope_text)?;\n"
+                                 + I01B3_IN_ANSWER))),
+    ("H8-7 refusals' list via Vec::push", "(t5)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    Vec::push(&mut list, KEY_SCOPE);\n"),)),
+    ("H8-8 refusals' list via extend", "(t5)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    list.extend([KEY_SCOPE]);\n"),)),
+    ("H8-9 a lower-case const typed &(str)", "(t2)", None,
+     ((_ANSWER, I01B3_TOP, "const scope_text: &(str) = KEY_SCOPE;\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    ("H8-10 a lower-case const typed through a type alias of str", "(t9)", None,
+     ((_ANSWER, I01B3_TOP, "type Text = str;\nconst scope_text: &Text = KEY_SCOPE;\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    # PR review round 2's forms N-10 (both spellings), M-1 (both spellings) and M-2 (R2-1..R2-3; U7), each planted from
+    # the round-2 record's huntedForms text.
+    ("N-10 a const fn as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or_else(scope_text)?;\n" + I01B3_IN_ANSWER))),
+    ("N-10b a pub const fn as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "pub const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    let _ = utc_text(now).ok_or_else(scope_text)?;\n" + I01B3_IN_ANSWER))),
+    ("M-1 an early return of vec! from refusals", "(t10)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if facts.expired { return vec![KEY_SCOPE]; }\n"),)),
+    ("M-1b an early return of Vec::from from refusals", "(t10)", None,
+     ((_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if facts.expired { return Vec::from([KEY_SCOPE]); }\n"),)),
+    ("M-2 a module fn push given refusals' list", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "fn push(into: &mut Vec<&'static str>, text: &'static str) { into.extend([text, KEY_SCOPE]); }\n\n"
+                           + I01B3_TOP),
+      (_ANSWER, I01B3_LIST_PUSH, "                push(&mut list, text);\n"))),
+)
+I01B3_TEXT_FUNCTIONS = {"(t1)": "answer_texts_t1_pins", "(t2)": "answer_texts_t2_set",
+                        "(t3)": "answer_texts_t3_no_other_string", "(t4)": "answer_texts_t4_routes",
+                        "(t5)": "answer_texts_t5_positions", "(t6)": "answer_texts_t6_key_prefixed",
+                        "(t7)": "answer_texts_t7_no_static", "(t8)": "answer_texts_t8_calls_only",
+                        "(t9)": "answer_texts_t9_no_str_alias", "(t10)": "answer_texts_t10_refusals_no_return"}
+
+
+def i01b3_answer_tree(changes=()):
+    """I01B3_ANSWER_TREE with each (file, anchor, replacement) applied in order; each anchor must occur once."""
+    texts = dict(I01B3_ANSWER_TREE)
+    for rel, old, new in changes:
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+class I01b3AnswerTreeTests(Tree):
+    """The shared fixture of HE-004-I01B3's G-I01B-9 and G-I01B-8 rows (a copy of the real i01_answer.rs, i01_digest.rs
+    and definitions.json, with small observe.rs, client.rs and i01_service.rs)."""
+
+    TREE = I01B3_ANSWER_TREE
+
+    def plant(self, changes):
+        for rel, text in i01b3_answer_tree(changes).items():
+            self.write(rel, text)
+
+    def refuses_each(self, rows, check, rule):
+        for label, clause, _, changes in rows:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(%s %s)" % (rule, clause)), msg=label):
+                    check(self.base)
+            finally:
+                self.plant(())
+
+
+class AnswerModuleRuleTests(I01b3AnswerTreeTests):
+    """HE-004-I01B3 G-I01B-9, `Derived` closed (DESIGN-I01B3 rev 4 sections 4 and 8; DIB section 7.6): the fixture and the
+    real sources pass, and each of I01B3_DERIVED_ROWS (DIB section 7.6's N2-8 and N2-8b, round 3's X9-1 in both files and
+    X9-2..X9-4, round 1's forms (1), (2), (3a) and (3b), I3D-3's four rows, round 2's NEW-1, NEW-2, NEW-3 and NEW-10 with
+    the (vi)-alone and (vii)-alone rows, and round 3's H6 and H7) refuses with its own sub-clause's message."""
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual(len(gate.DERIVED_FIELDS), 13)
+        self.assertEqual(gate.check_i01b_derived(self.base), 7)
+        self.assertEqual(gate.check_i01b_derived(gate.HE), 7)
+
+    def test_the_rows_and_their_stated_sets(self):
+        self.assertEqual(len(I01B3_DERIVED_ROWS), 23)
+        self.assertEqual(sorted(I01B3_DERIVED_FUNCTIONS), ["(i)", "(ii)", "(iii)", "(iv)", "(v)", "(vi)", "(vii)"])
+        for label, clause, stated, _ in I01B3_DERIVED_ROWS:
+            self.assertEqual(stated[0], clause, label)
+            self.assertTrue(set(stated) <= set(I01B3_DERIVED_FUNCTIONS), label)
+            self.assertTrue(callable(getattr(gate, I01B3_DERIVED_FUNCTIONS[clause])), label)
+
+    def test_each_row_refuses_with_its_own_sub_clause_s_message(self):
+        self.refuses_each(I01B3_DERIVED_ROWS, gate.check_i01b_derived, "Derived closed, G-I01B-9")
+
+
+class I01b3TextTests(I01b3AnswerTreeTests):
+    """HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 sections 5 and 8; I3E-3, I3F-1..3): the fixture and the
+    real sources pass, pinned_constant reads a text in its `&str` form, and each of I01B3_TEXT_ROWS ((t1) a changed VPO
+    text, a missing citation, a key const holding an invented value; (t2) an unlisted R10 text, a second const with a
+    text's value, a key const equal to a text, a fn-local const, a `&'static str` const outside the lists, a pinned line
+    inside a block comment with the name redefined; (t3) a bare literal and raw, byte and C strings; (t4) stringify!,
+    file!() and module_path!(); (t5) Default::default(), a slice of a pinned const, an I01B1 non-refusal text, and a
+    KEY_ const through the rule function, map_err, ok_or_else(move ||) and a braced argument; (t6) a key-prefixed
+    literal; (t7) a static aliasing a key const and a fn-local static shadowing a pinned name; U3's const array of key
+    consts, (t2)'s since R1-2 (a); and PR review round 1's H8-1 .. H8-10: (t5) the Err, ok_or and map_err turbofish, a fn
+    item as map_err's argument and refusals' list via Vec::push and extend; (t8) Err and the rule helper as function
+    values; (t2) a lower-case const typed &(str); (t9) one typed through a type alias of str; and PR review round 2's
+    N-10 and N-10b, a const fn and a pub const fn as ok_or_else's argument, (t5); M-1 and M-1b, an early return of
+    vec! and Vec::from from refusals, (t10); M-2, a module fn push given refusals' list, (t5)) refuses with its own
+    check's message."""
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual((len(gate.I01B3_TEXT_PINS), len(gate.I01B3_KEY_CONSTS)), (17, 37))
+        self.assertEqual(gate.check_i01b3_texts(self.base), 54)
+        self.assertEqual(gate.check_i01b3_texts(gate.HE), 54)
+        self.assertEqual(gate.answer_texts_t5_positions(self.base, "G-I01B-8"),
+                         gate.answer_texts_t5_positions(gate.HE, "G-I01B-8"))
+        # The 17 texts: the 14 VPO labels and generic text, cited by line, and the three R10 texts, cited to MODEL_DEFINED.
+        self.assertEqual(sum(citation.startswith("scripts/validate_policy_observation.py:")
+                             for _, _, citation in gate.I01B3_TEXT_PINS), 14)
+        self.assertEqual([name for name, _, citation in gate.I01B3_TEXT_PINS if citation == gate.R10_CITATION],
+                         list(gate.I01B3_R10_TEXTS))
+
+    def test_pinned_constant_reads_a_text(self):
+        value, _, _ = gate.pinned_constant(self.base, gate.I01_ANSWER, "KEY_UID", "&str", gate.STR_FORM, "a rule")
+        self.assertEqual(value, "uid")
+        # The &str form: no escape, quote, tab, non-ASCII letter or DEL.
+        for value in ("u\\x41", 'u\\"', "u\tid", "ué", "u\x7f"):
+            self.plant(((gate.I01_ANSWER, I01B3_KEY_UID, 'pub const KEY_UID: &str = "%s";\n' % value),))
+            with self.assertRaisesRegex(gate.GateError, "does not define KEY_UID exactly once"):
+                gate.pinned_constant(self.base, gate.I01_ANSWER, "KEY_UID", "&str", gate.STR_FORM, "a rule")
+        self.plant(())
+
+    def test_the_rows(self):
+        self.assertEqual(len(I01B3_TEXT_ROWS), 46)
+        self.assertEqual(sorted({clause for _, clause, _, _ in I01B3_TEXT_ROWS}), sorted(I01B3_TEXT_FUNCTIONS))
+        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-15:-5]],
+                         ["H8-%d" % number for number in range(1, 11)])
+        self.assertEqual([label.split()[0] for label, _, _, _ in I01B3_TEXT_ROWS[-5:]],
+                         ["N-10", "N-10b", "M-1", "M-1b", "M-2"])
+
+    def test_each_row_refuses_with_its_own_check_s_message(self):
+        self.refuses_each(I01B3_TEXT_ROWS, gate.check_i01b3_texts, "constants and texts, G-I01B-8")
+
+    def test_the_record_s_hunted_spellings_refuse_too(self):
+        # PR review round 1's huntedForms spell H8-1, H8-2 and H8-4 with KEY_X; the rows plant its findings' spellings.
+        for text, clause in (("        return Err::<_, _>(KEY_X);\n", "(t5)"),
+                             ("        let _ = utc_text(now).ok_or::<_>(KEY_X)?;\n", "(t5)"),
+                             ("        Some(KEY_X).map_or(Ok(()), Err)?;\n", "(t8)")):
+            self.plant(((gate.I01_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n" + text + "    }\n" + I01B3_IN_ANSWER),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 %s)" % clause),
+                                            msg=text):
+                    gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+
+    def test_call_opening_reads_an_optional_turbofish(self):
+        # R1-1 (a): the `(` past whitespace and a balanced turbofish; none when the word is not called.
+        for code in ("Err(x)", "Err (x)", "Err::<_, _>(x)", "Err::<Vec<Vec<u8>>, &'static str>(x)",
+                     "Err::<fn(u8) -> u8, ()>(x)", "Err:: < u8 > (x)"):
+            self.assertEqual(code[gate.call_opening(code, 3):], "(x)", code)
+        for code in ("Err)", "Err, y", "Err::new(x)", "Err::<u8; (x)", "Err::<u8 { (x)", "Err::<u8"):
+            self.assertIsNone(gate.call_opening(code, 3), code)
+
+    def test_refusals_list_is_named_only_at_its_receivers(self):
+        # R1-1 (c), tightened by R2-3: inside fn refusals the list is named only at its declaration, its tail and the
+        # .push( and .contains( receivers. Its .extend( and .insert( (even with a binding), Vec::push(&mut list, ..), a
+        # helper taking &mut list, any other naming, a second declaration or another tail refuse, each with (t5)'s
+        # message; .extend( and .insert( outside refusals stay legal, as the real file's traversal and objects use them.
+        _, _, code = gate.answer_source(gate.HE, "G-I01B-8")
+        self.assertIsNone(gate.refusals_list_names(code, "G-I01B-8"))
+        self.assertIn(".extend(", code)
+        self.assertIn(".insert(", code)
+        for old, new in ((I01B3_LIST_LET, I01B3_LIST_LET + "    list.insert(0, text_of_nothing);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    let more = Vec::new();\n    list.extend(more);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    Vec::push(&mut list, text_of_nothing);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    list.push(text_of_nothing);\n    list[0] = KEY_SCOPE;\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    grow(&mut list);\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + "    let list = vec![KEY_SCOPE];\n"),
+                         (I01B3_LIST_LET, I01B3_LIST_LET + I01B3_LIST_LET),
+                         (I01B3_LIST_TAIL, "    vec![KEY_SCOPE]\n}\n")):
+            self.plant(((gate.I01_ANSWER, old, new),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t5))"), msg=new):
+                    gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+        # Its .contains( and .push( with a binding pass, as the real refusals writes and reads it.
+        self.plant(((gate.I01_ANSWER, I01B3_LIST_LET, I01B3_LIST_LET + "    if !list.contains(&KEY_SCOPE) {\n"
+                                                                       "        list.push(text_of_nothing);\n    }\n"),))
+        self.assertEqual(gate.check_i01b3_texts(self.base), 54)
+        self.plant(())
 
 
 class OutputPrefixTests(unittest.TestCase):
