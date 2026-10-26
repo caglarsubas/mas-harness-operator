@@ -231,9 +231,10 @@ pub fn request_schema(value: &Value) -> Result<I01Request, RequestRefusal> {
 
 /// One session's chain, keyed to its last answered request (HE-004-I01B5, DESIGN-I01B5 rev 5 section 4.5; I5D-1 (b);
 /// Q-I01B5D-3 (a)): that request's sequence and challenge and the digest of its answer, set only by [`Chain::answered`].
+/// The field is `last_answer`, so the word `answered` names only that method (G-I01B-5 (i)'s count).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Chain {
-    answered: Option<(u64, String, String)>,
+    last_answer: Option<(u64, String, String)>,
 }
 
 impl Chain {
@@ -243,7 +244,7 @@ impl Chain {
     /// (I5E-8).
     pub fn check(&self, request: &I01Request) -> Result<(), RequestRefusal> {
         let chain = RequestRefusal::Chain;
-        match &self.answered {
+        match &self.last_answer {
             None => {
                 if request.sequence != 1 || request.previous_digest != ZERO_DIGEST {
                     return Err(chain("a session's first request is sequence 1 after the zero digest"));
@@ -267,7 +268,7 @@ impl Chain {
     /// The answer sent to the request of `sequence` and `challenge`, its bytes' digest `digest` (`sha256:` and hex): the
     /// session's `sent` is its one caller (G-I01B-5 (i)).
     pub fn answered(&mut self, sequence: u64, challenge: &str, digest: &str) {
-        self.answered = Some((sequence, challenge.to_string(), digest.to_string()));
+        self.last_answer = Some((sequence, challenge.to_string(), digest.to_string()));
     }
 }
 

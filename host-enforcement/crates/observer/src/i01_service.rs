@@ -335,8 +335,10 @@ impl I01Service {
     }
 
     /// The answer to the pending request (DESIGN-I01B5 rev 5 section 4.3; SR-1 amend; I5D-13 (ii), I5D-15), in order,
-    /// each refusal closing: (1) the process unchanged; (2) freshness, then the views (the snapshot view derived and of
-    /// the availability's phase, every stream established, the fresh mark within its bound); (3) one wall reading, `now`
+    /// each refusal closing: (1) the process unchanged; (2) the views (the snapshot view derived and of the
+    /// availability's phase, every stream established, the fresh mark within its bound), then freshness (before the
+    /// receipt plus `I01_EXCHANGE_DEADLINE` and the outer bound), the statement directly before the clock statement
+    /// (I5F-4); (3) one wall reading, `now`
     /// the wake's monotonic one; (4) the capture facts from the latest capture set; (5) `answer`'s bytes; (6) those
     /// exact bytes parsed back and passed by the public `self_check` with the previous sent observation, so VPO's
     /// observer-knowable observation rules, chain included, pass on every byte sent; (7) the one send. `None` after the
@@ -346,14 +348,14 @@ impl I01Service {
             return Some(Closed::Changed);
         }
         let Some((checked, received)) = session.pending.take() else { return Some(Closed::NotServed) };
-        if now >= after(received, I01_EXCHANGE_DEADLINE) || now >= session.outer {
-            return Some(Closed::NotServed);
-        }
         let (Some(view), Some(availability), Some(gate)) = (&self.snapshot, &self.availability, &self.capture) else {
             return Some(Closed::NotServed);
         };
         let Ok(derived) = &view.derived else { return Some(Closed::NotServed) };
         if availability.phase != view.phase || !availability.established || !availability.fresh {
+            return Some(Closed::NotServed);
+        }
+        if now >= after(received, I01_EXCHANGE_DEADLINE) || now >= session.outer {
             return Some(Closed::NotServed);
         }
         let wall_ms = match wall_ms { Some(ms) => ms, None => return Some(Closed::Window) };
