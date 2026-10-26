@@ -7853,10 +7853,10 @@ class I01BindingRuleTests(Tree):
 
     def test_the_fixture_and_the_real_sources_pass(self):
         self.assertEqual(gate.check_i01b_binding(self.base), 6)
-        self.assertEqual(gate.check_i01b_constructor(self.base), 13)
+        self.assertEqual(gate.check_i01b_constructor(self.base), 14)
         self.assertEqual(gate.check_observer_serve(self.base), 14)
         self.assertEqual(gate.check_i01b_binding(gate.HE), 6)
-        self.assertEqual(gate.check_i01b_constructor(gate.HE), 13)
+        self.assertEqual(gate.check_i01b_constructor(gate.HE), 14)
 
     def test_g_i01b_3_section_7_1_rows_refuse(self):
         binding, constructor = gate.check_i01b_binding, gate.check_i01b_constructor
@@ -7922,7 +7922,7 @@ class I01BindingRuleTests(Tree):
                      other_file)
         # G-I01B-4 does not refuse these G-I01B-3 forms that name no from_config (they are G-I01B-3's).
         self.plant(((request, derive, "#[derive(Clone, Debug, PartialEq, Eq)]\npub struct I01Binding"),))
-        self.assertEqual(constructor(self.base), 13)
+        self.assertEqual(constructor(self.base), 14)
         self.plant(())
 
     def test_g_i01b_3_round_3_rows_refuse(self):
@@ -7988,7 +7988,7 @@ class I01BindingRuleTests(Tree):
         self.plant(((I01B2_OBSERVE, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "#[cfg(test)]\nmod tests {\n    use super::*;\n"
                                                                           "    fn twice(doc: &Value) { let _ = "
                                                                           "I01Binding::from_config(doc); }\n}\n"),))
-        self.assertEqual(constructor(self.base), 13)
+        self.assertEqual(constructor(self.base), 14)
         self.assertEqual(gate.check_i01b_binding(self.base), 6)
         self.plant(())
         # Wiring: the statement before check_lifetime( (the wiring order's), or wrapped in loop { .. } ((a)).
@@ -8321,9 +8321,10 @@ I01B3_DERIVED_ROWS = (
 I01B3_DERIVED_FUNCTIONS = {"(i)": "derived_i_struct", "(ii)": "derived_ii_literal", "(iii)": "derived_iii_impls",
                            "(iv)": "derived_iv_fields", "(v)": "derived_v_names", "(vi)": "derived_vi_name_count",
                            "(vii)": "derived_vii_top_level"}
-# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review round 1's R1-1 and R1-2 (U6): G-I01B-8's I01B3
-# rows, (t1)-(t9), each with its named check (the first of its actual set to refuse, the checks running (t1), (t6),
-# (t2), (t9), (t3), (t4), (t8), (t5), (t7)), no stated set (section 4 states sets for G-I01B-9 only), and its plantings.
+# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review rounds 1 and 2 (R1-1, R1-2: U6; R2-1..R2-3: U7):
+# G-I01B-8's I01B3 rows, (t1)-(t10), each with its named check (the first of its actual set to refuse, the checks
+# running (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), and (t11) since HE-004-I01B5), no stated set
+# (section 4 states sets for G-I01B-9 only), and its plantings. HE-004-I01B5's rows are I01B5_TEXT_ROWS.
 I01B3_TEXT_ROWS = (
     ("(t1) a changed VPO text", "(t1)", None,
      ((_ANSWER, I01B3_NAMESPACE_PIN, I01B3_NAMESPACE_PIN.replace('"observed namespace"', '"observed namespaces"')),)),
@@ -8592,6 +8593,178 @@ class I01b3TextTests(I01b3AnswerTreeTests):
                                                                        "        list.push(text_of_nothing);\n    }\n"),))
         self.assertEqual(gate.check_i01b3_texts(self.base), 54)
         self.plant(())
+
+
+# HE-004-I01B5 U1 (DESIGN-I01B5 rev 5 sections 6.6, 6.7 and 8): R1-1's two G-I01B-4 clauses (I01B2's HUNT-22 carry,
+# closed gate-side; config.rs's bytes and pin unchanged) and the carries from HE-004-I01B3 (R3-1's row, round 3's NOTE
+# rows). Each row: (label, named sub-clause, stated set or None, ((file, anchor, replacement), ..)). The build's mutation
+# proof reads these tables, records each row's actual refusing set and runs the single-clause or each-alone proof.
+I01B5_CONSTRUCTOR_FUNCTIONS = {"(a)": "constructor_a_from_config", "(b)": "constructor_b_wiring", **I01B2_CLAUSE_FUNCTIONS,
+                               "(c)": "constructor_c_accessor", "(c5)": "constructor_c5_binding_fields"}
+I01B5_LITERAL = "binding: Value::Null, sealed: None"
+I01B5_NAMESPACE_LET = '        let namespace = text(root, "qualificationNamespace", "the document")?;\n'
+I01B5_CONSTRUCTOR_ROWS = (
+    # (c) tightened [R1-1]: `binding: Value::Null` only as the literal's own top-level initialiser (I01B2 PR review
+    # round 1's HUNT-22 and HUNT-24).
+    ("HUNT-22 (c): the own binding forged, a W { binding: Value::Null } nested in another field", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_LITERAL, "binding: forged(), sealed: crate::wrap::seal(crate::wrap::W { binding: Value::Null })"),)),
+    ("HUNT-24 (c): binding: Value::Null.forged()", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_LITERAL, "binding: Value::Null.forged(), sealed: None"),)),
+    ("R1-1 (c): the shorthand binding", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_NAMESPACE_LET, I01B5_NAMESPACE_LET + "        let binding = forged();\n"),
+      (_CONFIG, I01B5_LITERAL, "binding, sealed: None"))),
+    # (c5) I2E-7 as a gate check [R1-1; HUNT-22; I5D-10].
+    ("HUNT-22 (c5): struct W { binding: Value }", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nstruct W {\n    binding: Value,\n}\n"),)),
+    ("I5D-10 (c5): an enum variant's binding field", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nenum Hidden {\n    Carry { binding: Value },\n}\n"),)),
+    ("(c5): a union's binding field", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nunion Raw {\n    binding: std::mem::ManuallyDrop<Value>,\n}\n"),)),
+    # HUNT-22 whole: both clauses refuse it, each alone.
+    ("HUNT-22 whole: W declared, its literal nested, the own binding forged", "(c)", ("(c)", "(c5)"),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nstruct W {\n    binding: Value,\n}\n"),
+      (_CONFIG, I01B5_LITERAL, "binding: forged(), sealed: seal(W { binding: Value::Null })"))),
+)
+I01B5_STEP_TWO_LINE = "    if let Some(&refusal) = refusals(derived, facts).first() {\n"
+I01B5_TEXT_FUNCTIONS = {**I01B3_TEXT_FUNCTIONS, "(t11)": "answer_texts_t11_step_two"}
+I01B5_TEXT_ROWS = (
+    # R3-1 [HE-004-I01B3 PR review round 3, carried]: a key text fed in at the answer list's consumer, without a local.
+    ("R3-1 S1 .first().or(Some(&KEY_SCOPE))", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    if let Some(&refusal) = refusals(derived, facts).first().or(Some(&KEY_SCOPE)) {\n"),)),
+    ("R3-1 S2 .iter().chain(&[KEY_SCOPE]).next()", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE,
+       "    if let Some(&refusal) = refusals(derived, facts).iter().chain(&[KEY_SCOPE]).next() {\n"),)),
+    ("(t11) a second refusals( call", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    let _again = refusals(derived, facts);\n" + I01B5_STEP_TWO_LINE),)),
+    ("(t11) refusals as a fn item", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    let _list = refusals;\n" + I01B5_STEP_TWO_LINE),)),
+    # Round 3's NOTE [R2-1's two changes]: a row that only the item reading refuses, and one that only ok_or_else's
+    # closure-only rule refuses (N-10 and N-10b are refused by each).
+    ("R2-1 item reading alone: a const fn at Err(", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    ("R2-1 closure-only alone: a local closure as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let pick = || KEY_SCOPE;\n    let _ = utc_text(now).ok_or_else(pick)?;\n"
+                                 + I01B3_IN_ANSWER),)),
+)
+# R2-1's two changes, each undone alone (the proof's and the self-test's isolation): the item reading emptied, and
+# ok_or_else taken out of the closure-only words.
+I01B5_R2_1_UNDO = {"item reading": ("answer_item_names", lambda code: set()),
+                   "closure-only": ("I01B3_CLOSURE_ONLY", ("map_err",))}
+I01B5_R2_1_ROWS = {"R2-1 item reading alone: a const fn at Err(": "item reading",
+                   "R2-1 closure-only alone: a local closure as ok_or_else's argument": "closure-only"}
+# R2-4 [HE-004-I01B3 PR review round 3, carried]: const generic parameters, after `<` and after `,`, that (t2) skips.
+I01B5_GENERIC_CONSTS = ("pub fn pick<const N: usize>(texts: [&'static str; N]) -> &'static str {\n    texts[0]\n}\n\n",
+                        "pub fn pick<T: Copy, const N: usize>(texts: [&'static str; N], _t: T) -> &'static str {\n"
+                        "    texts[0]\n}\n\n")
+
+
+class I01b5ConstructorTests(Tree):
+    """HE-004-I01B5 U1, R1-1 (DESIGN-I01B5 rev 5 sections 6.6 and 8; I01B2's HUNT-22 carry, gate-side only): G-I01B-4
+    (c), tightened so that `binding: Value::Null` counts only as the ObserverConfig literal's own top-level initialiser,
+    and (c5), I2E-7's "no other binding field in config.rs" over every struct, enum and union body [I5D-10]. Both accept
+    the fixture and today's config.rs (bytes and pin unchanged); each of I01B5_CONSTRUCTOR_ROWS (HUNT-22's nested
+    literal, HUNT-24's longer initialiser and a shorthand under (c); HUNT-22's struct W, an enum variant's field and a
+    union's field under (c5); HUNT-22 whole under both) refuses with its own sub-clause's message."""
+
+    TREE = I01B2_TREE
+
+    def plant(self, changes):
+        for rel, text in i01b2_tree(changes).items():
+            self.write(rel, text)
+
+    def test_both_clauses_accept_the_fixture_and_today_s_config_rs(self):
+        rule = "one constructor call, G-I01B-4"
+        for base in (self.base, gate.HE):
+            codes = gate.observer_code(base, rule)
+            self.assertIsNone(gate.constructor_c_accessor(codes, rule))
+            self.assertIsNone(gate.constructor_c5_binding_fields(codes, rule))
+        self.assertEqual(gate.check_i01b_constructor(gate.HE), 14)
+        self.assertEqual(hashlib.sha256((gate.HE / gate.I01B2_CONFIG).read_bytes()).hexdigest(),
+                         gate.I01B_GUARDED_PINS[gate.I01B2_CONFIG])
+        # Today's literal: exactly one top-level binding field, `binding: Value::Null`.
+        code = gate.observer_code(gate.HE, rule)[gate.I01B2_CONFIG]
+        literal = [found for found in gate.OBSERVER_CONFIG_LITERAL.finditer(code)][-1]
+        fields = gate.literal_fields(code, literal.end() - 1)
+        self.assertEqual([field for field in fields if field.startswith("binding")], ["binding: Value::Null"])
+
+    def test_the_rows_and_their_stated_sets(self):
+        self.assertEqual(len(I01B5_CONSTRUCTOR_ROWS), 7)
+        self.assertEqual(len(I01B5_CONSTRUCTOR_FUNCTIONS), 14)
+        for label, clause, stated, _ in I01B5_CONSTRUCTOR_ROWS:
+            self.assertEqual(stated[0], clause, label)
+            self.assertTrue(set(stated) <= set(I01B5_CONSTRUCTOR_FUNCTIONS), label)
+        for function in I01B5_CONSTRUCTOR_FUNCTIONS.values():
+            self.assertTrue(callable(getattr(gate, function)), function)
+
+    def test_each_row_refuses_with_its_own_sub_clause_s_message(self):
+        for label, clause, _, changes in I01B5_CONSTRUCTOR_ROWS:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(one constructor call, G-I01B-4 %s" % clause),
+                                            msg=label):
+                    gate.check_i01b_constructor(self.base)
+            finally:
+                self.plant(())
+
+    def test_the_literal_s_top_level_fields(self):
+        code = "x = S { a: f(b, c), binding: W { binding: Value::Null }, d: [1, 2], e }"
+        self.assertEqual(gate.literal_fields(code, code.index("{")),
+                         ["a: f(b, c)", "binding: W { binding: Value::Null }", "d: [1, 2]", "e"])
+
+
+class I01b5TextTests(I01b3AnswerTreeTests):
+    """HE-004-I01B5 U1, the carries from HE-004-I01B3 (DESIGN-I01B5 rev 5 sections 6.7 and 8): (t11), R3-1's row,
+    reads answer's step 2 exactly and refuses S1, S2, a second refusals( call and a fn-item reference; R2-1's two
+    changes each have a row that only it refuses (the item reading, the closure-only rule); and (t2) skips a const
+    generic parameter (R2-4), which without the skip it refuses (fail-closed)."""
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual(I01B3_ANSWER_TEXT.count(I01B5_STEP_TWO_LINE), 1)
+        self.assertEqual(gate.check_i01b3_texts(self.base), 54)
+        self.assertEqual(gate.check_i01b3_texts(gate.HE), 54)
+        self.assertIsNone(gate.answer_texts_t11_step_two(gate.HE, "constants and texts, G-I01B-8"))
+
+    def test_the_rows(self):
+        self.assertEqual(len(I01B5_TEXT_ROWS), 6)
+        self.assertEqual(sorted(I01B5_TEXT_FUNCTIONS), sorted(list(I01B3_TEXT_FUNCTIONS) + ["(t11)"]))
+        for _, clause, _, _ in I01B5_TEXT_ROWS:
+            self.assertTrue(callable(getattr(gate, I01B5_TEXT_FUNCTIONS[clause])), clause)
+
+    def test_each_row_refuses_with_its_own_check_s_message(self):
+        self.refuses_each(I01B5_TEXT_ROWS, gate.check_i01b3_texts, "constants and texts, G-I01B-8")
+
+    def test_r2_1_s_two_changes_each_have_a_row_only_it_refuses(self):
+        rows = {label: changes for label, _, _, changes in I01B5_TEXT_ROWS}
+        for label, own in I01B5_R2_1_ROWS.items():
+            self.plant(rows[label])
+            try:
+                for change, (name, undone) in I01B5_R2_1_UNDO.items():
+                    with mock.patch.object(gate, name, undone):
+                        if change == own:
+                            self.assertEqual(gate.check_i01b3_texts(self.base), 54, label)
+                        else:
+                            with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t5))"),
+                                                        msg=label):
+                                gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+
+    def test_r2_4_a_const_generic_parameter_is_skipped(self):
+        for planted in I01B5_GENERIC_CONSTS:
+            self.plant(((gate.I01_ANSWER, I01B3_TOP, planted + I01B3_TOP),))
+            try:
+                self.assertEqual(gate.check_i01b3_texts(self.base), 54, planted)
+                with mock.patch.object(gate, "generic_parameter", lambda code, position: False):
+                    with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t2))"),
+                                                msg=planted):
+                        gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+        for code, expected in (("fn f<const N: usize>()", True), ("fn f<T, const N: usize>()", True),
+                               ("fn f<F: Fn(u8) -> u8, const N: usize>()", True), ("pub const X: &str = KEY;", False),
+                               ("{ const X: u8 = 1; }", False), ("f(a, const X: u8)", False), ("a < b; const X: u8", False)):
+            self.assertEqual(gate.generic_parameter(code, code.index("const")), expected, code)
 
 
 class OutputPrefixTests(unittest.TestCase):

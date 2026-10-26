@@ -4374,11 +4374,35 @@ def constructor_b6_parse_v3(codes: dict[str, str], rule: str) -> None:
             % (words, rule))
 
 
+def literal_fields(code: str, opening: int) -> list[str]:
+    """HE-004-I01B5 (R1-1, HUNT-22; DESIGN-I01B5 rev 5 section 6.6): the top-level field texts of the struct expression
+    or pattern whose `{` is at `opening`, in a source read without comments and with literal contents emptied: its body
+    split at the commas at bracket depth 0 of `(`, `[` and `{`, each stripped, empty ones dropped. A field nested in
+    another field's initialiser (a nested literal's, a call's or a block's) is never a top-level field."""
+    close = block_end(code, opening) - 1
+    fields, depth, start = [], 0, opening + 1
+    for index in range(opening + 1, close):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            fields.append(code[start:index].strip())
+            start = index + 1
+    fields.append(code[start:close].strip())
+    return [field for field in fields if field]
+
+
 def constructor_c_accessor(codes: dict[str, str], rule: str) -> None:
     """G-I01B-4 (c), restated as B3-2 requires: in config.rs, ObserverConfig's field binding is exactly `binding: Value`
     (no visibility); `pub fn binding(&self) -> &Value` is its one fn binding, with its body exactly `&self.binding`; and
     the struct-expression-or-pattern form OBSERVER_CONFIG_LITERAL matches exactly once outside the struct definition and
-    the impl headers, inside fn members, holding `binding: Value::Null`. `Self` is (c4)'s and the dot forms (c2)'s."""
+    the impl headers, inside fn members, holding `binding: Value::Null`. `Self` is (c4)'s and the dot forms (c2)'s.
+    HE-004-I01B5 (R1-1, HUNT-22; DESIGN-I01B5 rev 5 section 6.6): `binding: Value::Null` counts only as the literal's own
+    top-level field initialiser (literal_fields): exactly one top-level field is named binding, and it is exactly
+    `binding: Value::Null`, spacing free; one nested in another field's initialiser (HUNT-22's `W { binding:
+    Value::Null }`), a shorthand `binding` or a longer initialiser (HUNT-24's `Value::Null.forged()`) refuses."""
     code = codes[I01B2_CONFIG]
     structs = list(re.finditer(r"\bstruct\s+ObserverConfig\b", code))
     fields = [re.sub(r"\s+", " ", field.strip()) for field in struct_fields(code, structs[0].end())] if len(structs) == 1 else []
@@ -4397,11 +4421,12 @@ def constructor_c_accessor(codes: dict[str, str], rule: str) -> None:
     literals = [found for found in OBSERVER_CONFIG_LITERAL.finditer(code)
                 if found.start() != name and not any(start <= found.start() < end for start, end in headers)]
     members = function_span(code, "members")
-    inner = code[literals[0].end() - 1:block_end(code, literals[0].end() - 1)] if len(literals) == 1 else ""
+    fields = literal_fields(code, literals[0].end() - 1) if len(literals) == 1 else []
+    own = [field for field in fields if re.match(r"(?:r#)?binding\b(?!\s*::)", field)]
     require(len(literals) == 1 and members is not None and members[0] < literals[0].start() < members[1]
-            and re.search(r"\bbinding\s*:\s*Value::Null\b", inner),
+            and len(own) == 1 and re.fullmatch(r"binding\s*:\s*Value::Null", own[0]),
             "%s writes the ObserverConfig literal or pattern other than once, in fn members holding `binding: Value::Null` "
-            "(%s (c), B3-2)" % (I01B2_CONFIG, rule))
+            "as its own top-level field initialiser (%s (c), B3-2, R1-1)" % (I01B2_CONFIG, rule))
 
 
 def constructor_c1_alias(codes: dict[str, str], rule: str) -> None:
@@ -4464,6 +4489,46 @@ def constructor_c4_no_self(codes: dict[str, str], rule: str) -> None:
     require(not found, "%s names Self %d time(s); it names no Self (%s (c4), I2E-7)" % (I01B2_CONFIG, found, rule))
 
 
+# HE-004-I01B5 (R1-1, HUNT-22, I5D-10): the kinds of D2_TYPE_ITEM whose bodies declare fields, and a field named binding
+# (raw or not, `::` aside) anywhere in an item's text.
+FIELD_ITEM_KINDS = ("struct", "enum", "union")
+BINDING_FIELD = re.compile(r"\b(?:r#)?binding\s*:(?!:)")
+
+
+def field_item_text(code: str, start: int, what: str) -> str:
+    """The text of the struct, enum or union whose name ends at `start` (comments removed, literal contents emptied):
+    its generic parameters skipped with bracket_scan's angle rule as struct_fields does, then up to its `;` at depth 0
+    (a unit or tuple struct) or to the `}` closing its body."""
+    index = start + len(code[start:]) - len(code[start:].lstrip())
+    if code.startswith("<", index):
+        index = bracket_scan(code, index + 1, ">", what)[0] + 1
+    stop = bracket_scan(code, index, "{;", what)[0]
+    return code[start:stop] if code[stop] == ";" else code[start:block_end(code, stop)]
+
+
+def constructor_c5_binding_fields(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c5) [I2E-7 as a gate check; R1-1, HUNT-22; I5D-10]: in config.rs, read without comments, every struct,
+    enum and union item (D2_TYPE_ITEM's kinds FIELD_ITEM_KINDS, at any nesting) is read whole (field_item_text), and a
+    field named binding (BINDING_FIELD: a struct's or union's field, an enum struct-variant's field) occurs only in
+    ObserverConfig's, exactly once. So HUNT-22's `struct W { binding: Value }`, an enum variant's `Carry { binding: Value
+    }` and a union's binding field refuse; today's config.rs declares only ObserverConfig's."""
+    code = codes[I01B2_CONFIG]
+    what = "%s: a type item (%s (c5))" % (I01B2_CONFIG, rule)
+    owner = 0
+    for found in D2_TYPE_ITEM.finditer(code):
+        kind = found.group(0).split()[0]
+        if kind not in FIELD_ITEM_KINDS:
+            continue
+        count = len(BINDING_FIELD.findall(field_item_text(code, found.end(), what)))
+        if kind == "struct" and found.group(1) == "ObserverConfig":
+            owner += count
+            continue
+        require(not count, "%s declares a binding field in %s %s; only ObserverConfig declares one (%s (c5), I2E-7, R1-1)"
+                % (I01B2_CONFIG, kind, found.group(1), rule))
+    require(owner == 1, "%s declares ObserverConfig's binding field %d times, not once (%s (c5), I2E-7, R1-1)"
+            % (I01B2_CONFIG, owner, rule))
+
+
 def check_i01b_constructor(base: Path) -> int:
     """HE-004-I01B2 G-I01B-4, one constructor call (DESIGN-I01B rev 3 section 6; DESIGN-I01B2 rev 3 sections 3, 5 and 7).
     crates/observer's non-test sources are read as observer_code reads them (use declarations kept), serve's body as
@@ -4471,9 +4536,10 @@ def check_i01b_constructor(base: Path) -> int:
     own function, so that exactly one can be disabled: (a) from_config twice, serve's statement outermost; (b) serve
     twice in main.rs and observe::run('s arguments; (b1) the pinned load statement; (b2) document 5 times and (b3) config
     5 times at their places; (b4) both pinned statements outermost and in order; (b5) the pinned parse statement; (b6)
-    parse_v3 twice; (c) the accessor, the field and the one ObserverConfig literal; (c1) no rename or type item naming
-    ObserverConfig; (c2) the dot form twice; (c3) the local binding bound once and assigned once; (c4) no Self in
-    config.rs. The number of clauses."""
+    parse_v3 twice; (c) the accessor, the field and the one ObserverConfig literal, its own top-level binding
+    initialiser `Value::Null` (HE-004-I01B5, R1-1); (c1) no rename or type item naming ObserverConfig; (c2) the dot form
+    twice; (c3) the local binding bound once and assigned once; (c4) no Self in config.rs; (c5) no binding field in
+    config.rs but ObserverConfig's (HE-004-I01B5, I2E-7 as a gate check). The number of clauses."""
     rule = "one constructor call, G-I01B-4"
     codes = observer_code(base, rule)
     for rel in (OBSERVER_MAIN, I01B2_CONFIG, I01B2_REQUEST):
@@ -4497,7 +4563,8 @@ def check_i01b_constructor(base: Path) -> int:
     constructor_c2_dot_form(codes, rule)
     constructor_c3_bound_once(codes, rule)
     constructor_c4_no_self(codes, rule)
-    return 13
+    constructor_c5_binding_fields(codes, rule)
+    return 14
 
 
 # HE-004-I01B3 G-I01B-9, `Derived` closed (DESIGN-I01B3 rev 4 section 4; DIB section 6; I3D-3, I3E-1, I3E-5, I3E-6,
@@ -4928,6 +4995,42 @@ def answer_source(base: Path, rule: str) -> tuple[str, str, str]:
         raise GateError("%s: %s (%s)" % (I01_ANSWER, error, rule)) from None
 
 
+def answer_item_names(code: str) -> set[str]:
+    """(t5)'s item names [PR review round 2's R2-1, the first of its two changes]: every `fn` (`\\bfn\\s+(name)`, whatever
+    precedes it: `const fn`, `pub const fn`, `unsafe fn`, `async fn`) and every `const` or `static` item
+    (`\\b(?:const|static)\\s+(name)\\s*[:=]`) of i01_answer.rs, so that no qualifier hides one. HE-004-I01B5 (the round-3
+    NOTE, DESIGN-I01B5 rev 5 section 6.7) names it, so that each of R2-1's two changes has a row that only it refuses."""
+    return (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
+            | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
+
+
+def generic_parameter(code: str, position: int) -> bool:
+    """R2-4 (HE-004-I01B3 PR review round 3, a NOTE carried to HE-004-I01B5; DESIGN-I01B5 rev 5 section 6.7): whether
+    the `const` at `position` opens a const generic parameter, which (t2) skips: the text before it, past whitespace,
+    ends with `<` or `,`, and walking back from there over balanced `(`, `[` and `<` brackets (a `>` after `-` closing
+    none) an unmatched `<` comes before any `;`, `{`, `}`, or unmatched `(` or `[`. A const item never follows `<` or `,`,
+    so no item is skipped."""
+    before = code[:position].rstrip()
+    if not before.endswith(("<", ",")):
+        return False
+    depth = 0
+    for index in range(len(before) - 1, -1, -1):
+        char = before[index]
+        if char in ";{}":
+            return False
+        if char in ")]" or (char == ">" and before[index - 1:index] != "-"):
+            depth += 1
+        elif char in "([":
+            if depth == 0:
+                return False
+            depth -= 1
+        elif char == "<":
+            if depth == 0:
+                return True
+            depth -= 1
+    return False
+
+
 def answer_texts_t1_pins(base: Path, rule: str) -> int:
     """(t1) The pins: pinned_constant (`&str`) holds each I01B3_TEXT_PINS const to its text with its citation in the
     `///` doc comment directly above it, and each I01B3_KEY_CONSTS const to its value."""
@@ -4951,7 +5054,8 @@ def answer_texts_t2_set(base: Path, rule: str) -> None:
     array or Option of them), at any depth, is one of the 17 text names or a listed key name, each defined exactly
     once, as a top-level, line-anchored `pub const <NAME>: &str = "<text>";`; their values are pairwise distinct; no
     key value equals a text, a contract refusal text (definitions.json's refusalTexts, B1_MALFORMED's among them); no
-    R10 text equals a VPO text or a contract text. A str named through a `type` alias is (t9)'s."""
+    R10 text equals a VPO text or a contract text. A str named through a `type` alias is (t9)'s. HE-004-I01B5 (R2-4): a
+    `const` that opens a const generic parameter (generic_parameter) is no const item and is skipped."""
     _, kept, code = answer_source(base, rule)
     try:
         refusals = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))["refusalTexts"]
@@ -4961,6 +5065,8 @@ def answer_texts_t2_set(base: Path, rule: str) -> None:
     keys = {name: text for name, text in I01B3_KEY_CONSTS}
     defined: dict[str, int] = {}
     for item in re.finditer(r"\bconst\s+([A-Za-z_]\w*)\s*:", code):
+        if generic_parameter(code, item.start()):
+            continue
         try:
             declared = item_text(code, item.start(), "const")
         except GateError:
@@ -5040,8 +5146,7 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
         require(len(re.findall(r"\bpub\s+fn\s+%s\s*\(\s*self\s*\)\s*->\s*&\s*'static\s+str\s*\{" % method, digest_code)) == 1,
                 "%s does not define the refusal method %s returning one text (%s (t5))" % (I01B1_DIGEST_RS, method, rule))
     texts = {name for name, _, _ in I01B3_TEXT_PINS}
-    items = (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
-             | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
+    items = answer_item_names(code)
     method = re.compile(r"([a-z_][a-z0-9_]*)\s*\.\s*(?:%s)\s*\(\s*\)" % "|".join(I01B1_REFUSAL_METHODS))
 
     def binding(name: str) -> bool:
@@ -5177,6 +5282,33 @@ def answer_texts_t10_refusals_no_return(base: Path, rule: str) -> None:
             "as its tail (%s (t10))" % (I01_ANSWER, rule))
 
 
+# (t11) [HE-004-I01B3 PR review round 3's R3-1, carried to HE-004-I01B5; DESIGN-I01B5 rev 5 section 6.7]: answer's step 2,
+# the answer list's one consumer, matched whole, spacing free, the binding named twice the same.
+I01B5_STEP_TWO = re.compile(r"if\s+let\s+Some\s*\(\s*&\s*([a-z_][a-z0-9_]*)\s*\)\s*=\s*refusals\s*\(\s*derived\s*,\s*facts\s*\)"
+                            r"\s*\.\s*first\s*\(\s*\)\s*\{\s*return\s+Err\s*\(\s*\1\s*\)\s*;\s*\}")
+
+
+def answer_texts_t11_step_two(base: Path, rule: str) -> None:
+    """(t11) The answer list's consumer [R3-1]: in i01_answer.rs read without comments (literal contents emptied), fn
+    answer's outermost block (outermost_statements) holds exactly one statement that is exactly `if let Some(&<b>) =
+    refusals(derived, facts).first() { return Err(<b>); }` (I01B5_STEP_TWO, spacing free), and the word refusals occurs
+    exactly twice: `fn refusals(` and that statement's call. So a key text fed in at the consumer without a local, as
+    `.first().or(Some(&KEY_SCOPE))` (S1) or `.iter().chain(&[KEY_SCOPE]).next()` (S2), refuses, and so do a second call
+    and a fn-item reference."""
+    _, _, code = answer_source(base, rule)
+    span = function_span(code, "answer")
+    require(span is not None, "%s does not define fn answer once (%s (t11))" % (I01_ANSWER, rule))
+    statements = outermost_statements(code, span[0], rule)
+    steps = [statement for statement in statements if I01B5_STEP_TWO.fullmatch(code[statement[0]:statement[1]].strip())]
+    words = [found.start() for found in re.finditer(r"\brefusals\b", code)]
+    definitions = [found.start(1) for found in re.finditer(r"\bfn\s+(refusals)\s*\(", code)]
+    require(len(steps) == 1 and len(definitions) == 1 and len(words) == 2 and definitions[0] in words
+            and sum(steps[0][0] <= word < steps[0][1] for word in words) == 1,
+            "%s's fn answer does not consume its answer list once, as the outermost statement `if let Some(&<b>) = "
+            "refusals(derived, facts).first() { return Err(<b>); }`, with refusals named only there and at its definition "
+            "(%s (t11))" % (I01_ANSWER, rule))
+
+
 def check_i01b3_texts(base: Path) -> int:
     """HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 section 5; I3D-7, I3E-3, I3F-1..3; PR review round 1's
     R1-1 and R1-2), each its own function with its own message: (t1) the 17 text pins with their citations and the key
@@ -5185,11 +5317,11 @@ def check_i01b3_texts(base: Path) -> int:
     names read past any qualifier) or an I01B1 refusal method, map_err( and ok_or_else( take a closure, and refusals'
     list is named only at its declaration, its tail and the .push( and .contains( receivers; (t6) no key-prefixed
     literal; (t7) no static; (t8) the refusal words only as calls; (t9) no `type` naming str; (t10) no `return` in fn
-    refusals. They run in the order (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), so that a key-prefixed
-    literal, which only a const line can hold, is refused with (t6)'s message, and a str const or alias reaching a
-    refusal with (t2)'s or (t9)'s. The stated limit (a text reaching a refusal through a local; a helper other than the
-    rule helper returning `Err(param)`; `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The
-    number of pins."""
+    refusals; (t11) answer's step 2 read exactly, refusals called only there (HE-004-I01B5, R3-1). They run in the order
+    (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), (t11), so that a key-prefixed literal, which only a const
+    line can hold, is refused with (t6)'s message, and a str const or alias reaching a refusal with (t2)'s or (t9)'s. The
+    stated limit (a text reaching a refusal through a local; a helper other than the rule helper returning `Err(param)`;
+    `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The number of pins."""
     rule = "constants and texts, G-I01B-8"
     pins = answer_texts_t1_pins(base, rule)
     answer_texts_t6_key_prefixed(base, rule)
@@ -5201,6 +5333,7 @@ def check_i01b3_texts(base: Path) -> int:
     answer_texts_t5_positions(base, rule)
     answer_texts_t7_no_static(base, rule)
     answer_texts_t10_refusals_no_return(base, rule)
+    answer_texts_t11_step_two(base, rule)
     return pins
 
 
@@ -6609,8 +6742,10 @@ def main() -> int:
             "load statement is pinned (b1), document occurs 5 times (b2) and config 5 times (b3) at their places, the "
             "pinned load and parse statements are outermost and in order (b4), the parse statement is pinned (b5) and "
             "parse_v3 occurs twice in the crate (b6); in %s the accessor, the private field and the one ObserverConfig "
-            "literal in fn members (c), no rename or type item naming ObserverConfig (c1), the dot form .binding twice "
-            "(c2), parse_v3's local binding bound once and assigned once (c3) and no Self (c4)"
+            "literal in fn members, its own top-level binding initialiser exactly Value::Null (c; HE-004-I01B5, R1-1), no "
+            "rename or type item naming ObserverConfig (c1), the dot form .binding twice (c2), parse_v3's local binding "
+            "bound once and assigned once (c3), no Self (c4) and no struct, enum or union field binding but "
+            "ObserverConfig's (c5; HE-004-I01B5, I2E-7)"
             % (check_i01b_constructor(HE), ", ".join(OBSERVE_RUN_ARGUMENTS), I01B2_CONFIG))
         say("Derived closed (HE-004-I01B3, G-I01B-9): %d clauses over %s's sources: %s defines one `struct Derived {` at "
             "its top level, its fields exactly %s, its one attribute #[derive(Debug)] (i); its one literal is `Ok(Derived "
@@ -6640,15 +6775,17 @@ def main() -> int:
             "modules' %d refusal texts are exactly its refusalTexts"
             % (check_i01b_constants(HE), I01B_DEFINITIONS, ", ".join(name for name, _, _, _ in I01B_LITERAL_PINS),
                check_i01b_refusal_texts(HE)))
-        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t10)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
+        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t11)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
             "citations and its %d key consts with their values (t1); its consts whose type names str exactly those, each "
-            "once, top-level and line-anchored, the values distinct and no key or R10 text a refusal or VPO text (t2); no "
+            "once, top-level and line-anchored (a const generic parameter skipped, HE-004-I01B5, R2-4), the values "
+            "distinct and no key or R10 text a refusal or VPO text (t2); no "
             "string outside those lines (t3); no stringify!, concat!, include_str!, include_bytes!, env!, option_env!, "
             "format_args!, file!, module_path!, leak, from_utf8 or transmute (t4); %d refusal positions, turbofish or "
             "not, each naming a pinned text, a binding no item names or one of %s on such a binding, map_err( and "
             "ok_or_else( taking a closure, and refusals' list named only at its declaration, its tail and the .push( and "
             ".contains( receivers (t5); no key-prefixed text (t6); no static (t7); %s only as calls (t8); no type alias "
-            "naming str (t9); no return in fn refusals (t10)"
+            "naming str (t9); no return in fn refusals (t10); answer's step 2 exactly `if let Some(&<b>) = "
+            "refusals(derived, facts).first() { return Err(<b>); }`, refusals called only there (t11; HE-004-I01B5, R3-1)"
             % (check_i01b3_texts(HE), I01_ANSWER, len(I01B3_TEXT_PINS), len(I01B3_KEY_CONSTS),
                answer_texts_t5_positions(HE, "G-I01B-8 (t5)"), ", ".join(I01B1_REFUSAL_METHODS),
                ", ".join(word for _, word in I01B3_CALL_ONLY)))
