@@ -5,5 +5,12 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A, with the scope notes; owner decisions Q-HE5A-1..3 (a)): HE-001's
+# scaffold becomes the capacity broker's library (src/lib.rs: the seal, the status table and the I02 listener's seam)
+# and binary (src/main.rs), in the observer's form. It drops host-common (H5D-12): the seal is role-seal's stages over
+# gate-sys's raw calls and the I02 listener is gate-sys's channel module, both by path, so planeon-broker links exactly
+# crates/broker, crates/role-seal and crates/gate-sys. No registry crate (the signed configuration and ring are
+# HE-005C's); Cargo.lock gains only these two path edges.
 [dependencies]
-host-common = { path = "../host-common" }
+gate-sys = { path = "../gate-sys" }
+role-seal = { path = "../role-seal" }
