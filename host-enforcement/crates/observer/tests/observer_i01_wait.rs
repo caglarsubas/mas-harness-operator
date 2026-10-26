@@ -20,9 +20,10 @@ use std::time::{Duration, Instant};
 use c_support::{observer_tls, shared_pki, Rig};
 use gate_sys::inet::{InetAddress, IpLiteral};
 use i05_protocol::json;
-use planeon_observer::client::{AcceptResult, Client, ConnId, Connecting, ExeLink, Interest, ListenerBackoff, PeerCreds, PeerId,
-                               PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService, PeerWatch, PollError,
-                               ProcIdentity, Ready, Transfer, Wire, Woken, LISTENER_BACKOFF, LISTENER_FAULT_LIMIT};
+use planeon_observer::client::{AcceptResult, Availability, CaptureGate, Client, ConnId, Connecting, ExeLink, Interest, ListenerBackoff,
+                               PeerCreds, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerSent, PeerService,
+                               PeerWatch, PollError, ProcIdentity, Ready, SnapshotView, Transfer, Wire, Woken, LISTENER_BACKOFF,
+                               LISTENER_FAULT_LIMIT};
 use planeon_observer::enrolled::{ServerClass, ServerIdentity};
 use planeon_observer::i01_request::I01Binding;
 use planeon_observer::i01_service::I01Service;
@@ -96,6 +97,11 @@ impl Wire for ScriptWire {
     fn wall_seconds(&self) -> Option<u64> {
         Some(1_000 + self.0.borrow().elapsed.as_secs())
     }
+
+    /// HE-004-I01B5: the same clock in milliseconds.
+    fn wall_millis(&self) -> Option<u64> {
+        Some(1_000_000 + self.0.borrow().elapsed.as_millis() as u64)
+    }
 }
 
 impl PeerOps for ScriptWire {
@@ -129,9 +135,14 @@ impl PeerOps for ScriptWire {
     }
 
     fn peer_close(&mut self, _peer: PeerId) {}
+
+    fn peer_send(&mut self, _peer: PeerId, _bytes: &[u8]) -> PeerSent {
+        PeerSent::Failed(9)
+    }
 }
 
-/// What the recording service saw: each step with its wall second, and the deadline calls.
+/// What the recording service saw: each step with its wall reading (milliseconds since HE-004-I01B5), and the deadline
+/// calls.
 #[derive(Default)]
 struct Calls {
     steps: Vec<(PeerReady, Option<u64>)>,
@@ -152,15 +163,25 @@ impl PeerService for Recorder {
         PeerPlan { watch: self.watch, deadline: self.every.map(|every| now + every) }
     }
 
-    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, _now: Instant, ready: PeerReady) -> PeerOutcome {
+    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, _now: Instant, ready: PeerReady) -> PeerOutcome {
         let _ = ops.accept_peer();
         let mut calls = self.calls.borrow_mut();
-        calls.steps.push((ready, wall));
+        calls.steps.push((ready, wall_ms));
         if self.fail_at == Some(calls.steps.len()) { PeerOutcome::ListenerFailed } else { PeerOutcome::Served }
     }
 
-    fn serve_peer_deadlines(&mut self, _ops: &mut dyn PeerOps, _wall: Option<u64>, _now: Instant) {
+    fn serve_peer_deadlines(&mut self, _ops: &mut dyn PeerOps, _wall_ms: Option<u64>, _now: Instant) {
         self.calls.borrow_mut().deadlines += 1;
+    }
+
+    fn peer_snapshot_view(&mut self, _view: SnapshotView) {}
+
+    fn peer_availability(&mut self, _availability: Availability) {}
+
+    fn peer_capture_view(&mut self, _gate: CaptureGate) {}
+
+    fn peer_pending(&self) -> Option<Instant> {
+        None
     }
 }
 
@@ -220,7 +241,7 @@ fn each_ready_i01_descriptor_is_one_step_and_the_deadlines_one_call_per_wake() {
     let mut client = new_client(&wire);
     let calls = attach(&mut client, PeerWatch { listener: true, peer: Some(PeerId(1)) }, None, None);
     client.pause(wire.base() + secs(1)).expect("no failure");
-    let wall = Some(1_001);
+    let wall = Some(1_001_000);
     assert_eq!(calls.borrow().steps, [(PeerReady::Listener(READABLE), wall), (PeerReady::Peer(PeerId(1), READABLE), wall),
                                       (PeerReady::Peer(PeerId(2), hung), wall), (PeerReady::PeerFault(PeerId(3)), wall)]);
     assert_eq!(calls.borrow().deadlines, 1);
@@ -231,7 +252,7 @@ fn each_ready_i01_descriptor_is_one_step_and_the_deadlines_one_call_per_wake() {
     let mut client = new_client(&wire);
     let calls = attach(&mut client, PeerWatch { listener: true, peer: None }, None, None);
     client.pause(wire.base() + secs(1)).expect("no failure");
-    assert_eq!(calls.borrow().steps, [(PeerReady::ListenerFault, Some(1_001))]);
+    assert_eq!(calls.borrow().steps, [(PeerReady::ListenerFault, Some(1_001_000))]);
 }
 
 #[test]

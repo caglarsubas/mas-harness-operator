@@ -12,8 +12,9 @@
 //! - The schema, `planeon.internal.policy-observation-request/v1`: exactly its seven members, each of its type and form
 //!   (`sequence` an integer from 1 to 2^53 - 1).
 //! - The chain, per session: a session's first request carries sequence 1 and the all-zero previous digest; a later one
-//!   would carry the next sequence, a challenge other than its predecessor's and the digest of the last answer, and
-//!   I01a answers nothing, so no later request passes.
+//!   carries the next sequence, a challenge other than its predecessor's and the digest of the last answer. Since
+//!   HE-004-I01B5 (DESIGN-I01B5 rev 5 section 4.5) the chain is keyed to the last *answered* request, recorded only when
+//!   its answer is sent (`Chain::answered`); checking a request records nothing.
 //! - The binding gate: `bindingDigest` and `runNonce` must equal HE-008's binding. I01a had none, so the gate refused
 //!   every request. HE-004-I01B2 (DESIGN-I01B2 rev 3 section 6; G-I01B-3 and G-I01B-4): [`I01Binding`] is closed (private
 //!   fields, no `Clone`, one literal) and built only by [`I01Binding::from_config`], once, in `serve`, from configuration
@@ -228,35 +229,45 @@ pub fn request_schema(value: &Value) -> Result<I01Request, RequestRefusal> {
     })
 }
 
-/// One session's request-side chain: the previous request's sequence and challenge.
+/// One session's chain, keyed to its last answered request (HE-004-I01B5, DESIGN-I01B5 rev 5 section 4.5; I5D-1 (b);
+/// Q-I01B5D-3 (a)): that request's sequence and challenge and the digest of its answer, set only by [`Chain::answered`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Chain {
-    last: Option<(u64, String)>,
+    answered: Option<(u64, String, String)>,
 }
 
 impl Chain {
-    /// A request against the session's chain; on success it becomes the previous one.
-    pub fn check(&mut self, request: &I01Request) -> Result<(), RequestRefusal> {
+    /// A request against the session's chain; it records nothing. With no answer yet, sequence 1 after the zero digest;
+    /// after one, the answered sequence + 1, a challenge other than the answered one's, and `previousObservationDigest`
+    /// the answered digest. So only the newest answer can be continued, and the reuse rule is pairwise, as VPO's is
+    /// (I5E-8).
+    pub fn check(&self, request: &I01Request) -> Result<(), RequestRefusal> {
         let chain = RequestRefusal::Chain;
-        match &self.last {
+        match &self.answered {
             None => {
                 if request.sequence != 1 || request.previous_digest != ZERO_DIGEST {
                     return Err(chain("a session's first request is sequence 1 after the zero digest"));
                 }
             }
-            Some((sequence, challenge)) => {
+            Some((sequence, challenge, digest)) => {
                 if sequence.checked_add(1) != Some(request.sequence) {
                     return Err(chain("a request out of sequence"));
                 }
                 if request.challenge == *challenge {
                     return Err(chain("a challenge repeated"));
                 }
-                // The previous digest names the last answer, and I01a sends none.
-                return Err(chain("no observation was answered"));
+                if request.previous_digest != *digest {
+                    return Err(chain("previousObservationDigest is not the last answer's digest"));
+                }
             }
         }
-        self.last = Some((request.sequence, request.challenge.clone()));
         Ok(())
+    }
+
+    /// The answer sent to the request of `sequence` and `challenge`, its bytes' digest `digest` (`sha256:` and hex): the
+    /// session's `sent` is its one caller (G-I01B-5 (i)).
+    pub fn answered(&mut self, sequence: u64, challenge: &str, digest: &str) {
+        self.answered = Some((sequence, challenge.to_string(), digest.to_string()));
     }
 }
 

@@ -23,6 +23,12 @@
 //! `poll` and `pause`, is the one wire wait inside `Client::wait_serving` (G-I01-2): it watches the service's listener
 //! and peer beside the links, on poller tokens of their own, shortens its timeout to the service's earliest deadline,
 //! routes the links' readiness as before and hands each ready I01 descriptor to the service, one step each.
+//!
+//! HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.4 and 5): the epoch's pushes to the service ([`SnapshotView`],
+//! [`Availability`] with its request round's [`Passed`] or `Failed`, and [`CaptureGate`], built only by
+//! [`CaptureGate::from_view`]) and its pending query go through the client's forwarding methods, none of which takes
+//! the peer operations; the waits read the wall clock in milliseconds ([`Wire::wall_millis`]); and [`PeerOps`] gains its
+//! one send, `peer_send` ([`PeerSent`]), which only the service's answer reaches.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -220,8 +226,17 @@ pub struct Woken {
     pub peer_faults: Vec<PeerId>,
 }
 
+/// One answer's send on the held peer (HE-004-I01B5, DESIGN-I01B5 rev 5 section 5): sent whole, or failed with its
+/// errno (a short send, EAGAIN and EPIPE among them; a peer not held is EBADF).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PeerSent {
+    Sent,
+    Failed(i32),
+}
+
 /// The I01 operations a wire offers beside [`Wire`] (DESIGN-I01A section 5): `linux_net::LinuxWire` serves them through
-/// its I01 listener, the tests through fakes. No supertrait, and no send operation: nothing leaves I01a.
+/// its I01 listener, the tests through fakes. No supertrait. Its one send, `peer_send` (HE-004-I01B5), is called only
+/// by the service's `respond`, with the bytes `i01_answer::answer` built and `i01_answer::self_check` passed (G-I01B-5).
 pub trait PeerOps {
     /// One accept: a new peer, nothing queued, or a fault.
     fn accept_peer(&mut self) -> AcceptResult;
@@ -239,6 +254,8 @@ pub trait PeerOps {
     fn peer_recv(&mut self, peer: PeerId, buffer: &mut [u8]) -> PeerRecv;
     /// Closes the peer and everything kept with it.
     fn peer_close(&mut self, peer: PeerId);
+    /// HE-004-I01B5: one non-blocking send of exactly `bytes` to the held peer.
+    fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent;
 }
 
 /// What the I01 service wants of the next wait: the descriptors it watches and its earliest deadline.
@@ -348,12 +365,13 @@ pub trait PeerService {
     /// The descriptors the next wait watches and the earliest I01 deadline (the idle and outer bounds, the backoff's
     /// re-add).
     fn peer_plan(&self, now: Instant) -> PeerPlan;
-    /// One ready I01 descriptor, bounded: one accept, or one request read and its checks, then a close. `wall` is the
-    /// wire's wall second (`None` before the epoch), `now` its monotonic clock.
-    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant, ready: PeerReady) -> PeerOutcome;
-    /// Once per wake, after the steps: the deadlines that have come (a session's bounds and the record's window, the
-    /// backoff's end).
-    fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant);
+    /// One ready I01 descriptor, bounded: one accept, or one request read and its checks. `wall_ms` is the wire's wall
+    /// clock in whole milliseconds (`None` before the epoch; HE-004-I01B5, in place of the wall second), `now` its
+    /// monotonic clock.
+    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant, ready: PeerReady) -> PeerOutcome;
+    /// Once per wake, after the steps: the deadlines that have come (a session's bounds, the exchange deadline and the
+    /// record's window, the backoff's end) and, when a request is ready, its answer (HE-004-I01B5).
+    fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant);
     /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the latest snapshot view, replacing the earlier one.
     fn peer_snapshot_view(&mut self, view: SnapshotView);
     /// The latest availability, replacing the earlier one.
@@ -438,6 +456,9 @@ pub trait Wire {
     fn now(&self) -> Instant;
     /// The wall clock in whole seconds since the epoch, or `None` before the epoch.
     fn wall_seconds(&self) -> Option<u64>;
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the wall clock in whole milliseconds since the epoch, or `None`
+    /// before the epoch (Linux: `utc::wall_millis`, the capture engine's reading).
+    fn wall_millis(&self) -> Option<u64>;
 }
 
 /// A link's handle (a counter, never reused within the client).
@@ -790,9 +811,10 @@ impl<W: Wire + PeerOps> Client<W> {
     /// The observer's one wire wait (DESIGN-I01A section 5; G-I01-2): `poll` and `pause` wait only through it. With an
     /// I01 service attached, the wait also watches the service's listener and peer and ends no later than the
     /// service's earliest deadline; the connections' readiness goes back to the caller as before; each ready I01
-    /// descriptor is one `serve_peer_step` (the wall second and the monotonic clock passed in, so the tests drive them),
-    /// and the service's due deadlines are served once after them. A fatal listener outcome ends the wait with an error
-    /// that [`Client::listener_failed`] names.
+    /// descriptor is one `serve_peer_step` (one reading of the wall clock, in milliseconds since HE-004-I01B5, and the
+    /// monotonic clock passed in, so the tests drive them), and the service's due deadlines, with any ready answer, are
+    /// served once after them. A fatal listener outcome ends the wait with an error that [`Client::listener_failed`]
+    /// names.
     fn wait_serving(&mut self, interests: &[(ConnId, Interest)], until: Instant)
                     -> Result<Vec<(ConnId, Ready)>, PollError> {
         let now = self.wire.now();
@@ -801,7 +823,7 @@ impl<W: Wire + PeerOps> Client<W> {
         let wake = plan.and_then(|plan| plan.deadline).map_or(until, |deadline| deadline.min(until));
         let woken = self.wire.wait(interests, watch, wake)?;
         let Some(service) = self.service.as_deref_mut() else { return Ok(woken.conns) };
-        let (wall, now) = (self.wire.wall_seconds(), self.wire.now());
+        let (wall_ms, now) = (self.wire.wall_millis(), self.wire.now());
         let mut ready = Vec::new();
         if woken.listener_fault {
             ready.push(PeerReady::ListenerFault);
@@ -811,12 +833,12 @@ impl<W: Wire + PeerOps> Client<W> {
         ready.extend(woken.peers.iter().map(|(peer, found)| PeerReady::Peer(*peer, *found)));
         ready.extend(woken.peer_faults.iter().map(|peer| PeerReady::PeerFault(*peer)));
         for step in ready {
-            if service.serve_peer_step(&mut self.wire, wall, now, step) == PeerOutcome::ListenerFailed {
+            if service.serve_peer_step(&mut self.wire, wall_ms, now, step) == PeerOutcome::ListenerFailed {
                 self.listener_failed = true;
                 return Err(PollError(LISTENER_FAILED_ERRNO));
             }
         }
-        service.serve_peer_deadlines(&mut self.wire, wall, now);
+        service.serve_peer_deadlines(&mut self.wire, wall_ms, now);
         Ok(woken.conns)
     }
 

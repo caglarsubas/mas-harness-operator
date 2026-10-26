@@ -7,8 +7,13 @@
 //!   a NUL where both should carry it, a doubled NUL, an empty label).
 //! - Each message: SCM_CREDENTIALS and SCM_SECURITY against the accept's (exactly), the process unchanged before and after
 //!   the read, the receive's other outcomes, and the request checks; a request that does not name the service's
-//!   binding closes at the gate, and since HE-004-I01B2 (B3-9 (a), I2D-7) the service holds a `from_config` test binding
-//!   and a request naming it closes as `NotAnswered`, nothing sent.
+//!   binding closes at the gate, and since HE-004-I01B2 (B3-9 (a), I2D-7) the service holds a `from_config` test binding;
+//!   since HE-004-I01B5 (Q-11 (a)) a request naming it waits pending for its answer, nothing sent.
+//! - HE-004-I01B5 (DESIGN-I01B5 rev 5 section 4): the wall reading in milliseconds; the exchange deadline in the idle
+//!   bound's place while a request is pending; a second datagram while one is pending closes `Pipelined`; no round, a
+//!   failed round, a round started before the receipt or a view of another phase is not ready and closes `NotServed` at
+//!   the exchange deadline; a ready request whose view is unusable or not current closes `NotServed`, and one whose
+//!   process changed `Changed`, each with nothing sent. The answered cases are `observer_i01_send.rs`'s.
 //! - The window: a start before `validFrom` (no latch), the `expiresAt - 3 s` cut and its latch, a clock stepped back, no
 //!   clock; the idle and outer bounds.
 //! - The listener: its two reasons to leave the wait (a session, a backoff), the backoff's deadline, faults, the twelfth
@@ -20,11 +25,12 @@ use std::time::{Duration, Instant};
 use i05_protocol::json::{self, Value};
 use i05_protocol::sha256;
 use planeon_observer::capture_schema::CaptureSchema;
-use planeon_observer::client::{AcceptResult, ExeLink, PeerCreds, PeerId, PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv,
-                               PeerService, PeerWatch, ProcIdentity, Ready, LISTENER_BACKOFF};
+use planeon_observer::client::{AcceptResult, Availability, CaptureGate, ExeLink, Passed, PeerCreds, PeerId, PeerOps, PeerOutcome,
+                               PeerPlan, PeerReady, PeerRecv, PeerSent, PeerService, PeerWatch, ProcIdentity, Ready, Round,
+                               SnapshotView, LISTENER_BACKOFF};
 use planeon_observer::enrolled::{record_form, Enrolled, RecordBytes, ServerClass, ServerIdentity};
 use planeon_observer::i01_request::{I01Binding, RequestRefusal, ZERO_DIGEST};
-use planeon_observer::i01_service::{Closed, I01Service, IDLE_BOUND, OUTER_BOUND};
+use planeon_observer::i01_service::{Closed, I01Service, I01_EXCHANGE_DEADLINE, IDLE_BOUND, OUTER_BOUND};
 use planeon_observer::kernel_text;
 
 const VECTORS: &str = include_str!("../../../contracts/native-profile-v4/vectors.json");
@@ -34,7 +40,8 @@ const CGROUP_REL: &str = "planeon.slice/planeon-proxy-server.service";
 const CGROUP: &[u8] = b"0::/planeon.slice/planeon-proxy-server.service\n";
 const VALID_FROM: u64 = 1_000_000;
 const EXPIRES_AT: u64 = 1_000_600;
-const WALL: Option<u64> = Some(1_000_100);
+/// The wire's wall reading, in milliseconds since HE-004-I01B5.
+const WALL: Option<u64> = Some(1_000_100_000);
 const READY: Ready = Ready { readable: true, writable: false, error: false, hangup: false };
 const PEER: PeerId = PeerId(1);
 
@@ -64,6 +71,9 @@ struct FakePeer {
     recvs: VecDeque<(Vec<u8>, PeerRecv)>,
     calls: Vec<&'static str>,
     closed: Vec<PeerId>,
+    /// HE-004-I01B5: the bytes handed to `peer_send`, and its answer.
+    sent: Vec<Vec<u8>>,
+    send: PeerSent,
 }
 
 impl FakePeer {
@@ -79,6 +89,8 @@ impl FakePeer {
             recvs: VecDeque::new(),
             calls: Vec::new(),
             closed: Vec::new(),
+            sent: Vec::new(),
+            send: PeerSent::Sent,
         }
     }
 }
@@ -125,6 +137,12 @@ impl PeerOps for FakePeer {
     fn peer_close(&mut self, peer: PeerId) {
         self.calls.push("close");
         self.closed.push(peer);
+    }
+
+    fn peer_send(&mut self, _peer: PeerId, bytes: &[u8]) -> PeerSent {
+        self.calls.push("send");
+        self.sent.push(bytes.to_vec());
+        self.send
     }
 }
 
@@ -250,15 +268,16 @@ fn a_request_is_read_with_its_message_custody_and_closes_at_a_binding_it_does_no
     assert_eq!(ops.calls, ["alive", "proc_read", "recv", "alive", "proc_read", "close"]);
     assert_eq!(service.last_closed(), Some(Closed::Request(RequestRefusal::Binding)));
     assert!(!service.session_open());
-    // HE-004-I01B2 (I2D-7): a request naming the service's binding (its digest and nonce) passes the checks and the
-    // gate and closes as NotAnswered, with the same calls; nothing is sent (PeerOps has no send).
+    // HE-004-I01B2 (I2D-7), its NotAnswered case rewritten for HE-004-I01B5 (Q-11 (a)): a request naming the service's
+    // binding (its digest and nonce) passes the checks and the gate and waits for its answer, pending with its receipt,
+    // with the same calls and no close; nothing is sent.
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
     ops.calls.clear();
     ops.recvs.push_back(datagram(&request_naming(test_binding().signed_digest())));
     assert_eq!(service.serve_peer_step(&mut ops, WALL, now, PeerReady::Peer(PEER, READY)), PeerOutcome::Served);
-    assert_eq!(ops.calls, ["alive", "proc_read", "recv", "alive", "proc_read", "close"]);
-    assert_eq!(service.last_closed(), Some(Closed::NotAnswered));
-    assert_eq!((service.session_open(), ops.closed.as_slice()), (false, [PEER].as_slice()));
+    assert_eq!(ops.calls, ["alive", "proc_read", "recv", "alive", "proc_read"]);
+    assert_eq!((service.last_closed(), service.session_open(), service.peer_pending()), (None, true, Some(now)));
+    assert!(ops.closed.is_empty() && ops.sent.is_empty());
     // Nothing queued keeps the session; a step for another peer is not this session's.
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
     service.serve_peer_step(&mut ops, WALL, now, PeerReady::Peer(PEER, READY));
@@ -344,9 +363,9 @@ fn the_record_s_window_bounds_every_session() {
     let mut ops = FakePeer::good();
     ops.accepts.push_back(AcceptResult::Peer(PeerId(2)));
     let now = Instant::now();
-    service.serve_peer_step(&mut ops, Some(VALID_FROM - 1), now, PeerReady::Listener(READY));
+    service.serve_peer_step(&mut ops, Some((VALID_FROM - 1) * 1_000), now, PeerReady::Listener(READY));
     assert_eq!((service.last_closed(), service.latched(), service.session_open()), (Some(Closed::Window), false, false));
-    service.serve_peer_step(&mut ops, Some(VALID_FROM), now, PeerReady::Listener(READY));
+    service.serve_peer_step(&mut ops, Some(VALID_FROM * 1_000), now, PeerReady::Listener(READY));
     assert!(service.session_open());
     // No wall clock: closed without a latch.
     let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
@@ -357,7 +376,7 @@ fn the_record_s_window_bounds_every_session() {
     let mut service = I01Service::new(server(ServerClass::Observed), test_binding());
     let mut ops = FakePeer::good();
     ops.accepts.push_back(AcceptResult::Peer(PeerId(2)));
-    service.serve_peer_step(&mut ops, Some(EXPIRES_AT - 3), now, PeerReady::Listener(READY));
+    service.serve_peer_step(&mut ops, Some((EXPIRES_AT - 3) * 1_000), now, PeerReady::Listener(READY));
     assert_eq!((service.last_closed(), service.latched()), (Some(Closed::Window), true));
     service.serve_peer_step(&mut ops, WALL, now, PeerReady::Listener(READY));
     assert_eq!((service.last_closed(), service.latched(), service.session_open()), (Some(Closed::Window), true, false));
@@ -366,15 +385,15 @@ fn the_record_s_window_bounds_every_session() {
     let (service, _, _) = accepted(ServerClass::Observed, |_| {});
     assert!(service.session_open());
     let mut inside = I01Service::new(server(ServerClass::Observed), test_binding());
-    inside.serve_peer_step(&mut FakePeer::good(), Some(EXPIRES_AT - 4), now, PeerReady::Listener(READY));
+    inside.serve_peer_step(&mut FakePeer::good(), Some((EXPIRES_AT - 4) * 1_000), now, PeerReady::Listener(READY));
     assert!(inside.session_open() && !inside.latched());
     // An open session is cut at the next deadline call or read once the cut comes, and the latch holds.
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
-    service.serve_peer_deadlines(&mut ops, Some(EXPIRES_AT - 3), now);
+    service.serve_peer_deadlines(&mut ops, Some((EXPIRES_AT - 3) * 1_000), now);
     assert_eq!((service.last_closed(), service.latched(), service.session_open()), (Some(Closed::Window), true, false));
     let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
     ops.recvs.push_back(datagram(&first_request()));
-    service.serve_peer_step(&mut ops, Some(EXPIRES_AT), now, PeerReady::Peer(PEER, READY));
+    service.serve_peer_step(&mut ops, Some(EXPIRES_AT * 1_000), now, PeerReady::Peer(PEER, READY));
     assert_eq!((service.last_closed(), service.latched()), (Some(Closed::Window), true));
     assert_eq!(ops.recvs.len(), 1, "nothing was read");
 }
@@ -434,4 +453,102 @@ fn the_listener_leaves_the_wait_for_a_session_or_a_backoff_and_faults_escalate()
     service.serve_peer_step(&mut ops, WALL, now, PeerReady::PeerFault(PEER));
     assert_eq!((service.last_closed(), service.session_open()), (Some(Closed::Watch), false));
     assert!(service.peer_plan(now).watch.listener);
+}
+
+// ------------------------------------------------------------------------------------------------ HE-004-I01B5
+
+/// The text of a snapshot view these tests leave unusable (derive's result is the answer file's).
+const VIEW_REFUSAL: &str = "a view the tests leave unusable";
+
+/// The epoch's three pushes: the snapshot view of `phase` (unusable), an availability of `availability_phase` with
+/// `round`, established and fresh unless `established` says otherwise, and a capture set.
+fn views(service: &mut I01Service, phase: u64, availability_phase: u64, round: Option<Round>, established: bool, at: Instant) {
+    service.peer_snapshot_view(SnapshotView { phase, mark: 7, fresh_stamp: at, derived: Err(VIEW_REFUSAL) });
+    service.peer_availability(Availability { phase: availability_phase, established, fresh: true, round });
+    service.peer_capture_view(CaptureGate { scheduled: Some(at), set_started_ms: 0, slots: Vec::new(),
+                                            record_digest: String::new(), expired: false });
+}
+
+fn passed_at(started: Instant) -> Option<Round> {
+    Some(Round::Passed(Passed { started, mark: 7, stamp: started }))
+}
+
+/// A session whose request naming the binding passed `after` its accept and waits pending.
+fn pending(after: Duration) -> (I01Service, FakePeer, Instant, Instant) {
+    let (mut service, mut ops, now) = accepted(ServerClass::Observed, |_| {});
+    ops.recvs.push_back(datagram(&request_naming(test_binding().signed_digest())));
+    let received = now + after;
+    service.serve_peer_step(&mut ops, WALL, received, PeerReady::Peer(PEER, READY));
+    assert_eq!((service.peer_pending(), service.session_open()), (Some(received), true));
+    (service, ops, now, received)
+}
+
+#[test]
+fn the_exchange_deadline_replaces_the_idle_bound_while_a_request_is_pending() {
+    assert_eq!(I01_EXCHANGE_DEADLINE, Duration::from_secs(2));
+    let (mut service, mut ops, now, received) = pending(Duration::from_millis(500));
+    // The plan's deadline is the receipt plus 2 s, not the accept's idle bound.
+    assert_eq!(service.peer_plan(received).deadline, Some(received + I01_EXCHANGE_DEADLINE));
+    // At the accept's idle bound, the receipt plus 1.5 s, the session stays open.
+    assert_eq!(now + IDLE_BOUND, received + Duration::from_millis(1_500));
+    service.serve_peer_deadlines(&mut ops, WALL, now + IDLE_BOUND);
+    assert!(service.session_open());
+    // At the receipt plus 2 s it closes, not served, nothing sent.
+    service.serve_peer_deadlines(&mut ops, WALL, received + I01_EXCHANGE_DEADLINE);
+    assert_eq!((service.last_closed(), service.session_open()), (Some(Closed::NotServed), false));
+    assert!(ops.sent.is_empty());
+}
+
+#[test]
+fn a_second_datagram_while_a_request_is_pending_closes_pipelined() {
+    for second in [request_naming(test_binding().signed_digest()), first_request()] {
+        let (mut service, mut ops, _, received) = pending(Duration::from_millis(100));
+        ops.recvs.push_back(datagram(&second));
+        service.serve_peer_step(&mut ops, WALL, received + Duration::from_millis(10), PeerReady::Peer(PEER, READY));
+        assert_eq!((service.last_closed(), service.session_open()), (Some(Closed::Pipelined), false));
+        assert!(ops.sent.is_empty());
+    }
+}
+
+#[test]
+fn no_round_a_failed_round_an_earlier_round_or_another_phase_is_not_ready() {
+    // No round; a failed round; a round started 1 ms before the receipt; a passed round in another phase than the view's.
+    for index in 0..4 {
+        let (mut service, mut ops, _, received) = pending(Duration::from_millis(100));
+        let (round, availability_phase) = match index {
+            0 => (None, 1),
+            1 => (Some(Round::Failed), 1),
+            2 => (passed_at(received - Duration::from_millis(1)), 1),
+            _ => (passed_at(received), 2),
+        };
+        views(&mut service, 1, availability_phase, round, true, received);
+        // Not ready: the plan keeps the exchange deadline, and a deadline call before it answers nothing.
+        assert_eq!(service.peer_plan(received).deadline, Some(received + I01_EXCHANGE_DEADLINE), "case {index}");
+        service.serve_peer_deadlines(&mut ops, WALL, received + Duration::from_millis(100));
+        assert!(service.session_open(), "case {index}");
+        service.serve_peer_deadlines(&mut ops, WALL, received + I01_EXCHANGE_DEADLINE);
+        assert_eq!(service.last_closed(), Some(Closed::NotServed), "case {index}");
+        assert!(ops.sent.is_empty(), "case {index}");
+    }
+}
+
+#[test]
+fn a_ready_request_with_an_unusable_or_stale_view_or_a_changed_process_closes_with_nothing_sent() {
+    // derive's refusal, and an availability whose streams are not established: ready, then not served.
+    for established in [true, false] {
+        let (mut service, mut ops, _, received) = pending(Duration::from_millis(100));
+        views(&mut service, 1, 1, passed_at(received), established, received);
+        let at = received + Duration::from_millis(100);
+        assert_eq!(service.peer_plan(at).deadline, Some(at), "ready: the plan wakes at once");
+        service.serve_peer_deadlines(&mut ops, WALL, at);
+        assert_eq!((service.last_closed(), service.session_open()), (Some(Closed::NotServed), false));
+        assert!(ops.sent.is_empty() && !ops.calls.contains(&"send"));
+    }
+    // The process changed between the request and its answer (I5D-15): Changed.
+    let (mut service, mut ops, _, received) = pending(Duration::from_millis(100));
+    views(&mut service, 1, 1, passed_at(received), true, received);
+    ops.alive.push_back(false);
+    service.serve_peer_deadlines(&mut ops, WALL, received + Duration::from_millis(100));
+    assert_eq!(service.last_closed(), Some(Closed::Changed));
+    assert!(ops.sent.is_empty());
 }

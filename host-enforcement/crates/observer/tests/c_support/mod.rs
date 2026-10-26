@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use gate_sys::inet::InetAddress;
 use i05_protocol::json::Doc;
 use planeon_observer::client::{AcceptResult, Availability, CaptureGate, ConnId, Connecting, ExeLink, Interest, PeerCreds, PeerId,
-                               PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerService, PeerWatch, PollError,
+                               PeerOps, PeerOutcome, PeerPlan, PeerReady, PeerRecv, PeerSent, PeerService, PeerWatch, PollError,
                                ProcIdentity, Ready, SnapshotView, Transfer, Wire, Woken};
 use planeon_observer::config::{FileRef, ObserverConfig, FORMAT};
 use planeon_observer::credentials::ObserverIdentity;
@@ -765,6 +765,8 @@ pub struct Lab {
     pub next_tick: Duration,
     /// Replies due later: (at, connection, reply, resource, opening resourceVersion).
     pub delayed: Vec<(Duration, u64, Reply, Option<Resource>, u64)>,
+    /// HE-004-I01B5: the bytes handed to `peer_send`.
+    pub answers: Vec<Vec<u8>>,
 }
 
 pub type SharedLab = Rc<RefCell<Lab>>;
@@ -1076,6 +1078,16 @@ impl Wire for FakeWire {
         let seconds = wall_start() as i64 + lab.elapsed.as_secs() as i64 + lab.wall_shift;
         u64::try_from(seconds).ok()
     }
+
+    /// HE-004-I01B5: the same clock in milliseconds.
+    fn wall_millis(&self) -> Option<u64> {
+        let lab = self.0.borrow();
+        if lab.wall_before_epoch {
+            return None;
+        }
+        let millis = (wall_start() as i64 + lab.wall_shift) * 1_000 + lab.elapsed.as_millis() as i64;
+        u64::try_from(millis).ok()
+    }
 }
 
 /// HE-004-I01a: the apiserver rig has no I01 peer (no epoch built here attaches the I01 service); the I01 tests script
@@ -1110,6 +1122,12 @@ impl PeerOps for FakeWire {
     }
 
     fn peer_close(&mut self, _peer: PeerId) {}
+
+    /// HE-004-I01B5: the bytes are recorded; the rig holds no peer, so the send fails as its other operations do.
+    fn peer_send(&mut self, _peer: PeerId, bytes: &[u8]) -> PeerSent {
+        self.0.borrow_mut().answers.push(bytes.to_vec());
+        PeerSent::Failed(9)
+    }
 }
 
 // ------------------------------------------------------------------------------------------ the rig
@@ -1153,6 +1171,7 @@ impl Rig {
             closes: 0,
             next_tick: Duration::from_secs(20),
             delayed: Vec::new(),
+            answers: Vec::new(),
         }));
         Rig { lab, pki, config: config_for(Duration::from_secs(600)) }
     }
@@ -1273,11 +1292,11 @@ impl PeerService for PushRecorder {
         PeerPlan { watch: PeerWatch::default(), deadline: next.map(|from| base + from) }
     }
 
-    fn serve_peer_step(&mut self, _ops: &mut dyn PeerOps, _wall: Option<u64>, _now: Instant, _ready: PeerReady) -> PeerOutcome {
+    fn serve_peer_step(&mut self, _ops: &mut dyn PeerOps, _wall_ms: Option<u64>, _now: Instant, _ready: PeerReady) -> PeerOutcome {
         PeerOutcome::Served
     }
 
-    fn serve_peer_deadlines(&mut self, _ops: &mut dyn PeerOps, _wall: Option<u64>, _now: Instant) {}
+    fn serve_peer_deadlines(&mut self, _ops: &mut dyn PeerOps, _wall_ms: Option<u64>, _now: Instant) {}
 
     fn peer_snapshot_view(&mut self, view: SnapshotView) {
         let at = self.elapsed();

@@ -14,7 +14,9 @@
 //!   directory by SO_PEERCRED's number and reads nothing; `proc_read` reads `stat`, `cgroup` and `attr/current` through
 //!   it and `exe` its `exe` link; `alive` is the pidfd's zero-timeout poll; `recv` is one `recvmsg` into the frame
 //!   buffer; `close` drops the peer with everything kept for it (the close also takes it off the poller).
-//! - Nothing is sent: this file calls no send operation (G-I01-5).
+//! - One send (HE-004-I01B5, DESIGN-I01B5 rev 5 section 5): `send_answer` holds the observer's only `channel::send`,
+//!   gate-sys's one non-blocking `sendmsg` of exactly the bytes handed in, to the held peer; `LinuxWire::peer_send` is
+//!   its one caller, and the I01 service's `respond` that one's (G-I01B-5). No write interest is registered.
 
 use std::fmt;
 use std::io;
@@ -22,7 +24,7 @@ use std::io;
 use gate_sys::channel::{self, ListenStep};
 use gate_sys::peer_wire::{control_capacity, FRAME_BUFFER_BYTES};
 
-use crate::client::{AcceptResult, ExeLink, ListenerSetup, PeerCreds, PeerId, PeerRecv, ProcIdentity};
+use crate::client::{AcceptResult, ExeLink, ListenerSetup, PeerCreds, PeerId, PeerRecv, PeerSent, ProcIdentity};
 use crate::seal::Sealed;
 
 /// The I01 path (HS53, DESIGN-I01A section 4): written here and nowhere else (G-I01-4).
@@ -170,6 +172,17 @@ impl I01Socket {
             channel::Recv::Datagram { length, truncated, control_length, control_truncated } => {
                 PeerRecv::datagram(length, truncated, control.get(..control_length).unwrap_or_default(), control_truncated)
             }
+        }
+    }
+
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 5): the observer's one send, exactly `bytes` to the held peer, as gate-sys's
+    /// `channel::send` (one `sendmsg` with `MSG_DONTWAIT | MSG_NOSIGNAL`, EINTR retried): sent whole, or its errno (a
+    /// short send is `WriteZero`, -1; no peer held is EBADF).
+    pub(crate) fn send_answer(&self, peer: PeerId, bytes: &[u8]) -> PeerSent {
+        let Some(held) = self.held_peer(peer) else { return PeerSent::Failed(NO_PEER) };
+        match channel::send(&held.conn, bytes) {
+            Ok(()) => PeerSent::Sent,
+            Err(error) => PeerSent::Failed(errno(&error)),
         }
     }
 
