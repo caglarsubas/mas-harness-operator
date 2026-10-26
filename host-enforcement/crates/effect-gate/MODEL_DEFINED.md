@@ -3517,3 +3517,134 @@ sim's `a4fcaee5…` and `21117a26…`.
 > - **The agent's departures are accepted as procedural.** The extra reads weren't forbidden, and the git commands were read-only.
 
 The complete messages are recorded in the operator's `tools/w03/he004/OWNER_DECISIONS.md`.
+
+## HE-005A0: the role-seal extraction (`crates/role-seal`; the observer's `seal.rs`, `lib.rs`'s doc and `Cargo.toml`; the workspace manifest and lock; `tools/gate.py`)
+
+HE-005A0 is step A0 of DESIGN-HE005 revision 5 §4 HE-005A (sha256 `0335ce2d…`, closed under MON-HE005-CLOSE), with the
+scope notes of `DESIGN-HE005.NOTES.md` (MON-HE005A-PLAN: A0 and A are two packets, each with its own verify, owner merge
+question and binary statement). It is the first packet of HE-005, the capacity broker, and it is a move: the observer's
+role-neutral seal code goes into a new safe crate, `crates/role-seal`, with no change of behaviour (O16; Q-HE5-11 (a)).
+planeon-observer's bytes change, since crate-qualified symbols move, and its re-pin is declared; planeon-gate,
+planeon-broker, planeon-containment and planeon-writer are unchanged; effect-gate's seal is untouched. Its rules are
+R226-R232.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R226 | **The move.** `crates/role-seal` (`Cargo.toml`, `src/lib.rs`): std only, `#![forbid(unsafe_code)]`, one path dependency (gate-sys), no registry crate, build script or feature, nothing embedded. It receives the observer seal's role-neutral helpers with their tokens: the capability words (`capability_words`, `capability_sets`, `CapabilitySets`), `filter_length` with `BPF_MAXINSNS` and `INSTRUCTION_BYTES`, `status_threads`, `Prctl` (no `BoundingDrop` and no `AmbientClearAll`, R87's departure), the bounding and ambient reads with `CAP_LAST_CAP` (C9) and the TSYNC return; the types `Stage`, `SealStep`, `SealFailure` and `SealError`; the crate-private `SealOps`, its Linux implementation over gate-sys and the engine (`accept_start`, `plan`, `run_stage1`, `run_stage2` and their helpers) with its 15 fake-kernel tests; the concrete Linux stages `seal_stage1(spec: RoleSpec)` and `seal_stage2(stage1)`; and the tokens `Stage1` and `Sealed`. The role specification `RoleSpec { bounding, kept, program, instructions }` (public fields, `Copy`) holds the bounding set the start state must equal (also the final one: no capability is dropped), the kept set (permitted = effective after stage 1, held by the start permitted set) and the role's published program for the running architecture with its pinned count, which `plan` checks before any change. The engine reads the specification where R87 read the observer's constants: `KEPT` as `spec.bounding` (the acceptance's and the final-state bounding set) and `spec.kept` (the acceptance's permitted set, `kept_sets`), `arch.program()` as `spec.program`, `arch.instructions()` as `spec.instructions`; the specification travels from stage 1 to stage 2 in `Stage1`'s private `Plan { spec, length }`. R86's statuses and R87's stages, order, checks, read-backs and `SealStep`s are unchanged | DESIGN-HE005 §4 HE-005A A0; O16; Q-HE5-11 (a); MON-HE005A-PLAN |
+| R227 | **The observer's seal.rs** keeps `CAP_NET_ADMIN`, `CAP_BPF`, `KEPT`, the two `include_bytes!` OBSERVER programs (R88's include rule unchanged: exactly the two), `Arch`, `RUNNING_ARCH`, the instruction counts and their compile-time asserts (now naming `role_seal::INSTRUCTION_BYTES`); its private instance `observer_spec()`, `RoleSpec { bounding: KEPT, kept: KEPT, program: RUNNING_ARCH.program(), instructions: RUNNING_ARCH.instructions() }`, built inside the stage-1 wrapper (a pure match, no system call); its public `seal_stage1()` and `seal_stage2(stage1)`, one-line wrappers over role-seal's stages with their signatures unchanged; and `pub use role_seal::{..}` of the 14 public names its users import (`capability_sets`, `capability_words`, `filter_length`, `status_threads`, `CapabilitySets`, `Prctl`, `BPF_MAXINSNS`, `CAP_LAST_CAP`, `SealError`, `SealFailure`, `SealStep`, `Sealed`, `Stage`, `Stage1`). `CAP_LAST_CAP` moved with the reads that use it and is re-exported. `main.rs`, `status.rs`, `linux_listen.rs`, `linux_net.rs`, `linux_capture.rs`, every pinned file and both test files (`observer_seal.rs`, `observer_kernel_text.rs`) are byte-identical; `lib.rs` changes only its module doc's engine sentence. `Stage1`'s derived `Debug` now shows the `RoleSpec`; nothing formats it (R230) | §4 A0; MON-HE005A0-U1 (addendum 2, 3) |
+| R228 | **D6.** role-seal's `SealOps` engine is crate-private; the public stages are concrete over its Linux implementation, present only on Linux, and the only makers of `Stage1` and `Sealed` (private fields; no `Clone`, `Copy` or `Default`). `RoleSpec`, though public, only parameterises those real stages, so no crate can obtain a token from a fake. check_role_seal (b) holds the public item set (R231), proven by its own failing rows | effect-gate's D6; §4 A0; MON-HE005A-PLAN |
+| R229 | **The pure-move proof, by script** (MON-HE005A-PLAN; the brief's addenda 1 and 2): the build's scratch `pure_move.py`, lexing with `gate.py`'s `rust_code` (comments removed, literals kept), lists every item of the base `seal.rs` (120: 68 top-level, 52 in the test module) and of the two new files (role-seal 115, the observer 18). No item is added or dropped outside the listed exceptions (the two `pub use` re-export lines, `RoleSpec`, `observer_spec`, the two observer wrappers) and exception 4, the tests' fixture: seven items under `#[cfg(test)]` (`CAP_NET_ADMIN`, `CAP_BPF`, `KEPT`, `PROGRAM_X86_64`, `PROGRAM_AARCH64`, `Arch`, `impl Arch`). Every moved or kept item's tokens are equal but for 2 qualifiers (`role_seal::` on `INSTRUCTION_BYTES` in the two asserts), 1 visibility (`INSTRUCTION_BYTES` `pub`), 9 specification fields and 29 carriers (5 parameters, 6 arguments, 5 Plan fields, 13 `.spec()` calls; each only adds or threads the specification), with 0 other: PURE. The values, parsed from the source: `KEPT` = 549755817984 (0x8000001000) at `f4b05e9c`, equal to the OBSERVER instance's `bounding` and `kept` (6 sites); `arch.program()` (`arch` bound to `RUNNING_ARCH`) = `OBSERVER.x86_64.bpf`, 2024 B, `a20d2a95…`, and `OBSERVER.aarch64.bpf`, 1936 B, `887bf078…`, equal to its `program` (2 sites); `arch.instructions()` = 253 and 242, equal to its `instructions`. The fixture's constants and counts equal the observer's (12, 39, `KEPT`, 253, 242, 2024 and 1936 bytes); its program bytes are zero-filled stand-ins, since role-seal embeds nothing, and the observer's `tests/observer_seal.rs` still pins the real bytes (`the_embedded_programs_are_the_published_bytes`, beside the decode and length tests) | MON-HE005A-PLAN; MON-HE005A0-LAUNCH; MON-HE005A0-U1 |
+| R230 | **Gate: role-seal joins the observer's rules.** `OBSERVER_LINKED_CRATES` (the exact set; the SBOM's workspace set for planeon-observer becomes {gate-sys, i05-protocol, observer-sys, planeon-observer, role-seal}), `SCANNED_CRATES` (the linked-source tripwire, foreign items, Debug, socket modules, read_link, macros, code before main, prints), `OBSERVER_POST_SEAL_CRATES`, `OBSERVER_NO_PANIC` (its `lib.rs` outside the strict test block) and `CRATE_ROOTS` (`#![forbid(unsafe_code)]`); `role_seal` joins `CRATE_PATH_ROOTS`, so no observer logic module reaches it. The workspace shape has 12 members; `OBSERVER_SEAL_RS`'s include rule is unchanged. A `Stage1` is printed nowhere: the print rule refuses printing it in every linked source, role-seal included; in `main.rs` the seal-order grammar refuses formatting it between the stages or in another function; the no-panic list refuses a panic carrying it through `unwrap` or `expect` in role-seal and `main.rs`. `format!` into a `String`, and `unwrap_err` or `expect_err` (which the panic list does not name) outside `main.rs`'s pinned grammar, stay code review's (R3) | §4 A0 (H5E-8); MON-HE005A0-U1 (addendum 2, 3 and 4) |
+| R231 | **Gate: check_role_seal** (D6; exception 4), four clauses, each its own function: (a) role-seal's `src/` holds only `lib.rs`; (b) read without comments and literal contents, outside its strict `#[cfg(test)] mod tests` block, its public items are exactly 18 (`CAP_LAST_CAP`, `BPF_MAXINSNS`, `INSTRUCTION_BYTES`, `RoleSpec`, `CapabilitySets`, `capability_words`, `capability_sets`, `filter_length`, `status_threads`, `Prctl`, `Stage`, `SealStep`, `SealFailure`, `SealError`, `Stage1`, `Sealed`, `seal_stage1`, `seal_stage2`), its pub methods exactly `Prctl::arguments`, `SealError::step` and `SealError::failure`, and its pub fields exactly `RoleSpec`'s four and `CapabilitySets`' three; a `pub` the clause cannot place refuses; (c) outside that block, no `include_bytes!` or `include_str!`, no const or static whose type names `u8`, no `RoleSpec` literal and none of the fixture's names; (d) its manifest's one dependency is gate-sys by path, with no dev-, build- or target table | D6; MON-HE005A-PLAN; MON-HE005A0-U1 (addendum 2, 2) |
+| R232 | **The self-tests.** `LINKED_TREE` gains role-seal's root, so every tree built on it counts one more linked and workspace source (each moved count is in the build record, with its reason). New rows: role-seal in every linked-crate scan, the post-seal list and the print rule's two `Stage1` forms (16, beside the root's `deny` row); the logic modules naming `role_seal` (4 forms in each of two modules); role-seal's no-panic (4, beside the strict block passing); the closure (role-seal reaching effect-gate; the HE-004D1 shape without role-seal); and `RoleSealRuleTests` over a copy of the real `lib.rs` and manifest: the real copy passes, (a) 3 rows, (b) D6's 14 failing rows (a public `run_stage1`, `run_stage2`, `SealOps`, `plan`, `LinuxOps` or `Plan`, a public `seal_with` over `SealOps`, a `pub use` of the engine, a pub field and a pub constructor of `Stage1`, a listed item made private, and three `pub`s the clause cannot place), (c) 13 rows and (d) 7 rows. The self-test count and the mutation proof are `<pending heavy step>` | §4 A0; MON-HE005A-PLAN |
+
+### Binaries
+
+Declared up front (DESIGN-HE005 §4 A0): moving reachable seal code into a new crate changes crate-qualified symbols, so
+**planeon-observer is re-pinned**: its new sha256 values are `<pending heavy step>` (x86_64) and `<pending heavy step>`
+(aarch64), against HE-004-I01B5's `d7225132…` and `45412bf4…`, with the source diff showing only the move.
+MON-I01B3-BIN's identical branch is not claimed. planeon-gate, planeon-broker, planeon-containment and planeon-writer
+stay byte-identical, with their SBOMs: `<pending heavy step>`. `Cargo.lock` gains path entries only: the role-seal path
+package and planeon-observer's edge to it.
+
+### Superseded and discharged
+
+- **R87's location:** the observer's seal engine, its helpers and its 15 fake-kernel tests are role-seal's (R226-R228);
+  R87's behaviour, statuses and residuals stand as written.
+- **HE-004A's carried "HE-005..HE-007: a shared, role-neutral seal module extracted before they add their seals"
+  (Q-HE4A-6 (a))** is discharged for the observer; effect-gate's copy stays carried (R2, below).
+
+### Evidence
+
+At build, light (`python3 -I -B` text checks, no cargo): the brief's, its two addenda's and the design's digests
+(`8b98fecc…`, `8f433a86…`, `835ec8af…`, `0335ce2d…`); the pure-move proof, PURE (R229); every source-text check `main()`
+calls, run over the worktree by importing `tools/gate.py` read-only, passing (check_role_seal 18 public items; the linked
+sources 92; the observer post-seal sources 55; the no-panic sources 30; the workspace shape 12 members); the planted
+copies refused by check_role_seal's clauses (b) and (c) and by the print, seal-order and no-panic rules (R230); the word
+check over the packet's added lines (no name token, legacy term, absolute local path or email address: every count 0);
+and the zero-bill scan, light, passed (rc 0).
+
+The heavy evidence, through the build's `heavy.zsh`, one step at a time, on the monitor's word: `cargo test`
+`<pending heavy step>` (role-seal's 15 unit tests among them); both musl release builds `<pending heavy step>`;
+`he-gate: passed` `<pending heavy step>`; the gate's self-test `<pending heavy step>` tests; the mutation proof
+`<pending heavy step>` rows; the span check and `tests/verify` `<pending heavy step>`. The sim, the verify and their
+timings are the author's.
+
+### Code and audit
+
+- `crates/role-seal/Cargo.toml` and `src/lib.rs` (new; R226, R228); `crates/observer/src/seal.rs` (R227),
+  `crates/observer/src/lib.rs` (its module doc's engine sentence) and `crates/observer/Cargo.toml` (the path dependency);
+  `Cargo.toml` (one member) and `Cargo.lock` (path entries only); `tools/gate.py` and `tools/test_gate.py` (R230-R232);
+  this section. No other file: effect-gate's sources and seal, gate-sys, the observer's other sources and tests, the
+  contracts, `ci/` and the vendored crates are untouched.
+
+### Stated residuals
+
+- **R3, the textual reading's limits:** check_role_seal reads text, not Rust; a form it does not read (a public path
+  reached through a macro, a `format!` of a token, an `unwrap_err`) stays code review's, beside the whole-file pins.
+- **The tests' stand-in programs:** role-seal's engine tests run against zero-filled programs of the published lengths;
+  the published bytes are pinned by the observer's own tests, and each built planeon-observer holds its program exactly
+  once (R90).
+
+### Carried
+
+- **R2, the remaining seal copy** (DESIGN-HE005 §8; MON-HE005-R2): effect-gate's `seal.rs` keeps its own copy of the
+  role-neutral helpers beside role-seal until its successor, the next packet that edits effect-gate's seal or HE-008's
+  seal-configuration pass, whichever comes first. That packet moves effect-gate onto role-seal, with planeon-gate under
+  MON-I01B3-BIN's proof or a declared re-pin.
+- **To HE-005A** (on A0's merged base): the broker's seal over role-seal with BROKER's specification, the four programs
+  vendored (CONTRACTS 63 → 67) and the I02 listener; role-seal's second user.
+- **To T04:** R87's items stand unchanged (the installed filter equal to the OBSERVER digest, `Seccomp_filters: 1`,
+  `PR_CAPBSET_READ(41)` EINVAL, TSYNC and dumpability at exec).
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-26)
+
+> MON-HE005-CLOSE: ruled (a). DESIGN-HE005 closes at rev 5 (0335ce2d). Apply it to DESIGN-HE005.md as class B folds of a passed round, with no further round.
+>
+> What I checked:
+> - the round-4 record's sha256 is 7fbdd791, verdict PASS_FOR_BUILD: 2 class B and 3 NOTEs, privacy 0;
+> - rev4 is 6e7a2bb8, kept;
+> - the rev4 → rev5 diff, read in full, is text only: H5G-1 marks the superseded post-exec read, H5G-2 drops startDeadlineSeconds and names the deadline, H5G-3 is all-ones and the widened pinned span, H5G-4 is STARTED before exec plus its vector, and H5G-5 is the not-on-R1 sentence. Privacy 0.
+>
+> The round-4 reviewer disclosures are noted, with no action.
+>
+> Next, HE-005A0 and HE-005A:
+> - **Allowed now (light):**
+>   - the build brief and task-packet YAML;
+>   - writing code from rev 5;
+>   - light checks: gate.py dry text checks with no cargo, the zero-bill scan, and the privacy scan.
+> - **Waits for the heavy slot:** any cargo build or test, a sim, or a mutation proof. The slot comes after slot 268's dry run and verify; I'll tell you when it's free.
+> - **Plan to send me before any agent launch:**
+>   - A0 and A as one packet or two;
+>   - each one's binary statement: A0 declares the observer re-pin up front; in A, only planeon-broker's bytes change and the other four stay identical;
+>   - CONTRACTS 63 → 67 for the seccomp-v3 first vendor;
+>   - the gate rules each adds;
+>   - the agent caps and the PAUSE/HOLD checks.
+> - **Slot 269:** EDGE-V12, the I02/I03 registration plus H5E-10's errata list, without the (a) matrix item. It is assigned after 268 merges.
+
+> MON-HE005A-PLAN: your plan is approved. Go ahead with the light preparation.
+>
+> Rulings (owner delegation):
+> - **Packet count: two.** HE-005A0 (role-seal extraction and the observer re-pin) is one PR. HE-005A (the broker's seal, programs and listener) follows on A0's merged base. Each has its own verify and its own owner merge question, with one binary statement each.
+> - **Q-HE5A-1: (a).** Following Q-HE4A-1 (b)'s precedent, A seals with nothing between the stages.
+>   - §3.1's signed configuration (ring with its pinned registry line, and the black_box) and the HOLD derivation move to HE-005C, where they are first consumed.
+>   - BROKER_LINKED_CRATES stays exactly {broker, role-seal, gate-sys}, and A's Cargo.lock gains path entries only.
+>   - Record this in the design notes as a scope move with no design change. A's listener closes every connection unanswered, so nothing is lost before C.
+>
+> The binary statements, CONTRACTS 63 → 67 (vendored byte-identical, BROKER embedded in A, WORKER vendored now and embedded in C), the gate rules for A0 and A, and the agent kit and rules are all accepted as written.
+>
+> One addition for A0: the PR must show the move is pure by script, not by eye:
+> - every moved item's tokens are equal before and after, apart from the path or crate qualifiers;
+> - no item is added or dropped;
+> - D6's private engine is proven by the item-set rule's own failing test.
+>
+> Now (light):
+> - BUILD_BRIEF_HE005A0.md, the A0 YAML, the worktree mas-harness-operator-he005a0 from f4b05e9c, and the kit;
+> - then the agent launch prompt, sent to me with its digest before launch.
+> The agent may write code and run light checks. Cargo, musl builds, the gate run, the self-test, the mutation proof and the sim all wait for my heavy-slot word. Slot 268's dry run is running now, and its verify follows.
+
+MON-HE005A0-LAUNCH (the pure-move proof's value equality) and MON-HE005A0-U1 (the NOT PURE amendment: the carrier kind,
+exception 4 and the build's departures, accepted) are the build brief's addenda 1 and 2 (`8f433a86…`, `835ec8af…`). The
+complete messages are recorded in the operator's `tools/w03/he005/OWNER_DECISIONS.md`.
