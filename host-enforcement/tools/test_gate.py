@@ -406,6 +406,9 @@ LINKED_TREE = {
     "crates/observer/src/main.rs": "#![forbid(unsafe_code)]\nfn main() {}\n",
     # HE-004D1 (G-D1-1): observer-sys's root joins the scanned crates (CRATE_ROOTS).
     "crates/observer-sys/src/lib.rs": "//! Kernel reads.\n#![deny(unsafe_code)]\n",
+    # HE-005A0: role-seal's root joins the scanned crates (CRATE_ROOTS), so every tree built on this one holds one more
+    # linked and workspace source.
+    "crates/role-seal/src/lib.rs": "//! The role-neutral seal.\n#![forbid(unsafe_code)]\n",
     "crates/broker/src/main.rs": "fn main() {}\n",
     "target/debug/build/out.rs": "unsafe fn generated() {}\n",
 }
@@ -436,9 +439,9 @@ class LinkedSourceTests(unittest.TestCase):
             (self.base / rel).unlink()
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
-        self.assertEqual(gate.check_unsafe(self.base), 13)
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_unsafe(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     def test_forbidden_names_in_linked_sources(self):
         for text in ("use std::process::Command;", "let _ = std::env::args_os();", "use std::net::TcpStream;",
@@ -450,7 +453,7 @@ class LinkedSourceTests(unittest.TestCase):
                          "linked-source tripwire")
         # Tests and other crates are outside the linked-source tripwire (the start-up lint and the unsafe rule still apply).
         self.write("crates/broker/src/main.rs", "use std::path::Path;\nfn main() {}\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_std_fs_items(self):
         source = "crates/effect-gate/src/file_store.rs"
@@ -462,7 +465,7 @@ class LinkedSourceTests(unittest.TestCase):
                      + "use std::os::unix::fs::{FileExt, MetadataExt};\n", "std fs item")
         self.write("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"]
                    + "use std::os::unix::fs::FileExt;\nuse std::os::unix::fs::MetadataExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_fd_items_only_in_openat(self):
         for text in ("use std::os::fd::AsRawFd;", "fn f(_: RawFd) {}", "use std::os::unix::io::FromRawFd;",
@@ -477,7 +480,7 @@ class LinkedSourceTests(unittest.TestCase):
                      "use std::io as z;"):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", "renames a std item")
         self.write("crates/i05-protocol/src/json.rs", "use crate::json as j;\nlet x = y as u64;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     # HE-002S PR review round 1, R1-2 (d): a rename through a use of a name imported from std (in any linked source,
     # whatever the order), and a top-level group that renames std.
@@ -500,7 +503,7 @@ class LinkedSourceTests(unittest.TestCase):
         self.write(json, "use crate::json as j;\nuse crate::frame::{Frame as F, self as fr};\n"
                          "fn f<'a>(x: &'a u8) -> impl Sized + use<'a> { x }\n// use std::io; use io as z;\n"
                          "const S: &str = \"use io as z;\";\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     # HE-002S PR review round 2, R2-1: a glob through std or a name imported from std.
     def test_std_globs_through_other_uses(self):
@@ -512,7 +515,7 @@ class LinkedSourceTests(unittest.TestCase):
                           (store, LINKED_TREE[store] + "mod m { pub use super::io::*; }")):
             self.refused(rel, text + "\n", message)
         self.write(json, "use crate::json::*;\n#[cfg(test)]\nmod tests { use super::*; }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_crate_root_attributes(self):
         for rel in gate.CRATE_ROOTS:
@@ -526,12 +529,12 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused(rel, LINKED_TREE.get(rel, "") + "// no unsafe here\n", "contains unsafe outside",
                          check=gate.check_unsafe)
         self.write("crates/effect-gate/src/lib.rs", "#![forbid(unsafe_code)]\n// unsafe_code is a lint name\n")
-        self.assertEqual(gate.check_unsafe(self.base), 13)
+        self.assertEqual(gate.check_unsafe(self.base), 14)
 
     # HE-002S DESIGN section 6: gate-sys's seal.rs is the second file that may contain the word unsafe.
     def test_unsafe_is_also_allowed_in_gate_sys_seal(self):
         self.write("crates/gate-sys/src/seal.rs", "#![allow(unsafe_code)]\nfn f() -> i32 { unsafe { prctl(38, 1) } }\n")
-        self.assertEqual(gate.check_unsafe(self.base), 14)
+        self.assertEqual(gate.check_unsafe(self.base), 15)
         for rel in ("crates/effect-gate/src/seal.rs", "crates/gate-sys/src/seal/raw.rs", "crates/gate-sys/tests/seal.rs"):
             self.refused(rel, "fn f() { unsafe { g() } }\n", "contains unsafe outside crates/gate-sys/src/openat.rs and "
                          "crates/gate-sys/src/seal.rs", check=gate.check_unsafe)
@@ -544,7 +547,7 @@ class LinkedSourceTests(unittest.TestCase):
                          "macro_rules! call { ($m:ident) => { core::arch::$m!(\"\"); } }\ncall!(global_asm);"):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", "uses inline assembly", check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", "fn main() { let global_asmx = 1; let _ = global_asmx; }\n")
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     # HE-002S PR review round 1, R1-4: a renaming import of asm (now possible in seal.rs too), and the word asm in a
     # linked source, where a macro could otherwise assemble the call from its arguments.
@@ -561,8 +564,8 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused(rel, text + "\n", "names asm .inline assembly. .linked-source tripwire")
         # Outside the linked crates the word alone passes; the forms above do not.
         self.write("crates/broker/src/main.rs", "fn main() { let asm = 1; let _ = asm; }\n")
-        self.assertEqual(gate.check_included_code(self.base), 13)
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     # HE-002S DESIGN section 5 (D7): std APIs that reach a call the EFFECT_GATE filter kills, in effect-gate, gate-sys
     # and (PR review round 1, R1-2) i05-protocol, whose code runs after the seal too; is_terminal joins the list.
@@ -600,7 +603,7 @@ class LinkedSourceTests(unittest.TestCase):
                          "std::os item other than")
         self.write("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"]
                    + "use std::os::fd::AsRawFd;\nuse std::os::fd::OwnedFd;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_nested_globs_and_std_aliases(self):
         for text, message in (("use std::collections::*;", "nested glob of std"),
@@ -609,7 +612,7 @@ class LinkedSourceTests(unittest.TestCase):
                               ("use {std as s};", "renames std"), ("pub use { std  as  s };", "renames std")):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
         self.write("crates/i05-protocol/src/json.rs", "mod tests { use super::*; }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_raw_identifiers_and_inline_assembly(self):
         for rel in ("crates/i05-protocol/src/json.rs", "crates/broker/src/main.rs", "crates/effect-gate/tests/files.rs"):
@@ -620,7 +623,7 @@ class LinkedSourceTests(unittest.TestCase):
                                   ('fn f() { asm ! ("nop") }', "uses inline assembly")):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", message, check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", 'fn main() { let _ = r#"raw string"#; let asm = 1; }\n')
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     def test_symlinks_and_manifest_paths(self):
         (self.base / "crates/elsewhere").mkdir()
@@ -635,7 +638,7 @@ class LinkedSourceTests(unittest.TestCase):
                                "gives a bin target a path")):
             self.refused("crates/gate/Cargo.toml", text, message, check=gate.check_included_code)
         self.write("crates/gate/Cargo.toml", '[package]\nname = "gate"\n[dependencies]\nhost-common = { path = "../host-common" }\n')
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     # HE-002C PR review round 1, R1-1: the forms that passed the first tripwire.
 
@@ -645,7 +648,7 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                          + text + "\n", "top-level group or glob of std")
         self.write("crates/i05-protocol/src/json.rs", "use std::collections::{BTreeMap, BTreeSet};\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_spaced_paths(self):
         for text, message in (("let _ = std :: process :: Command::new(x);", "std::process"),
@@ -658,7 +661,7 @@ class LinkedSourceTests(unittest.TestCase):
                               ("use std::fs :: File as Handle;", "renames a std item")):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
         self.write("crates/effect-gate/src/file_store.rs", "use std :: fs :: File;\nuse std::os::unix::fs ::FileExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
 
     def test_extern_crate(self):
         for text in ("extern crate std as s;\nfn f() { let _ = s::net::TcpStream::connect(x); }", "extern  crate alloc;"):
@@ -677,7 +680,7 @@ class LinkedSourceTests(unittest.TestCase):
                          '#[cfg_attr(all(), path = "extra.inc")]\nmod extra;'):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", "has a path attribute", check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", '#[cfg_attr(test, derive(Debug))]\nstruct S;\nfn main() { let path = "p"; }\n')
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     def test_include_in_a_linked_crate(self):
         for text in ('include!("extra.txt");', 'std::include !("extra.txt");', "use core::include as inc;",
@@ -690,7 +693,7 @@ class LinkedSourceTests(unittest.TestCase):
                      check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", 'const A: &str = include_str!("a.txt");\n'
                                               'const B: &[u8] = include_bytes!("b.bin");\nfn main() {}\n')
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
     def test_non_rs_files_under_src(self):
         for rel in ("crates/gate-sys/src/extra.inc", "crates/gate/src/extra.txt", "crates/effect-gate/src/sub/x.rs.txt"):
@@ -700,7 +703,7 @@ class LinkedSourceTests(unittest.TestCase):
             gate.check_included_code(self.base)
         (self.base / "crates/effect-gate/src/linked").unlink()
         self.write("crates/effect-gate/tests/data.json", "{}\n")
-        self.assertEqual(gate.check_included_code(self.base), 13)
+        self.assertEqual(gate.check_included_code(self.base), 14)
 
 
 SEAL_DECLARATIONS = ("unsafe extern \"C\" {\n    fn prlimit(pid: c_int, resource: c_int, new: *const R, old: *mut R) -> c_int;\n"
@@ -777,7 +780,7 @@ class ForeignItemTests(unittest.TestCase):
             (self.base / rel).unlink()
 
     def test_the_allowlisted_declarations_pass(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
         self.assertEqual(gate.extern_blocks("unsafe extern \"C\" { fn a(); }\nextern {\n fn b(); }"),
                          [" fn a(); ", "\n fn b(); "])
 
@@ -806,7 +809,7 @@ class ForeignItemTests(unittest.TestCase):
         self.write("crates/effect-gate/src/file_store.rs", "type Callback = unsafe extern \"C\" fn(i32) -> i32;\n"
                                                            "pub extern \"C\" fn exported() {}\n")
         self.write("crates/broker/src/main.rs", "unsafe extern \"C\" { fn system(c: *const u8) -> i32; }\nfn main() {}\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
 
     def test_extern_items_are_private_and_not_safe(self):
         seal = "crates/gate-sys/src/seal.rs"
@@ -817,7 +820,7 @@ class ForeignItemTests(unittest.TestCase):
             self.refused(seal, FOREIGN_TREE[seal].replace(old, new), message)
         # A comment inside the block is not read; the word unsafe before extern is not the word safe.
         self.write(seal, FOREIGN_TREE[seal].replace("    fn prctl(", "    // not pub, not safe\n    fn prctl("))
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
 
     def test_no_link_name(self):
         for rel in ("crates/gate-sys/src/seal.rs", "crates/effect-gate/src/file_store.rs"):
@@ -847,7 +850,7 @@ class ForeignItemTests(unittest.TestCase):
         # A brace or an extern block inside a literal is not code.
         self.write(seal, FOREIGN_TREE[seal] + "const A: &str = \"}\"; const B: char = '}';\n"
                    "const C: &str = r#\"unsafe extern \"C\" { fn kill(); }\"#;\nfn f<'a>(x: &'a str) -> &'a str { x }\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
 
     def test_a_macro_generated_block(self):
         seal, lib = "crates/gate-sys/src/seal.rs", "crates/gate-sys/src/lib.rs"
@@ -870,7 +873,7 @@ class ForeignItemTests(unittest.TestCase):
         # A string literal may hold a $ in seal.rs; a fixed-size array parameter is read.
         self.write(seal, FOREIGN_TREE[seal].replace("fn capget(h: *mut H, d: *mut D)", "fn capget(h: *mut H, d: *mut [D; 2])")
                    + "const D: &str = \"$n macro_rules\";\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
 
     def test_the_reader(self):
         self.assertEqual(gate.rust_code("a /* x /* y */ z */ b // c\nd"), "a   b  \nd")
@@ -1243,13 +1246,13 @@ class ChannelModuleTests(Tree):
     TREE = FOREIGN_TREE
 
     def test_unsafe_is_also_allowed_in_gate_sys_channel(self):
-        self.assertEqual(gate.check_unsafe(self.base), 17)
+        self.assertEqual(gate.check_unsafe(self.base), 18)
         for rel in ("crates/gate-sys/src/channel/raw.rs", "crates/effect-gate/src/channel.rs",
                     "crates/effect-gate/src/substrate.rs", "crates/gate-sys/src/peer_wire.rs"):
             self.refused(gate.check_unsafe, rel, "fn f() { unsafe { g() } }\n", "contains unsafe outside .*channel.rs")
 
     def test_the_channel_module_declares_exactly_its_twelve_symbols(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
         self.assertEqual(len(gate.FOREIGN_ITEMS[CHANNEL]), 12)
         message = "channel.rs declares the foreign items .* not exactly"
         for text in (FOREIGN_TREE[CHANNEL].replace("    fn ppoll(", "    fn poll("),
@@ -1271,7 +1274,7 @@ class ChannelModuleTests(Tree):
         with_fd = (FOREIGN_TREE[CHANNEL] + "use std::fs::File;\nuse std::os::fd::AsRawFd;\nuse std::os::fd::FromRawFd;\n"
                    "use std::os::fd::OwnedFd;\n")
         self.write(CHANNEL, with_fd)
-        self.assertEqual(gate.check_linked_sources(self.base), 15)
+        self.assertEqual(gate.check_linked_sources(self.base), 16)
         message = "std::os::fd item outside crates/gate-sys/src/openat.rs and crates/gate-sys/src/channel.rs"
         for rel in ("crates/gate-sys/src/peer_wire.rs", "crates/effect-gate/src/substrate.rs",
                     "crates/effect-gate/src/linux_os.rs"):
@@ -1369,7 +1372,7 @@ class DebugDeriveTests(Tree):
     TREE = DEBUG_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_debug_derives(self.base), 12)
+        self.assertEqual(gate.check_debug_derives(self.base), 13)
 
     def test_hazardous_field_types_refuse(self):
         rel = "crates/effect-gate/src/extra.rs"
@@ -1391,7 +1394,7 @@ class DebugDeriveTests(Tree):
         self.write("crates/effect-gate/src/extra.rs", "#[derive(Debug)]\nenum E { File, Dir }\n"
                    "/* #[derive(Debug)] struct S { f: File } */\nconst A: &str = \"#[derive(Debug)] struct S { f: File }\";\n"
                    "impl fmt::Debug for FileStores { fn fmt() {} }\n")
-        self.assertEqual(gate.check_debug_derives(self.base), 13)
+        self.assertEqual(gate.check_debug_derives(self.base), 14)
 
 
 WORKSPACE_TREE = {
@@ -1472,19 +1475,24 @@ class WorkspaceShapeTests(Tree):
         # not in check_workspace's result). HE-004B1 DESIGN-B section 3 (Q-HE4B-6 (a)): i05-protocol joins it, so the
         # HE-004A shape (gate-sys alone) now refuses too.
         # HE-004D1 (G-D1-1): observer-sys joins it, so the HE-004C shape refuses too.
-        self.write("Cargo.toml", WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]',
-                                                                      '"crates/gate-tls", "crates/observer", "crates/observer-sys"]'))
+        # HE-005A0: role-seal joins it (its one dependency gate-sys), so the HE-004D1 shape refuses too.
+        self.write("Cargo.toml", WORKSPACE_TREE["Cargo.toml"].replace(
+            '"crates/gate-tls"]', '"crates/gate-tls", "crates/observer", "crates/observer-sys", "crates/role-seal"]'))
         self.write("crates/observer/Cargo.toml", '[package]\nname = "planeon-observer"\nedition.workspace = true\n')
         self.write("crates/observer-sys/Cargo.toml", '[package]\nname = "observer-sys"\nedition.workspace = true\n')
+        self.write("crates/role-seal/Cargo.toml", '[package]\nname = "role-seal"\nedition.workspace = true\n')
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
-                                                       "crates/observer-sys"))
-        good = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys"}, "observer-sys": set()}
-        self.assertEqual(gate.check_workspace_shape(self.base, good), 7)
-        self.assertEqual(gate.check_workspace_shape(self.base, {**good, "planeon-observer": {"i05-protocol", "observer-sys"},
-                                                                "i05-protocol": {"gate-sys"}}), 7)
+                                                       "crates/observer-sys", "crates/role-seal"))
+        good = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys", "role-seal"},
+                "observer-sys": set(), "role-seal": {"gate-sys"}}
+        self.assertEqual(gate.check_workspace_shape(self.base, good), 8)
+        self.assertEqual(gate.check_workspace_shape(self.base, {**good, "planeon-observer": {"i05-protocol", "observer-sys",
+                                                                                             "role-seal"},
+                                                                "i05-protocol": {"gate-sys"}}), 8)
         for dependencies in (set(), {"gate-sys"}, {"i05-protocol"}, {"gate-sys", "i05-protocol"},
-                             {"gate-sys", "i05-protocol", "observer-sys", "effect-gate"},
-                             {"effect-gate"}, {"gate-sys", "i05-protocol", "observer-sys", "planeon-broker"}):
+                             {"gate-sys", "i05-protocol", "observer-sys"},
+                             {"gate-sys", "i05-protocol", "observer-sys", "role-seal", "effect-gate"},
+                             {"effect-gate"}, {"gate-sys", "i05-protocol", "observer-sys", "role-seal", "planeon-broker"}):
             with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
                 gate.check_workspace_shape(self.base, {**good, "planeon-observer": dependencies, "planeon-broker": set()})
         without = {name: dependencies for name, dependencies in good.items() if name != "planeon-observer"}
@@ -1503,7 +1511,7 @@ class TcpModuleTests(Tree):
     TREE = FOREIGN_TREE
 
     def test_the_tcp_module_declares_exactly_its_ten_symbols(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
         self.assertEqual(gate.FOREIGN_ITEMS[TCP], {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt",
                                                     "recv", "send", "shutdown", "syscall"})
         message = "tcp.rs declares the foreign items .* not exactly"
@@ -1524,11 +1532,11 @@ class TcpModuleTests(Tree):
             gate.check_foreign_items(self.base)
 
     def test_unsafe_and_fd_items_are_allowed_in_tcp(self):
-        self.assertEqual(gate.check_unsafe(self.base), 17)
+        self.assertEqual(gate.check_unsafe(self.base), 18)
         self.write(TCP, FOREIGN_TREE[TCP] + "use std::os::fd::AsRawFd;\nuse std::os::fd::OwnedFd;\n"
                         "fn f() { unsafe { g() } }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 15)
-        self.assertEqual(gate.check_unsafe(self.base), 17)
+        self.assertEqual(gate.check_linked_sources(self.base), 16)
+        self.assertEqual(gate.check_unsafe(self.base), 18)
         self.refused(gate.check_unsafe, "crates/gate-tls/src/i04.rs", "fn f() { unsafe { g() } }\n",
                      "contains unsafe outside")
 
@@ -1738,7 +1746,7 @@ class SecretDebugTests(Tree):
     TREE = SECRET_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_debug_derives(self.base), 13)
+        self.assertEqual(gate.check_debug_derives(self.base), 14)
 
     def test_secret_names_and_fields_refuse(self):
         rel = "crates/gate-tls/src/extra.rs"
@@ -2033,7 +2041,7 @@ class SocketModuleTests(Tree):
     TREE = SOCKET_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_the_bypass_forms_refuse(self):
         message = "socket-module check"
@@ -2051,7 +2059,7 @@ class SocketModuleTests(Tree):
                      SOCKET_TREE["crates/effect-gate/src/linux_os.rs"] + "pub(crate) use gate_sys::channel::Conn;\n", "re-exports")
         # A comment or a literal is not a path.
         self.write("crates/gate-tls/src/upstream.rs", "// gate_sys::tcp\nconst A: &str = \"gate_sys::channel\";\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 19)
 
     def test_threads_refuse_in_every_linked_crate(self):
         for rel in ("crates/gate-sys/src/channel.rs", "crates/i05-protocol/src/json.rs", gate.GATE_MAIN,
@@ -2061,7 +2069,7 @@ class SocketModuleTests(Tree):
                              "names std::thread or thread::")
         self.write("crates/effect-gate/src/linux_os.rs", SOCKET_TREE["crates/effect-gate/src/linux_os.rs"]
                    + "// one thread::\nconst T: &str = \"thread-self\";\nfn threads() {}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
 
 class SocketItemTests(Tree):
@@ -2079,8 +2087,8 @@ class SocketItemTests(Tree):
                                                   "pub fn new(_s: &Sealed) -> Result<u8, SetupError> { z() }\n"}
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
-        self.assertEqual(gate.check_macros(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_macros(self.base), 18)
 
     def test_pub_items_naming_socket_items_refuse(self):
         message = "pub item naming gate-sys's socket items"
@@ -2124,7 +2132,7 @@ class SocketItemTests(Tree):
         os_rs = "crates/effect-gate/src/linux_os.rs"
         self.write(os_rs, "use gate_sys as gs;\nuse gs::channel::{ListenError, Poller};\nfn private(p: Poller) {}\n"
                    "pub fn new(_s: &Sealed) -> Result<u8, ListenError> { z() }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_aliases_fields_and_fn_pointers_refuse(self):
         # PR review round 2, R2-1 (the reviewer's Q6, Q7, Q9, Q15 and their kin).
@@ -2146,7 +2154,7 @@ class SocketItemTests(Tree):
         self.write(os_rs, base + "pub struct Held { poller: Poller, pub n: u8, pub e: ListenError, f: fn() }\n"
                    "pub type Shared = Rc<RefCell<u8>>;\npub const BACKLOG: u16 = 16;\nstruct Unit;\n"
                    "pub struct Pair(u8, Poller);\nfn private() -> fn() { f }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_fn_traits_fn_pointers_and_pub_enum_variants_refuse(self):
         # HE-003D PR review round 2 confirmation, N1 (HE-003A2 DESIGN section 6, Q-A2-9 (a), D1-3, D2-1).
@@ -2210,10 +2218,10 @@ class SocketItemTests(Tree):
             "fn port_request(&self, request: impl FnOnce(&Poller, Watched<'_>) -> io::Result<()>) -> bool { r() }\n"
             "struct Hidden { f: Box<dyn Fn()>, g: fn() }\n")
         self.write(net_rs, self.TREE[net_rs] + "enum Stream {\n    Listener(TcpListener),\n    Conn(TcpConn),\n}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
         # Comments are not code; the reader refuses an enum it cannot read.
         self.write(os_rs, self.TREE[os_rs] + "// pub enum Leak { P(Poller) }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
         self.refused(gate.check_socket_modules, os_rs, self.TREE[os_rs] + "pub enum Broken { A(u8)\n", "cannot read")
 
     def test_macros_refuse_in_every_linked_crate(self):
@@ -2229,7 +2237,7 @@ class SocketItemTests(Tree):
         # Comments, literals and the tests are not definitions.
         self.write("crates/effect-gate/src/substrate.rs", "// no macro_rules here\nconst S: &str = \"macro_rules! m\";\n")
         self.write("crates/effect-gate/tests/m.rs", "macro_rules! m { () => {} }\n")
-        self.assertEqual(gate.check_macros(self.base), 18)
+        self.assertEqual(gate.check_macros(self.base), 19)
 
 
 class StructAngleTests(Tree):
@@ -2295,7 +2303,7 @@ class StructAngleTests(Tree):
                      "pub struct S<T = [u8; N >> 1]> { a: T, pub p: Poller }"):
             self.refused(gate.check_socket_modules, os_rs, base + text + "\n", "pub field naming gate-sys's socket items")
         self.write(os_rs, base + "pub struct S<T> where T: Copy;\npub struct Q<T = [u8; N >> 1]> { a: T, p: Poller }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_an_unreadable_struct_or_a_field_default_refuses(self):
         os_rs = "crates/effect-gate/src/linux_os.rs"
@@ -2361,7 +2369,7 @@ class ObservationRuleTests(Tree):
     TREE = OBSERVATION_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_observation(self.base), 15)
+        self.assertEqual(gate.check_observation(self.base), 16)
 
     def test_the_callers_are_pinned_by_exact_call_forms(self):
         os_rs, openat = self.TREE[gate.LINUX_OS], self.TREE[gate.OPENAT]
@@ -2429,7 +2437,7 @@ class ObservationRuleTests(Tree):
                      "use crate::observation::WorkerObserver as W;\nimpl W for X {}\n", "renames or aliases")
         self.write("crates/effect-gate/src/substrate.rs",
                    "fn f(o: impl WorkerObserver, r: &dyn KernelReads<Pidfd = u8>) -> impl FnOnce() -> u8 { x() }\n")
-        self.assertEqual(gate.check_observation(self.base), 16)
+        self.assertEqual(gate.check_observation(self.base), 17)
 
     def test_the_fake_kernel_is_confined(self):
         message = "names the fake kernel outside a strict"
@@ -2469,7 +2477,7 @@ class ObservationRuleTests(Tree):
     def test_the_cgroup_root_open_is_the_linked_tripwire_s_one_fs_exception(self):
         # HE-003A3 (R96): the exact `KernelRoot::open_kernel_root("/sys/fs/cgroup")` once in linux_os.rs; another
         # `fs` word there, or the same expression in another file, still refuses.
-        self.assertEqual(gate.check_linked_sources(self.base), 15)
+        self.assertEqual(gate.check_linked_sources(self.base), 16)
         os_rs = self.TREE[gate.LINUX_OS]
         message = "names a std fs item other than its allowed ones"
         for rel, text in ((gate.LINUX_OS, os_rs + 'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n'),
@@ -2624,7 +2632,7 @@ class ObservationPathTests(Tree):
             self.refused(gate.check_observation, gate.OBSERVATION_RS, text, message)
         # A strict in-source test module may hold its own helpers, even one named like an observer.
         self.write(gate.OBSERVATION_RS, observation + "#[cfg(test)]\nmod tests {\n    struct Unobserved;\n    fn t() {}\n}\n")
-        self.assertEqual(gate.check_observation(self.base), 15)
+        self.assertEqual(gate.check_observation(self.base), 16)
 
 
 class DebugKernelRootTests(Tree):
@@ -2645,8 +2653,8 @@ class PreMainAndPrintTests(Tree):
     TREE = LINKED_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_pre_main(self.base), 11)
-        self.assertEqual(gate.check_prints(self.base), 11)
+        self.assertEqual(gate.check_pre_main(self.base), 12)
+        self.assertEqual(gate.check_prints(self.base), 12)
 
     def test_code_before_main_refuses(self):
         for rel in (gate.GATE_MAIN, "crates/effect-gate/src/file_store.rs", "crates/gate-tls/src/lib.rs"):
@@ -2656,7 +2664,7 @@ class PreMainAndPrintTests(Tree):
                                ("#[unsafe(export_name = \"main\")]\nfn f() {}", "export_name")):
                 self.refused(gate.check_pre_main, rel, LINKED_TREE[rel] + text + "\n", name + " .code before main")
         self.write(gate.GATE_MAIN, LINKED_TREE[gate.GATE_MAIN] + "// no link_section, #[used] or no_mangle here\n")
-        self.assertEqual(gate.check_pre_main(self.base), 11)
+        self.assertEqual(gate.check_pre_main(self.base), 12)
 
     def test_printing_refuses(self):
         for rel in (gate.GATE_MAIN, "crates/gate-sys/src/openat.rs", "crates/i05-protocol/src/json.rs"):
@@ -2668,7 +2676,7 @@ class PreMainAndPrintTests(Tree):
                 self.refused(gate.check_prints, rel, LINKED_TREE[rel] + text + "\n", re.escape(name) + " .print rule")
         self.write(gate.GATE_MAIN, LINKED_TREE[gate.GATE_MAIN] + "// a panic message may reach stderr\n"
                    "const S: &str = \"stdout\";\nfn f() { let _ = format!(\"x\"); let reprint = 1; }\n")
-        self.assertEqual(gate.check_prints(self.base), 11)
+        self.assertEqual(gate.check_prints(self.base), 12)
 
 
 class LinkedBinaryTests(Tree):
@@ -2681,9 +2689,9 @@ class LinkedBinaryTests(Tree):
         main = gate.GATE_MAIN
         good = LINKED_TREE[main] + "use std::process::ExitCode;\nfn run() -> ExitCode { ExitCode::from(2) }\n"
         self.write(main, good)
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
         self.write(main, LINKED_TREE[main] + "use std :: process ::\n    ExitCode ;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
         for text in (good + "use std::process::ExitCode;\n", good + "fn f() { std::process::exit(1); }\n",
                      good + "use std::process::Command;\n", good + "fn f() { let _ = std::env::args_os(); }\n",
                      LINKED_TREE[main] + "use std::process;\n", LINKED_TREE[main] + "use std::process::{ExitCode};\n"):
@@ -2842,7 +2850,7 @@ class OpenatReadLinkTests(Tree):
 
     def test_the_openat_module_declares_exactly_its_two_symbols(self):
         self.assertEqual(gate.FOREIGN_ITEMS[gate.OPENAT], {"openat", "readlinkat"})
-        self.assertEqual(gate.check_foreign_items(self.base), 15)
+        self.assertEqual(gate.check_foreign_items(self.base), 16)
         message = "openat.rs declares the foreign items .* not exactly"
         openat = self.TREE[gate.OPENAT]
         readlinkat = "    fn readlinkat(dirfd: c_int, path: *const c_char, buffer: *mut c_char, size: usize) -> isize;\n"
@@ -3123,17 +3131,18 @@ class ObserverLinkedCrateTests(Tree):
     TREE = OBSERVER_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.SCANNED_CRATES, gate.LINKED_CRATES + ("crates/observer", "crates/observer-sys"))
+        self.assertEqual(gate.SCANNED_CRATES, gate.LINKED_CRATES + ("crates/observer", "crates/observer-sys",
+                                                                    "crates/role-seal"))
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
-                                                       "crates/observer-sys"))
+                                                       "crates/observer-sys", "crates/role-seal"))
         # 13 sources of the gate's linked crates, 6 of the observer's (HE-004C: its socket module; HE-004-I01a: its I01
-        # listener file) and 2 of observer-sys's (HE-004D1).
+        # listener file), 2 of observer-sys's (HE-004D1) and role-seal's 1 (HE-005A0).
         for check in (gate.check_linked_sources, gate.check_foreign_items, gate.check_debug_derives, gate.check_socket_modules,
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
-            self.assertEqual(check(self.base), 21, check.__name__)
+            self.assertEqual(check(self.base), 22, check.__name__)
         # HE-004B1: the observer's (5 with HE-004C's socket module, 6 with HE-004-I01a's listener file) and i05-protocol's
-        # 2; HE-004D1: observer-sys's 2.
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1.
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
         self.assertEqual(gate.check_post_seal_sources(self.base), 13, "the gate's post-seal crates do not include the observer")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_LIB], "#![forbid(unsafe_code)]")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_MAIN], "#![forbid(unsafe_code)]")
@@ -3161,9 +3170,39 @@ class ObserverLinkedCrateTests(Tree):
             self.refused(gate.check_linked_sources, rel, self.TREE[rel].replace("#![forbid(unsafe_code)]", "#![deny(unsafe_code)]"),
                          "lacks #!\\[forbid")
 
+    def test_role_seal_joins_every_linked_crate_scan(self):
+        # HE-005A0 (DESIGN-HE005 section 4, A0): the coverage the observer's seal code had moves with it to role-seal:
+        # every linked-crate scan, the observer post-seal list and its crate root; and the print rule refuses printing a
+        # Stage1 there (MON-HE005A0-U1).
+        root = self.TREE[gate.ROLE_SEAL_LIB]
+        for check, text, message in (
+                (gate.check_linked_sources, "fn f() { let _ = std::env::args_os(); }", "linked-source tripwire"),
+                (gate.check_linked_sources, "use std::net::TcpStream;", "linked-source tripwire"),
+                (gate.check_foreign_items, "unsafe extern \"C\" { fn prctl(o: i32, ...) -> i32; }", "declares the foreign items"),
+                (gate.check_debug_derives, "#[derive(Debug)]\npub struct S { f: File }", "Debug check"),
+                (gate.check_socket_modules, "use gate_sys::channel::Poller;", "socket-module check"),
+                (gate.check_socket_modules, "fn f() { std::thread::spawn(g); }", "names std::thread"),
+                (gate.check_read_link, "fn f(d: &Dir, b: &mut [u8]) { let _ = d.read_link(\"exe\", b); }",
+                 "role-seal/src/lib.rs names read_link"),
+                (gate.check_macros, "macro_rules! m { () => {} }", "macro rule"),
+                (gate.check_pre_main, "#[unsafe(no_mangle)]\nfn f() {}", "code before main"),
+                (gate.check_prints, "fn f() { println!(\"x\"); }", "print rule"),
+                (gate.check_prints, "fn show(stage1: &Stage1) { eprintln!(\"{stage1:?}\"); }", "print rule"),
+                (gate.check_prints, "fn show(stage1: &Stage1) { let _ = writeln!(std::io::stderr(), \"{stage1:?}\"); }",
+                 "print rule"),
+                (gate.check_unsafe, "fn f() { unsafe { g() } }", "contains unsafe outside"),
+                (gate.check_observer_post_seal, "impl Drop for Sealed { fn drop(&mut self) {} }", "observer post-seal check"),
+                (gate.check_observer_post_seal, "fn f(d: &Dir) { let _ = d.sync(); }", "observer post-seal check"),
+                (gate.check_observer_post_seal, "fn f() { membarrier(0, 0); }", "observer post-seal check")):
+            self.refused(check, gate.ROLE_SEAL_LIB, root + text + "\n", message)
+        self.refused(gate.check_linked_sources, gate.ROLE_SEAL_LIB, root.replace("#![forbid(unsafe_code)]", "#![deny(unsafe_code)]"),
+                     "lacks #!\\[forbid")
+        self.assertEqual(gate.CRATE_ROOTS[gate.ROLE_SEAL_LIB], "#![forbid(unsafe_code)]")
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
+
     def test_the_observer_exit_import_once_in_main(self):
         main = gate.OBSERVER_MAIN
-        self.assertEqual(gate.check_linked_sources(self.base), 21)
+        self.assertEqual(gate.check_linked_sources(self.base), 22)
         for text in (GOOD_OBSERVER_MAIN + "use std::process::ExitCode;\n",
                      GOOD_OBSERVER_MAIN + "fn f() { std::process::exit(1); }\n",
                      GOOD_OBSERVER_MAIN + "fn f() { let _ = std::env::args_os(); }\n"):
@@ -3199,11 +3238,11 @@ class ObserverLinkedCrateTests(Tree):
         self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                    + "fn f(d: &Dir) { let _ = d.file(n, FileMode::Existing); let _ = d.sync(); }\n")
         self.write(OBSERVER_SEAL, seal + "fn f(blocked: bool, clocks: u8) -> bool { let synced = blocked; synced }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
         # R1-1: a module path segment, comments and literals pass; drop() is not the Drop trait.
         self.write(OBSERVER_SEAL, seal + "use std::sync::atomic::AtomicU8;\n// Dir::sync, File::lock and impl Drop are refused\n"
                    "fn g(x: u8) -> &'static str { drop(x); \"file lock sync Drop\" }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
         for rel in list(OBSERVER_TREE):
             if rel.startswith("crates/observer/"):
                 (self.base / rel).unlink()
@@ -3213,13 +3252,14 @@ class ObserverLinkedCrateTests(Tree):
     def test_i05_protocol_joins_the_observer_post_seal_list(self):
         # HE-004B1 DESIGN-B section 6 (owner decision Q-HE4B-6 (a)): i05-protocol's sources join the rule, with json.rs's
         # one memory-only `impl Drop for Value` excepted once; gate-sys stays outside.
-        self.assertEqual(gate.OBSERVER_POST_SEAL_CRATES, ("crates/observer", "crates/i05-protocol", "crates/observer-sys"))
+        self.assertEqual(gate.OBSERVER_POST_SEAL_CRATES, ("crates/observer", "crates/i05-protocol", "crates/observer-sys",
+                                                          "crates/role-seal"))
         json_rs = self.TREE[gate.I05_JSON]
         drop = "impl Drop for Value {\n    fn drop(&mut self) { let mut pending = Vec::new(); pending.clear(); }\n}\n"
         self.write(gate.I05_JSON, json_rs + drop)
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
         self.write(gate.I05_JSON, json_rs + "impl  Drop\n    for Value { fn drop(&mut self) {} }\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
         message = "names .* .observer post-seal check"
         for rel, text in ((gate.I05_JSON, json_rs + drop + drop),
                           (gate.I05_JSON, json_rs + "impl Drop for Doc { fn drop(&mut self) {} }\n"),
@@ -3234,7 +3274,7 @@ class ObserverLinkedCrateTests(Tree):
             self.refused(gate.check_observer_post_seal, rel, text, message)
         # Comments and literals pass; gate-sys's own definitions stay outside (OBSERVER_TREE's openat.rs).
         self.write(gate.I05_JSON, json_rs + "// impl Drop for Doc, file, lock and sync in a comment\nconst T: &str = \"Drop file\";\n")
-        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 11)
 
 
 class ObserverBinaryTests(unittest.TestCase):
@@ -3953,21 +3993,27 @@ class ObserverClosureTests(Tree):
     dependency of planeon-observer still refuses (the gate-tls dev-dependency is not in check_workspace's result)."""
 
     TREE = {**WORKSPACE_TREE,
-            "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]',
-                                                               '"crates/gate-tls", "crates/observer", "crates/observer-sys"]'),
+            "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace(
+                '"crates/gate-tls"]', '"crates/gate-tls", "crates/observer", "crates/observer-sys", "crates/role-seal"]'),
             "crates/observer/Cargo.toml": '[package]\nname = "planeon-observer"\nedition.workspace = true\n',
             # HE-004D1 (G-D1-1): observer-sys joins the closure.
-            "crates/observer-sys/Cargo.toml": '[package]\nname = "observer-sys"\nedition.workspace = true\n'}
+            "crates/observer-sys/Cargo.toml": '[package]\nname = "observer-sys"\nedition.workspace = true\n',
+            # HE-005A0: role-seal joins the closure.
+            "crates/role-seal/Cargo.toml": '[package]\nname = "role-seal"\nedition.workspace = true\n'}
 
     def test_a_fifth_workspace_path_dependency_refuses(self):
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
-                                                       "crates/observer-sys"))
-        good = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys"}, "observer-sys": set()}
-        self.assertEqual(gate.check_workspace_shape(self.base, good), 7)
+                                                       "crates/observer-sys", "crates/role-seal"))
+        good = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys", "role-seal"},
+                "observer-sys": set(), "role-seal": {"gate-sys"}}
+        self.assertEqual(gate.check_workspace_shape(self.base, good), 8)
         for extra in ("gate-tls", "effect-gate", "planeon-gate"):
             with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
                 gate.check_workspace_shape(self.base, {**good, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys",
-                                                                                    extra}})
+                                                                                    "role-seal", extra}})
+        # role-seal reaching another workspace crate widens the closure too.
+        with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
+            gate.check_workspace_shape(self.base, {**good, "role-seal": {"gate-sys", "effect-gate"}})
 
 
 OBSERVER_TLS_TREE = {"crates/gate-tls/src/lib.rs": "#![forbid(unsafe_code)]\npub mod tls;\n",
@@ -4068,7 +4114,7 @@ class ObserverSocketModuleTests(Tree):
         # HE-004-I01a (DESIGN-I01A section 4): the I01 listener file is the observer's second socket file.
         self.assertIn(gate.OBSERVER_LINUX_LISTEN, gate.SOCKET_FILES)
         self.assertEqual(gate.OBSERVER_LINUX_LISTEN, "crates/observer/src/linux_listen.rs")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
 
     def test_every_other_observer_source_refuses_the_socket_modules(self):
         for rel in ("crates/observer/src/client.rs", "crates/observer/src/observe.rs", gate.OBSERVER_MAIN,
@@ -4104,7 +4150,7 @@ class ObserverSocketModuleTests(Tree):
                               ("type Held = channel::Conn;", "private type alias")):
             self.refused(gate.check_socket_modules, rel, OBSERVER_LINUX_LISTEN_TEXT + text + "\n", message)
         self.write(rel, OBSERVER_LINUX_LISTEN_TEXT + "pub(crate) fn peer(s: &I01Socket) -> Option<channel::Watched<'_>> { None }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 17)
+        self.assertEqual(gate.check_socket_modules(self.base), 18)
         (self.base / rel).unlink()
         with self.assertRaisesRegex(gate.GateError, "crates/observer/src/linux_listen.rs is missing .socket-module check"):
             gate.check_socket_modules(self.base)
@@ -4320,7 +4366,7 @@ class ContractsPinTests(Tree):
 
 
 # HE-004C's 13 modules, main.rs and status.rs, D1's three and observer-sys's three; HE-004-I01a's as their units add them.
-NO_PANIC_COUNT = 21 + len(gate.I01_NO_PANIC_BUILT)
+NO_PANIC_COUNT = 22 + len(gate.I01_NO_PANIC_BUILT)   # HE-005A0: role-seal's lib.rs, the 22nd
 
 
 class ObserverNoPanicTests(Tree):
@@ -4355,6 +4401,18 @@ class ObserverNoPanicTests(Tree):
             self.write(rel, good + "#[cfg(test)]\nmod tests {\n    fn t() { assert_eq!(1, 1); Some(1).unwrap(); }\n}\n")
             self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
             self.write(rel, good)
+
+    def test_role_seal_joins_the_no_panic_list(self):
+        # HE-005A0: role-seal's one source, outside its strict test block (a panic message could format a Stage1).
+        rel = gate.ROLE_SEAL_LIB
+        self.assertEqual(gate.OBSERVER_NO_PANIC[-1], rel)
+        good = self.TREE[rel]
+        for text in ("fn g(x: Option<u8>) -> u8 { x.unwrap() }", "fn g(r: Result<u8, Stage1>) -> u8 { r.expect(\"x\") }",
+                     "fn g() { panic!(\"x\"); }", "fn g() { assert_eq!(1, 1); }"):
+            self.refused(gate.check_observer_no_panic, rel, good + text + "\n", "observer no-panic tripwire")
+        self.write(rel, good + "#[cfg(test)]\nmod tests {\n    fn t() { assert_eq!(1, 1); Some(1).unwrap(); }\n}\n")
+        self.assertEqual(gate.check_observer_no_panic(self.base), NO_PANIC_COUNT)
+        self.write(rel, good)
 
 
 class ObserverSymbolTests(unittest.TestCase):
@@ -4666,16 +4724,19 @@ class ObserverSysWorkspaceTests(Tree):
     """HE-004D1 G-D1-1: observer-sys joins planeon-observer's closure and the scanned crates, its root denies unsafe_code
     and its manifest names no dependency; planeon-gate's closure is unchanged."""
 
+    # HE-005A0: role-seal joins the closure too (and SCANNED_CRATES after observer-sys).
     TREE = {**WORKSPACE_TREE,
-            "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]',
-                                                               '"crates/gate-tls", "crates/observer", "crates/observer-sys"]'),
+            "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace(
+                '"crates/gate-tls"]', '"crates/gate-tls", "crates/observer", "crates/observer-sys", "crates/role-seal"]'),
             "crates/observer/Cargo.toml": '[package]\nname = "planeon-observer"\nedition.workspace = true\n',
-            "crates/observer-sys/Cargo.toml": '[package]\nname = "observer-sys"\nedition.workspace = true\n'}
-    GOOD = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys"}, "observer-sys": set()}
+            "crates/observer-sys/Cargo.toml": '[package]\nname = "observer-sys"\nedition.workspace = true\n',
+            "crates/role-seal/Cargo.toml": '[package]\nname = "role-seal"\nedition.workspace = true\n'}
+    GOOD = {**WORKSPACE, "planeon-observer": {"gate-sys", "i05-protocol", "observer-sys", "role-seal"}, "observer-sys": set(),
+            "role-seal": {"gate-sys"}}
 
     def test_the_closure_and_the_lists(self):
-        self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 7)
-        self.assertEqual(gate.SCANNED_CRATES[-1], "crates/observer-sys")
+        self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 8)
+        self.assertEqual(gate.SCANNED_CRATES[-2:], ("crates/observer-sys", "crates/role-seal"))
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_SYS_LIB], "#![deny(unsafe_code)]")
         self.assertIn("crates/observer-sys", gate.OBSERVER_POST_SEAL_CRATES)
 
@@ -4692,13 +4753,13 @@ class ObserverSysWorkspaceTests(Tree):
         with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
             gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-observer": self.GOOD["planeon-observer"] | {"effect-gate"}})
         with self.assertRaisesRegex(gate.GateError, "planeon-observer links .*, not .* .workspace shape"):
-            gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-observer": {"gate-sys", "i05-protocol"}})
+            gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-observer": {"gate-sys", "i05-protocol", "role-seal"}})
 
     def test_the_root_must_deny_unsafe_code(self):
         tree = {**LINKED_TREE}
         for rel, text in tree.items():
             self.write(rel, text)
-        self.assertEqual(gate.check_linked_sources(self.base), 11)
+        self.assertEqual(gate.check_linked_sources(self.base), 12)
         for text in ("//! Kernel reads.\n#![allow(unsafe_code)]\n", "//! Kernel reads.\n"):
             self.refused(gate.check_linked_sources, gate.OBSERVER_SYS_LIB, text, "lacks #!\\[deny")
 
@@ -4713,9 +4774,9 @@ class ObserverSysUnsafeTests(Tree):
         self.assertEqual(gate.FOREIGN_ITEMS[KERNEL], {"syscall"})
         self.assertIn(KERNEL, gate.UNSAFE_FILES)
         self.assertIn(KERNEL, gate.FD_FILES)
-        self.assertEqual(gate.check_foreign_items(self.base), 18)
-        self.assertEqual(gate.check_unsafe(self.base), 20)
-        self.assertEqual(gate.check_linked_sources(self.base), 18)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
+        self.assertEqual(gate.check_unsafe(self.base), 21)
+        self.assertEqual(gate.check_linked_sources(self.base), 19)
 
     def test_unsafe_outside_kernel_rs_refuses(self):
         for rel in (gate.OBSERVER_SYS_LIB, OBSERVER_SYS_DIRENT, "crates/observer-sys/tests/dirent.rs", LINUX_CAPTURE):
@@ -4737,7 +4798,7 @@ class ObserverSysUnsafeTests(Tree):
         for rel in (CAPTURE_RS, LINUX_CAPTURE):
             self.refused(gate.check_linked_sources, rel, self.TREE[rel] + "use std::os::unix::fs::MetadataExt;\n", message)
         self.write(OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT + "use std::os::unix::fs::MetadataExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 18)
+        self.assertEqual(gate.check_linked_sources(self.base), 19)
         self.write(OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT)
         self.refused(gate.check_linked_sources, OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT + "use std::os::fd::OwnedFd;\n",
                      "std::os::fd item outside")
@@ -4872,13 +4933,13 @@ class ObserverRootConstantTests(Tree):
                           'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";',
                           'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const CGROUP_ROOT: &str = "/sys/fs/cgroup";',
                           'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";'])
-        self.assertEqual(gate.check_sources(self.base), 22)
-        self.assertEqual(gate.check_linked_sources(self.base), 20)
+        self.assertEqual(gate.check_sources(self.base), 23)
+        self.assertEqual(gate.check_linked_sources(self.base), 21)
         # A rustfmt-wrapped expression is removed once (both scans).
         self.write(self.ENROLLED, self.ENROLLED_TEXT.replace('const PIN_ROOT: &str = "/sys/fs/bpf/planeon";',
                                                              'const PIN_ROOT: &str =\n    "/sys/fs/bpf/planeon";'))
-        self.assertEqual(gate.check_sources(self.base), 22)
-        self.assertEqual(gate.check_linked_sources(self.base), 20)
+        self.assertEqual(gate.check_sources(self.base), 23)
+        self.assertEqual(gate.check_linked_sources(self.base), 21)
 
     def forms(self, rel, text, old):
         """Each refused form of `old` (one of `rel`'s expressions) in `text`."""
@@ -4921,7 +4982,7 @@ class ObserverRootConstantTests(Tree):
                          message)
         # R96's one cgroup2-root open in linux_os.rs still passes beside them.
         self.write(gate.LINUX_OS, 'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n')
-        self.assertEqual(gate.check_linked_sources(self.base), 21)
+        self.assertEqual(gate.check_linked_sources(self.base), 22)
 
 
 class ObserverCaptureCallerTests(Tree):
@@ -5113,6 +5174,20 @@ class ObserverD1LogicTests(Tree):
         self.refused(gate.check_observer_logic, "crates/observer/src/inputs.rs", self.TREE["crates/observer/src/inputs.rs"]
                      + "use crate::kernel_text;\n", "imports crate::kernel_text")
 
+    def test_no_logic_module_reaches_role_seal(self):
+        # HE-005A0 (MON-HE005A0-U1): role_seal is a crate root, so a logic module naming it names a rooted path outside
+        # every whitelist, in a use declaration or in the code; the same name as a local path segment still passes.
+        self.assertIn("role_seal", gate.CRATE_PATH_ROOTS)
+        for rel in ("crates/observer/src/inputs.rs", "crates/observer/src/capture_check.rs"):
+            good = self.TREE[rel]
+            for text, message in (("use role_seal::filter_length;\n", "imports role_seal::filter_length"),
+                                  ("use role_seal::{self};\n", "imports role_seal::self"),
+                                  ("fn f(p: &[u8]) -> Option<u16> { role_seal::filter_length(p) }\n",
+                                   "names role_seal::filter_length"),
+                                  ("fn f() -> u32 { ::role_seal::CAP_LAST_CAP }\n", "names ::role_seal::CAP_LAST_CAP")):
+                self.refused(gate.check_observer_logic, rel, good + text, message)
+        self.assertEqual(gate.check_observer_logic(self.base), LOGIC_COUNT)
+
 
 class ObserverD1NoPanicTests(Tree):
     """HE-004D1 G-D1-11: the no-panic tripwire over enrolled.rs, capture.rs, linux_capture.rs and observer-sys's three
@@ -5151,7 +5226,7 @@ class ObserverSysPostSealTests(Tree):
     TREE = D1_TREE
 
     def test_post_seal_words_refuse_in_observer_sys(self):
-        self.assertEqual(gate.check_observer_post_seal(self.base), 9)
+        self.assertEqual(gate.check_observer_post_seal(self.base), 10)
         for rel in (KERNEL, OBSERVER_SYS_DIRENT, gate.OBSERVER_SYS_LIB):
             for text in ("impl Drop for Opened { fn drop(&mut self) {} }", "fn f() { let _ = std::fs::read_dir(p); }",
                          "fn f(h: &File) { let _ = h.sync_all(); }", "fn f(d: &Dir) { let _ = d.file(n, m); }",
@@ -9380,6 +9455,107 @@ class I01b5RuleTests(Tree):
         self.assertFalse(gate.pinned_pattern('f("a")', literals=True).fullmatch('f("b")'))
         self.assertTrue(gate.named_at("a b a", "a", (("a", 2),)))
         self.assertFalse(gate.named_at("a b a c", "c", ()))
+
+
+ROLE_SEAL_MANIFEST = "crates/role-seal/Cargo.toml"
+
+
+class RoleSealRuleTests(Tree):
+    """HE-005A0 (DESIGN-HE005 section 4, A0, D6; MON-HE005A-PLAN; MON-HE005A0-U1, exception 4): check_role_seal over a
+    fixture copy of role-seal's real lib.rs and manifest. (a) Only lib.rs; (b) the public item set, so the SealOps engine
+    stays crate-private (the item-set rule's own failing rows plant a public engine); (c) no program bytes, embedded file
+    or fixture name outside the strict test block; (d) gate-sys by path, the one dependency. Each row names the clause
+    whose message refuses it."""
+
+    TREE = {gate.ROLE_SEAL_LIB: (gate.HE / gate.ROLE_SEAL_LIB).read_text(encoding="utf-8"),
+            ROLE_SEAL_MANIFEST: (gate.HE / ROLE_SEAL_MANIFEST).read_text(encoding="utf-8")}
+    TESTS = "#[cfg(test)]\nmod tests {"
+
+    def planted(self, text):
+        """The real lib.rs with `text` planted at its top level, right before its strict test block."""
+        real = self.TREE[gate.ROLE_SEAL_LIB]
+        at = real.index(self.TESTS)
+        return real[:at] + text + "\n\n" + real[at:]
+
+    def test_the_real_copy_passes(self):
+        self.assertEqual(gate.check_role_seal(self.base), 18)
+        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1])
+        self.assertEqual(len(gate.ROLE_SEAL_PUBLIC), 18)
+        self.assertEqual(self.TREE[gate.ROLE_SEAL_LIB].count(self.TESTS), 1)
+        # The seven fixture items sit inside the strict test block, where clause (c) does not read.
+        tests = self.TREE[gate.ROLE_SEAL_LIB][self.TREE[gate.ROLE_SEAL_LIB].index(self.TESTS):]
+        for name in gate.ROLE_SEAL_FIXTURE_NAMES:
+            self.assertRegex(tests, r"\b%s\b" % name)
+
+    def test_a_only_lib_rs(self):
+        message = "role-seal/src holds .* not exactly lib.rs .role-seal rule \\(a\\)"
+        for rel in ("crates/role-seal/src/engine.rs", "crates/role-seal/src/seal/mod.rs"):
+            self.refused(gate.check_role_seal, rel, "pub fn run() {}\n", message)
+        (self.base / gate.ROLE_SEAL_LIB).unlink()
+        with self.assertRaisesRegex(gate.GateError, message):
+            gate.check_role_seal(self.base)
+
+    def test_b_d6_refuses_a_public_engine(self):
+        # MON-HE005A-PLAN: D6's private engine is proven by the item-set rule's own failing rows.
+        real = self.TREE[gate.ROLE_SEAL_LIB]
+        engine = "pub fn seal_with<O: SealOps>(ops: &mut O, spec: RoleSpec) -> Result<Stage1, SealError> {\n" \
+                 "    run_stage1(ops, spec).map(|plan| Stage1 { plan })\n}"
+        rows = (
+            (real.replace("pub(crate) fn run_stage1<O: SealOps>", "pub fn run_stage1<O: SealOps>", 1),
+             "not listed [('fn', 'run_stage1')]"),
+            (real.replace("pub(crate) fn run_stage2<O: SealOps>", "pub fn run_stage2<O: SealOps>", 1),
+             "not listed [('fn', 'run_stage2')]"),
+            (real.replace("pub(crate) trait SealOps {", "pub trait SealOps {", 1), "not listed [('trait', 'SealOps')]"),
+            (real.replace("pub(crate) fn plan(spec: RoleSpec)", "pub fn plan(spec: RoleSpec)", 1),
+             "not listed [('fn', 'plan')]"),
+            (real.replace("\nstruct LinuxOps;", "\npub struct LinuxOps;", 1), "not listed [('struct', 'LinuxOps')]"),
+            (real.replace("pub(crate) struct Plan {", "pub struct Plan {", 1), "not listed [('struct', 'Plan')]"),
+            (self.planted(engine), "not listed [('fn', 'seal_with')]"),
+            (self.planted("pub use self::run_stage1 as stage;"), "not listed [('use', 'self')]"),
+            (real.replace("pub struct Stage1 {\n    plan: Plan,", "pub struct Stage1 {\n    pub plan: Plan,", 1),
+             "pub fields are not exactly the listed ones: not listed [('Stage1', 'plan')]"),
+            (self.planted("impl Stage1 {\n    pub fn new(plan: Plan) -> Stage1 {\n        Stage1 { plan }\n    }\n}"),
+             "pub methods are not exactly the listed ones: not listed [('Stage1', 'new')]"),
+            (real.replace("pub fn filter_length(", "fn filter_length(", 1), "missing [('fn', 'filter_length')]"),
+            (self.planted("fn hidden() {\n    pub fn inner() {}\n}"), "a pub the item-set rule cannot place"),
+            (self.planted("mod engine {\n    pub use super::run_stage1;\n}"), "a pub the item-set rule cannot place"),
+            (self.planted("#[cfg(test)] mod other {\n    pub fn run() {}\n}"), "a pub the item-set rule cannot place"))
+        for text, fragment in rows:
+            self.assertNotEqual(text, real, fragment)
+            self.refused(gate.check_role_seal, gate.ROLE_SEAL_LIB, text,
+                         re.escape(fragment) + ".*" + re.escape("(role-seal rule (b), D6)"))
+
+    def test_c_no_program_bytes_or_fixture_outside_the_tests(self):
+        rows = (("static P: &[u8; 8] = include_bytes!(\"../p.bpf\");", "embeds a file with include_bytes! or include_str!"),
+                ("const P: &str = include_str!(\"../p.txt\");", "embeds a file with include_bytes! or include_str!"),
+                ("static P: &[u8; 8] = &[0; 8];", "holds program bytes: P's type names u8"),
+                ("const P: &[u8] = &[0x20, 0, 0, 0];", "holds program bytes: P's type names u8"),
+                ("pub(crate) static PROGRAM: [u8; 4] = [6, 0, 0, 0];", "holds program bytes: PROGRAM's type names u8"),
+                ("fn spec() -> u16 {\n    RoleSpec { bounding: 0, kept: 0, program: &[], instructions: 0 }.instructions\n}",
+                 "builds a RoleSpec outside its tests"),
+                ("const CAP_NET_ADMIN: u32 = 12;", "names the tests' fixture CAP_NET_ADMIN"),
+                ("const CAP_BPF: u32 = 39;", "names the tests' fixture CAP_BPF"),
+                ("const KEPT: u64 = 1 << 12 | 1 << 39;", "names the tests' fixture KEPT"),
+                ("fn f() -> usize { PROGRAM_X86_64.len() }", "names the tests' fixture PROGRAM_X86_64"),
+                ("const PROGRAM_AARCH64: usize = 1936;", "names the tests' fixture PROGRAM_AARCH64"),
+                ("enum Arch {\n    X86_64,\n}", "names the tests' fixture Arch"),
+                # A test block in another form is not the strict one, so its fixture is read.
+                ("#[cfg(test)] mod fixture {\n    const KEPT: u64 = 0;\n}", "names the tests' fixture KEPT"))
+        for text, fragment in rows:
+            self.refused(gate.check_role_seal, gate.ROLE_SEAL_LIB, self.planted(text),
+                         re.escape(fragment) + ".*" + re.escape("(role-seal rule (c), exception 4)"))
+
+    def test_d_gate_sys_by_path_alone(self):
+        good = self.TREE[ROLE_SEAL_MANIFEST]
+        line = 'gate-sys = { path = "../gate-sys" }\n'
+        self.assertEqual(good.count(line), 1)
+        rows = (good + 'i05-protocol = { path = "../i05-protocol" }\n', good + 'ring = "=0.17.14"\n',
+                good.replace(line, 'gate-sys = { path = "../gate-sys", features = ["x"] }\n'),
+                good.replace(line, ""), good + '\n[dev-dependencies]\ni05-protocol = { path = "../i05-protocol" }\n',
+                good + '\n[build-dependencies]\ncc = "1"\n', good + '\n[target.\'cfg(unix)\'.dependencies]\nlibc = "0.2"\n')
+        for text in rows:
+            self.refused(gate.check_role_seal, ROLE_SEAL_MANIFEST, text,
+                         re.escape("Cargo.toml's dependencies are not exactly gate-sys by path (role-seal rule (d))"))
 
 
 class OutputPrefixTests(unittest.TestCase):

@@ -201,6 +201,17 @@ ObserverConfig literal's own field, (c5) refuses another binding field in config
 step 2 exactly. R-B3-PIN re-pins client.rs, i01_service.rs and i01_request.rs, and OBSERVER_HOME_PINS linux_listen.rs
 and linux_net.rs, at I01B5's bytes.
 
+HE-005A0 (the role-seal extraction; DESIGN-HE005 revision 5 section 4, HE-005A step A0; owner decision Q-HE5-11 (a);
+MON-HE005A-PLAN and MON-HE005A0-U1) moves the observer's role-neutral seal helpers and engine into crates/role-seal, a
+std-only crate over gate-sys. It joins planeon-observer's closure (OBSERVER_LINKED_CRATES, so the SBOM's workspace set),
+every linked-crate scan (SCANNED_CRATES: the linked-source tripwire, foreign items, Debug, socket modules, read_link,
+macros, code before main and prints), the observer post-seal rule, the no-panic list and CRATE_ROOTS
+(`#![forbid(unsafe_code)]`); role_seal joins CRATE_PATH_ROOTS, so no observer logic module reaches it. Its own rule
+(check_role_seal, D6): its src/ holds only lib.rs; its public items, pub methods and pub fields are exactly the listed
+ones, so the SealOps engine stays crate-private; outside its strict test block it holds no embedded file, no u8-typed
+const or static, no RoleSpec literal and none of the tests' fixture names; its one dependency is gate-sys by path. The
+observer's seal.rs keeps its include rule: exactly the two OBSERVER programs.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -457,8 +468,14 @@ OBSERVER_CRATE = "crates/observer"
 OBSERVER_SYS = "crates/observer-sys"
 OBSERVER_SYS_LIB = "crates/observer-sys/src/lib.rs"
 OBSERVER_SYS_KERNEL = "crates/observer-sys/src/kernel.rs"
-OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol", OBSERVER_SYS)
-SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS)
+# HE-005A0 (DESIGN-HE005 revision 5 section 4, HE-005A step A0; owner decision Q-HE5-11 (a); MON-HE005A-PLAN): role-seal,
+# the observer's role-neutral seal helpers and engine moved into their own std-only crate over gate-sys, joins
+# planeon-observer's closure (so the SBOM's workspace set too), every linked-crate scan, the observer post-seal rule, the
+# no-panic list and CRATE_ROOTS, and has its own rule (check_role_seal).
+ROLE_SEAL = "crates/role-seal"
+ROLE_SEAL_LIB = "crates/role-seal/src/lib.rs"
+OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol", OBSERVER_SYS, ROLE_SEAL)
+SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS, ROLE_SEAL)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
 GATE_MAIN = "crates/gate/src/main.rs"
@@ -1129,8 +1146,9 @@ OBSERVER_POST_SEAL_FORBIDDEN = tuple(
 # `impl Drop for Value` in json.rs (a parsed value freed iteratively: munmap and brk, both in the OBSERVER row; a recorded
 # residual), is removed once from that file's code before the word scan; a second one, another type's Drop, or the impl
 # in another file still refuses.
-# HE-004D1 DESIGN-D1 section 19 (G-D1-12): observer-sys's code runs after the seal too.
-OBSERVER_POST_SEAL_CRATES = (OBSERVER_CRATE, "crates/i05-protocol", OBSERVER_SYS)
+# HE-004D1 DESIGN-D1 section 19 (G-D1-12): observer-sys's code runs after the seal too. HE-005A0: role-seal, whose
+# stage 2 ends with the install, takes the coverage the observer's seal code had.
+OBSERVER_POST_SEAL_CRATES = (OBSERVER_CRATE, "crates/i05-protocol", OBSERVER_SYS, ROLE_SEAL)
 I05_JSON = "crates/i05-protocol/src/json.rs"
 OBSERVER_DROP_EXCEPTIONS = {I05_JSON: re.compile(r"\bimpl\s+Drop\s+for\s+Value\b")}
 # HE-004B1 DESIGN-B section 6 (D1-7, D2-5, D3-2): the observer's five logic modules. Read with comments removed, literal
@@ -1148,8 +1166,9 @@ OBSERVER_LOGIC = tuple("crates/observer/src/%s.rs" % name for name in OBSERVER_L
 OBSERVER_CONTRACTS = "crates/observer/src/contracts.rs"
 OBSERVER_SEAL_RS = "crates/observer/src/seal.rs"
 # HE-004D1 (G-D1-10): observer_sys is a crate root too, so a logic module naming it names a rooted path and refuses.
+# HE-005A0 (MON-HE005A0-U1): so is role_seal, so no observer logic module reaches it.
 CRATE_PATH_ROOTS = ("std", "core", "alloc", "crate", "self", "super", "i05_protocol", "gate_sys", "planeon_observer",
-                    "observer_sys")
+                    "observer_sys", "role_seal")
 OBSERVER_LOGIC_PATHS = (tuple(("crate", name) for name in OBSERVER_LOGIC_NAMES + ("contracts",))
                         + tuple(("self", name) for name in OBSERVER_LOGIC_NAMES)
                         + (("i05_protocol", "json"), ("i05_protocol", "sha256"), ("i05_protocol", "contracts"))
@@ -1233,8 +1252,10 @@ OBSERVER_STATUS = "crates/observer/src/status.rs"
 # the role pin as their units add them (I01_NO_PANIC_BUILT). HE-004-I01B1 (G-I01B-7 (d)): the digest port's three.
 # HE-004-I01B3 (G-I01B-7 (d)): the answer logic too.
 I01_NO_PANIC_BUILT = ("linux_listen", "i01_service", "i01_request", "observer_rbac") + I01B3_MODULES
+# HE-005A0: role-seal's one source joins it (its strict test block aside), the seal code's coverage moving with it.
 OBSERVER_NO_PANIC = OBSERVER_C_MODULES + (OBSERVER_MAIN, OBSERVER_STATUS) + tuple(
-    "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT)
+    "crates/observer/src/%s.rs" % name for name in ("enrolled", "capture", "linux_capture") + I01_NO_PANIC_BUILT) + (
+    ROLE_SEAL_LIB,)
 OBSERVER_SYS_NO_PANIC = (OBSERVER_SYS_LIB, "crates/observer-sys/src/dirent.rs", OBSERVER_SYS_KERNEL)
 CONST_ASSERT = re.compile(r"\bconst\s+_\s*:\s*\(\s*\)\s*=\s*assert\s*!\s*\(")
 OBSERVER_INCLUDE_FORM = re.compile(r'\binclude_(?:bytes|str)\s*!\s*\(\s*"([^"\\]*)"\s*\)')
@@ -1247,7 +1268,39 @@ CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                OBSERVER_LIB: "#![forbid(unsafe_code)]",
                OBSERVER_MAIN: "#![forbid(unsafe_code)]",
                # HE-004D1 DESIGN-D1 section 4 (G-D1-1): observer-sys's root denies unsafe_code; kernel.rs allows it.
-               OBSERVER_SYS_LIB: "#![deny(unsafe_code)]"}
+               OBSERVER_SYS_LIB: "#![deny(unsafe_code)]",
+               # HE-005A0 (DESIGN-HE005 section 4, A0): role-seal's root forbids it.
+               ROLE_SEAL_LIB: "#![forbid(unsafe_code)]"}
+# HE-005A0 (DESIGN-HE005 section 4, A0: effect-gate's D6; MON-HE005A-PLAN; MON-HE005A0-U1, exception 4): role-seal's
+# rule (check_role_seal), each clause its own function. (a) Its src/ holds only lib.rs. (b) Read without comments and
+# literal contents, outside the strict #[cfg(test)] mod tests block, its public items are exactly ROLE_SEAL_PUBLIC
+# (kind, name), its pub methods exactly ROLE_SEAL_PUBLIC_METHODS and its pub fields exactly ROLE_SEAL_PUBLIC_FIELDS:
+# the concrete Linux stages, the tokens, the error and step types, the role specification and the helpers the observer
+# re-exports (with INSTRUCTION_BYTES, which its compile-time asserts name), so SealOps and the engine stay crate-private
+# and no Stage1 or Sealed token comes from a fake; a `pub` the clause cannot place refuses. (c) Outside that block, no
+# program bytes (a const or static whose type names u8, or a RoleSpec literal: each role's crate gives its own), no
+# include_bytes! or include_str!, and none of the tests' fixture names (ROLE_SEAL_FIXTURE_NAMES). (d) Its manifest's one
+# dependency is gate-sys by path, with no other dependency table (std only, no registry crate).
+ROLE_SEAL_PUBLIC = frozenset({("const", "CAP_LAST_CAP"), ("const", "BPF_MAXINSNS"), ("const", "INSTRUCTION_BYTES"),
+                              ("struct", "RoleSpec"), ("struct", "CapabilitySets"), ("fn", "capability_words"),
+                              ("fn", "capability_sets"), ("fn", "filter_length"), ("fn", "status_threads"),
+                              ("enum", "Prctl"), ("enum", "Stage"), ("enum", "SealStep"), ("enum", "SealFailure"),
+                              ("struct", "SealError"), ("struct", "Stage1"), ("struct", "Sealed"), ("fn", "seal_stage1"),
+                              ("fn", "seal_stage2")})
+ROLE_SEAL_PUBLIC_METHODS = frozenset({("Prctl", "arguments"), ("SealError", "step"), ("SealError", "failure")})
+ROLE_SEAL_PUBLIC_FIELDS = frozenset({("RoleSpec", "bounding"), ("RoleSpec", "kept"), ("RoleSpec", "program"),
+                                     ("RoleSpec", "instructions"), ("CapabilitySets", "effective"),
+                                     ("CapabilitySets", "permitted"), ("CapabilitySets", "inheritable")})
+ROLE_SEAL_FIXTURE_NAMES = ("CAP_NET_ADMIN", "CAP_BPF", "KEPT", "PROGRAM_X86_64", "PROGRAM_AARCH64", "Arch")
+ROLE_SEAL_DEPENDENCIES = {"gate-sys": {"path": "../gate-sys"}}
+ROLE_SEAL_PUB = re.compile(r"\bpub\b(?!\s*\()")
+ROLE_SEAL_ITEM = re.compile(r"pub\s+(?:(?:const|unsafe|async)\s+(?=fn\b))?"
+                            r"(fn|struct|enum|union|trait|type|const|static|mod|use|macro)\b\s*(?:mut\s+)?([A-Za-z_]\w*)?")
+ROLE_SEAL_FIELD = re.compile(r"pub\s+([A-Za-z_]\w*)\s*:(?!:)")
+ROLE_SEAL_IMPL = re.compile(r"\bimpl\s*([A-Za-z_]\w*)\s*$")
+ROLE_SEAL_STRUCT = re.compile(r"\bstruct\s+([A-Za-z_]\w*)\s*$")
+ROLE_SEAL_BYTES_ITEM = re.compile(r"\b(?:const|static)\s+(?:mut\s+)?([A-Za-z_]\w*)\s*:([^=;]*)")
+ROLE_SEAL_SPEC_LITERAL = re.compile(r"(?<!struct )\bRoleSpec\s*\{")
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -2363,6 +2416,116 @@ def check_observer_no_panic(base: Path) -> int:
             require(not pattern.search(code), "%s names %s outside a strict #[cfg(test)] mod tests block (observer "
                     "no-panic tripwire)" % (rel, name))
     return len(OBSERVER_NO_PANIC) + len(OBSERVER_SYS_NO_PANIC)
+
+
+def role_seal_code(base: Path, rule: str) -> str:
+    """role-seal's lib.rs as check_role_seal's clauses (b) and (c) read it: comments removed, literal contents emptied,
+    its strict #[cfg(test)] mod tests block removed. The file is required."""
+    rel = ROLE_SEAL_LIB
+    require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    try:
+        code = rust_code((base / rel).read_text(encoding="utf-8"))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    for start, end in reversed(cfg_test_blocks(code)):
+        code = code[:start] + " " + code[end:]
+    return code
+
+
+def role_seal_sources(base: Path) -> int:
+    """check_role_seal (a): crates/role-seal/src holds exactly lib.rs, so the clauses read the whole crate."""
+    rule = "role-seal rule (a)"
+    source = base / ROLE_SEAL / "src"
+    present = sorted(path.relative_to(base).as_posix() for path in source.rglob("*")) if source.is_dir() else []
+    require(present == [ROLE_SEAL_LIB], "%s/src holds %s, not exactly lib.rs (%s)" % (ROLE_SEAL, present, rule))
+    return len(present)
+
+
+def role_seal_public(base: Path) -> int:
+    """check_role_seal (b), D6: outside the strict test block, every bare `pub` (a `pub(..)` is crate-private) is placed:
+    a top-level item (kind, name), a pub fn of an inherent `impl <Type> {` (Type, name) or a pub field of a
+    `struct <Name> {` (Name, field); each set must equal its listed one. A `pub` the clause cannot place refuses. The
+    number of public items."""
+    rule = "role-seal rule (b), D6"
+    code = role_seal_code(base, rule)
+    items, methods, fields = set(), set(), set()
+    for match in ROLE_SEAL_PUB.finditer(code):
+        at = match.start()
+        item = ROLE_SEAL_ITEM.match(code, at)
+        depth = brace_depth(code, at)
+        if depth == 0 and item and item.group(2):
+            items.add((item.group(1), item.group(2)))
+            continue
+        if depth == 1:
+            level, opening = 0, at
+            while opening > 0:
+                opening -= 1
+                if code[opening] == "}":
+                    level += 1
+                elif code[opening] == "{":
+                    if level == 0:
+                        break
+                    level -= 1
+            header = code[max(code.rfind(";", 0, opening), code.rfind("}", 0, opening), code.rfind("{", 0, opening)) + 1:
+                          opening]
+            owner = ROLE_SEAL_IMPL.search(header)
+            if owner and item and item.group(1) == "fn" and item.group(2):
+                methods.add((owner.group(1), item.group(2)))
+                continue
+            owner, field = ROLE_SEAL_STRUCT.search(header), ROLE_SEAL_FIELD.match(code, at)
+            if owner and field:
+                fields.add((owner.group(1), field.group(1)))
+                continue
+        raise GateError("%s holds a pub the item-set rule cannot place: %r (%s)"
+                        % (ROLE_SEAL_LIB, " ".join(code[at:at + 60].split()), rule))
+    for found, listed, what in ((items, ROLE_SEAL_PUBLIC, "public items"),
+                                (methods, ROLE_SEAL_PUBLIC_METHODS, "pub methods"),
+                                (fields, ROLE_SEAL_PUBLIC_FIELDS, "pub fields")):
+        require(found == listed, "%s's %s are not exactly the listed ones: not listed %s, missing %s (%s)"
+                % (ROLE_SEAL_LIB, what, sorted(found - listed), sorted(listed - found), rule))
+    return len(items)
+
+
+def role_seal_no_fixture(base: Path) -> int:
+    """check_role_seal (c), exception 4 (MON-HE005A0-U1): outside the strict test block, no include_bytes! or
+    include_str!, no program bytes (a const or static whose type names u8, or a RoleSpec literal: each role's crate
+    gives its own specification), and none of the tests' fixture names. The number of names."""
+    rule = "role-seal rule (c), exception 4"
+    code = PATH_SPACE.sub("::", role_seal_code(base, rule))
+    require(not OBSERVER_INCLUDE.search(code), "%s embeds a file with include_bytes! or include_str! (%s)"
+            % (ROLE_SEAL_LIB, rule))
+    for match in ROLE_SEAL_BYTES_ITEM.finditer(code):
+        require(not re.search(r"\bu8\b", match.group(2)), "%s holds program bytes: %s's type names u8 (%s)"
+                % (ROLE_SEAL_LIB, match.group(1), rule))
+    require(not ROLE_SEAL_SPEC_LITERAL.search(code), "%s builds a RoleSpec outside its tests (%s)" % (ROLE_SEAL_LIB, rule))
+    for name in ROLE_SEAL_FIXTURE_NAMES:
+        require(not re.search(r"\b%s\b" % name, code), "%s names the tests' fixture %s outside its strict test block (%s)"
+                % (ROLE_SEAL_LIB, name, rule))
+    return len(ROLE_SEAL_FIXTURE_NAMES)
+
+
+def role_seal_manifest(base: Path) -> int:
+    """check_role_seal (d): crates/role-seal/Cargo.toml's one dependency is gate-sys by path, with no dev-, build- or
+    target dependency (std only, no registry crate)."""
+    rule = "role-seal rule (d)"
+    path = base / ROLE_SEAL / "Cargo.toml"
+    require(path.is_file(), "%s/Cargo.toml is missing (%s)" % (ROLE_SEAL, rule))
+    table = tomllib.loads(path.read_text(encoding="utf-8"))
+    require(table.get("dependencies") == ROLE_SEAL_DEPENDENCIES
+            and not any(key in table for key in ("dev-dependencies", "build-dependencies", "target")),
+            "%s/Cargo.toml's dependencies are not exactly gate-sys by path (%s)" % (ROLE_SEAL, rule))
+    return len(ROLE_SEAL_DEPENDENCIES)
+
+
+ROLE_SEAL_CLAUSES = (("a", role_seal_sources), ("b", role_seal_public), ("c", role_seal_no_fixture),
+                     ("d", role_seal_manifest))
+
+
+def check_role_seal(base: Path) -> int:
+    """HE-005A0 (DESIGN-HE005 section 4, A0, D6; MON-HE005A-PLAN; MON-HE005A0-U1): role-seal's rule, its clauses
+    (ROLE_SEAL_CLAUSES) in order. The number of public items (clause (b))."""
+    results = {name: clause(base) for name, clause in ROLE_SEAL_CLAUSES}
+    return results["b"]
 
 
 def check_unsafe(base: Path) -> int:
@@ -7735,10 +7898,17 @@ def main() -> int:
             "pin, and nothing else (HE-004C, R1-3); it embeds only %s (HE-004D2, G-D2-2)"
             % (OBSERVER_CONTRACTS, check_observer_contracts_module(HE), ", ".join(OBSERVER_EMBEDDED_CONTRACTS)))
         say("observer no-panic: %d sources (the HE-004C modules, main.rs, status.rs, enrolled.rs, capture.rs and "
-            "linux_capture.rs, HE-004-I01a's %s, and observer-sys's three after their item-level compile-time asserts) "
-            "name no panicking macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; HE-004D1, G-D1-11; "
-            "HE-004-I01a, I01_NO_PANIC_BUILT)"
-            % (check_observer_no_panic(HE), ", ".join("%s.rs" % name for name in I01_NO_PANIC_BUILT)))
+            "linux_capture.rs, HE-004-I01a's %s, %s (HE-005A0), and observer-sys's three after their item-level "
+            "compile-time asserts) name no panicking macro or call outside strict #[cfg(test)] blocks (HE-004C, G8; "
+            "HE-004D1, G-D1-11; HE-004-I01a, I01_NO_PANIC_BUILT)"
+            % (check_observer_no_panic(HE), ", ".join("%s.rs" % name for name in I01_NO_PANIC_BUILT), ROLE_SEAL_LIB))
+        say("role-seal (HE-005A0, D6; MON-HE005A0-U1): %s/src holds only lib.rs (a); outside its strict test block its %d "
+            "public items are exactly %s, its pub methods %s and its pub fields %s, so SealOps and the engine stay "
+            "crate-private (b); it holds no include_bytes! or include_str!, no u8-typed const or static, no RoleSpec "
+            "literal and none of the tests' fixture names %s (c); its one dependency is gate-sys by path (d)"
+            % (ROLE_SEAL, check_role_seal(HE), ", ".join("%s %s" % pair for pair in sorted(ROLE_SEAL_PUBLIC)),
+               ", ".join("%s::%s" % pair for pair in sorted(ROLE_SEAL_PUBLIC_METHODS)),
+               ", ".join("%s.%s" % pair for pair in sorted(ROLE_SEAL_PUBLIC_FIELDS)), ", ".join(ROLE_SEAL_FIXTURE_NAMES)))
         say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
             "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
             "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "

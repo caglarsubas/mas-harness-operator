@@ -108,6 +108,7 @@ dependencies = [
  "i05-protocol",
  "observer-sys",
  "ring",
+ "role-seal",
  "rustls",
  "zeroize",
 ]
@@ -129,6 +130,13 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys",
+]
+
+[[package]]
+name = "role-seal"
+version = "0.1.0"
+dependencies = [
+ "gate-sys",
 ]
 
 [[package]]
