@@ -185,6 +185,22 @@ literal, no rename or type item naming ObserverConfig, the dot form twice, parse
 assigned once, and no Self. Each sub-clause is its own function. R-B3-PIN re-pins config.rs, i01_request.rs and
 i01_service.rs at I01B2's bytes.
 
+HE-004-I01B5 (the pushes, the send path and the re-pins; DESIGN-I01B5 rev 5, with round 3's B3-4..B3-11, the section
+reviews' I5D-1..17, I5E-1..10 and I5F-1..11, the monitor's Q-I01B5D-1..5 and MON-I01B5-STOPS) sends the first I01
+answer: G-I01B-1's I01B5 form lets i01_answer be named at five listed places, each once, and the symbol check retires;
+G-I01B-5 (check_i01b5_send) holds one send path: peer_send three times, send_answer twice and channel::send once, each
+at its pinned place, the socket files' use-path backstops, PeerOps only in PeerService's two signatures, respond's
+answer, self-check and send statements adjacent and its one call inside serve_peer_deadlines, readable-only
+registrations, serve_peer_deadlines called once, and the chain's words at their places; G-I01B-6 (a) and (c) read a
+socket file's paths in its own scope (resolved_uses, check_socket_items); G-I01-5 keeps its clauses but the two that
+became G-I01B-5's counts. The pinned statements (check_i01b5_statements), round 3's folds (check_i01b5_folds, with
+PR review round 1's R1-1: observe.rs never assigns, borrows &mut or exchanges self.config and self.closure), SnapshotView
+closed (check_i01b5_snapshot_view) and the new literal pins (check_i01b5_constants) hold the epoch's
+pushes and the service's answer to their reviewed texts. G-I01B-4 (c) counts `binding: Value::Null` only as the
+ObserverConfig literal's own field, (c5) refuses another binding field in config.rs, and G-I01B-8 (t11) reads answer's
+step 2 exactly. R-B3-PIN re-pins client.rs, i01_service.rs and i01_request.rs, and OBSERVER_HOME_PINS linux_listen.rs
+and linux_net.rs, at I01B5's bytes.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -914,10 +930,12 @@ OBSERVER_SYS_PINS = {
 # counted construction stays code review's (R5-1).
 # HE-004-I01a DESIGN-I01A section 12 (G-I01-6): the I01 listener file is pinned whole too, and linux_net.rs re-pinned
 # after its I01 changes (the listener's registration, the I01 watch of each wait, PeerOps).
+# HE-004-I01B5 (DESIGN-I01B5 rev 5 section 1; R-B3-PIN; Q-4): linux_net.rs (LinuxWire's peer_send and wall_millis) and
+# linux_listen.rs (I01Socket::send_answer, the one channel::send) re-pinned at I01B5's bytes, each read whole (R-TEXT).
 OBSERVER_HOME_PINS = {
     "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
-    "crates/observer/src/linux_net.rs": "41a23aa7d6215d5f8194b703da511a8945d7600f1f0d306affb94cd830ac17ac",
-    "crates/observer/src/linux_listen.rs": "d06742932d92eaf05308158d37ce670859f316e1b0fe7a1972b8e4c93be5433b",
+    "crates/observer/src/linux_net.rs": "d0ba15d46f21c43195f9c50e2b0440f36bce58555842f960c3e4f215750b20e4",
+    "crates/observer/src/linux_listen.rs": "f64acf69dbe1870356ce5aaa7b576e837859bc09371a8af29ef4cc16ee535d2b",
 }
 # HE-004-I01B1 R-B3-PIN (the monitor's ruling closing DESIGN-I01B under Q-I01B-CAP; DESIGN-I01B1 rev 2 section 1): every
 # guarded file is pinned whole by sha256. The six not yet pinned are pinned here at their dd7422ed bytes (I01B1 changes
@@ -933,9 +951,13 @@ I01B_GUARDED_PINS = {
     # load-time checks and the private binding with its accessor; the closed I01Binding and from_config; the service
     # holding the binding and closing a passing request as NotAnswered).
     "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
-    "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
-    "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
-    "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
+    # HE-004-I01B5 (DESIGN-I01B5 rev 5 section 1; Q-4): i01_request.rs (the chain keyed to the last answered request),
+    # i01_service.rs (one request at a time, the views, respond and its one send) and client.rs (the pushes, PeerSent,
+    # peer_send, wall_millis, CaptureGate::from_view) re-pinned at I01B5's bytes, each read whole (R-TEXT); config.rs
+    # and i01_answer.rs keep their pins and bytes.
+    "crates/observer/src/i01_request.rs": "7d3b6951a5082fddf7313a7a94a4bb96b2eccf63003d1e605dcb2549c316d7af",
+    "crates/observer/src/i01_service.rs": "11b921cfa316eca65ff3259e992f2330734d3e8423bc9a10514db469f608e298",
+    "crates/observer/src/client.rs": "9c496052b5c05cf59fe21867f689aa68d74b30671d37ad77e52837e3f9b45c35",
     # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1; Q-4): i01_answer.rs's absence becomes its pin, at I01B3's bytes, with
     # I1D-3's file form and I1D-10's casefold clause; the other guarded files keep their pins and bytes.
     "crates/observer/src/i01_answer.rs": "3ee5fb683bc6bcbc13a39db985782038915f4851d825a75f02c26f0409764736",
@@ -1882,14 +1904,28 @@ def source_uses(rel: str, raw: str) -> list[tuple[tuple[str, ...], str | None]]:
         raise GateError("%s: %s (linked-source tripwire)" % (rel, error)) from None
 
 
-def resolved_uses(uses: list[tuple[tuple[str, ...], str | None]]) -> list[tuple[tuple[str, ...], str | None]]:
+def own_scope_path(path: tuple[str, ...], own: str | None) -> tuple[str, ...]:
+    """HE-004-I01B5 G-I01B-6 (a) (DESIGN-I01B5 rev 5 section 6.3; DIB section 6; Q-7 (a)): a use path read in its file's
+    own scope: a leading `self`, and in a socket file whose own module is `own` (its file stem; its `super` is the crate
+    root) a leading `crate::<own>` or `super::<own>`, dropped when something follows."""
+    for prefix in (("self",),) + ((("crate", own), ("super", own)) if own else ()):
+        if path[:len(prefix)] == prefix and len(path) > len(prefix):
+            return path[len(prefix):]
+    return path
+
+
+def resolved_uses(uses: list[tuple[tuple[str, ...], str | None]],
+                  own: str | None = None) -> list[tuple[tuple[str, ...], str | None]]:
     """HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3; Q-U7-2 (a)): a source's use paths (source_uses) with the
     source's own aliases followed. A name one of its use paths binds under gate_sys (a rename of gate_sys itself, as
     `use gate_sys as gs;` or `use gate_sys::{self as gs};`, or the last segment or rename of a path below it, as
     `use gs::channel as c;` once gs is known) stands for that gate_sys path: a path starting with it (after a leading
     `self`) is read as the gate_sys path and its remaining segments, again until nothing changes, so a chain of aliases
-    resolves. Each path keeps its rename; globs bind nothing."""
-    paths = [(path[1:] if path[:1] == ("self",) and len(path) > 1 else path, rename) for path, rename in uses]
+    resolves. Each path keeps its rename; globs bind nothing. HE-004-I01B5 G-I01B-6 (a): with `own`, a socket file's
+    paths through `crate::<own>` or `super::<own>` are read in its own scope too (own_scope_path), so
+    `use crate::linux_listen::channel::{send};` in linux_listen.rs imports gate-sys's channel send as
+    `use channel::send;` does."""
+    paths = [(own_scope_path(path, own), rename) for path, rename in uses]
     for _ in range(len(paths) + 1):
         bound = {}
         for path, rename in paths:
@@ -3055,6 +3091,13 @@ def block_end(code: str, opening: int) -> int:
     raise GateError("a block without its closing brace")
 
 
+def own_scope_strip(text: str, own: str) -> str:
+    """HE-004-I01B5 G-I01B-6 (c) (DESIGN-I01B5 rev 5 section 6.3; DIB section 6; Q-7 (a)): a socket file's item text
+    (comments removed, `::` spacing removed) with every `self::`, `crate::<own>::` and `super::<own>::` path prefix
+    removed, `own` the file's stem, so a path in the file's own scope is read as its remainder."""
+    return re.sub(r"(?<![\w:])(?:self|crate::%s|super::%s)::" % (re.escape(own), re.escape(own)), "", text)
+
+
 def check_socket_items(rel: str, raw: str, code: str) -> None:
     """R1-3: in a SOCKET_FILES source (code read without comments, `::` spacing removed), no `pub` type alias, const,
     static or fn signature names a gate-sys channel or tcp item other than SOCKET_DATA_TYPES; no glob of those modules.
@@ -3065,9 +3108,13 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
     (HE-004-I01a PR review round 1, R1-3): the use paths are read with the source's aliases followed (resolved_uses), so
     an import through a rename of gate_sys (`use gate_sys as gs; use gs::channel::{Conn};`) or of a socket module
     (`use gs::channel as c; use c::Conn;`) binds its items as the direct form does, and a gate_sys rename's qualified
-    paths (`gs::channel::Conn`) are read as gate_sys's."""
+    paths (`gs::channel::Conn`) are read as gate_sys's. HE-004-I01B5 G-I01B-6 (a) and (c) (DESIGN-I01B5 rev 5 section 6.3;
+    Q-7 (a)): the use paths are read in the file's own scope (resolved_uses with its stem), and each pub item's, field's
+    and variant's text is read with `self::`, `crate::<own>::` and `super::<own>::` removed (own_scope_strip), so
+    `-> &crate::linux_os::Conn` or `pub type T = self::channel::Conn;` names the socket item as `-> &Conn` does."""
     modules, items = set(), {}
-    uses = resolved_uses(source_uses(rel, raw))
+    own = posixpath.basename(rel)[:-3]
+    uses = resolved_uses(source_uses(rel, raw), own)
     for path, rename in uses:
         if len(path) < 2 or path[0] != "gate_sys" or path[1] not in SOCKET_MODULES:
             continue
@@ -3079,6 +3126,7 @@ def check_socket_items(rel: str, raw: str, code: str) -> None:
     crates = gate_sys_aliases(uses)
 
     def hazards(text: str) -> list[str]:
+        text = own_scope_strip(text, own)
         named = set(re.findall(r"\bgate_sys::(?:channel|tcp)::(\w+)", text))
         for alias in crates:
             named |= set(re.findall(r"(?<!::)\b%s::(?:channel|tcp)::(\w+)" % re.escape(alias), text))
@@ -4374,11 +4422,35 @@ def constructor_b6_parse_v3(codes: dict[str, str], rule: str) -> None:
             % (words, rule))
 
 
+def literal_fields(code: str, opening: int) -> list[str]:
+    """HE-004-I01B5 (R1-1, HUNT-22; DESIGN-I01B5 rev 5 section 6.6): the top-level field texts of the struct expression
+    or pattern whose `{` is at `opening`, in a source read without comments and with literal contents emptied: its body
+    split at the commas at bracket depth 0 of `(`, `[` and `{`, each stripped, empty ones dropped. A field nested in
+    another field's initialiser (a nested literal's, a call's or a block's) is never a top-level field."""
+    close = block_end(code, opening) - 1
+    fields, depth, start = [], 0, opening + 1
+    for index in range(opening + 1, close):
+        char = code[index]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            fields.append(code[start:index].strip())
+            start = index + 1
+    fields.append(code[start:close].strip())
+    return [field for field in fields if field]
+
+
 def constructor_c_accessor(codes: dict[str, str], rule: str) -> None:
     """G-I01B-4 (c), restated as B3-2 requires: in config.rs, ObserverConfig's field binding is exactly `binding: Value`
     (no visibility); `pub fn binding(&self) -> &Value` is its one fn binding, with its body exactly `&self.binding`; and
     the struct-expression-or-pattern form OBSERVER_CONFIG_LITERAL matches exactly once outside the struct definition and
-    the impl headers, inside fn members, holding `binding: Value::Null`. `Self` is (c4)'s and the dot forms (c2)'s."""
+    the impl headers, inside fn members, holding `binding: Value::Null`. `Self` is (c4)'s and the dot forms (c2)'s.
+    HE-004-I01B5 (R1-1, HUNT-22; DESIGN-I01B5 rev 5 section 6.6): `binding: Value::Null` counts only as the literal's own
+    top-level field initialiser (literal_fields): exactly one top-level field is named binding, and it is exactly
+    `binding: Value::Null`, spacing free; one nested in another field's initialiser (HUNT-22's `W { binding:
+    Value::Null }`), a shorthand `binding` or a longer initialiser (HUNT-24's `Value::Null.forged()`) refuses."""
     code = codes[I01B2_CONFIG]
     structs = list(re.finditer(r"\bstruct\s+ObserverConfig\b", code))
     fields = [re.sub(r"\s+", " ", field.strip()) for field in struct_fields(code, structs[0].end())] if len(structs) == 1 else []
@@ -4397,11 +4469,12 @@ def constructor_c_accessor(codes: dict[str, str], rule: str) -> None:
     literals = [found for found in OBSERVER_CONFIG_LITERAL.finditer(code)
                 if found.start() != name and not any(start <= found.start() < end for start, end in headers)]
     members = function_span(code, "members")
-    inner = code[literals[0].end() - 1:block_end(code, literals[0].end() - 1)] if len(literals) == 1 else ""
+    fields = literal_fields(code, literals[0].end() - 1) if len(literals) == 1 else []
+    own = [field for field in fields if re.match(r"(?:r#)?binding\b(?!\s*::)", field)]
     require(len(literals) == 1 and members is not None and members[0] < literals[0].start() < members[1]
-            and re.search(r"\bbinding\s*:\s*Value::Null\b", inner),
+            and len(own) == 1 and re.fullmatch(r"binding\s*:\s*Value::Null", own[0]),
             "%s writes the ObserverConfig literal or pattern other than once, in fn members holding `binding: Value::Null` "
-            "(%s (c), B3-2)" % (I01B2_CONFIG, rule))
+            "as its own top-level field initialiser (%s (c), B3-2, R1-1)" % (I01B2_CONFIG, rule))
 
 
 def constructor_c1_alias(codes: dict[str, str], rule: str) -> None:
@@ -4464,6 +4537,46 @@ def constructor_c4_no_self(codes: dict[str, str], rule: str) -> None:
     require(not found, "%s names Self %d time(s); it names no Self (%s (c4), I2E-7)" % (I01B2_CONFIG, found, rule))
 
 
+# HE-004-I01B5 (R1-1, HUNT-22, I5D-10): the kinds of D2_TYPE_ITEM whose bodies declare fields, and a field named binding
+# (raw or not, `::` aside) anywhere in an item's text.
+FIELD_ITEM_KINDS = ("struct", "enum", "union")
+BINDING_FIELD = re.compile(r"\b(?:r#)?binding\s*:(?!:)")
+
+
+def field_item_text(code: str, start: int, what: str) -> str:
+    """The text of the struct, enum or union whose name ends at `start` (comments removed, literal contents emptied):
+    its generic parameters skipped with bracket_scan's angle rule as struct_fields does, then up to its `;` at depth 0
+    (a unit or tuple struct) or to the `}` closing its body."""
+    index = start + len(code[start:]) - len(code[start:].lstrip())
+    if code.startswith("<", index):
+        index = bracket_scan(code, index + 1, ">", what)[0] + 1
+    stop = bracket_scan(code, index, "{;", what)[0]
+    return code[start:stop] if code[stop] == ";" else code[start:block_end(code, stop)]
+
+
+def constructor_c5_binding_fields(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-4 (c5) [I2E-7 as a gate check; R1-1, HUNT-22; I5D-10]: in config.rs, read without comments, every struct,
+    enum and union item (D2_TYPE_ITEM's kinds FIELD_ITEM_KINDS, at any nesting) is read whole (field_item_text), and a
+    field named binding (BINDING_FIELD: a struct's or union's field, an enum struct-variant's field) occurs only in
+    ObserverConfig's, exactly once. So HUNT-22's `struct W { binding: Value }`, an enum variant's `Carry { binding: Value
+    }` and a union's binding field refuse; today's config.rs declares only ObserverConfig's."""
+    code = codes[I01B2_CONFIG]
+    what = "%s: a type item (%s (c5))" % (I01B2_CONFIG, rule)
+    owner = 0
+    for found in D2_TYPE_ITEM.finditer(code):
+        kind = found.group(0).split()[0]
+        if kind not in FIELD_ITEM_KINDS:
+            continue
+        count = len(BINDING_FIELD.findall(field_item_text(code, found.end(), what)))
+        if kind == "struct" and found.group(1) == "ObserverConfig":
+            owner += count
+            continue
+        require(not count, "%s declares a binding field in %s %s; only ObserverConfig declares one (%s (c5), I2E-7, R1-1)"
+                % (I01B2_CONFIG, kind, found.group(1), rule))
+    require(owner == 1, "%s declares ObserverConfig's binding field %d times, not once (%s (c5), I2E-7, R1-1)"
+            % (I01B2_CONFIG, owner, rule))
+
+
 def check_i01b_constructor(base: Path) -> int:
     """HE-004-I01B2 G-I01B-4, one constructor call (DESIGN-I01B rev 3 section 6; DESIGN-I01B2 rev 3 sections 3, 5 and 7).
     crates/observer's non-test sources are read as observer_code reads them (use declarations kept), serve's body as
@@ -4471,9 +4584,10 @@ def check_i01b_constructor(base: Path) -> int:
     own function, so that exactly one can be disabled: (a) from_config twice, serve's statement outermost; (b) serve
     twice in main.rs and observe::run('s arguments; (b1) the pinned load statement; (b2) document 5 times and (b3) config
     5 times at their places; (b4) both pinned statements outermost and in order; (b5) the pinned parse statement; (b6)
-    parse_v3 twice; (c) the accessor, the field and the one ObserverConfig literal; (c1) no rename or type item naming
-    ObserverConfig; (c2) the dot form twice; (c3) the local binding bound once and assigned once; (c4) no Self in
-    config.rs. The number of clauses."""
+    parse_v3 twice; (c) the accessor, the field and the one ObserverConfig literal, its own top-level binding
+    initialiser `Value::Null` (HE-004-I01B5, R1-1); (c1) no rename or type item naming ObserverConfig; (c2) the dot form
+    twice; (c3) the local binding bound once and assigned once; (c4) no Self in config.rs; (c5) no binding field in
+    config.rs but ObserverConfig's (HE-004-I01B5, I2E-7 as a gate check). The number of clauses."""
     rule = "one constructor call, G-I01B-4"
     codes = observer_code(base, rule)
     for rel in (OBSERVER_MAIN, I01B2_CONFIG, I01B2_REQUEST):
@@ -4497,7 +4611,8 @@ def check_i01b_constructor(base: Path) -> int:
     constructor_c2_dot_form(codes, rule)
     constructor_c3_bound_once(codes, rule)
     constructor_c4_no_self(codes, rule)
-    return 13
+    constructor_c5_binding_fields(codes, rule)
+    return 14
 
 
 # HE-004-I01B3 G-I01B-9, `Derived` closed (DESIGN-I01B3 rev 4 section 4; DIB section 6; I3D-3, I3E-1, I3E-5, I3E-6,
@@ -4729,7 +4844,8 @@ def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str,
     """HE-004-I01B1 G-I01B-8: the one line-anchored `pub const <name>: <kind> = <form>;` of a raw source, the only
     `const <name>` there: its value (the form's integer, underscores removed), the source's lines and the line's
     index. HE-004-I01B3 (DESIGN-I01B3 rev 4 section 5; I3E-3): extended to `&str`, whose form is STR_FORM (printable
-    ASCII without `"` or `\\`, so no escape) and whose value is the text."""
+    ASCII without `"` or `\\`, so no escape) and whose value is the text. HE-004-I01B5 (DESIGN-I01B5 rev 5 section 6.4;
+    I5E-7): an array kind (`[&str; 5]`) is read as its text too, compared whole."""
     path = base / rel
     require(path.is_file(), "%s is missing (%s)" % (rel, rule))
     raw = path.read_text(encoding="utf-8")
@@ -4740,7 +4856,7 @@ def pinned_constant(base: Path, rel: str, name: str, kind: str, form: str,
             "%s does not define %s exactly once, as a line-anchored pub const (%s)" % (rel, name, rule))
     index, match = found[0]
     value = match.group(1)
-    return (value if kind == "&str" else int(value.replace("_", ""))), lines, index
+    return (value if kind == "&str" or kind.startswith("[") else int(value.replace("_", ""))), lines, index
 
 
 def check_i01b_constants(base: Path) -> int:
@@ -4928,6 +5044,42 @@ def answer_source(base: Path, rule: str) -> tuple[str, str, str]:
         raise GateError("%s: %s (%s)" % (I01_ANSWER, error, rule)) from None
 
 
+def answer_item_names(code: str) -> set[str]:
+    """(t5)'s item names [PR review round 2's R2-1, the first of its two changes]: every `fn` (`\\bfn\\s+(name)`, whatever
+    precedes it: `const fn`, `pub const fn`, `unsafe fn`, `async fn`) and every `const` or `static` item
+    (`\\b(?:const|static)\\s+(name)\\s*[:=]`) of i01_answer.rs, so that no qualifier hides one. HE-004-I01B5 (the round-3
+    NOTE, DESIGN-I01B5 rev 5 section 6.7) names it, so that each of R2-1's two changes has a row that only it refuses."""
+    return (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
+            | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
+
+
+def generic_parameter(code: str, position: int) -> bool:
+    """R2-4 (HE-004-I01B3 PR review round 3, a NOTE carried to HE-004-I01B5; DESIGN-I01B5 rev 5 section 6.7): whether
+    the `const` at `position` opens a const generic parameter, which (t2) skips: the text before it, past whitespace,
+    ends with `<` or `,`, and walking back from there over balanced `(`, `[` and `<` brackets (a `>` after `-` closing
+    none) an unmatched `<` comes before any `;`, `{`, `}`, or unmatched `(` or `[`. A const item never follows `<` or `,`,
+    so no item is skipped."""
+    before = code[:position].rstrip()
+    if not before.endswith(("<", ",")):
+        return False
+    depth = 0
+    for index in range(len(before) - 1, -1, -1):
+        char = before[index]
+        if char in ";{}":
+            return False
+        if char in ")]" or (char == ">" and before[index - 1:index] != "-"):
+            depth += 1
+        elif char in "([":
+            if depth == 0:
+                return False
+            depth -= 1
+        elif char == "<":
+            if depth == 0:
+                return True
+            depth -= 1
+    return False
+
+
 def answer_texts_t1_pins(base: Path, rule: str) -> int:
     """(t1) The pins: pinned_constant (`&str`) holds each I01B3_TEXT_PINS const to its text with its citation in the
     `///` doc comment directly above it, and each I01B3_KEY_CONSTS const to its value."""
@@ -4951,7 +5103,8 @@ def answer_texts_t2_set(base: Path, rule: str) -> None:
     array or Option of them), at any depth, is one of the 17 text names or a listed key name, each defined exactly
     once, as a top-level, line-anchored `pub const <NAME>: &str = "<text>";`; their values are pairwise distinct; no
     key value equals a text, a contract refusal text (definitions.json's refusalTexts, B1_MALFORMED's among them); no
-    R10 text equals a VPO text or a contract text. A str named through a `type` alias is (t9)'s."""
+    R10 text equals a VPO text or a contract text. A str named through a `type` alias is (t9)'s. HE-004-I01B5 (R2-4): a
+    `const` that opens a const generic parameter (generic_parameter) is no const item and is skipped."""
     _, kept, code = answer_source(base, rule)
     try:
         refusals = json.loads((base / I01B_DEFINITIONS).read_text(encoding="utf-8"))["refusalTexts"]
@@ -4961,6 +5114,8 @@ def answer_texts_t2_set(base: Path, rule: str) -> None:
     keys = {name: text for name, text in I01B3_KEY_CONSTS}
     defined: dict[str, int] = {}
     for item in re.finditer(r"\bconst\s+([A-Za-z_]\w*)\s*:", code):
+        if generic_parameter(code, item.start()):
+            continue
         try:
             declared = item_text(code, item.start(), "const")
         except GateError:
@@ -5040,8 +5195,7 @@ def answer_texts_t5_positions(base: Path, rule: str) -> int:
         require(len(re.findall(r"\bpub\s+fn\s+%s\s*\(\s*self\s*\)\s*->\s*&\s*'static\s+str\s*\{" % method, digest_code)) == 1,
                 "%s does not define the refusal method %s returning one text (%s (t5))" % (I01B1_DIGEST_RS, method, rule))
     texts = {name for name, _, _ in I01B3_TEXT_PINS}
-    items = (set(re.findall(r"\bfn\s+([A-Za-z_]\w*)", code))
-             | set(re.findall(r"\b(?:const|static)\s+([A-Za-z_]\w*)\s*[:=]", code)))
+    items = answer_item_names(code)
     method = re.compile(r"([a-z_][a-z0-9_]*)\s*\.\s*(?:%s)\s*\(\s*\)" % "|".join(I01B1_REFUSAL_METHODS))
 
     def binding(name: str) -> bool:
@@ -5177,6 +5331,33 @@ def answer_texts_t10_refusals_no_return(base: Path, rule: str) -> None:
             "as its tail (%s (t10))" % (I01_ANSWER, rule))
 
 
+# (t11) [HE-004-I01B3 PR review round 3's R3-1, carried to HE-004-I01B5; DESIGN-I01B5 rev 5 section 6.7]: answer's step 2,
+# the answer list's one consumer, matched whole, spacing free, the binding named twice the same.
+I01B5_STEP_TWO = re.compile(r"if\s+let\s+Some\s*\(\s*&\s*([a-z_][a-z0-9_]*)\s*\)\s*=\s*refusals\s*\(\s*derived\s*,\s*facts\s*\)"
+                            r"\s*\.\s*first\s*\(\s*\)\s*\{\s*return\s+Err\s*\(\s*\1\s*\)\s*;\s*\}")
+
+
+def answer_texts_t11_step_two(base: Path, rule: str) -> None:
+    """(t11) The answer list's consumer [R3-1]: in i01_answer.rs read without comments (literal contents emptied), fn
+    answer's outermost block (outermost_statements) holds exactly one statement that is exactly `if let Some(&<b>) =
+    refusals(derived, facts).first() { return Err(<b>); }` (I01B5_STEP_TWO, spacing free), and the word refusals occurs
+    exactly twice: `fn refusals(` and that statement's call. So a key text fed in at the consumer without a local, as
+    `.first().or(Some(&KEY_SCOPE))` (S1) or `.iter().chain(&[KEY_SCOPE]).next()` (S2), refuses, and so do a second call
+    and a fn-item reference."""
+    _, _, code = answer_source(base, rule)
+    span = function_span(code, "answer")
+    require(span is not None, "%s does not define fn answer once (%s (t11))" % (I01_ANSWER, rule))
+    statements = outermost_statements(code, span[0], rule)
+    steps = [statement for statement in statements if I01B5_STEP_TWO.fullmatch(code[statement[0]:statement[1]].strip())]
+    words = [found.start() for found in re.finditer(r"\brefusals\b", code)]
+    definitions = [found.start(1) for found in re.finditer(r"\bfn\s+(refusals)\s*\(", code)]
+    require(len(steps) == 1 and len(definitions) == 1 and len(words) == 2 and definitions[0] in words
+            and sum(steps[0][0] <= word < steps[0][1] for word in words) == 1,
+            "%s's fn answer does not consume its answer list once, as the outermost statement `if let Some(&<b>) = "
+            "refusals(derived, facts).first() { return Err(<b>); }`, with refusals named only there and at its definition "
+            "(%s (t11))" % (I01_ANSWER, rule))
+
+
 def check_i01b3_texts(base: Path) -> int:
     """HE-004-I01B3 G-I01B-8's I01B3 checks (DESIGN-I01B3 rev 4 section 5; I3D-7, I3E-3, I3F-1..3; PR review round 1's
     R1-1 and R1-2), each its own function with its own message: (t1) the 17 text pins with their citations and the key
@@ -5185,11 +5366,11 @@ def check_i01b3_texts(base: Path) -> int:
     names read past any qualifier) or an I01B1 refusal method, map_err( and ok_or_else( take a closure, and refusals'
     list is named only at its declaration, its tail and the .push( and .contains( receivers; (t6) no key-prefixed
     literal; (t7) no static; (t8) the refusal words only as calls; (t9) no `type` naming str; (t10) no `return` in fn
-    refusals. They run in the order (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), so that a key-prefixed
-    literal, which only a const line can hold, is refused with (t6)'s message, and a str const or alias reaching a
-    refusal with (t2)'s or (t9)'s. The stated limit (a text reaching a refusal through a local; a helper other than the
-    rule helper returning `Err(param)`; `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The
-    number of pins."""
+    refusals; (t11) answer's step 2 read exactly, refusals called only there (HE-004-I01B5, R3-1). They run in the order
+    (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), (t11), so that a key-prefixed literal, which only a const
+    line can hold, is refused with (t6)'s message, and a str const or alias reaching a refusal with (t2)'s or (t9)'s. The
+    stated limit (a text reaching a refusal through a local; a helper other than the rule helper returning `Err(param)`;
+    `?` on an I01B1 result) stays with R-TEXT and the tests' expected texts. The number of pins."""
     rule = "constants and texts, G-I01B-8"
     pins = answer_texts_t1_pins(base, rule)
     answer_texts_t6_key_prefixed(base, rule)
@@ -5201,6 +5382,7 @@ def check_i01b3_texts(base: Path) -> int:
     answer_texts_t5_positions(base, rule)
     answer_texts_t7_no_static(base, rule)
     answer_texts_t10_refusals_no_return(base, rule)
+    answer_texts_t11_step_two(base, rule)
     return pins
 
 
@@ -5322,6 +5504,999 @@ RULE_FIELDS = (("api_groups", "apiGroups"), ("resources", "resources"), ("non_re
 ONLY_SEPARATORS = re.compile(r"[\s,]*")
 
 
+# --- HE-004-I01B5: the pushes, the send path and the re-pins (DESIGN-I01B5 rev 5 sections 1 and 3-8) -----------------
+#
+# Each pinned text below is matched whole and spacing free (pinned_pattern, WIRE_SETUP_MATCH's construction) over the
+# sources as observer_code reads them (comments removed, literal contents emptied, the whitespace around `::` removed,
+# strict test blocks blanked); a text whose string literals name members is matched once more with literals kept. Every
+# rule's sub-clause is its own function with its own message, so that exactly one can be disabled.
+OBSERVER_SERVICE = "crates/observer/src/i01_service.rs"
+OBSERVER_CAPTURE = "crates/observer/src/capture.rs"
+# The tokens of a pinned text: a string literal, a word, `::`, `=>`, `->` or any one other character.
+STATEMENT_TOKEN = re.compile(r'"(?:[^"\\]|\\.)*"|\w+|::|=>|->|\S')
+# observe.rs's check_snapshot (B3-6 (1); I5D-3, I5D-12; I5E-2; I5F-1 (2); rev 5): the quota match, then ADM-4's
+# statement, the configuration Value, the quota Value and the derive statement, four adjacent outermost statements,
+# then `drop(inputs);`.
+I01B5_QUOTA_MATCH = ("let quotas = match quotas { Ok(quotas) => quotas, Err(QuotaError::Unsettled) => return "
+                     "Err(Stop::Restart(Cause::Unsettled)), Err(QuotaError::Refused(why)) => return "
+                     "Err(self.stop(ObserverExit::Quota, why)), };")
+I01B5_FOUR = (
+    ("ADM-4's statement", "let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;"),
+    ("the configuration Value",
+     'let configuration = object([("qualificationNamespace", Some(Value::str(&self.config.namespace))), '
+     '("pinnedManifestHash", Some(Value::str(&self.config.pinned_manifest_hash))), ("sealedAdmission", '
+     'self.config.sealed.as_ref().map(|sealed| object([("ipFamily", Some(Value::str(&sealed.ip_family))), '
+     '("serviceCIDR", Some(Value::str(&sealed.service_cidr))), ("defaultTolerationSeconds", '
+     'Some(Value::int(sealed.default_toleration_seconds as i64))), ]))), ]);'),
+    ("the quota Value",
+     'let quota = object([("hard", Some(quota_side(&quotas.pairs, |pair| pair.hard))), '
+     '("used", Some(quota_side(&quotas.pairs, |pair| pair.used)))]);'),
+    ("the derive statement",
+     "let derived = match self.captures.as_deref() { Some(cycle) => crate::i01_answer::derive(&inputs, "
+     "&Value::str(resource_version), &configuration, &record.loaded_hash().map_or(Value::Null, Value::str), "
+     "cycle.record(), &self.closure, self.config.binding(), &quota, &self.config.generation, self.config.not_before, "
+     "self.config.not_after), None => Err(NO_CAPTURE_ENGINE_TEXT), };"))
+I01B5_DROP_INPUTS = "drop(inputs);"
+# The two observe.rs helpers the configuration and quota Values call (the crate's spelling of "one i05 JSON object" and
+# "from quotas.pairs with quota::UNITS' member names", I5D-12), each pinned whole.
+I01B5_HELPERS = (("object", "fn object<const N: usize>(members: [(&str, Option<Value>); N]) -> Value { let mut built = "
+                  "Object::new(); for (name, member) in members { if let Some(member) = member { built.insert("
+                  "JStr::new(name), member); } } Value::Object(built) }"),
+                 ("quota_side", "fn quota_side(pairs: &QuotaPairs, side: fn(&Pair) -> u64) -> Value { let ordered = "
+                  "[pairs.pods, pairs.config_maps, pairs.services, pairs.cpu_millis, pairs.memory_bytes, "
+                  "pairs.ephemeral_storage_bytes]; let mut built = Object::new(); for ((unit, _, _), pair) in "
+                  "quota::UNITS.iter().zip(ordered.iter()) { built.insert(JStr::new(unit), "
+                  "Value::Int(Int::from_u64(side(pair)))); } Value::Object(built) }"))
+# The SnapshotView literal (I5D-11), the capture push at its two sites (I5D-4, I5E-3), the round's start (I5F-2 (1)),
+# the Passed statement and the Availability push that carries it (I5E-3, I5F-2 (4)).
+I01B5_SNAPSHOT_LITERAL = "SnapshotView { phase: self.phase, mark, fresh_stamp: stamp, derived }"
+I01B5_CAPTURE_PUSH = ("if let Some(captures) = self.captures.as_deref() { self.client.push_capture_view("
+                      "CaptureGate::from_view(captures.view(), self.capture_expired.get())); }")
+I01B5_CAPTURE_SITES = ("check_capture_expiry", "capture_cycle")
+I01B5_ROUND_STARTED = "let started = self.client.now();"
+I01B5_ROUND_START = ("self.request_round = Some(RequestRound { started, deadline: after(started, REQUEST_ROUND_DEADLINE), "
+                     "mark: None });")
+I01B5_PASSED = ("let passed = self.request_round.take().and_then(|round| round.mark.map(|mark| Passed { started: "
+                "round.started, mark, stamp: self.client.now() }));")
+I01B5_AVAILABILITY_PASSED = ("self.client.push_availability(Availability { phase: self.phase, established, fresh, round: "
+                             "passed.map(Round::Passed) });")
+# client.rs's one CaptureGate constructor, whole (I5D-4; I5E-7).
+I01B5_FROM_VIEW = ("pub fn from_view(view: &CaptureView, expired: bool) -> CaptureGate { let taken = |slot: &Slot| "
+                   "matches!(slot, Slot::Taken { .. }); let mut slots: Vec<(String, bool)> = CAPTURE_ROLE_SLOTS.iter()"
+                   ".zip(view.roles.iter()).map(|(name, slot)| (name.to_string(), taken(slot))).collect(); "
+                   "slots.push((CAPTURE_LIFECYCLE_SLOT.to_string(), taken(&view.lifecycle))); "
+                   "slots.extend(view.backends.iter().map(|(component, slot)| "
+                   '(format!("{CAPTURE_BACKEND_SLOT_PREFIX}{component}"), taken(slot)))); CaptureGate { scheduled: '
+                   "view.scheduled, set_started_ms: view.set_started_ms, slots, record_digest: view.record_digest.clone(), "
+                   "expired } }")
+# i01_service.rs's fn respond (section 4.3; I5E-1, I5E-6, I5F-4, I5F-6; B3-6 (2), I3D-12): the freshness statement
+# directly before the clock statement, the CaptureFacts literal, and the answer, self-check and send statements.
+I01B5_FRESHNESS = ("if now >= after(received, I01_EXCHANGE_DEADLINE) || now >= session.outer { return "
+                   "Some(Closed::NotServed); }")
+I01B5_CLOCK = "let wall_ms = match wall_ms { Some(ms) => ms, None => return Some(Closed::Window) };"
+I01B5_FACTS = ("let facts = crate::i01_answer::CaptureFacts { completed: gate.scheduled.is_some(), expired: gate.expired, "
+               "scheduled_after_now: gate.scheduled > Some(now), slots: gate.slots.clone(), mono_age_ms: "
+               "gate.scheduled.filter(|at| *at <= now).map_or(0, |at| ms(now - at)), wall_age_ms: wall_ms as i64 - "
+               "gate.set_started_ms as i64, record_digest: gate.record_digest.clone(), };")
+I01B5_ANSWER = ("let bytes = match crate::i01_answer::answer(derived, &checked, &facts, wall_ms, session.last_observed) { "
+                "Ok(bytes) => bytes, Err(refusal) => return Some(Closed::Answer(refusal)), };")
+I01B5_SELF_CHECK = ("let observation = match ::std::str::from_utf8(&bytes).ok().and_then(|text| "
+                    "::i05_protocol::json::parse(text).ok()) { Some(observation) => match crate::i01_answer::self_check("
+                    "&observation, &checked, derived.binding_member(), wall_ms / 1000, session.previous.as_ref()) { "
+                    "Ok(()) => observation, Err(refusal) => return Some(Closed::Answer(refusal)), }, None => return "
+                    "Some(Closed::NotServed), };")
+I01B5_SEND = ("match ops.peer_send(session.peer, &bytes) { PeerSent::Sent => session.sent(&checked, &bytes, observation, "
+              "wall_ms), PeerSent::Failed(_) => return Some(Closed::NotServed), }")
+# serve_peer_deadlines (section 4.2; I5E-1, I5F-4, B3-4, B3-10): the statement closing at the exchange deadline and the
+# bounds, before the one statement calling respond when ready.
+I01B5_DEADLINES_CLOSE = ("let closed = if !inside { Some(Closed::Window) } else if session.pending.as_ref().is_some_and(|(_, "
+                         "received)| now >= after(*received, I01_EXCHANGE_DEADLINE)) { Some(Closed::NotServed) } else if "
+                         "now >= session.outer || (session.pending.is_none() && now >= session.idle) { Some(Closed::Bound) "
+                         "} else { None };")
+I01B5_RESPOND_CALL = ("let closed = if self.ready(&session, now) { self.respond(ops, &mut session, wall_ms, now) } else { "
+                      "None };")
+# G-I01B-5 (section 6.2; DIB section 5; I5D-7, I5D-9): the send path's declaration, LinuxWire's send, I01Socket's one
+# send, PeerService's two signatures that take PeerOps, and linux_net.rs's readable-only interest.
+I01B5_PEER_SEND_DECLARATION = "fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent;"
+I01B5_PEER_SEND_WIRE = "fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent { self.i01.send_answer(peer, bytes) }"
+I01B5_SEND_ANSWER = ("pub(crate) fn send_answer(&self, peer: PeerId, bytes: &[u8]) -> PeerSent { let Some(held) = "
+                     "self.held_peer(peer) else { return PeerSent::Failed(NO_PEER) }; match channel::send(&held.conn, "
+                     "bytes) { Ok(()) => PeerSent::Sent, Err(error) => PeerSent::Failed(errno(&error)), } }")
+I01B5_STEP_SIGNATURE = ("fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant, ready: "
+                        "PeerReady) -> PeerOutcome;")
+I01B5_DEADLINES_SIGNATURE = "fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant);"
+I01B5_READABLE = "let readable = channel::Interest { readable: true, writable: false };"
+TRAIT_HEADER = re.compile(r"\btrait\s+([A-Za-z_]\w*)")
+RESPOND_WORD = re.compile(r"\brespond\b")
+DEADLINES_WORD = re.compile(r"\bserve_peer_deadlines\b")
+DEADLINES_DEFINITION = re.compile(r"\bfn\s+serve_peer_deadlines\b")
+DEADLINES_PATH = re.compile(r"::\s*serve_peer_deadlines\b")
+# G-I01B-5 (i) [I5D-8, I5E-4, I5F-5]: in i01_service.rs the session's chain, previous and last_observed at their fixed
+# places, reads included; a place marked True lies inside fn sent.
+I01B5_SESSION_PLACES = {
+    "chain": ((re.compile(r"\bchain\s*:\s*Chain\s*,"), False), (re.compile(r"\bchain\s*:\s*Chain::default\s*\(\s*\)\s*,"), False),
+              (re.compile(r"\bcheck_request\s*\(\s*bytes\s*,\s*false\s*,\s*&\s*mut\s+session\s*\.\s*chain\s*,"), False),
+              (re.compile(r"\bself\s*\.\s*chain\s*\.\s*answered\s*\("), True)),
+    "previous": ((re.compile(r"\bprevious\s*:\s*Option\s*<\s*Value\s*>\s*,"), False),
+                 (re.compile(r"\bprevious\s*:\s*None\s*,"), False),
+                 (re.compile(r"\bself\s*\.\s*previous\s*=\s*Some\s*\(\s*observation\s*\)\s*;"), True),
+                 (I01B5_SELF_CHECK, False)),
+    "last_observed": ((re.compile(r"\blast_observed\s*:\s*Option\s*<\s*u64\s*>\s*,"), False),
+                      (re.compile(r"\blast_observed\s*:\s*None\s*,"), False),
+                      (re.compile(r"\bself\s*\.\s*last_observed\s*=\s*Some\s*\(\s*wall_ms\s*/\s*1_000\s*\)\s*;"), True),
+                      (I01B5_ANSWER, False)),
+}
+# Round 3's folds (section 6.8; I5F-1..3): check_snapshot's names and their counts at rev 5's shape; snapshot_once's
+# destructuring of the fresh list and its check_snapshot call; adm4's Match arm; request_round's seven places; the word
+# captures by enclosing fn (None: the Epoch struct's field); the struct-expression patterns.
+I01B5_SNAPSHOT_NAMES = (("inputs", 12), ("quotas", 9), ("resource_version", 2), ("samples", 1), ("window", 1),
+                        ("record", 4))
+I01B5_FRESH_TEXT = ('let Some((resource_text, mark, stamp)) = fresh else { return Err(self.stop(ObserverExit::Answer, '
+                    '"no list was read")); };')
+I01B5_CHECK_CALL = ("let (observation, view) = self.check_snapshot(pairs, exposition.samples, window, &resource_text, mark, "
+                    "stamp)?;")
+I01B5_ADM4_ARM = "Verdict::Match => { let digest = record.digest(); Ok((record, digest)) }"
+I01B5_ROUND_PLACES = ("request_round: Option<RequestRound>,", "request_round: None,", I01B5_ROUND_START,
+                      "self.request_round.as_ref().map(|round| (round.deadline, round.mark))", "self.request_round = None;",
+                      "if let Some(round) = self.request_round.as_mut() { round.mark = Some(mark); }", I01B5_PASSED)
+I01B5_CAPTURES_PLACES = {None: 1, "run": 2, "new": 1, "with_captures": 3, "capture_view": 4, "check_capture_expiry": 7,
+                         "capture_cycle": 7, "wake": 3, "check_snapshot": 1}
+REQUEST_ROUND_LITERAL = re.compile(r"\bRequestRound(?:::\s*<\s*>)?\s*\{")
+PASSED_LITERAL = re.compile(r"\bPassed(?:::\s*<\s*>)?\s*\{")
+CAPTURE_VIEW_LITERAL = re.compile(r"\bCaptureView(?:::\s*<\s*>)?\s*\{")
+CAPTURE_GATE_LITERAL = re.compile(r"\bCaptureGate(?:::\s*<\s*>)?\s*\{")
+SNAPSHOT_VIEW_LITERAL = re.compile(r"\bSnapshotView(?:::\s*<\s*>)?\s*\{")
+# SnapshotView closed (section 6.5; B3-7; I5D-11): its places in client.rs and observe.rs (use declarations aside).
+I01B5_SNAPSHOT_CLIENT = (re.compile(r"\bpub\s+struct\s+SnapshotView\s*\{"), "fn peer_snapshot_view(&mut self, view: SnapshotView);",
+                         "pub fn push_snapshot_view(&mut self, view: SnapshotView) {")
+I01B5_SNAPSHOT_OBSERVE = ("fn check_snapshot(&mut self, pairs: Vec<ListInput>, samples: Vec<MetricSample>, window: "
+                          "(Option<u64>, Option<u64>), resource_version: &str, mark: u64, stamp: Instant) -> "
+                          "Result<(Observation, SnapshotView), Stop> {", I01B5_SNAPSHOT_LITERAL)
+# The new literal pins (section 6.4; G-I01B-8's form; I5E-7): (file, name, kind, form, value or None, the citation its
+# doc comment holds, the i01_gate.rs constant it equals or None). REQUEST_ROUND_SPACING also equals observe.rs's
+# COALESCE, its source.
+DURATION_FORM = r"Duration::from_secs\(([0-9][0-9_]*)\)"
+TEXT_LIST_FORM = r'(\["[ !#-\[\]-~]*"(?:, "[ !#-\[\]-~]*")*\])'
+I01B5_LITERAL_PINS = (
+    ("crates/observer/src/observe.rs", "REQUEST_ROUND_SPACING", "Duration", DURATION_FORM, 1, "COALESCE's source", None),
+    ("crates/observer/src/observe.rs", "REQUEST_ROUND_DEADLINE", "Duration", DURATION_FORM, 2, "EXCHANGE_DEADLINE_SECONDS",
+     ("EXCHANGE_DEADLINE_SECONDS", "u64", r"([0-9][0-9_]*)")),
+    ("crates/observer/src/i01_service.rs", "I01_EXCHANGE_DEADLINE", "Duration", DURATION_FORM, 2,
+     "EXCHANGE_DEADLINE_SECONDS", ("EXCHANGE_DEADLINE_SECONDS", "u64", r"([0-9][0-9_]*)")),
+    ("crates/observer/src/observe.rs", "NO_CAPTURE_ENGINE_TEXT", "&str", r'"([ !#-\[\]-~]*)"', "no capture engine",
+     "Q-I01B5D-4 (a)", None),
+    ("crates/observer/src/client.rs", "CAPTURE_ROLE_SLOTS", "[&str; 5]", TEXT_LIST_FORM, None, "i01_gate.rs:37-45",
+     ("ROLE_SLOTS", "[&str; 5]", TEXT_LIST_FORM)),
+    ("crates/observer/src/client.rs", "CAPTURE_LIFECYCLE_SLOT", "&str", r'"([ !#-\[\]-~]*)"', None, "i01_gate.rs:37-45",
+     ("LIFECYCLE_SLOT", "&str", r'"([ !#-\[\]-~]*)"')),
+    ("crates/observer/src/client.rs", "CAPTURE_BACKEND_SLOT_PREFIX", "&str", r'"([ !#-\[\]-~]*)"', None,
+     "i01_gate.rs:37-45", ("BACKEND_SLOT_PREFIX", "&str", r'"([ !#-\[\]-~]*)"')))
+
+
+def pinned_pattern(text: str, literals: bool = False) -> re.Pattern:
+    """HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 6.2, 6.4 and 6.8): a pinned statement or body as one pattern, matched
+    whole and spacing free in WIRE_SETUP_MATCH's construction: `text`'s tokens (STATEMENT_TOKEN) in order, any
+    whitespace between two tokens and at least one between two words, the first not preceded by a word character, `.`
+    or `:`. Without `literals` a string literal is read as `""`, as observer_code empties it."""
+    tokens = STATEMENT_TOKEN.findall(text)
+    parts = []
+    for index, token in enumerate(tokens):
+        if index:
+            parts.append(r"\s+" if re.match(r"\w", tokens[index - 1][-1]) and re.match(r"\w", token[0]) else r"\s*")
+        parts.append(re.escape('""' if token.startswith('"') and not literals else token))
+    return re.compile(r"(?<![\w.:])" + "".join(parts))
+
+
+def place_pattern(place: str | re.Pattern) -> re.Pattern:
+    """A fixed place: a pattern as given, or a pinned text (pinned_pattern)."""
+    return place if isinstance(place, re.Pattern) else pinned_pattern(place)
+
+
+def named_at(code: str, word: str, places: tuple) -> bool:
+    """Whether `word` occurs in `code` exactly at its fixed places (G-I01-2's count construction with positions): each
+    place (a pinned text or a pattern, or a (place, times) pair) matches exactly once (or `times` times), and the word's
+    occurrences are exactly those inside the places' matches."""
+    pattern = re.compile(r"\b%s\b" % re.escape(word))
+    words = [found.start() for found in pattern.finditer(code)]
+    expected = []
+    for place in places:
+        place, times = place if isinstance(place, tuple) else (place, 1)
+        found = list(place_pattern(place).finditer(code))
+        if len(found) != times:
+            return False
+        expected.extend(match.start() + inner.start() for match in found for inner in pattern.finditer(match.group(0)))
+    return sorted(expected) == words
+
+
+def function_statements(code: str, name: str, rule: str) -> list[tuple[int, int]]:
+    """The outermost statements of the one `fn <name>(` (outermost_statements); none when there is not exactly one."""
+    span = function_span(code, name)
+    return outermost_statements(code, span[0], rule) if span else []
+
+
+def statement_indexes(code: str, statements: list[tuple[int, int]], text: str) -> list[int]:
+    """The indexes of the statements that are exactly the pinned `text`."""
+    pattern = pinned_pattern(text)
+    return [index for index, (start, end) in enumerate(statements) if pattern.fullmatch(code[start:end])]
+
+
+def function_spans(code: str) -> list[tuple[str, int, int]]:
+    """Each `fn <name>` with a body, as (name, the `fn` keyword's position, the index after its body's `}`), its
+    signature read with bracket_scan up to the body's `{` (a `;` first: a declaration without a body)."""
+    spans = []
+    for found in re.finditer(r"\bfn\s+([A-Za-z_]\w*)", code):
+        stop = bracket_scan(code, found.end(), "{;", "a fn signature the I01B5 rules")[0]
+        if code[stop] == "{":
+            spans.append((found.group(1), found.start(), block_end(code, stop)))
+    return spans
+
+
+def enclosing_function(spans: list[tuple[str, int, int]], position: int) -> str | None:
+    """The name of the innermost fn whose text holds `position`, or None."""
+    inside = [(end - start, name) for name, start, end in spans if start <= position < end]
+    return min(inside)[1] if inside else None
+
+
+def blank_uses(code: str) -> str:
+    """`code` with every use declaration blanked in place."""
+    return blank(re.compile(USE_DECLARATION.pattern), code)
+
+
+# G-I01B-5, one send path.
+
+def send_a_peer_send(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (a) [I5D-7]: over crates/observer the word peer_send occurs exactly three times: PeerOps' declaration
+    `fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent;`, matched whole (so no default body) inside
+    client.rs's `pub trait PeerOps {`; LinuxWire's `fn peer_send(..) -> PeerSent { self.i01.send_answer(peer, bytes) }`,
+    matched whole inside linux_net.rs's `impl PeerOps for LinuxWire {`; and the one call `ops.peer_send(` in
+    i01_service.rs."""
+    words = [(rel, found.start()) for rel, code in sorted(codes.items()) for found in PEER_SEND.finditer(code)]
+    require(len(words) == 3, "peer_send occurs %d times, not exactly 3: PeerOps' declaration, LinuxWire's fn and the one "
+            "call (%s (a))" % (len(words), rule))
+    places = []
+    for rel, header, shown, text in ((OBSERVER_CLIENT, r"\bpub\s+trait\s+PeerOps\s*\{", "pub trait PeerOps {",
+                                      I01B5_PEER_SEND_DECLARATION),
+                                     (OBSERVER_LINUX_NET, r"\bimpl\s+PeerOps\s+for\s+LinuxWire\s*\{",
+                                      "impl PeerOps for LinuxWire {", I01B5_PEER_SEND_WIRE)):
+        code = codes.get(rel, "")
+        blocks, found = list(re.finditer(header, code)), list(pinned_pattern(text).finditer(code))
+        require(len(blocks) == 1 and len(found) == 1
+                and blocks[0].end() <= found[0].start() < block_end(code, blocks[0].end() - 1),
+                "%s does not hold `%s` exactly once, whole, inside its one `%s` (%s (a), I5D-7)" % (rel, text, shown, rule))
+        places.append((rel, found[0].start() + found[0].group(0).index("peer_send")))
+    service = codes.get(OBSERVER_SERVICE, "")
+    calls = [(rel, at) for rel, at in words if rel == OBSERVER_SERVICE and re.search(r"\bops\s*\.\s*$", service[:at])
+             and re.match(r"peer_send\s*\(", service[at:])]
+    require(len(calls) == 1 and sorted(places + calls) == words, "the peer_send call is not in %s, as its one "
+            "`ops.peer_send(` (%s (a))" % (OBSERVER_SERVICE, rule))
+
+
+def send_b_send_answer(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (b) [I5D-7]: send_answer occurs exactly twice in crates/observer: `fn send_answer(` in linux_listen.rs's
+    `impl I01Socket {`, its whole fn matched as pinned (no peer held is `Failed(NO_PEER)`; else `match
+    channel::send(&held.conn, bytes) { Ok(()) => PeerSent::Sent, Err(error) => PeerSent::Failed(errno(&error)), }`, the
+    bytes unchanged), and `self.i01.send_answer(peer, bytes)`, the whole body of LinuxWire's peer_send."""
+    words = [(rel, found.start()) for rel, code in sorted(codes.items())
+             for found in re.finditer(r"\bsend_answer\b", code)]
+    require(len(words) == 2, "send_answer occurs %d times, not exactly twice: its definition and LinuxWire::peer_send's "
+            "body (%s (b))" % (len(words), rule))
+    listen = codes.get(OBSERVER_LINUX_LISTEN, "")
+    impls, found = list(re.finditer(r"\bimpl\s+I01Socket\s*\{", listen)), list(pinned_pattern(I01B5_SEND_ANSWER).finditer(listen))
+    require(len(impls) == 1 and len(found) == 1
+            and impls[0].end() <= found[0].start() < block_end(listen, impls[0].end() - 1),
+            "%s's fn send_answer is not exactly as pinned, once, inside its one `impl I01Socket {` (%s (b), I5D-7)"
+            % (OBSERVER_LINUX_LISTEN, rule))
+    wire = list(pinned_pattern(I01B5_PEER_SEND_WIRE).finditer(codes.get(OBSERVER_LINUX_NET, "")))
+    places = [(OBSERVER_LINUX_LISTEN, found[0].start() + found[0].group(0).index("send_answer"))]
+    places += [(OBSERVER_LINUX_NET, match.start() + match.group(0).index("send_answer")) for match in wire]
+    require(sorted(places) == words, "send_answer is named other than at its definition and as LinuxWire::peer_send's "
+            "whole body (%s (b))" % rule)
+
+
+def send_c_channel_send(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (c) (G-I01-5's channel::send clause as a count, F6.5): `channel::send` (the word form, called or not,
+    any prefix) occurs exactly once in crates/observer, inside linux_listen.rs's fn send_answer."""
+    words = [(rel, found.start()) for rel, code in sorted(codes.items()) for found in CHANNEL_SEND.finditer(code)]
+    span = function_span(codes.get(OBSERVER_LINUX_LISTEN, ""), "send_answer")
+    require(len(words) == 1 and words[0][0] == OBSERVER_LINUX_LISTEN and span is not None and span[0] < words[0][1] < span[1],
+            "channel::send occurs %d times, not exactly once inside I01Socket::send_answer (%s (c))" % (len(words), rule))
+
+
+def send_d_use_paths(base: Path, rule: str) -> None:
+    """G-I01B-5 (d), the backstops beside G-I01-5's use-path refusals (which stay, under G-I01B-6's own-scope reading):
+    in linux_net.rs and linux_listen.rs, their use paths read with resolved_uses in the file's own scope, no path ends
+    in send, none renames a path ending in channel (a trailing self read as its module) and none is a glob."""
+    for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+        require((base / rel).is_file(), "%s is missing (%s (d))" % (rel, rule))
+        uses = resolved_uses(source_uses(rel, (base / rel).read_text(encoding="utf-8")), posixpath.basename(rel)[:-3])
+        for path, rename in uses:
+            target = path[:-1] if path[-1:] == ("self",) and len(path) > 1 else path
+            require(path[-1] != "send", "%s imports a path ending in send (%s (d))" % (rel, rule))
+            require(rename is None or target[-1:] != ("channel",), "%s renames a path ending in channel (%s (d))"
+                    % (rel, rule))
+            require(path[-1] != "*", "%s imports a glob (%s (d))" % (rel, rule))
+
+
+def send_e_peer_ops(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (e) [B3-4; Q-6 (a); I5D-9]: in client.rs's `pub trait PeerService {` body PeerOps occurs only in the two
+    signatures of serve_peer_step and serve_peer_deadlines (each matched whole, once), so no push takes the peer
+    operations; crate-wide no use declaration or `as` renames PeerOps and no type item (read to its `;` at bracket
+    depth 0) names it; and every trait header, read whole to its `{` with bracket_scan as impl_headers reads impl
+    headers, names PeerOps nowhere (a supertrait, a generic bound, a where clause), PeerOps' own name aside."""
+    client = codes.get(OBSERVER_CLIENT, "")
+    headers = list(re.finditer(r"\bpub\s+trait\s+PeerService\s*\{", client))
+    require(len(headers) == 1, "%s does not hold `pub trait PeerService {` exactly once (%s (e))" % (OBSERVER_CLIENT, rule))
+    opening = headers[0].end() - 1
+    body = client[opening + 1:block_end(client, opening) - 1]
+    for text in (I01B5_STEP_SIGNATURE, I01B5_DEADLINES_SIGNATURE):
+        found = list(pinned_pattern(text).finditer(body))
+        require(len(found) == 1, "PeerService does not declare `%s` exactly once (%s (e))" % (text, rule))
+        body = body[:found[0].start()] + " " * (found[0].end() - found[0].start()) + body[found[0].end():]
+    require(not re.search(r"\bPeerOps\b", body), "PeerService names PeerOps outside serve_peer_step and "
+            "serve_peer_deadlines (%s (e), B3-4)" % rule)
+    for rel, code in sorted(codes.items()):
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s (e))" % (rel, rule)) from None
+        require(not re.search(r"\bPeerOps\s+as\b|\bas\s+PeerOps\b", code)
+                and not any(re.search(r"\bPeerOps\b", text) for text in type_items),
+                "%s renames or aliases PeerOps (%s (e))" % (rel, rule))
+        for found in TRAIT_HEADER.finditer(code):
+            end = bracket_scan(code, found.end(), "{;", "%s: a trait header (%s (e))" % (rel, rule))[0]
+            rest = code[found.end():end] if found.group(1) == "PeerOps" else code[found.start():end]
+            require(not re.search(r"\bPeerOps\b", rest), "%s has a trait header naming PeerOps, `%s` (%s (e), I5D-9)"
+                    % (rel, " ".join(code[found.start():end].split()), rule))
+
+
+def send_f_respond(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (f) [B2-3; B3-4; B3-11 (b); SR-1 amend; I5D-13 (ii); I5E-5, I5F-6]: the answer, self-check and send
+    statements (I01B5_ANSWER, I01B5_SELF_CHECK, I01B5_SEND; the self-check spelling ::std::str::from_utf8( and
+    ::i05_protocol::json::parse( in full) each match exactly once in i01_service.rs and are three adjacent statements of
+    fn respond's outermost block; and the word respond occurs exactly twice in crates/observer: `fn respond(` and one
+    call in the form `self.respond(` (as G-I01-2 reads `.serve_peer_step(`, so `Self::respond` refuses, X5-5), inside fn
+    serve_peer_deadlines' body in `impl PeerService for I01Service {`."""
+    service = codes.get(OBSERVER_SERVICE, "")
+    words = [(rel, found.start()) for rel, code in sorted(codes.items()) for found in RESPOND_WORD.finditer(code)]
+    require(len(words) == 2, "respond occurs %d times, not its definition and one call (%s (f))" % (len(words), rule))
+    definitions = [found.start() + found.group(0).index("respond") for found in re.finditer(r"\bfn\s+respond\s*\(", service)]
+    impls = list(re.finditer(r"\bimpl\s+PeerService\s+for\s+I01Service\s*\{", service))
+    deadlines = None
+    if len(impls) == 1:
+        opening = impls[0].end() - 1
+        inner = function_span(service[opening:block_end(service, opening)], "serve_peer_deadlines")
+        deadlines = (opening + inner[0], opening + inner[1]) if inner else None
+    calls = [at for rel, at in words if rel == OBSERVER_SERVICE and at not in definitions]
+    require(len(definitions) == 1 and len(calls) == 1 and all(rel == OBSERVER_SERVICE for rel, _ in words)
+            and deadlines is not None and deadlines[0] < calls[0] < deadlines[1]
+            and re.search(r"\bself\s*\.\s*$", service[:calls[0]]) is not None and re.match(r"respond\s*\(", service[calls[0]:]),
+            "the one respond call is not `self.respond(` inside fn serve_peer_deadlines of `impl PeerService for "
+            "I01Service {` (%s (f), B3-4, X5-5)" % rule)
+    spans = []
+    for name, text in (("answer", I01B5_ANSWER), ("self-check", I01B5_SELF_CHECK), ("send", I01B5_SEND)):
+        found = [(match.start(), match.end()) for match in pinned_pattern(text).finditer(service)]
+        require(len(found) == 1, "the %s statement is not exactly as pinned, once (%s (f))" % (name, rule))
+        spans.append(found[0])
+    statements = function_statements(service, "respond", rule)
+    require(any(statements[index:index + 3] == spans for index in range(len(statements))),
+            "the answer, self-check and send statements are not adjacent in fn respond's outermost block (%s (f), SR-1 "
+            "amend)" % rule)
+
+
+def send_g_readable(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (g) [F6.10], beside linux_net.rs's whole-file pin: no `writable: true` in linux_net.rs or
+    linux_listen.rs; every binding of readable in linux_net.rs is `let readable = channel::Interest { readable: true,
+    writable: false };`; every `.add(` there of the I01 listener or peer (a first argument naming i01 or watched)
+    passes readable last; and every `.modify(` is of a `channel::Watched::TcpConn(`."""
+    net = codes.get(OBSERVER_LINUX_NET, "")
+    for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+        require(not re.search(r"\bwritable\s*:\s*true\b", codes.get(rel, "")), "%s registers a write interest (%s (g))"
+                % (rel, rule))
+    require(len(re.findall(r"\blet\s+(?:mut\s+)?readable\b", net)) == len(pinned_pattern(I01B5_READABLE).findall(net)),
+            "%s binds readable other than as `%s` (%s (g))" % (OBSERVER_LINUX_NET, I01B5_READABLE, rule))
+    for found in re.finditer(r"\.\s*(add|modify)\s*\(", net):
+        arguments = call_arguments(net, found.end() - 1)
+        first = arguments[0] if arguments else ""
+        if found.group(1) == "modify":
+            require(first.startswith("channel::Watched::TcpConn("), "%s modifies an I01 registration (%s (g))"
+                    % (OBSERVER_LINUX_NET, rule))
+        elif re.search(r"\bi01\b|\bwatched\b", first):
+            require(arguments[-1:] == ["readable"], "%s registers the I01 listener or peer other than readable only "
+                    "(%s (g))" % (OBSERVER_LINUX_NET, rule))
+
+
+def send_h_deadlines_call(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (h) [B2-10; B3-11 (d)], G-I01-2's construction for serve_peer_step: serve_peer_deadlines, its `fn`
+    definitions aside (the trait declaration and the service's impl), occurs exactly once in crates/observer, as the
+    method call `.serve_peer_deadlines(` inside client.rs's fn wait_serving; any `::serve_peer_deadlines` path refuses."""
+    client = codes.get(OBSERVER_CLIENT, "")
+    serving = body_of(client, re.compile(r"\bfn\s+wait_serving\s*\("), "%s's fn wait_serving (%s (h))"
+                      % (OBSERVER_CLIENT, rule))
+    calls = []
+    for rel, code in sorted(codes.items()):
+        kept = blank(DEADLINES_DEFINITION, code)
+        require(not DEADLINES_PATH.search(kept), "%s names a ::serve_peer_deadlines path (%s (h))" % (rel, rule))
+        calls.extend((rel, found.start()) for found in DEADLINES_WORD.finditer(kept))
+    require(len(calls) == 1 and calls[0][0] == OBSERVER_CLIENT and serving[0] < calls[0][1] < serving[1]
+            and re.search(r"\.\s*$", client[:calls[0][1]]) is not None
+            and re.match(r"serve_peer_deadlines\s*\(", client[calls[0][1]:]) is not None,
+            "serve_peer_deadlines is not called exactly once, as `.serve_peer_deadlines(` inside %s's fn wait_serving "
+            "(%s (h))" % (OBSERVER_CLIENT, rule))
+
+
+def send_i_chain(codes: dict[str, str], rule: str) -> None:
+    """G-I01B-5 (i) [I5D-8, I5E-4, I5F-5], G-I01-2's count construction: over crates/observer the word answered, its
+    `fn answered` definition aside, occurs exactly once, as the call `.answered(` inside i01_service.rs's fn sent; in
+    i01_service.rs the word sent, `fn sent` aside, occurs once, as `.sent(` inside the pinned send statement; and the
+    session's chain, previous and last_observed are named only at their fixed places (I01B5_SESSION_PLACES), reads
+    included: the field, the Session literal, check_request's argument or the answer or self-check statement's read,
+    and fn sent's call or write."""
+    service = codes.get(OBSERVER_SERVICE, "")
+    sent = function_span(service, "sent")
+    require(sent is not None, "%s does not define fn sent once (%s (i))" % (OBSERVER_SERVICE, rule))
+    answered = [(rel, found.start()) for rel, code in sorted(codes.items())
+                for found in re.finditer(r"\banswered\b", blank(re.compile(r"\bfn\s+answered\b"), code))]
+    require(len(answered) == 1 and answered[0][0] == OBSERVER_SERVICE and sent[0] < answered[0][1] < sent[1]
+            and re.search(r"\.\s*$", service[:answered[0][1]]) is not None
+            and re.match(r"answered\s*\(", service[answered[0][1]:]) is not None,
+            "answered occurs %d times outside its definition, not once, as the call `.answered(` inside fn sent (%s (i), "
+            "I5D-8)" % (len(answered), rule))
+    calls = [found.start() for found in re.finditer(r"\bsent\b", blank(re.compile(r"\bfn\s+sent\b"), service))]
+    sends = [(match.start(), match.end()) for match in pinned_pattern(I01B5_SEND).finditer(service)]
+    require(len(calls) == 1 and len(sends) == 1 and sends[0][0] < calls[0] < sends[0][1]
+            and re.search(r"\.\s*$", service[:calls[0]]) is not None,
+            "sent occurs %d times outside its definition, not once, as the call `.sent(` in the pinned send statement (%s "
+            "(i), I5D-8)" % (len(calls), rule))
+    for word, places in I01B5_SESSION_PLACES.items():
+        inside = all(sent[0] < match.start() < sent[1] for place, in_sent in places if in_sent
+                     for match in place_pattern(place).finditer(service))
+        require(named_at(service, word, tuple(place for place, _ in places)) and inside,
+                "%s names %s other than at its %d fixed places (%s (i), I5E-4, I5F-5)" % (OBSERVER_SERVICE, word,
+                                                                                         len(places), rule))
+
+
+def check_i01b5_send(base: Path) -> int:
+    """HE-004-I01B5 G-I01B-5, one send path (DESIGN-I01B5 rev 5 section 6.2; DIB sections 5 and 6; B3-4, B3-11 (b),
+    (d); Q-6 (a); I5D-7..9, I5E-4, I5F-5, I5F-6). Over crates/observer's non-test sources, read as observer_code reads
+    them, its sub-clauses are each their own function: (a) peer_send three times, PeerOps' declaration and LinuxWire's
+    fn matched whole; (b) send_answer twice, its fn matched whole; (c) channel::send once, inside send_answer; (d) the
+    use-path backstops in the two socket files, under G-I01B-6's own-scope reading; (e) PeerOps only in PeerService's
+    two signatures, renamed and aliased nowhere, in no trait header; (f) the answer, self-check and send statements
+    pinned and adjacent in respond's outermost block, respond's one call `self.respond(` inside serve_peer_deadlines;
+    (g) readable-only registrations; (h) serve_peer_deadlines called once, inside wait_serving; (i) answered, sent and
+    the session's chain, previous and last_observed at their fixed places. So every byte the observer sends is
+    respond's, after answer and the public self_check. The number of clauses (nine)."""
+    rule = "one send path, G-I01B-5"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_CLIENT, OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, OBSERVER_SERVICE):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    send_a_peer_send(codes, rule)
+    send_b_send_answer(codes, rule)
+    send_c_channel_send(codes, rule)
+    send_d_use_paths(base, rule)
+    send_e_peer_ops(codes, rule)
+    send_f_respond(codes, rule)
+    send_g_readable(codes, rule)
+    send_h_deadlines_call(codes, rule)
+    send_i_chain(codes, rule)
+    return 9
+
+
+# The pinned statements (section 6.4).
+
+def statements_s1_check_snapshot(codes: dict[str, str], kept: dict[str, str], rule: str) -> None:
+    """(s1) [B3-6 (1); I5D-3, I5D-12; I5E-2; I5F-1 (2); rev 5]: in observe.rs's fn check_snapshot the quota match
+    (I01B5_QUOTA_MATCH) is exactly one outermost statement, and the next five are exactly ADM-4's statement, the
+    configuration Value, the quota Value, the derive statement (I01B5_FOUR) and `drop(inputs);`, each matched whole;
+    read with literals kept, the configuration Value's text occurs once in observe.rs, so its members are exactly
+    qualificationNamespace, pinnedManifestHash and sealedAdmission's ipFamily, serviceCIDR and
+    defaultTolerationSeconds; and the two helpers those Values call, `fn object` and `fn quota_side`, are each defined
+    once and matched whole (I01B5_HELPERS)."""
+    code = codes[OBSERVER_OBSERVE]
+    spans = function_spans(code)
+    for name, text in I01B5_HELPERS:
+        homes = [(start, end) for found, start, end in spans if found == name]
+        match = pinned_pattern(text).match(code, homes[0][0]) if len(homes) == 1 else None
+        require(match is not None and match.end() == homes[0][1], "%s's fn %s is not defined once, exactly as pinned "
+                "(%s (s1), I5D-12)" % (OBSERVER_OBSERVE, name, rule))
+    statements = function_statements(code, "check_snapshot", rule)
+    anchors = statement_indexes(code, statements, I01B5_QUOTA_MATCH)
+    after = [statement_indexes(code, statements, text) for _, text in I01B5_FOUR + (("drop", I01B5_DROP_INPUTS),)]
+    require(len(anchors) == 1 and all(found == [anchors[0] + 1 + index] for index, found in enumerate(after)),
+            "%s's check_snapshot does not hold the quota match, then ADM-4's statement, the configuration Value, the quota "
+            "Value and the derive statement, each as pinned, as four adjacent outermost statements directly before "
+            "`drop(inputs);` (%s (s1), B3-6 (1), I5D-3, I5E-2)" % (OBSERVER_OBSERVE, rule))
+    require(len(pinned_pattern(I01B5_FOUR[1][1], literals=True).findall(kept.get(OBSERVER_OBSERVE, ""))) == 1,
+            "%s's configuration Value does not name exactly qualificationNamespace, pinnedManifestHash and "
+            "sealedAdmission's ipFamily, serviceCIDR and defaultTolerationSeconds (%s (s1), rev 5)" % (OBSERVER_OBSERVE, rule))
+
+
+def statements_s2_snapshot_literal(codes: dict[str, str], rule: str) -> None:
+    """(s2) [I5D-11]: observe.rs writes the SnapshotView literal exactly once, exactly `SnapshotView { phase: self.phase,
+    mark, fresh_stamp: stamp, derived }` to its closing brace, inside check_snapshot's last outermost statement."""
+    code = codes[OBSERVER_OBSERVE]
+    literals = list(SNAPSHOT_VIEW_LITERAL.finditer(code))
+    statements = function_statements(code, "check_snapshot", rule)
+    whole = False
+    if len(literals) == 1 and statements:
+        match = pinned_pattern(I01B5_SNAPSHOT_LITERAL).match(code, literals[0].start())
+        whole = (match is not None and match.end() == block_end(code, literals[0].end() - 1)
+                 and statements[-1][0] <= literals[0].start() < statements[-1][1])
+    require(whole, "%s does not write the SnapshotView literal once, exactly `%s`, in check_snapshot's tail (%s (s2), "
+            "I5D-11)" % (OBSERVER_OBSERVE, I01B5_SNAPSHOT_LITERAL, rule))
+
+
+def statements_s3_capture_push(codes: dict[str, str], rule: str) -> None:
+    """(s3) [I5D-4, I5E-3]: the capture push statement, binding from the field (I01B5_CAPTURE_PUSH), occurs exactly
+    twice in observe.rs, once in fn check_capture_expiry and once in fn capture_cycle."""
+    code = codes[OBSERVER_OBSERVE]
+    found = [match.start() for match in pinned_pattern(I01B5_CAPTURE_PUSH).finditer(code)]
+    spans = [function_span(code, name) for name in I01B5_CAPTURE_SITES]
+    require(len(found) == 2 and all(span is not None and sum(span[0] < at < span[1] for at in found) == 1 for span in spans),
+            "%s does not hold the capture push statement `%s` exactly once in each of fn check_capture_expiry and fn "
+            "capture_cycle (%s (s3), I5D-4, I5E-3)" % (OBSERVER_OBSERVE, I01B5_CAPTURE_PUSH, rule))
+
+
+def statements_s4_passed(codes: dict[str, str], rule: str) -> None:
+    """(s4) [I5D-4, I5E-3, I5F-2 (4)]: the Passed statement, taking the round from its field (I01B5_PASSED), occurs once
+    in observe.rs, inside fn push_availability, and the next statement of its block is exactly the Availability push
+    that carries it (I01B5_AVAILABILITY_PASSED)."""
+    code = codes[OBSERVER_OBSERVE]
+    found = list(pinned_pattern(I01B5_PASSED).finditer(code))
+    span = function_span(code, "push_availability")
+    pushed = False
+    if len(found) == 1 and span is not None and span[0] < found[0].start() < span[1]:
+        block = [(start + len(code[start:end]) - len(code[start:end].lstrip()), end)
+                 for start, end in block_statements(code, found[0].start(), rule)]
+        here = (found[0].start(), found[0].end())
+        if here in block and block.index(here) + 1 < len(block):
+            start, end = block[block.index(here) + 1]
+            pushed = pinned_pattern(I01B5_AVAILABILITY_PASSED).fullmatch(code[start:end]) is not None
+    require(pushed, "%s does not hold the Passed statement once, in fn push_availability, directly followed by the "
+            "Availability push that carries it, each as pinned (%s (s4), I5E-3, I5F-2 (4))" % (OBSERVER_OBSERVE, rule))
+
+
+def statements_s5_round_start(codes: dict[str, str], rule: str) -> None:
+    """(s5) [I5F-2 (1)]: the round-start statement (I01B5_ROUND_START) occurs once in observe.rs, an outermost statement
+    of fn start_round directly after `let started = self.client.now();`."""
+    code = codes[OBSERVER_OBSERVE]
+    statements = function_statements(code, "start_round", rule)
+    starts = statement_indexes(code, statements, I01B5_ROUND_START)
+    lets = statement_indexes(code, statements, I01B5_ROUND_STARTED)
+    require(len(pinned_pattern(I01B5_ROUND_START).findall(code)) == 1 and len(starts) == 1 and starts[0] - 1 in lets,
+            "%s does not start the round once, as `%s` directly after `%s` in fn start_round (%s (s5), I5F-2 (1))"
+            % (OBSERVER_OBSERVE, I01B5_ROUND_START, I01B5_ROUND_STARTED, rule))
+
+
+def statements_s6_from_view(codes: dict[str, str], kept: dict[str, str], rule: str) -> None:
+    """(s6) [I5D-4; I5E-7]: client.rs's one `pub fn from_view(` is exactly I01B5_FROM_VIEW to its closing brace, and
+    with literals kept that text, the backend slot's format included, occurs once in client.rs."""
+    client = codes[OBSERVER_CLIENT]
+    definitions = list(re.finditer(r"\bpub\s+fn\s+from_view\s*\(", client))
+    span = function_span(client, "from_view")
+    require(len(definitions) == 1 and span is not None
+            and pinned_pattern(I01B5_FROM_VIEW).fullmatch(client[definitions[0].start():span[1]]) is not None
+            and len(pinned_pattern(I01B5_FROM_VIEW, literals=True).findall(kept.get(OBSERVER_CLIENT, ""))) == 1,
+            "%s's CaptureGate::from_view is not exactly as pinned, whole (%s (s6), I5D-4, I5E-7)" % (OBSERVER_CLIENT, rule))
+
+
+def statements_s7_clock(codes: dict[str, str], rule: str) -> None:
+    """(s7) [I5E-1, I5E-6, I5F-4]: in i01_service.rs the clock statement (I01B5_CLOCK) occurs once, an outermost
+    statement of fn respond, and the outermost statement directly before it is the freshness statement
+    (I01B5_FRESHNESS), each matched whole."""
+    service = codes[OBSERVER_SERVICE]
+    statements = function_statements(service, "respond", rule)
+    clocks = statement_indexes(service, statements, I01B5_CLOCK)
+    fresh = statement_indexes(service, statements, I01B5_FRESHNESS)
+    require(len(pinned_pattern(I01B5_CLOCK).findall(service)) == 1 and len(clocks) == 1 and fresh == [clocks[0] - 1],
+            "%s's fn respond does not hold the freshness statement directly before the one clock statement, each as "
+            "pinned and outermost (%s (s7), I5E-1, I5E-6, I5F-4)" % (OBSERVER_SERVICE, rule))
+
+
+def statements_s8_facts(codes: dict[str, str], rule: str) -> None:
+    """(s8) [B3-6 (2); I3D-12; I5D-12; I5E-6]: the CaptureFacts statement (I01B5_FACTS), its initialisers the latest
+    CaptureGate's fields and the two ages from `wall_ms` and `now`, occurs once in i01_service.rs, an outermost
+    statement of fn respond."""
+    service = codes[OBSERVER_SERVICE]
+    statements = function_statements(service, "respond", rule)
+    require(len(statement_indexes(service, statements, I01B5_FACTS)) == 1
+            and len(pinned_pattern(I01B5_FACTS).findall(service)) == 1,
+            "%s's CaptureFacts literal's initialisers are not exactly as pinned, in fn respond's outermost block (%s "
+            "(s8), B3-6 (2), I3D-12)" % (OBSERVER_SERVICE, rule))
+
+
+def statements_s9_order(codes: dict[str, str], rule: str) -> None:
+    """(s9) [I5E-1, I5F-4; B3-10], G-I01B-4 (b4)'s order construction: fn serve_peer_deadlines' outermost block holds
+    the statement closing at the window, the exchange deadline and the bounds (I01B5_DEADLINES_CLOSE) and, after it,
+    the one statement calling respond when ready (I01B5_RESPOND_CALL), each matched whole."""
+    service = codes[OBSERVER_SERVICE]
+    statements = function_statements(service, "serve_peer_deadlines", rule)
+    closes = statement_indexes(service, statements, I01B5_DEADLINES_CLOSE)
+    calls = statement_indexes(service, statements, I01B5_RESPOND_CALL)
+    require(len(closes) == 1 and len(calls) == 1 and closes[0] < calls[0],
+            "%s's fn serve_peer_deadlines does not hold the statement closing at the exchange deadline and the bounds, "
+            "then the one statement calling respond when ready, each as pinned and outermost, in that order (%s (s9), "
+            "I5E-1, I5F-4, B3-10)" % (OBSERVER_SERVICE, rule))
+
+
+def check_i01b5_statements(base: Path) -> int:
+    """HE-004-I01B5's pinned statements (DESIGN-I01B5 rev 5 section 6.4; B3-6 (1), (2); I5D-3, I5D-4, I5D-11, I5D-12;
+    I5E-2, I5E-3, I5E-6, I5E-7; I5F-2 (1), I5F-4), each matched whole and spacing free, each sub-clause its own
+    function: (s1) check_snapshot's quota match and four adjacent statements before drop(inputs), the configuration's
+    members read with literals kept; (s2) the SnapshotView literal; (s3) the capture push at its two sites; (s4) the
+    Passed statement and the push that carries it; (s5) the round's start; (s6) CaptureGate::from_view whole; (s7)
+    respond's freshness statement directly before its one clock statement; (s8) the CaptureFacts literal; (s9)
+    serve_peer_deadlines' closing statement before its respond call. The number of clauses (nine)."""
+    rule = "pinned statements, B3-6"
+    codes = observer_code(base, rule)
+    kept = observer_code(base, rule, literals=True)
+    for rel in (OBSERVER_OBSERVE, OBSERVER_CLIENT, OBSERVER_SERVICE):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    statements_s1_check_snapshot(codes, kept, rule)
+    statements_s2_snapshot_literal(codes, rule)
+    statements_s3_capture_push(codes, rule)
+    statements_s4_passed(codes, rule)
+    statements_s5_round_start(codes, rule)
+    statements_s6_from_view(codes, kept, rule)
+    statements_s7_clock(codes, rule)
+    statements_s8_facts(codes, rule)
+    statements_s9_order(codes, rule)
+    return 9
+
+
+# Round 3's folds (section 6.8; I5F-1..3, I5F-7), each with its existing construction.
+
+def fold_1_snapshot_names(codes: dict[str, str], rule: str) -> None:
+    """I5F-1 (1), G-I01B-4 (b2)'s count: in fn check_snapshot's body inputs, quotas, resource_version, samples, window
+    and record each occur exactly I01B5_SNAPSHOT_NAMES' times (rev 5's shape), so no shadow of one before the four
+    statements (A2-A4) passes."""
+    code = codes[OBSERVER_OBSERVE]
+    span = function_span(code, "check_snapshot")
+    require(span is not None, "%s does not define fn check_snapshot once (%s, I5F-1 (1))" % (OBSERVER_OBSERVE, rule))
+    body = code[span[0]:span[1]]
+    for word, count in I01B5_SNAPSHOT_NAMES:
+        found = len(re.findall(r"\b%s\b" % word, body))
+        require(found == count, "%s's check_snapshot names %s %d times, not %d, its fixed places (%s, I5F-1 (1))"
+                % (OBSERVER_OBSERVE, word, found, count, rule))
+
+
+def fold_1_snapshot_call(codes: dict[str, str], rule: str) -> None:
+    """I5F-1 (3): fn snapshot_once's outermost block holds the fresh list's destructuring (I01B5_FRESH_TEXT) and the
+    check_snapshot call (I01B5_CHECK_CALL), each matched whole, and its body names resource_text only there (twice)."""
+    code = codes[OBSERVER_OBSERVE]
+    statements = function_statements(code, "snapshot_once", rule)
+    span = function_span(code, "snapshot_once")
+    words = len(re.findall(r"\bresource_text\b", code[span[0]:span[1]])) if span else 0
+    require(len(statement_indexes(code, statements, I01B5_FRESH_TEXT)) == 1
+            and len(statement_indexes(code, statements, I01B5_CHECK_CALL)) == 1 and words == 2,
+            "%s's snapshot_once does not hold the fresh list's destructuring and the check_snapshot call, each as pinned "
+            "and outermost, naming resource_text only there (%s, I5F-1 (3))" % (OBSERVER_OBSERVE, rule))
+
+
+def fold_1_adm4_arm(codes: dict[str, str], rule: str) -> None:
+    """I5F-1 (4), WIRE_SETUP_MATCH's construction: fn adm4 holds its Verdict::Match arm exactly as `Verdict::Match => {
+    let digest = record.digest(); Ok((record, digest)) }`, once, so ADM-4's digest is the record's."""
+    code = codes[OBSERVER_OBSERVE]
+    span = function_span(code, "adm4")
+    found = [match.start() for match in pinned_pattern(I01B5_ADM4_ARM).finditer(code)]
+    require(span is not None and len(found) == 1 and span[0] < found[0] < span[1],
+            "%s's fn adm4 does not hold its Verdict::Match arm exactly as `%s` (%s, I5F-1 (4))"
+            % (OBSERVER_OBSERVE, I01B5_ADM4_ARM, rule))
+
+
+def fold_2_round_literals(codes: dict[str, str], rule: str) -> None:
+    """I5F-2 (2), G-I01B-9 (ii)'s literal-once construction: the RequestRound struct expression occurs once in the crate
+    (its struct header aside), inside the pinned round-start statement, and the Passed struct expression once
+    (client.rs's struct header and i01_service.rs's read-only `Round::Passed(Passed {` patterns aside), inside the
+    pinned Passed statement."""
+    observe = codes[OBSERVER_OBSERVE]
+    asides = {"RequestRound": ((OBSERVER_OBSERVE, r"\bstruct\s+(RequestRound)\b"),),
+              "Passed": ((OBSERVER_CLIENT, r"\bstruct\s+(Passed)\b"), (OBSERVER_SERVICE, r"\bRound::Passed\s*\(\s*(Passed)\b"))}
+    for name, literal, text, home in (("RequestRound", REQUEST_ROUND_LITERAL, I01B5_ROUND_START, "round-start"),
+                                      ("Passed", PASSED_LITERAL, I01B5_PASSED, "Passed")):
+        aside = {(rel, found.start(1)) for rel, header in asides[name] for found in re.finditer(header, codes.get(rel, ""))}
+        literals = [(rel, found.start()) for rel, code in sorted(codes.items()) for found in literal.finditer(code)
+                    if (rel, found.start()) not in aside]
+        homes = [(match.start(), match.end()) for match in pinned_pattern(text).finditer(observe)]
+        require(len(literals) == 1 and len(homes) == 1 and literals[0][0] == OBSERVER_OBSERVE
+                and homes[0][0] < literals[0][1] < homes[0][1],
+                "the %s literal is written %d times, not once, in the pinned %s statement (%s, I5F-2 (2))"
+                % (name, len(literals), home, rule))
+
+
+def fold_2_request_round(codes: dict[str, str], rule: str) -> None:
+    """I5F-2 (3), G-I01-2's count with positions: observe.rs names request_round only at its seven fixed places
+    (I01B5_ROUND_PLACES: the field, the Epoch literal's None, the round's start, its one read, the failed round's
+    clear, the mark's record and the Passed statement's take), each matched whole once."""
+    code = codes[OBSERVER_OBSERVE]
+    words = len(re.findall(r"\brequest_round\b", code))
+    require(named_at(code, "request_round", I01B5_ROUND_PLACES), "%s names request_round %d times, not once at each of "
+            "its seven fixed places (%s, I5F-2 (3))" % (OBSERVER_OBSERVE, words, rule))
+
+
+def fold_2_passed_names(codes: dict[str, str], rule: str) -> None:
+    """I5F-2 (4): fn push_availability names passed exactly twice, once in the Passed statement and once in the
+    Availability push that carries it, each matched whole."""
+    code = codes[OBSERVER_OBSERVE]
+    span = function_span(code, "push_availability")
+    body = code[span[0]:span[1]] if span else ""
+    require(named_at(body, "passed", (I01B5_PASSED, I01B5_AVAILABILITY_PASSED)), "%s's fn push_availability names passed "
+            "other than once in the Passed statement and once in the Availability push that carries it (%s, I5F-2 (4))"
+            % (OBSERVER_OBSERVE, rule))
+
+
+def fold_3_capture_counts(codes: dict[str, str], rule: str) -> None:
+    """I5F-3 (1), G-I01-2's count with positions: push_capture_view occurs only at client.rs's definition and in the two
+    pinned push statements; from_view only at its definition and in those two; peer_capture_view only at PeerService's
+    declaration, client.rs's forwarding call and the service's impl."""
+    places = {"push_capture_view": {OBSERVER_CLIENT: (re.compile(r"\bpub\s+fn\s+push_capture_view\s*\("),),
+                                    OBSERVER_OBSERVE: ((I01B5_CAPTURE_PUSH, 2),)},
+              "from_view": {OBSERVER_CLIENT: (re.compile(r"\bpub\s+fn\s+from_view\s*\("),),
+                            OBSERVER_OBSERVE: ((I01B5_CAPTURE_PUSH, 2),)},
+              "peer_capture_view": {OBSERVER_CLIENT: ("fn peer_capture_view(&mut self, gate: CaptureGate);",
+                                                      "service.peer_capture_view(gate);"),
+                                    OBSERVER_SERVICE: (re.compile(r"\bfn\s+peer_capture_view\s*\("),)}}
+    for word, homes in places.items():
+        for rel, code in sorted(codes.items()):
+            require(named_at(code, word, homes.get(rel, ())), "%s names %s other than at its fixed places (%s, I5F-3 (1))"
+                    % (rel, word, rule))
+
+
+def fold_3_captures(codes: dict[str, str], rule: str) -> None:
+    """I5F-3 (2): observe.rs names captures only at its fixed places, counted by enclosing fn (I01B5_CAPTURES_PLACES:
+    the field, the Epoch literal, run's parameter and call, with_captures' assignment, capture_view,
+    check_capture_expiry, capture_cycle, the expiry wake, the derive statement and the two push statements), and
+    with_captures occurs in the crate only at its definition and as run's one call `.with_captures(`."""
+    code = codes[OBSERVER_OBSERVE]
+    spans = function_spans(code)
+    counts: dict[str | None, int] = {}
+    for found in re.finditer(r"\bcaptures\b", code):
+        name = enclosing_function(spans, found.start())
+        counts[name] = counts.get(name, 0) + 1
+    shown = ", ".join("%s %d" % (name or "the field", count) for name, count in sorted(counts.items(), key=lambda item: item[0] or ""))
+    require(counts == I01B5_CAPTURES_PLACES, "%s names captures %s, not at its fixed places (%s, I5F-3 (2))"
+            % (OBSERVER_OBSERVE, shown, rule))
+    words = [(rel, found.start()) for rel, other in sorted(codes.items()) for found in re.finditer(r"\bwith_captures\b", other)]
+    definitions = [found.start() + found.group(0).index("with_captures")
+                   for found in re.finditer(r"\bfn\s+with_captures\s*\(", code)]
+    calls = [at for rel, at in words if rel == OBSERVER_OBSERVE and at not in definitions
+             and re.search(r"\.\s*$", code[:at]) and re.match(r"with_captures\s*\(", code[at:])
+             and enclosing_function(spans, at) == "run"]
+    require(len(words) == 2 and len(definitions) == 1 and len(calls) == 1, "with_captures occurs %d times, not its "
+            "definition and run's one call (%s, I5F-3 (2))" % (len(words), rule))
+
+
+def fold_3_capture_literals(codes: dict[str, str], rule: str) -> None:
+    """I5F-3 (3), G-I01B-9 (ii)'s "no other source" rule: no observer source but capture.rs writes the CaptureView
+    struct expression, and no source but client.rs's CaptureGate::from_view writes the CaptureGate one (client.rs's
+    struct and impl headers aside)."""
+    client = codes.get(OBSERVER_CLIENT, "")
+    headers = {found.start(1) for found in re.finditer(r"\b(?:struct|impl)\s+(CaptureGate)\b", client)}
+    definitions = list(re.finditer(r"\bpub\s+fn\s+from_view\s*\(", client))
+    span = function_span(client, "from_view")
+    home = (definitions[0].start(), span[1]) if len(definitions) == 1 and span else (0, 0)
+    for rel, code in sorted(codes.items()):
+        require(rel == OBSERVER_CAPTURE or not CAPTURE_VIEW_LITERAL.search(code), "%s writes the CaptureView literal; "
+                "only capture.rs does (%s, I5F-3 (3))" % (rel, rule))
+        for found in CAPTURE_GATE_LITERAL.finditer(code):
+            require(rel == OBSERVER_CLIENT and (found.start() in headers or home[0] < found.start() < home[1]),
+                    "%s writes the CaptureGate literal; only %s's CaptureGate::from_view does (%s, I5F-3 (3))"
+                    % (rel, OBSERVER_CLIENT, rule))
+
+
+def fold_7_respond_clock(codes: dict[str, str], rule: str) -> None:
+    """I5F-7, G-I01B-4 (c3)'s bound-once reading: in fn respond's body wall_ms and now occur only inside its pinned
+    outermost statements (the freshness, clock, CaptureFacts, answer, self-check and send statements), so wall_ms is
+    bound by `let` only in the clock statement, now by no `let`, and neither is the left side of `=` (G1, G2)."""
+    service = codes.get(OBSERVER_SERVICE, "")
+    span = function_span(service, "respond")
+    require(span is not None, "%s does not define fn respond once (%s, I5F-7)" % (OBSERVER_SERVICE, rule))
+    statements = outermost_statements(service, span[0], rule)
+    pinned = [(start, end) for start, end in statements
+              if any(pinned_pattern(text).fullmatch(service[start:end]) for text in
+                     (I01B5_FRESHNESS, I01B5_CLOCK, I01B5_FACTS, I01B5_ANSWER, I01B5_SELF_CHECK, I01B5_SEND))]
+    clocks = [statement for statement in pinned if pinned_pattern(I01B5_CLOCK).fullmatch(service[statement[0]:statement[1]])]
+    outside = [found.group(0) for found in re.finditer(r"\b(?:wall_ms|now)\b", service[span[0]:span[1]])
+               if not any(start <= span[0] + found.start() < end for start, end in pinned)]
+    require(not outside and len(clocks) == 1, "%s's fn respond names %s outside its pinned statements; wall_ms is bound "
+            "by let only in the clock statement and now by none (%s, I5F-7)"
+            % (OBSERVER_SERVICE, " and ".join(sorted(set(outside))) or "wall_ms", rule))
+
+
+# PR review round 1's R1-1 (MON-I01B5-R1): derive's live sources in observe.rs, self.config and self.closure (and their
+# fields), are never rewritten there. An assignment `=` (compound forms included, `<<=` and `>>=` too; not `==`, `!=`,
+# `<=`, `>=` or `=>`); a derive source as a place; a mutable borrow of one; and std::mem's three exchanging calls, by a
+# bare, `mem::` or `std::`/`core::` path (not a method call).
+I01B5_ASSIGN = re.compile(r"(?:(?<![=!<>])|(?<=<<)|(?<=>>))=(?![=>])")
+I01B5_DERIVE_SOURCE = re.compile(r"\bself\s*\.\s*(?:config|closure)\b")
+I01B5_MUT_SOURCE = re.compile(r"&\s*(?:raw\s+)?mut\b[\s(]*self\s*\.\s*(?:config|closure)\b")
+I01B5_MEM_CALL = re.compile(r"(?<![\w.:])(?:(?:::)?(?:std|core)::)?(?:mem::)?(?:swap|replace|take)\s*\(")
+
+
+def left_side(code: str, index: int) -> str:
+    """The left side of the `=` at `index`: back to the nearest `;`, `{`, `}`, `,`, `|` or `=>` outside brackets, or the
+    `(` or `[` that encloses it (so a closure's or a call's own assignment stops at its parameter list or argument)."""
+    depth, position = 0, index
+    while position > 0:
+        position -= 1
+        char = code[position]
+        if char in ")]":
+            depth += 1
+        elif char in "([":
+            if depth == 0:
+                break
+            depth -= 1
+        elif depth == 0 and (char in "{};,|" or (char == ">" and code[position - 1:position] == "=")):
+            break
+    else:
+        return code[:index]
+    return code[position + 1:index]
+
+
+def fold_r1_1_assignments(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (1), G-I01B-4 (c3)'s left-side reading: in observe.rs no assignment's left side names self.config or
+    self.closure (or a field of either), compound assignments included (R-P6, R-P7, R-P8)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    for found in I01B5_ASSIGN.finditer(code):
+        side = left_side(code, found.start())
+        require(not I01B5_DERIVE_SOURCE.search(side), "%s assigns to %s; derive's sources are never the left side of `=` "
+                "(%s, R1-1 (1), MON-I01B5-R1)" % (OBSERVER_OBSERVE, " ".join(side.split()), rule))
+
+
+def fold_r1_1_borrows(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (2): in observe.rs neither self.config nor self.closure (nor a field of either) is borrowed `&mut` (or `&raw
+    mut`), parenthesised forms included (R-P9)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    found = I01B5_MUT_SOURCE.search(code)
+    require(not found, "%s borrows %s; derive's sources are never borrowed &mut (%s, R1-1 (2), MON-I01B5-R1)"
+            % (OBSERVER_OBSERVE, " ".join(found.group(0).split()) if found else "", rule))
+
+
+def fold_r1_1_exchanges(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (3), G-I01-2's named_at reading of the call: in observe.rs no swap, replace or take call by a bare, `mem::`,
+    `std::mem::` or `core::mem::` path (a method call aside) names self.config or self.closure in its arguments (R-P9)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    for found in I01B5_MEM_CALL.finditer(code):
+        arguments = code[found.end() - 1:paren_end(code, found.end() - 1)]
+        require(not I01B5_DERIVE_SOURCE.search(arguments), "%s passes derive's sources to %s; never an argument of "
+                "std::mem::{swap, replace, take} (%s, R1-1 (3), MON-I01B5-R1)"
+                % (OBSERVER_OBSERVE, found.group(0).rstrip("( "), rule))
+
+
+def check_i01b5_folds(base: Path) -> int:
+    """HE-004-I01B5, round 3's folds (DESIGN-I01B5 rev 5 section 6.8; I5F-1..3, I5F-7; I5F-4 is (s7) and (s9), I5F-5
+    G-I01B-5 (i), I5F-6 (f)'s pinned text), each with its existing construction and its own function: (I5F-1 (1))
+    check_snapshot's names counted; (I5F-1 (2)) the quota match is (s1)'s anchor; (I5F-1 (3)) snapshot_once's
+    destructuring and call; (I5F-1 (4)) adm4's Match arm; (I5F-2 (2)) the RequestRound and Passed literals once; (I5F-2
+    (3)) request_round at seven places; (I5F-2 (4)) passed twice; (I5F-3 (1)) the push words at their places; (I5F-3
+    (2)) captures by enclosing fn and with_captures twice; (I5F-3 (3)) the CaptureView and CaptureGate literals' homes;
+    (I5F-7) respond's clock words only in its pinned statements; and PR review round 1's R1-1 (MON-I01B5-R1), over
+    observe.rs: (R1-1 (1)) derive's sources never the left side of `=`, (R1-1 (2)) never borrowed &mut, (R1-1 (3)) never
+    an argument of std::mem's swap, replace or take. The number of clauses (thirteen)."""
+    rule = "round 3's folds"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_OBSERVE, OBSERVER_CLIENT, OBSERVER_SERVICE):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    fold_1_snapshot_names(codes, rule)
+    fold_1_snapshot_call(codes, rule)
+    fold_1_adm4_arm(codes, rule)
+    fold_2_round_literals(codes, rule)
+    fold_2_request_round(codes, rule)
+    fold_2_passed_names(codes, rule)
+    fold_3_capture_counts(codes, rule)
+    fold_3_captures(codes, rule)
+    fold_3_capture_literals(codes, rule)
+    fold_7_respond_clock(codes, rule)
+    fold_r1_1_assignments(codes, rule)
+    fold_r1_1_exchanges(codes, rule)
+    fold_r1_1_borrows(codes, rule)
+    return 13
+
+
+# SnapshotView closed (section 6.5; B3-7; I5D-11), with G-I01B-9's names clauses.
+
+def snapshot_view_i_struct(codes: dict[str, str], rule: str) -> None:
+    """(i): client.rs defines `struct SnapshotView` once, at its top level, and no other source defines it; its
+    attributes are exactly one `#[derive(Debug)]`, so it derives none of Clone, PartialEq and Eq."""
+    client = codes.get(OBSERVER_CLIENT, "")
+    structs = [(rel, found.start()) for rel, code in sorted(codes.items())
+               for found in re.finditer(r"\bstruct\s+SnapshotView\b", code)]
+    require(len(structs) == 1 and structs[0][0] == OBSERVER_CLIENT and brace_depth(client, structs[0][1]) == 0,
+            "%s does not define struct SnapshotView once, at its top level (%s (i), B3-7)" % (OBSERVER_CLIENT, rule))
+    start = re.search(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bstruct\s+SnapshotView\b", client).start()
+    try:
+        attributes = [re.sub(r"\s+", "", attribute) for attribute in token_attributes(client, start)]
+    except GateError:
+        raise GateError("%s's struct SnapshotView carries an attribute that cannot be read (%s (i))"
+                        % (OBSERVER_CLIENT, rule)) from None
+    require(attributes == ["#[derive(Debug)]"], "%s's struct SnapshotView carries attributes other than exactly one "
+            "#[derive(Debug)] (%s (i), B3-7)" % (OBSERVER_CLIENT, rule))
+
+
+def snapshot_view_ii_literal(codes: dict[str, str], rule: str) -> None:
+    """(ii) [I5D-11]: outside its struct header and impl headers ((iii)'s) the SnapshotView struct expression occurs
+    once in the crate, in observe.rs (the pinned literal, (s2))."""
+    literals = [rel for rel, code in sorted(codes.items()) for found in SNAPSHOT_VIEW_LITERAL.finditer(code)
+                if not re.search(r"\b(?:struct|impl|for)\s+$", code[:found.start()])]
+    require(literals == [OBSERVER_OBSERVE], "the SnapshotView literal is written %d times, not once, in %s (%s (ii))"
+            % (len(literals), OBSERVER_OBSERVE, rule))
+
+
+def snapshot_view_iii_impls(codes: dict[str, str], rule: str) -> None:
+    """(iii): no impl header in the crate names SnapshotView (no trait impl, PartialEq or Clone among them)."""
+    for rel, code in sorted(codes.items()):
+        for _, header in impl_headers(rel, code):
+            require("SnapshotView" not in header.split(), "%s holds an impl naming SnapshotView, `%s` (%s (iii))"
+                    % (rel, header, rule))
+
+
+def snapshot_view_v_names(codes: dict[str, str], rule: str) -> None:
+    """(v): SnapshotView is renamed with `as` nowhere and named by no `type` item (read to its `;` at bracket depth 0)."""
+    for rel, code in sorted(codes.items()):
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in re.finditer(r"\btype\b", code)]
+        except GateError:
+            raise GateError("%s holds a type item the alias rule cannot read (%s (v))" % (rel, rule)) from None
+        require(not re.search(r"\bSnapshotView\s+as\b|\bas\s+SnapshotView\b", code)
+                and not any(re.search(r"\bSnapshotView\b", text) for text in type_items),
+                "%s renames or aliases SnapshotView (%s (v))" % (rel, rule))
+
+
+def snapshot_view_vi_places(codes: dict[str, str], rule: str) -> None:
+    """(vi) [I5D-11], G-I01B-9 (vi)'s construction: SnapshotView is named in client.rs only at its definition,
+    PeerService's method and Client's forwarding method; in observe.rs, use declarations aside, only in
+    check_snapshot's exact signature and its one literal; in i01_service.rs (pinned whole) as it is; in no other
+    source."""
+    for rel, code in sorted(codes.items()):
+        if rel == OBSERVER_CLIENT:
+            ok = named_at(code, "SnapshotView", I01B5_SNAPSHOT_CLIENT)
+        elif rel == OBSERVER_OBSERVE:
+            ok = named_at(blank_uses(code), "SnapshotView", I01B5_SNAPSHOT_OBSERVE)
+        else:
+            ok = rel == OBSERVER_SERVICE or not re.search(r"\bSnapshotView\b", code)
+        require(ok, "%s names SnapshotView other than at its fixed places (%s (vi), I5D-11)" % (rel, rule))
+
+
+def check_i01b5_snapshot_view(base: Path) -> int:
+    """HE-004-I01B5, SnapshotView closed (DESIGN-I01B5 rev 5 section 6.5; B3-7; I5D-11), G-I01B-9's construction:
+    (i) one definition with exactly #[derive(Debug)]; (ii) one literal, in observe.rs; (iii) no impl; (v) no rename or
+    type item; (vi) named only at its fixed places. The number of clauses (five)."""
+    rule = "SnapshotView closed, B3-7"
+    codes = observer_code(base, rule)
+    for rel in (OBSERVER_OBSERVE, OBSERVER_CLIENT):
+        require(rel in codes, "%s is missing (%s)" % (rel, rule))
+    snapshot_view_i_struct(codes, rule)
+    snapshot_view_ii_literal(codes, rule)
+    snapshot_view_iii_impls(codes, rule)
+    snapshot_view_v_names(codes, rule)
+    snapshot_view_vi_places(codes, rule)
+    return 5
+
+
+def check_i01b5_constants(base: Path) -> int:
+    """HE-004-I01B5's literal pins (DESIGN-I01B5 rev 5 section 6.4; G-I01B-8's form, pinned_constant; I5E-7): each of
+    I01B5_LITERAL_PINS is one line-anchored `pub const`, its value pinned (or equal to its i01_gate.rs constant: the two
+    2 s deadlines to EXCHANGE_DEADLINE_SECONDS, the three slot names to ROLE_SLOTS, LIFECYCLE_SLOT and
+    BACKEND_SLOT_PREFIX, which client.rs may not name), with its citation in the doc comment directly above it;
+    REQUEST_ROUND_SPACING also equals observe.rs's COALESCE. One refusal per constant. The number of constants
+    (seven)."""
+    rule = "I01B5 literal pins, G-I01B-8"
+    for rel, name, kind, form, pinned, citation, source in I01B5_LITERAL_PINS:
+        value, lines, index = pinned_constant(base, rel, name, kind, form, rule)
+        above = index
+        while above > 0 and lines[above - 1].startswith("///"):
+            above -= 1
+        documented = " ".join(line[3:].strip() for line in lines[above:index])
+        if source is not None:
+            pinned = pinned_constant(base, I01_GATE_RS, source[0], source[1], source[2], rule)[0]
+        if name == "REQUEST_ROUND_SPACING":
+            coalesce = pinned_constant(base, rel, "COALESCE", "Duration", DURATION_FORM, rule)[0]
+            pinned = pinned if coalesce == pinned else None
+        require(value == pinned and citation in documented, "%s does not pin %s to %s with its citation %s%s (%s)"
+                % (rel, name, pinned, citation, ", equal to %s's %s" % (I01_GATE_RS, source[0]) if source else "", rule))
+    return len(I01B5_LITERAL_PINS)
+
+
 def observer_code(base: Path, rule: str, literals: bool = False) -> dict[str, str]:
     """crates/observer's non-test sources as the G-I01 rules read them: without comments (literal contents emptied
     unless `literals`), the whitespace around `::` removed, and strict #[cfg(test)] mod tests blocks blanked in place."""
@@ -5431,21 +6606,21 @@ def check_observer_no_send(base: Path) -> int:
     `use gs::channel as c;` renames the channel module, braced or not, and both refuse; a `name::send` path through any
     name bound to the channel module refuses as `channel::send` does; and, so that every route to the channel module is
     spelled through gate_sys, neither file renames gate_sys (`use gate_sys as ..`, `use gate_sys::{self as ..}`), imports
-    a glob of it or declares an extern crate. The number of sources."""
+    a glob of it or declares an extern crate. HE-004-I01B5 (DESIGN-I01B5 rev 5 section 6.3; F6.5): the observer sends,
+    through respond's one statement, so the "no peer_send" and "no channel::send path" clauses become G-I01B-5 (a) and
+    (c)'s exact counts; the use paths of the two socket files are read in each file's own scope (G-I01B-6 (a)); every
+    other clause stays. The number of sources."""
     rule = "nothing leaves I01a, G-I01-5"
     codes = observer_code(base, rule, literals=True)
-    for rel, code in codes.items():
-        require(not PEER_SEND.search(code), "%s spells peer_send; I01a sends nothing (%s)" % (rel, rule))
     for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, OBSERVER_CLIENT, OBSERVER_LIB):
         require(rel in codes, "%s is missing (%s)" % (rel, rule))
     for rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
         raw = (base / rel).read_text(encoding="utf-8")
         code = PATH_SPACE.sub("::", rust_code(raw))
-        uses = resolved_uses(source_uses(rel, raw))
+        uses = resolved_uses(source_uses(rel, raw), posixpath.basename(rel)[:-3])
         channel_uses = [(path, rename) for path, rename in uses if path[:2] == ("gate_sys", "channel")]
         for path, _ in channel_uses:
             require("send" not in path[2:], "%s imports gate-sys's channel send (%s)" % (rel, rule))
-        require(not CHANNEL_SEND.search(code), "%s names gate-sys's channel send (%s)" % (rel, rule))
         for name in sorted({rename for path, rename in channel_uses if rename and path[2:] in ((), ("self",))}):
             require(not re.search(r"(?<![\w:])%s::send\b" % re.escape(name), code),
                     "%s names gate-sys's channel send through %s (%s)" % (rel, name, rule))
@@ -5699,7 +6874,8 @@ def check_observer_role_constants(base: Path) -> int:
 
 # --- HE-004D2: the D2 logic modules' isolation and host-path literal, and their absence from the binary (DESIGN-D2 12) ---
 
-def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...], label: str, rule: str) -> int:
+def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...], label: str, rule: str,
+                     places: dict[str, tuple[re.Pattern, ...]] | None = None) -> int:
     """G-D2-5's construction over a list of crates/observer modules (HE-004D2's D2 modules; HE-004-I01B1's three digest
     port modules, G-I01B-1's I01B1 form). Over crates/observer's non-test sources, read without comments, literal
     contents emptied and the whitespace around `::` removed: the module files present are exactly `built` (so each takes
@@ -5709,7 +6885,10 @@ def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...],
     once among them, and none of those names occurs in another crates/observer source (whatever it is there, a
     definition included); (c) in the modules' files every impl header is exactly `impl <a name of that set> {` (no
     `for`, no generic parameter) and every `pub use` names only the modules' paths. `label` names the modules in the
-    refusals. The number of type names."""
+    refusals. HE-004-I01B5 (G-I01B-1's I01B5 form; DESIGN-I01B5 rev 5 section 6.1; B3-5): with `places`, each listed
+    occurrence in its file (a pattern of the full `crate::<module>::…` spelling) is present, and its first match is set
+    aside before (a) and (b) read the file, so it is allowed exactly once and any second one, a use declaration or
+    another spelling refuses. The number of type names."""
     sources = observer_sources(base, (OBSERVER_CRATE,))
     module_files = {"crates/observer/src/%s.rs" % name: name for name in names}
     present = sorted(name for rel, name in module_files.items() if (base / rel).is_file())
@@ -5732,9 +6911,16 @@ def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...],
             defined[name] = rel
     module_words = re.compile(r"\b(?:%s)\b" % "|".join(names))
     type_words = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(name) for name in sorted(defined))) if defined else None
+    for rel, place in sorted(((rel, place) for rel, listed in (places or {}).items() for place in listed),
+                             key=lambda item: (item[0], item[1].pattern)):
+        require(rel in codes and place.search(codes[rel]), "%s does not name the %s module at its listed place `%s` (%s)"
+                % (rel, label, place.pattern, rule))
     for rel, code in codes.items():
         if rel in module_files:
             continue
+        for place in (places or {}).get(rel, ()):
+            found = place.search(code)
+            code = code[:found.start()] + " " * (found.end() - found.start()) + code[found.end():]
         rest = code
         if rel == OBSERVER_LIB:
             for name in built:
@@ -5743,8 +6929,8 @@ def module_isolation(base: Path, names: tuple[str, ...], built: tuple[str, ...],
                         % (rel, name, rule))
                 rest = declaration.sub(" ", rest)
         found = module_words.search(rest)
-        require(not found, "%s names the %s module %s other than in lib.rs's one `pub mod` line (%s)"
-                % (rel, label, found.group(0) if found else "", rule))
+        require(not found, "%s names the %s module %s other than in lib.rs's one `pub mod` line%s (%s)"
+                % (rel, label, found.group(0) if found else "", " and its listed places" if places else "", rule))
         hit = type_words.search(code) if type_words else None
         require(not hit, "%s names %s, a type the %s module %s defines (%s)"
                 % (rel, hit.group(0) if hit else "", label, defined.get(hit.group(0)) if hit else "", rule))
@@ -5803,16 +6989,32 @@ def i01b_direction(base: Path, rule: str) -> int:
     return len(answer_names)
 
 
+# HE-004-I01B5 G-I01B-1's I01B5 form (DESIGN-I01B5 rev 5 section 6.1; B3-5; I5E-5): the only places outside its file
+# that name i01_answer, each written `crate::i01_answer::…` (no use declaration), each once: observe.rs's derive call,
+# client.rs's Derived type path, and i01_service.rs's CaptureFacts literal, answer call and self_check call. Derived
+# and CaptureFacts, of its type set, are named only there.
+I01B5_ANSWER_PLACES = {
+    OBSERVER_OBSERVE: (re.compile(r"(?<![\w:])crate::i01_answer::derive\s*\("),),
+    OBSERVER_CLIENT: (re.compile(r"(?<![\w:])crate::i01_answer::Derived\b"),),
+    OBSERVER_SERVICE: (re.compile(r"(?<![\w:])crate::i01_answer::CaptureFacts\s*\{"),
+                       re.compile(r"(?<![\w:])crate::i01_answer::answer\s*\("),
+                       re.compile(r"(?<![\w:])crate::i01_answer::self_check\s*\(")),
+}
+
+
 def check_i01b_isolation(base: Path) -> int:
     """HE-004-I01B3 G-I01B-1, its I01B3 form (DESIGN-I01B3 rev 4 section 6; Q-8; I3D-4, I3E-4), replacing the I01B1 form
     (HE-004-I01B1, DESIGN-I01B1 rev 2 section 4, I1D-5): (a)-(d) are module_isolation's union construction, unchanged
-    (G-D2-5's), over the four unreachable modules i01_digest, i01_admission_render, i01_gate and i01_answer: (a) their
-    names occur outside their files only in lib.rs's line-anchored `pub mod <name>;`; (b) the union type set they define
-    is named in no other observer source; (c) every impl header in them is `impl <a name of the union set> {`; (d)
-    every `pub use` in them names only the four modules' paths. Then (e), the direction clause (i01b_direction). So
-    nothing in serve reaches them in I01B3; I01B5 makes them reachable. The number of type names."""
-    rule = "I01B3 isolation, G-I01B-1"
-    names = module_isolation(base, I01B3_MODULES, I01B3_MODULES, "I01B3", rule)
+    (G-D2-5's), over the four modules i01_digest, i01_admission_render, i01_gate and i01_answer: (a) their names occur
+    outside their files only in lib.rs's line-anchored `pub mod <name>;`; (b) the union type set they define is named in
+    no other observer source; (c) every impl header in them is `impl <a name of the union set> {`; (d) every `pub use`
+    in them names only the four modules' paths. Then (e), the direction clause (i01b_direction). HE-004-I01B5, its
+    I01B5 form (DESIGN-I01B5 rev 5 section 6.1; B3-5; Q-8 (a)): i01_answer becomes reachable at exactly
+    I01B5_ANSWER_PLACES, each present and allowed once (module_isolation's `places`), every other occurrence still
+    refused at (a) or (b); the I01B1 modules stay as I01B3 left them, and (e) stays. The symbol check retires. The
+    number of type names."""
+    rule = "I01B5 isolation, G-I01B-1"
+    names = module_isolation(base, I01B3_MODULES, I01B3_MODULES, "I01B3", rule, I01B5_ANSWER_PLACES)
     i01b_direction(base, rule)
     return names
 
@@ -5850,18 +7052,9 @@ def check_d2_absent(names: set[str]) -> int:
     return len(names)
 
 
-def check_i01b1_absent(names: set[str]) -> int:
-    """HE-004-I01B1 G-I01B-1's corroboration (DESIGN-I01B rev 3 section 6, in G-D2-7's style; I1D-5): no symbol of
-    planeon-observer's .symtab has an item path or a first-crate-root path beginning `planeon_observer::<one of the
-    unreachable modules>`; a symbol that only mentions one passes. HE-004-I01B3 (DESIGN-I01B3 rev 4 section 0; I3D-11):
-    extended to i01_answer, the four modules of G-I01B-1's I01B3 form; it retires in I01B5 (Q-8). Build-time
-    corroboration, not the proof: the sim's byte-identical binary lines are. The number of symbols read."""
-    for name in names:
-        for path in (item_path(name), symbol_path(name)[0]):
-            if path[:1] == ("planeon_observer",) and path[1:2] and path[1] in I01B3_MODULES:
-                raise GateError("planeon-observer's symbol table holds %s, a symbol of the unreachable I01 module %s "
-                                "(G-I01B-1)" % (name, path[1]))
-    return len(names)
+# HE-004-I01B1's check_i01b1_absent, G-I01B-1's symbol-table corroboration (extended to i01_answer in HE-004-I01B3),
+# retired in HE-004-I01B5 with its gate line (Q-I01B3-8 (a); DESIGN-I01B5 rev 5 section 6.1): I01B5 makes the modules
+# reachable, so their symbols are linked. G-D2-7 (check_d2_absent) stays.
 
 
 # HE-004D2 DESIGN-D2 sections 8.1 and 12 (G-D2-8; owner decision Q-HE4D2-6 (a); D2-1; design review round 2, R2-1): the
@@ -6591,9 +7784,10 @@ def main() -> int:
             "profile v2 (c2), and row 79's %d negative texts and the schema's sha256 occur in no other source (c3)"
             % (check_i01b4_replay_scope(HE), PROFILE_V2_SCHEMA_NAME, PROFILE_V2_SCHEMA_SHA256, I01B4_ROW79,
                I01B4_ROW79_READER, I01B4_ROW79_TEXTS))
-        say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 (config.rs, i01_request.rs "
-            "and i01_service.rs re-pinned at HE-004-I01B2's bytes, i01_answer.rs's absence became its pin at "
-            "HE-004-I01B3's, the others at dd7422ed's), %s absent; no directory entry casefolds to a guarded name but "
+        say("I01b guarded pins (HE-004-I01B1, R-B3-PIN): %d entries: %s pinned whole by sha256 (config.rs at "
+            "HE-004-I01B2's bytes, i01_answer.rs's absence became its pin at HE-004-I01B3's, i01_request.rs, "
+            "i01_service.rs and client.rs re-pinned at HE-004-I01B5's, effect-gate's two at dd7422ed's), %s absent; no "
+            "directory entry casefolds to a guarded name but "
             "itself, and each guarded module is declared once, in file form, in its crate's lib.rs and never inline "
             "(I1D-3, I1D-10)"
             % (check_i01b_guarded_pins(HE), ", ".join(I01B_GUARDED_PINS), ", ".join(I01B_ABSENT) or "none"))
@@ -6609,8 +7803,10 @@ def main() -> int:
             "load statement is pinned (b1), document occurs 5 times (b2) and config 5 times (b3) at their places, the "
             "pinned load and parse statements are outermost and in order (b4), the parse statement is pinned (b5) and "
             "parse_v3 occurs twice in the crate (b6); in %s the accessor, the private field and the one ObserverConfig "
-            "literal in fn members (c), no rename or type item naming ObserverConfig (c1), the dot form .binding twice "
-            "(c2), parse_v3's local binding bound once and assigned once (c3) and no Self (c4)"
+            "literal in fn members, its own top-level binding initialiser exactly Value::Null (c; HE-004-I01B5, R1-1), no "
+            "rename or type item naming ObserverConfig (c1), the dot form .binding twice (c2), parse_v3's local binding "
+            "bound once and assigned once (c3), no Self (c4) and no struct, enum or union field binding but "
+            "ObserverConfig's (c5; HE-004-I01B5, I2E-7)"
             % (check_i01b_constructor(HE), ", ".join(OBSERVE_RUN_ARGUMENTS), I01B2_CONFIG))
         say("Derived closed (HE-004-I01B3, G-I01B-9): %d clauses over %s's sources: %s defines one `struct Derived {` at "
             "its top level, its fields exactly %s, its one attribute #[derive(Debug)] (i); its one literal is `Ok(Derived "
@@ -6625,12 +7821,43 @@ def main() -> int:
             "scope root alone and none globs one outside a crate root; item imports through a socket module pass"
             % (check_socket_module_aliases(HE), EFFECT_GATE_CRATE, OBSERVER_CRATE,
                "; ".join("%s: %s" % (crate, ", ".join(modules)) for crate, modules in SOCKET_CRATE_MODULES.items())))
-        say("observer I01B3 isolation (HE-004-I01B3, G-I01B-1, its I01B3 form): the modules present are %s; outside them "
-            "their names occur only as lib.rs's pub mod lines, none of the %d type names they define occurs in another %s "
-            "source, every impl in them is `impl <a type of the set> {` and none re-exports another item ((a)-(d), "
-            "module_isolation unchanged); and the three I01B1 files name neither i01_answer nor its %d type names, and "
-            "each module's impls name only its own types ((e))"
-            % (", ".join(I01B3_MODULES), check_i01b_isolation(HE), OBSERVER_CRATE, i01b_direction(HE, "G-I01B-1 (e)")))
+        say("observer I01B5 isolation (HE-004-I01B5, G-I01B-1, its I01B5 form): the modules present are %s; outside them "
+            "their names occur only as lib.rs's pub mod lines and i01_answer's %d listed places, each once and written "
+            "crate::i01_answer::… (observe.rs's derive( call, client.rs's Derived, i01_service.rs's CaptureFacts {, "
+            "answer( and self_check(), none of the %d type names they define occurs in another %s source but there, "
+            "every impl in them is `impl <a type of the set> {` and none re-exports another item ((a)-(d)); and the "
+            "three I01B1 files name neither i01_answer nor its %d type names, and each module's impls name only its own "
+            "types ((e)); the symbol check is retired (Q-8 (a))"
+            % (", ".join(I01B3_MODULES), sum(len(listed) for listed in I01B5_ANSWER_PLACES.values()),
+               check_i01b_isolation(HE), OBSERVER_CRATE, i01b_direction(HE, "G-I01B-1 (e)")))
+        say("one send path (HE-004-I01B5, G-I01B-5): %d clauses over %s: peer_send three times, PeerOps' declaration and "
+            "LinuxWire's fn matched whole (a); send_answer twice, its fn matched whole (b); channel::send once, inside "
+            "send_answer (c); in the two socket files no use path ending in send, no rename of channel, no glob, read in "
+            "each file's own scope (d); PeerOps only in PeerService's two signatures, renamed, aliased and named in a "
+            "trait header nowhere (e); respond's answer, self-check and send statements pinned and adjacent, its one call "
+            "`self.respond(` inside serve_peer_deadlines (f); readable-only registrations (g); serve_peer_deadlines "
+            "called once, inside wait_serving (h); answered, sent, and the session's chain, previous and last_observed "
+            "at their fixed places (i)" % (check_i01b5_send(HE), OBSERVER_CRATE))
+        say("I01B5 pinned statements (HE-004-I01B5, B3-6): %d clauses: check_snapshot's quota match, then ADM-4's "
+            "statement, the configuration Value (its members read with literals kept), the quota Value and the derive "
+            "statement before drop(inputs), and the object and quota_side helpers whole (s1); the SnapshotView literal "
+            "(s2); the capture push at its two sites (s3); "
+            "the Passed statement and the push that carries it (s4); the round's start (s5); CaptureGate::from_view "
+            "whole (s6); respond's freshness statement directly before its one clock statement (s7); the CaptureFacts "
+            "literal (s8); serve_peer_deadlines' closing statement before its respond call (s9)"
+            % check_i01b5_statements(HE))
+        say("I01B5 round 3's folds (HE-004-I01B5, I5F-1..3, I5F-7, R1-1): %d clauses: check_snapshot's names counted, "
+            "snapshot_once's destructuring and call, adm4's Match arm; the RequestRound and Passed literals once, "
+            "request_round at its seven places, passed twice; the push words at their places, captures by enclosing fn "
+            "and with_captures twice, the CaptureView and CaptureGate literals' homes; respond's clock words only in its "
+            "pinned statements; R1-1: observe.rs's self.config and self.closure never assigned, borrowed &mut or "
+            "passed to std::mem's swap, replace or take" % check_i01b5_folds(HE))
+        say("SnapshotView closed (HE-004-I01B5, B3-7): %d clauses: one definition deriving exactly Debug, one literal, no "
+            "impl, no rename or type item, named only at its fixed places" % check_i01b5_snapshot_view(HE))
+        say("I01B5 literal pins (HE-004-I01B5, G-I01B-8): %d constants (%s), each a line-anchored pub const with its "
+            "citation; the deadlines and slot names equal %s's" % (check_i01b5_constants(HE),
+                                                                    ", ".join(pin[1] for pin in I01B5_LITERAL_PINS),
+                                                                    I01_GATE_RS))
         say("observer i01_ sources (HE-004-I01B1, G-I01B-7): %d files, exactly %s; lib.rs declares exactly the %d "
             "OBSERVER_LIB_MODULES, each once in file form, and no other source declares a module; the I01B1 modules and "
             "i01_answer take the logic and no-panic rules"
@@ -6640,15 +7867,17 @@ def main() -> int:
             "modules' %d refusal texts are exactly its refusalTexts"
             % (check_i01b_constants(HE), I01B_DEFINITIONS, ", ".join(name for name, _, _, _ in I01B_LITERAL_PINS),
                check_i01b_refusal_texts(HE)))
-        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t10)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
+        say("I01B3 texts (HE-004-I01B3, G-I01B-8 (t1)-(t11)): %d pins in %s, its %d texts with their VPO or MODEL_DEFINED "
             "citations and its %d key consts with their values (t1); its consts whose type names str exactly those, each "
-            "once, top-level and line-anchored, the values distinct and no key or R10 text a refusal or VPO text (t2); no "
+            "once, top-level and line-anchored (a const generic parameter skipped, HE-004-I01B5, R2-4), the values "
+            "distinct and no key or R10 text a refusal or VPO text (t2); no "
             "string outside those lines (t3); no stringify!, concat!, include_str!, include_bytes!, env!, option_env!, "
             "format_args!, file!, module_path!, leak, from_utf8 or transmute (t4); %d refusal positions, turbofish or "
             "not, each naming a pinned text, a binding no item names or one of %s on such a binding, map_err( and "
             "ok_or_else( taking a closure, and refusals' list named only at its declaration, its tail and the .push( and "
             ".contains( receivers (t5); no key-prefixed text (t6); no static (t7); %s only as calls (t8); no type alias "
-            "naming str (t9); no return in fn refusals (t10)"
+            "naming str (t9); no return in fn refusals (t10); answer's step 2 exactly `if let Some(&<b>) = "
+            "refusals(derived, facts).first() { return Err(<b>); }`, refusals called only there (t11; HE-004-I01B5, R3-1)"
             % (check_i01b3_texts(HE), I01_ANSWER, len(I01B3_TEXT_PINS), len(I01B3_KEY_CONSTS),
                answer_texts_t5_positions(HE, "G-I01B-8 (t5)"), ", ".join(I01B1_REFUSAL_METHODS),
                ", ".join(word for _, word in I01B3_CALL_ONLY)))
@@ -6660,10 +7889,12 @@ def main() -> int:
             % (check_observer_wait_point(HE), OBSERVER_CLIENT, OBSERVER_LINUX_NET))
         say("observer I01 path (HE-004-I01a, G-I01-4): %s occurs %d time(s) in %s, only as %s's private constant I01_PATH"
             % (I01_PATH, check_observer_i01_path(HE), OBSERVER_CRATE, OBSERVER_LINUX_LISTEN))
-        say("observer sends nothing (HE-004-I01a, G-I01-5): %d sources; no peer_send; %s and %s neither import nor name "
-            "gate-sys's channel send nor rename the channel module, their aliases followed, and neither renames or globs "
-            "gate_sys nor declares an extern crate (HE-004-I01A2, R1-3); the i01_ sources are exactly %s, naming none of "
-            "Wire, connect, ConnId and Client; PeerOps is declared once, as `pub trait PeerOps {`"
+        say("observer I01 sources and socket imports (HE-004-I01a, G-I01-5, as HE-004-I01B5 rewrote it): %d sources; %s "
+            "and %s neither import gate-sys's channel send nor name it through a channel alias nor rename the channel "
+            "module, their aliases followed in each file's own scope, and neither renames or globs gate_sys nor declares "
+            "an extern crate (HE-004-I01A2, R1-3); peer_send and channel::send are G-I01B-5 (a) and (c)'s counts; the "
+            "i01_ sources are exactly %s, naming none of Wire, connect, ConnId and Client; PeerOps is declared once, as "
+            "`pub trait PeerOps {`"
             % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
         say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "
             "aliased nowhere, and I01Socket::open is called once, inside LinuxWire::new, its qualified forms counted"
@@ -6698,8 +7929,6 @@ def main() -> int:
                     say("%s planeon-observer capture symbols (G-D1-14): %s" % (target, ", ".join(check_capture_symbols(names))))
                     say("%s planeon-observer D2 symbols (G-D2-7): none of its %d symbols has a path in planeon_observer::%s"
                         % (target, check_d2_absent(names), ", ::".join(D2_LOGIC_NAMES)))
-                    say("%s planeon-observer I01B3 symbols (G-I01B-1, corroboration): none of its %d symbols has a path in "
-                        "planeon_observer::%s" % (target, check_i01b1_absent(names), ", ::".join(I01B3_MODULES)))
                     say("%s planeon-observer exempt span (G-D1-16): the %d bytes of %s occur exactly once, at offset %d "
                         "(length %d); the host-path scan (%s, the build root and the home directory) reads the binary "
                         "with that one span blanked and finds none; HOST_PATHS is unchanged, and every other binary is "

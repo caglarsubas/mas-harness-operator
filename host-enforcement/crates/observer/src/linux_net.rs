@@ -21,6 +21,10 @@
 //! never status 95), the session's peer is added (a failure is that peer's), and a watch failure makes that wait a
 //! zero-timeout one, so the fault is handled at once. The I01 readiness comes back apart from the connections'.
 //! The seccomp-v5 OBSERVER row allows the listener's `bind`, `listen` and `accept4`.
+//!
+//! HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.4 and 5): `wall_millis` is `utc::wall_millis`, and `peer_send` is exactly
+//! `self.i01.send_answer(peer, bytes)`, the listener file's one `channel::send` (`sendmsg`, already in the OBSERVER row);
+//! the listener and the peer stay registered readable only, so no write interest exists.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -31,7 +35,8 @@ use gate_sys::inet::InetAddress;
 use gate_sys::tcp;
 
 use crate::client::{AcceptResult, ConnId, Connecting, ExeLink, Interest, ListenerSetup, PeerCreds, PeerId, PeerOps,
-                    PeerRecv, PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, WireSetup, Woken, NO_CONNECTION};
+                    PeerRecv, PeerSent, PeerWatch, PollError, ProcIdentity, Ready, Transfer, Wire, WireSetup, Woken,
+                    NO_CONNECTION};
 use crate::linux_listen::I01Socket;
 use crate::seal::Sealed;
 use crate::utc;
@@ -218,6 +223,10 @@ impl Wire for LinuxWire {
     fn wall_seconds(&self) -> Option<u64> {
         utc::wall_seconds()
     }
+
+    fn wall_millis(&self) -> Option<u64> {
+        utc::wall_millis()
+    }
 }
 
 impl PeerOps for LinuxWire {
@@ -254,5 +263,9 @@ impl PeerOps for LinuxWire {
             self.peer_watched = None;
         }
         self.i01.close(peer);
+    }
+
+    fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent {
+        self.i01.send_answer(peer, bytes)
     }
 }

@@ -240,6 +240,9 @@ pub struct CaptureView {
     /// The backend components, in sorted order.
     pub backends: Vec<(String, Slot)>,
     pub set_started_ms: u64,
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.2; Q-9 (a)): the start the latest set was scheduled for, on the
+    /// monotonic clock, stored by `capture_set` beside `set_started_ms`; `None` before the first set.
+    pub scheduled: Option<Instant>,
 }
 
 impl CaptureView {
@@ -283,6 +286,9 @@ pub trait CaptureCycle {
     fn expire(&mut self);
     /// The latest view.
     fn view(&self) -> &CaptureView;
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.2; DIB section 4.1 route 2): the enrolled record's value, which the
+    /// epoch's derive statement hands to `i01_answer::derive`.
+    fn record(&self) -> &Value;
 }
 
 /// A memo key: (device, inode, size, ctime) of one path.
@@ -393,6 +399,7 @@ impl<K: KernelView> CaptureEngine<K> {
             lifecycle: Slot::Pending,
             backends: enrolled.backends.iter().map(|backend| (backend.component.clone(), Slot::Pending)).collect(),
             set_started_ms: 0,
+            scheduled: None,
         };
         CaptureEngine { kernel, enrolled, schema, memo: Memo { entries: BTreeMap::new(), partial: None }, view,
                         buffer: vec![0u8; HASH_CHUNK] }
@@ -1248,6 +1255,7 @@ impl<K: KernelView> CaptureCycle for CaptureEngine<K> {
             return;
         };
         view.set_started_ms = wall;
+        view.scheduled = Some(scheduled);
         if wall < self.enrolled.valid_from.saturating_mul(1_000) {
             view.every(&Slot::Pending);
             self.view = view;
@@ -1349,5 +1357,9 @@ impl<K: KernelView> CaptureCycle for CaptureEngine<K> {
 
     fn view(&self) -> &CaptureView {
         &self.view
+    }
+
+    fn record(&self) -> &Value {
+        self.enrolled.record.value()
     }
 }

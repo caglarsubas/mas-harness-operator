@@ -5753,11 +5753,12 @@ class D2ConstructorHomePinTests(Tree):
         self.write_bytes(rel, self.real[rel])
 
     def test_the_real_files_pass(self):
-        # HE-004-I01a (G-I01-6): linux_listen.rs joins the pins and linux_net.rs is re-pinned.
+        # HE-004-I01a (G-I01-6): linux_listen.rs joins the pins and linux_net.rs is re-pinned. HE-004-I01B5 (DESIGN-I01B5
+        # rev 5 section 1): both re-pinned at I01B5's bytes (the one send path), keeping this test's intent.
         self.assertEqual(gate.OBSERVER_HOME_PINS, {
             "crates/observer/src/linux_capture.rs": "77e50074e81eefc782ba287fad874ba83c3a5c01225ee6a1d5c69407b0be1862",
-            "crates/observer/src/linux_net.rs": "41a23aa7d6215d5f8194b703da511a8945d7600f1f0d306affb94cd830ac17ac",
-            "crates/observer/src/linux_listen.rs": "d06742932d92eaf05308158d37ce670859f316e1b0fe7a1972b8e4c93be5433b"})
+            "crates/observer/src/linux_net.rs": "d0ba15d46f21c43195f9c50e2b0440f36bce58555842f960c3e4f215750b20e4",
+            "crates/observer/src/linux_listen.rs": "f64acf69dbe1870356ce5aaa7b576e837859bc09371a8af29ef4cc16ee535d2b"})
         self.assertEqual(gate.check_observer_home_pins(self.base), 3)
 
     def test_each_file_refuses_a_change_missing_or_a_symlink(self):
@@ -6546,14 +6547,20 @@ class I01ListenerRuleTests(Tree):
 
     def test_g_i01_5_nothing_leaves_i01a(self):
         net, listen, client, lib = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN, gate.OBSERVER_CLIENT, gate.OBSERVER_LIB
-        self.refused(gate.check_observer_no_send, I01_OBSERVE,
-                     self.TREE[I01_OBSERVE] + "fn f(o: &mut dyn PeerOps) { o.peer_send(1, b); }\n", "G-I01-5")
+        # HE-004-I01B5 (DESIGN-I01B5 rev 5 section 6.3; F6.5): the "no peer_send" and "no channel::send path" clauses
+        # became G-I01B-5 (a) and (c)'s exact counts; their rows keep their intent there (I01b5SendTests: P5-1, P5-2,
+        # P5-4 and the three channel::send spellings), and G-I01-5 itself passes them now.
+        for rel, text in ((I01_OBSERVE, "fn f(o: &mut dyn PeerOps) { o.peer_send(1, b); }"),
+                          (net, "fn f(c: &Conn) { let _ = channel::send(c, b); }"),
+                          (listen, "fn f(c: &Conn) { let _ = gate_sys :: channel :: send(c, b); }"),
+                          (listen, "fn f(c: &Conn) { let _ = ::gate_sys::channel::send(c, b); }")):
+            self.write(rel, self.TREE[rel] + text + "\n")
+            self.assertEqual(gate.check_observer_no_send(self.base), I01_TREE_COUNT)
+            self.write(rel, self.TREE[rel])
         for rel in (net, listen):
             for text in ("use gate_sys::channel::send;", "use gate_sys::channel::{Conn, send};",
                          "use gate_sys::channel::send as s;", "use gate_sys::channel as ch;", "use gate_sys::{channel as ch};",
-                         "use gate_sys::channel::{self as ch};", "fn f(c: &Conn) { let _ = channel::send(c, b); }",
-                         "fn f(c: &Conn) { let _ = gate_sys :: channel :: send(c, b); }",
-                         "fn f(c: &Conn) { let _ = ::gate_sys::channel::send(c, b); }"):
+                         "use gate_sys::channel::{self as ch};"):
                 self.refused(gate.check_observer_no_send, rel, self.TREE[rel] + text + "\n", "G-I01-5")
         # PeerOps: exactly `pub trait PeerOps {`, once, in client.rs.
         good = self.TREE[client]
@@ -6614,8 +6621,8 @@ class I01ListenerRuleTests(Tree):
                     ("use gate_sys as gs;\nuse gs::{channel::{self as c}};\n" + call, "channel send through c"),
                     ("use gate_sys as gs;\nuse gs::channel as c;", "renames gate-sys's channel module"),
                     ("use gate_sys as gs;\nuse gs::{channel as c};", "renames gate-sys's channel module"),
-                    ("use gate_sys as gs;\nfn f(x: &Conn) { let _ = gs::channel::send(x, b); }",
-                     "names gate-sys's channel send"),
+                    # HE-004-I01B5: the path itself is G-I01B-5 (c)'s count now; the crate alias still refuses here.
+                    ("use gate_sys as gs;\nfn f(x: &Conn) { let _ = gs::channel::send(x, b); }", "renames gate_sys"),
                     ("use gate_sys as gs;", "renames gate_sys"),
                     ("use gate_sys::{self as gs};", "renames gate_sys"),
                     ("use ::gate_sys as gs;", "renames gate_sys"),
@@ -7132,8 +7139,14 @@ I01B1_ISOLATION_TREE = {
     "crates/observer/src/i01_gate.rs": "use crate::i01_digest::DigestKey;\npub struct LatestSet {\n    pub mono_age_ms: u64,\n}\n"
                                        "pub fn capture_gate(key: DigestKey) -> &'static str {\n    key.name()\n}\n",
     gate.I01_ANSWER: I01B3_ANSWER,
+    # HE-004-I01B5 (G-I01B-1's I01B5 form, DESIGN-I01B5 rev 5 section 6.1): i01_answer's five listed places, each once.
     "crates/observer/src/observe.rs": "//! i01_digest, DigestKey and LatestSet in a comment.\n"
-                                      "pub fn run() -> &'static str { \"i01_gate Rendered\" }\n",
+                                      "pub fn run() -> &'static str { \"i01_gate Rendered\" }\n"
+                                      "pub fn view(k: u8) -> u8 {\n    let _ = crate::i01_answer::derive(k);\n    0\n}\n",
+    gate.OBSERVER_CLIENT: "pub struct SnapshotView {\n    pub derived: Option<crate::i01_answer::Derived>,\n}\n",
+    gate.OBSERVER_SERVICE: "pub fn respond() {\n    let facts = crate::i01_answer::CaptureFacts { completed: true };\n"
+                           "    let _ = crate::i01_answer::answer(&facts);\n"
+                           "    let _ = crate::i01_answer::self_check(&facts);\n}\n",
     CAPTURE_RS: CAPTURE_TEXT,
     gate.OBSERVER_MAIN: GOOD_OBSERVER_MAIN,
 }
@@ -7158,6 +7171,22 @@ I01B3_DIRECTION_ROWS = (
 )
 # G-I01B-1's own sub-clause functions, by the label the proof disables them under.
 I01B3_DIRECTION_FUNCTIONS = {"(a)-(d)": "module_isolation", "(e)": "i01b_direction"}
+# HE-004-I01B5 G-I01B-1's I01B5 form (DESIGN-I01B5 rev 5 sections 6.1 and 8; B3-5): N2-9's forms, a second self_check(
+# call and a listed place missing, each refused at (a)-(d) (module_isolation with its listed places); the build's
+# mutation proof reads this table. Each row: (label, sub-clause, stated set, ((file, anchor, replacement), ..)).
+I01B5_ISOLATION_ROWS = (
+    ("N2-9 a second crate::i01_answer::derive( in observe.rs", "(a)-(d)", None,
+     (("crates/observer/src/observe.rs", "    0\n}\n", "    let _ = crate::i01_answer::derive(k);\n    0\n}\n"),)),
+    ("N2-9 use crate::i01_answer::Derived; in client.rs", "(a)-(d)", None,
+     ((gate.OBSERVER_CLIENT, "pub struct SnapshotView {\n", "use crate::i01_answer::Derived;\npub struct SnapshotView {\n"),)),
+    ("N2-9 pub use crate::i01_answer::Derived; in lib.rs", "(a)-(d)", None,
+     ((gate.OBSERVER_LIB, "pub mod observe;\n", "pub mod observe;\npub use crate::i01_answer::Derived;\n"),)),
+    ("a second self_check( call in i01_service.rs", "(a)-(d)", None,
+     ((gate.OBSERVER_SERVICE, "    let _ = crate::i01_answer::self_check(&facts);\n",
+       "    let _ = crate::i01_answer::self_check(&facts);\n    let _ = crate::i01_answer::self_check(&facts);\n"),)),
+    ("a listed place missing (self_check( spelled as answer()", "(a)-(d)", None,
+     ((gate.OBSERVER_SERVICE, "crate::i01_answer::self_check(", "crate::i01_answer::answer("),)),
+)
 
 
 def i01b3_isolation_tree(changes=()):
@@ -7257,14 +7286,46 @@ class I01b1IsolationTests(Tree):
             self.assertEqual(clause, "(e)")
             for rel, text in i01b3_isolation_tree(changes).items():
                 self.write(rel, text)
-            self.assertEqual(gate.module_isolation(self.base, gate.I01B3_MODULES, gate.I01B3_MODULES, "I01B3", self.RULE),
-                             7, label)
-            with self.assertRaisesRegex(gate.GateError, re.escape("(I01B3 isolation, G-I01B-1 (e))")):
+            self.assertEqual(gate.module_isolation(self.base, gate.I01B3_MODULES, gate.I01B3_MODULES, "I01B3", self.RULE,
+                                                   gate.I01B5_ANSWER_PLACES), 7, label)
+            with self.assertRaisesRegex(gate.GateError, re.escape("(I01B5 isolation, G-I01B-1 (e))")):
                 gate.check_i01b_isolation(self.base)
             for rel, text in i01b3_isolation_tree().items():
                 self.write(rel, text)
         # (e) refuses nothing legitimate: i01_answer naming the I01B1 types passes.
         self.assertEqual(gate.check_i01b_isolation(self.base), 7)
+
+    def test_the_i01b5_form_allows_the_five_listed_places_once_each(self):
+        # HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 6.1 and 8; B3-5): the five places, each written crate::i01_answer::…
+        # and each once; the compiled spelling (the real sources) passes. N2-9's forms, a use or pub use declaration, a
+        # second self_check( call, another spelling or a place missing refuses; without the listed places the I01B3 form
+        # refuses the fixture.
+        observe, service = "crates/observer/src/observe.rs", gate.OBSERVER_SERVICE
+        self.assertEqual(sorted(gate.I01B5_ANSWER_PLACES), sorted([observe, gate.OBSERVER_CLIENT, service]))
+        self.assertEqual(sum(len(places) for places in gate.I01B5_ANSWER_PLACES.values()), 5)
+        self.assertEqual(gate.check_i01b_isolation(gate.HE), 14)
+        good = self.TREE[service]
+        for rel, text in ((service, good.replace("}\n", "    let _ = crate::i01_answer::self_check(&facts);\n}\n")),
+                          (service, good + "use crate::i01_answer::self_check;\n"),
+                          (gate.OBSERVER_CLIENT, "pub use crate::i01_answer::Derived;\n" + self.TREE[gate.OBSERVER_CLIENT]),
+                          (observe, self.TREE[observe] + "pub fn g(k: u8) { let _ = crate::i01_answer::derive(k); }\n")):
+            self.refused(gate.check_i01b_isolation, rel, text, "names the I01B3 module i01_answer .*" + self.RULE)
+        for rel, old, new in ((service, "crate::i01_answer::self_check(", "crate::i01_answer::answer("),
+                              (service, "crate::i01_answer::answer(", "i01_answer::answer("),
+                              (gate.OBSERVER_CLIENT, "crate::i01_answer::Derived", "u8"),
+                              (observe, "crate::i01_answer::derive(k)", "k")):
+            self.refused(gate.check_i01b_isolation, rel, self.TREE[rel].replace(old, new),
+                         "does not name the I01B3 module at its listed place .*" + self.RULE)
+        with self.assertRaisesRegex(gate.GateError, "names the I01B3 module i01_answer"):
+            gate.module_isolation(self.base, gate.I01B3_MODULES, gate.I01B3_MODULES, "I01B3", self.RULE)
+        for label, clause, _, changes in I01B5_ISOLATION_ROWS:
+            self.assertEqual(clause, "(a)-(d)")
+            for rel, text in i01b3_isolation_tree(changes).items():
+                self.write(rel, text)
+            with self.assertRaisesRegex(gate.GateError, re.escape("(I01B5 isolation, G-I01B-1)"), msg=label):
+                gate.check_i01b_isolation(self.base)
+            for rel, text in i01b3_isolation_tree().items():
+                self.write(rel, text)
 
     def test_the_present_modules_are_the_four(self):
         for rel in ("crates/observer/src/i01_gate.rs", "crates/observer/src/i01_admission_render.rs", gate.I01_ANSWER):
@@ -7275,31 +7336,8 @@ class I01b1IsolationTests(Tree):
         self.assertEqual(gate.check_i01b_isolation(self.base), 7)
 
 
-class I01b1SymbolTests(unittest.TestCase):
-    """HE-004-I01B1 G-I01B-1's corroboration (G-D2-7's style): no planeon-observer symbol has a path in one of the
-    unreachable modules (the three, and from HE-004-I01B3 i01_answer, I3D-11), by item path (legacy, v0, an inherent
-    impl) or by its first crate root (a closure); a symbol that only mentions one passes."""
-
-    REFUSED = ("_ZN16planeon_observer10i01_digest10projection17h0123456789abcdefE",
-               "_RNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate",
-               "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer10i01_digestNtB2_9DigestKey4name",
-               "_ZN16planeon_observer20i01_admission_render6render17h0123456789abcdefE",
-               "_RNCNvNtCs5pXa2Z9YbGW_16planeon_observer8i01_gate12capture_gate0B5_",
-               # HE-004-I01B3: a planted planeon_observer::i01_answer:: symbol, legacy, v0, an inherent impl.
-               "_ZN16planeon_observer10i01_answer6answer17h0123456789abcdefE",
-               "_RNvNtCs5pXa2Z9YbGW_16planeon_observer10i01_answer6derive",
-               "_RNvMNtCs5pXa2Z9YbGW_16planeon_observer10i01_answerNtB2_7Derived7boot_id")
-    PASSED = ("_RNvNtCs5pXa2Z9YbGW_16planeon_observer7capture10i01_digest",
-              "_RINvNtCsifRdLFh1usa_4core3ptr13drop_in_placeNtNtCs5pXa2Z9YbGW_16planeon_observer10i01_digest9DigestKeyEB4_",
-              "_ZN16planeon_observer7capture8i01_gate17h0123456789abcdefE",
-              "_ZN18planeon_observer_x10i01_digest1f17h0123456789abcdefE", "i01_digest", "main",
-              "_ZN16planeon_observer7observe10i01_answer17h0123456789abcdefE", "i01_answer")
-
-    def test_i01b1_symbols_refuse_and_mentions_pass(self):
-        self.assertEqual(gate.check_i01b1_absent(set(self.PASSED)), len(self.PASSED))
-        for name in self.REFUSED:
-            with self.assertRaisesRegex(gate.GateError, "a symbol of the unreachable I01 module .*G-I01B-1"):
-                gate.check_i01b1_absent(set(self.PASSED) | {name})
+# HE-004-I01B1's I01b1SymbolTests (G-I01B-1's symbol-table corroboration) retired with check_i01b1_absent in
+# HE-004-I01B5 (Q-I01B3-8 (a); DESIGN-I01B5 rev 5 sections 6.1 and 8); G-D2-7's self-tests stay.
 
 
 I01_SOURCE_LIB = "#![forbid(unsafe_code)]\n" + "".join(
@@ -7482,14 +7520,15 @@ class I01bGuardedPinTests(Tree):
             "crates/effect-gate/src/linux_os.rs": "88e70bf599f0b3cb733aa018c0ea08da6b973ccd21aea8b1b15e3d1cfa7475a6",
             "crates/effect-gate/src/linux_net.rs": "d452aa507f1325028ce4dd62c77d5dfa808a5e18a77dc1cb1e5036db209e6fbd",
             "crates/observer/src/config.rs": "173b7adf575c946e55fb3384467bcb37377f0505a41d36d21308c04c458624da",
-            "crates/observer/src/i01_request.rs": "e87c1e44208007b2ae07be175e958ed72d04c9e722d65590ba242a5fa56b46c3",
-            "crates/observer/src/i01_service.rs": "56a07477300a385d2ca208475a575c9a6486951353524c4c65502026db21fbaa",
-            "crates/observer/src/client.rs": "2987e41d212a699b57e57872793c1dfd3151e09969e0c091af9ab2a68650f741",
+            # HE-004-I01B5 (DESIGN-I01B5 rev 5 section 1; Q-4): these three re-pinned at I01B5's bytes.
+            "crates/observer/src/i01_request.rs": "7d3b6951a5082fddf7313a7a94a4bb96b2eccf63003d1e605dcb2549c316d7af",
+            "crates/observer/src/i01_service.rs": "11b921cfa316eca65ff3259e992f2330734d3e8423bc9a10514db469f608e298",
+            "crates/observer/src/client.rs": "9c496052b5c05cf59fe21867f689aa68d74b30671d37ad77e52837e3f9b45c35",
             # HE-004-I01B3 (DESIGN-I01B3 rev 4 section 1; Q-4): the absence became the pin, at I01B3's bytes.
             "crates/observer/src/i01_answer.rs": "3ee5fb683bc6bcbc13a39db985782038915f4851d825a75f02c26f0409764736"})
         self.assertEqual(gate.I01B_ABSENT, ())
         self.assertIn("i01_answer", gate.I01B_FILE_FORM[gate.OBSERVER_LIB])
-        # linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS, unchanged.
+        # linux_listen.rs and linux_net.rs stay in OBSERVER_HOME_PINS (re-pinned there by HE-004-I01B5).
         self.assertIn("crates/observer/src/linux_listen.rs", gate.OBSERVER_HOME_PINS)
         self.assertIn("crates/observer/src/linux_net.rs", gate.OBSERVER_HOME_PINS)
         self.assertEqual(gate.check_i01b_guarded_pins(self.base), 7)
@@ -7853,10 +7892,10 @@ class I01BindingRuleTests(Tree):
 
     def test_the_fixture_and_the_real_sources_pass(self):
         self.assertEqual(gate.check_i01b_binding(self.base), 6)
-        self.assertEqual(gate.check_i01b_constructor(self.base), 13)
+        self.assertEqual(gate.check_i01b_constructor(self.base), 14)
         self.assertEqual(gate.check_observer_serve(self.base), 14)
         self.assertEqual(gate.check_i01b_binding(gate.HE), 6)
-        self.assertEqual(gate.check_i01b_constructor(gate.HE), 13)
+        self.assertEqual(gate.check_i01b_constructor(gate.HE), 14)
 
     def test_g_i01b_3_section_7_1_rows_refuse(self):
         binding, constructor = gate.check_i01b_binding, gate.check_i01b_constructor
@@ -7922,7 +7961,7 @@ class I01BindingRuleTests(Tree):
                      other_file)
         # G-I01B-4 does not refuse these G-I01B-3 forms that name no from_config (they are G-I01B-3's).
         self.plant(((request, derive, "#[derive(Clone, Debug, PartialEq, Eq)]\npub struct I01Binding"),))
-        self.assertEqual(constructor(self.base), 13)
+        self.assertEqual(constructor(self.base), 14)
         self.plant(())
 
     def test_g_i01b_3_round_3_rows_refuse(self):
@@ -7988,7 +8027,7 @@ class I01BindingRuleTests(Tree):
         self.plant(((I01B2_OBSERVE, I01B2_OBSERVE_USE, I01B2_OBSERVE_USE + "#[cfg(test)]\nmod tests {\n    use super::*;\n"
                                                                           "    fn twice(doc: &Value) { let _ = "
                                                                           "I01Binding::from_config(doc); }\n}\n"),))
-        self.assertEqual(constructor(self.base), 13)
+        self.assertEqual(constructor(self.base), 14)
         self.assertEqual(gate.check_i01b_binding(self.base), 6)
         self.plant(())
         # Wiring: the statement before check_lifetime( (the wiring order's), or wrapped in loop { .. } ((a)).
@@ -8321,9 +8360,10 @@ I01B3_DERIVED_ROWS = (
 I01B3_DERIVED_FUNCTIONS = {"(i)": "derived_i_struct", "(ii)": "derived_ii_literal", "(iii)": "derived_iii_impls",
                            "(iv)": "derived_iv_fields", "(v)": "derived_v_names", "(vi)": "derived_vi_name_count",
                            "(vii)": "derived_vii_top_level"}
-# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review round 1's R1-1 and R1-2 (U6): G-I01B-8's I01B3
-# rows, (t1)-(t9), each with its named check (the first of its actual set to refuse, the checks running (t1), (t6),
-# (t2), (t9), (t3), (t4), (t8), (t5), (t7)), no stated set (section 4 states sets for G-I01B-9 only), and its plantings.
+# DESIGN-I01B3 rev 4 sections 5 and 8 [I3E-3, I3F-1..3], and PR review rounds 1 and 2 (R1-1, R1-2: U6; R2-1..R2-3: U7):
+# G-I01B-8's I01B3 rows, (t1)-(t10), each with its named check (the first of its actual set to refuse, the checks
+# running (t1), (t6), (t2), (t9), (t3), (t4), (t8), (t5), (t7), (t10), and (t11) since HE-004-I01B5), no stated set
+# (section 4 states sets for G-I01B-9 only), and its plantings. HE-004-I01B5's rows are I01B5_TEXT_ROWS.
 I01B3_TEXT_ROWS = (
     ("(t1) a changed VPO text", "(t1)", None,
      ((_ANSWER, I01B3_NAMESPACE_PIN, I01B3_NAMESPACE_PIN.replace('"observed namespace"', '"observed namespaces"')),)),
@@ -8592,6 +8632,754 @@ class I01b3TextTests(I01b3AnswerTreeTests):
                                                                        "        list.push(text_of_nothing);\n    }\n"),))
         self.assertEqual(gate.check_i01b3_texts(self.base), 54)
         self.plant(())
+
+
+# HE-004-I01B5 U1 (DESIGN-I01B5 rev 5 sections 6.6, 6.7 and 8): R1-1's two G-I01B-4 clauses (I01B2's HUNT-22 carry,
+# closed gate-side; config.rs's bytes and pin unchanged) and the carries from HE-004-I01B3 (R3-1's row, round 3's NOTE
+# rows). Each row: (label, named sub-clause, stated set or None, ((file, anchor, replacement), ..)). The build's mutation
+# proof reads these tables, records each row's actual refusing set and runs the single-clause or each-alone proof.
+I01B5_CONSTRUCTOR_FUNCTIONS = {"(a)": "constructor_a_from_config", "(b)": "constructor_b_wiring", **I01B2_CLAUSE_FUNCTIONS,
+                               "(c)": "constructor_c_accessor", "(c5)": "constructor_c5_binding_fields"}
+I01B5_LITERAL = "binding: Value::Null, sealed: None"
+I01B5_NAMESPACE_LET = '        let namespace = text(root, "qualificationNamespace", "the document")?;\n'
+I01B5_CONSTRUCTOR_ROWS = (
+    # (c) tightened [R1-1]: `binding: Value::Null` only as the literal's own top-level initialiser (I01B2 PR review
+    # round 1's HUNT-22 and HUNT-24).
+    ("HUNT-22 (c): the own binding forged, a W { binding: Value::Null } nested in another field", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_LITERAL, "binding: forged(), sealed: crate::wrap::seal(crate::wrap::W { binding: Value::Null })"),)),
+    ("HUNT-24 (c): binding: Value::Null.forged()", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_LITERAL, "binding: Value::Null.forged(), sealed: None"),)),
+    ("R1-1 (c): the shorthand binding", "(c)", ("(c)",),
+     ((_CONFIG, I01B5_NAMESPACE_LET, I01B5_NAMESPACE_LET + "        let binding = forged();\n"),
+      (_CONFIG, I01B5_LITERAL, "binding, sealed: None"))),
+    # (c5) I2E-7 as a gate check [R1-1; HUNT-22; I5D-10].
+    ("HUNT-22 (c5): struct W { binding: Value }", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nstruct W {\n    binding: Value,\n}\n"),)),
+    ("I5D-10 (c5): an enum variant's binding field", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nenum Hidden {\n    Carry { binding: Value },\n}\n"),)),
+    ("(c5): a union's binding field", "(c5)", ("(c5)",),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nunion Raw {\n    binding: std::mem::ManuallyDrop<Value>,\n}\n"),)),
+    # HUNT-22 whole: both clauses refuse it, each alone.
+    ("HUNT-22 whole: W declared, its literal nested, the own binding forged", "(c)", ("(c)", "(c5)"),
+     ((_CONFIG, I01B2_USE, I01B2_USE + "\nstruct W {\n    binding: Value,\n}\n"),
+      (_CONFIG, I01B5_LITERAL, "binding: forged(), sealed: seal(W { binding: Value::Null })"))),
+)
+I01B5_STEP_TWO_LINE = "    if let Some(&refusal) = refusals(derived, facts).first() {\n"
+I01B5_TEXT_FUNCTIONS = {**I01B3_TEXT_FUNCTIONS, "(t11)": "answer_texts_t11_step_two"}
+I01B5_TEXT_ROWS = (
+    # R3-1 [HE-004-I01B3 PR review round 3, carried]: a key text fed in at the answer list's consumer, without a local.
+    ("R3-1 S1 .first().or(Some(&KEY_SCOPE))", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    if let Some(&refusal) = refusals(derived, facts).first().or(Some(&KEY_SCOPE)) {\n"),)),
+    ("R3-1 S2 .iter().chain(&[KEY_SCOPE]).next()", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE,
+       "    if let Some(&refusal) = refusals(derived, facts).iter().chain(&[KEY_SCOPE]).next() {\n"),)),
+    ("(t11) a second refusals( call", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    let _again = refusals(derived, facts);\n" + I01B5_STEP_TWO_LINE),)),
+    ("(t11) refusals as a fn item", "(t11)", None,
+     ((_ANSWER, I01B5_STEP_TWO_LINE, "    let _list = refusals;\n" + I01B5_STEP_TWO_LINE),)),
+    # Round 3's NOTE [R2-1's two changes]: a row that only the item reading refuses, and one that only ok_or_else's
+    # closure-only rule refuses (N-10 and N-10b are refused by each).
+    ("R2-1 item reading alone: a const fn at Err(", "(t5)", None,
+     ((_ANSWER, I01B3_TOP, "const fn scope_text() -> &'static str { KEY_SCOPE }\n\n" + I01B3_TOP),
+      (_ANSWER, I01B3_IN_ANSWER, "    if wall_ms == 1 {\n        return Err(scope_text);\n    }\n" + I01B3_IN_ANSWER))),
+    ("R2-1 closure-only alone: a local closure as ok_or_else's argument", "(t5)", None,
+     ((_ANSWER, I01B3_IN_ANSWER, "    let pick = || KEY_SCOPE;\n    let _ = utc_text(now).ok_or_else(pick)?;\n"
+                                 + I01B3_IN_ANSWER),)),
+)
+# R2-1's two changes, each undone alone (the proof's and the self-test's isolation): the item reading emptied, and
+# ok_or_else taken out of the closure-only words.
+I01B5_R2_1_UNDO = {"item reading": ("answer_item_names", lambda code: set()),
+                   "closure-only": ("I01B3_CLOSURE_ONLY", ("map_err",))}
+I01B5_R2_1_ROWS = {"R2-1 item reading alone: a const fn at Err(": "item reading",
+                   "R2-1 closure-only alone: a local closure as ok_or_else's argument": "closure-only"}
+# R2-4 [HE-004-I01B3 PR review round 3, carried]: const generic parameters, after `<` and after `,`, that (t2) skips.
+I01B5_GENERIC_CONSTS = ("pub fn pick<const N: usize>(texts: [&'static str; N]) -> &'static str {\n    texts[0]\n}\n\n",
+                        "pub fn pick<T: Copy, const N: usize>(texts: [&'static str; N], _t: T) -> &'static str {\n"
+                        "    texts[0]\n}\n\n")
+
+
+class I01b5ConstructorTests(Tree):
+    """HE-004-I01B5 U1, R1-1 (DESIGN-I01B5 rev 5 sections 6.6 and 8; I01B2's HUNT-22 carry, gate-side only): G-I01B-4
+    (c), tightened so that `binding: Value::Null` counts only as the ObserverConfig literal's own top-level initialiser,
+    and (c5), I2E-7's "no other binding field in config.rs" over every struct, enum and union body [I5D-10]. Both accept
+    the fixture and today's config.rs (bytes and pin unchanged); each of I01B5_CONSTRUCTOR_ROWS (HUNT-22's nested
+    literal, HUNT-24's longer initialiser and a shorthand under (c); HUNT-22's struct W, an enum variant's field and a
+    union's field under (c5); HUNT-22 whole under both) refuses with its own sub-clause's message."""
+
+    TREE = I01B2_TREE
+
+    def plant(self, changes):
+        for rel, text in i01b2_tree(changes).items():
+            self.write(rel, text)
+
+    def test_both_clauses_accept_the_fixture_and_today_s_config_rs(self):
+        rule = "one constructor call, G-I01B-4"
+        for base in (self.base, gate.HE):
+            codes = gate.observer_code(base, rule)
+            self.assertIsNone(gate.constructor_c_accessor(codes, rule))
+            self.assertIsNone(gate.constructor_c5_binding_fields(codes, rule))
+        self.assertEqual(gate.check_i01b_constructor(gate.HE), 14)
+        self.assertEqual(hashlib.sha256((gate.HE / gate.I01B2_CONFIG).read_bytes()).hexdigest(),
+                         gate.I01B_GUARDED_PINS[gate.I01B2_CONFIG])
+        # Today's literal: exactly one top-level binding field, `binding: Value::Null`.
+        code = gate.observer_code(gate.HE, rule)[gate.I01B2_CONFIG]
+        literal = [found for found in gate.OBSERVER_CONFIG_LITERAL.finditer(code)][-1]
+        fields = gate.literal_fields(code, literal.end() - 1)
+        self.assertEqual([field for field in fields if field.startswith("binding")], ["binding: Value::Null"])
+
+    def test_the_rows_and_their_stated_sets(self):
+        self.assertEqual(len(I01B5_CONSTRUCTOR_ROWS), 7)
+        self.assertEqual(len(I01B5_CONSTRUCTOR_FUNCTIONS), 14)
+        for label, clause, stated, _ in I01B5_CONSTRUCTOR_ROWS:
+            self.assertEqual(stated[0], clause, label)
+            self.assertTrue(set(stated) <= set(I01B5_CONSTRUCTOR_FUNCTIONS), label)
+        for function in I01B5_CONSTRUCTOR_FUNCTIONS.values():
+            self.assertTrue(callable(getattr(gate, function)), function)
+
+    def test_each_row_refuses_with_its_own_sub_clause_s_message(self):
+        for label, clause, _, changes in I01B5_CONSTRUCTOR_ROWS:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(one constructor call, G-I01B-4 %s" % clause),
+                                            msg=label):
+                    gate.check_i01b_constructor(self.base)
+            finally:
+                self.plant(())
+
+    def test_the_literal_s_top_level_fields(self):
+        code = "x = S { a: f(b, c), binding: W { binding: Value::Null }, d: [1, 2], e }"
+        self.assertEqual(gate.literal_fields(code, code.index("{")),
+                         ["a: f(b, c)", "binding: W { binding: Value::Null }", "d: [1, 2]", "e"])
+
+
+class I01b5TextTests(I01b3AnswerTreeTests):
+    """HE-004-I01B5 U1, the carries from HE-004-I01B3 (DESIGN-I01B5 rev 5 sections 6.7 and 8): (t11), R3-1's row,
+    reads answer's step 2 exactly and refuses S1, S2, a second refusals( call and a fn-item reference; R2-1's two
+    changes each have a row that only it refuses (the item reading, the closure-only rule); and (t2) skips a const
+    generic parameter (R2-4), which without the skip it refuses (fail-closed)."""
+
+    def test_the_fixture_and_the_real_sources_pass(self):
+        self.assertEqual(I01B3_ANSWER_TEXT.count(I01B5_STEP_TWO_LINE), 1)
+        self.assertEqual(gate.check_i01b3_texts(self.base), 54)
+        self.assertEqual(gate.check_i01b3_texts(gate.HE), 54)
+        self.assertIsNone(gate.answer_texts_t11_step_two(gate.HE, "constants and texts, G-I01B-8"))
+
+    def test_the_rows(self):
+        self.assertEqual(len(I01B5_TEXT_ROWS), 6)
+        self.assertEqual(sorted(I01B5_TEXT_FUNCTIONS), sorted(list(I01B3_TEXT_FUNCTIONS) + ["(t11)"]))
+        for _, clause, _, _ in I01B5_TEXT_ROWS:
+            self.assertTrue(callable(getattr(gate, I01B5_TEXT_FUNCTIONS[clause])), clause)
+
+    def test_each_row_refuses_with_its_own_check_s_message(self):
+        self.refuses_each(I01B5_TEXT_ROWS, gate.check_i01b3_texts, "constants and texts, G-I01B-8")
+
+    def test_r2_1_s_two_changes_each_have_a_row_only_it_refuses(self):
+        rows = {label: changes for label, _, _, changes in I01B5_TEXT_ROWS}
+        for label, own in I01B5_R2_1_ROWS.items():
+            self.plant(rows[label])
+            try:
+                for change, (name, undone) in I01B5_R2_1_UNDO.items():
+                    with mock.patch.object(gate, name, undone):
+                        if change == own:
+                            self.assertEqual(gate.check_i01b3_texts(self.base), 54, label)
+                        else:
+                            with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t5))"),
+                                                        msg=label):
+                                gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+
+    def test_r2_4_a_const_generic_parameter_is_skipped(self):
+        for planted in I01B5_GENERIC_CONSTS:
+            self.plant(((gate.I01_ANSWER, I01B3_TOP, planted + I01B3_TOP),))
+            try:
+                self.assertEqual(gate.check_i01b3_texts(self.base), 54, planted)
+                with mock.patch.object(gate, "generic_parameter", lambda code, position: False):
+                    with self.assertRaisesRegex(gate.GateError, re.escape("(constants and texts, G-I01B-8 (t2))"),
+                                                msg=planted):
+                        gate.check_i01b3_texts(self.base)
+            finally:
+                self.plant(())
+        for code, expected in (("fn f<const N: usize>()", True), ("fn f<T, const N: usize>()", True),
+                               ("fn f<F: Fn(u8) -> u8, const N: usize>()", True), ("pub const X: &str = KEY;", False),
+                               ("{ const X: u8 = 1; }", False), ("f(a, const X: u8)", False), ("a < b; const X: u8", False)):
+            self.assertEqual(gate.generic_parameter(code, code.index("const")), expected, code)
+
+
+# HE-004-I01B5 U4 (DESIGN-I01B5 rev 5 sections 6 and 8): the rules over a fixture of the real observer sources (and
+# effect-gate's lib.rs and two socket files), each row planted by (file, anchor, replacement) on the real bytes. Each
+# row: (label, named sub-clause, stated set or None, changes[, the message it is refused with, when that is another
+# rule's]). The build's mutation proof reads these tables (I01B5_PROOF_RULES), records each row's actual refusing set and
+# runs the single-clause or each-alone proof.
+I01B5_TREE = {**{path.relative_to(gate.HE).as_posix(): path.read_text(encoding="utf-8")
+                 for path in sorted((gate.HE / gate.OBSERVER_CRATE / "src").rglob("*.rs"))},
+              **{rel: (gate.HE / rel).read_text(encoding="utf-8")
+                 for rel in (gate.EFFECT_GATE_LIB, gate.LINUX_OS, "crates/effect-gate/src/linux_net.rs")}}
+_OBS, _CLI, _SRV = gate.OBSERVER_OBSERVE, gate.OBSERVER_CLIENT, gate.OBSERVER_SERVICE
+_NET, _LST, _EGN = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN, "crates/effect-gate/src/linux_net.rs"
+I01B5_SELF_CHECK_TEXT = re.search(r"        let observation = match ::std::str.*?\n        \};\n", I01B5_TREE[_SRV], re.S).group(0)
+I01B5_SEND_TEXT = re.search(r"        match ops\.peer_send\(.*?\n        \}\n", I01B5_TREE[_SRV], re.S).group(0)
+I01B5_ANSWER_LINE = ("        let bytes = match crate::i01_answer::answer(derived, &checked, &facts, wall_ms, "
+                     "session.last_observed) {\n")
+I01B5_RESPOND_TAIL = "            PeerSent::Failed(_) => return Some(Closed::NotServed),\n        }\n        None\n"
+I01B5_RESPOND_CALL_LINE = ("        let closed = if self.ready(&session, now) { self.respond(ops, &mut session, wall_ms, now) } "
+                           "else { None };\n")
+I01B5_FRESHNESS_LINES = ("        if now >= after(received, I01_EXCHANGE_DEADLINE) || now >= session.outer {\n"
+                         "            return Some(Closed::NotServed);\n        }\n")
+I01B5_CLOCK_LINE = "        let wall_ms = match wall_ms { Some(ms) => ms, None => return Some(Closed::Window) };\n"
+I01B5_WOKE = "        session.woke = now;\n"
+I01B5_END = "        ops.peer_close(peer);\n"
+I01B5_SERVICE_TAIL = "        None\n    }\n}\n\nimpl PeerService for I01Service {\n"
+I01B5_DRAINS_DOC = "    /// The poll count of each drain so far (the tests' reading).\n"
+I01B5_PASSED_LINE = "                let passed = self.request_round.take()\n"
+I01B5_PUSH_PASSED = "                self.client.push_availability(Availability { phase: self.phase, established, fresh,\n"
+I01B5_SEND_FUNCTIONS = {"(a)": "send_a_peer_send", "(b)": "send_b_send_answer", "(c)": "send_c_channel_send",
+                        "(d)": "send_d_use_paths", "(e)": "send_e_peer_ops", "(f)": "send_f_respond",
+                        "(g)": "send_g_readable", "(h)": "send_h_deadlines_call", "(i)": "send_i_chain"}
+I01B5_SEND_ROWS = (
+    # (a) [DIB 7.3 P5-1; I5D-7].
+    ("P5-1 a second ops.peer_send call", "(a)", None,
+     ((_SRV, I01B5_END, I01B5_END + "        let _ = ops.peer_send(peer, &[]);\n"),)),
+    ("P5-1 UFCS PeerOps::peer_send(ops, ..)", "(a)", None,
+     ((_SRV, I01B5_END, I01B5_END + "        let _ = PeerOps::peer_send(ops, peer, &[]);\n"),)),
+    ("P5-1 the call moved to i01_answer.rs", "(a)", None,
+     ((gate.I01_ANSWER, "pub fn self_check(", "pub fn send(ops: &mut dyn PeerOps, peer: PeerId, bytes: &[u8]) -> PeerSent "
+       "{\n    ops.peer_send(peer, bytes)\n}\n\npub fn self_check("),
+      (_SRV, "        match ops.peer_send(session.peer, &bytes) {\n",
+       "        match crate::i01_answer::send(ops, session.peer, &bytes) {\n"))),
+    ("I5D-7 a default peer_send body", "(a)", None,
+     ((_CLI, "    fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent;\n",
+       "    fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent {\n        let _ = (peer, bytes);\n"
+       "        PeerSent::Sent\n    }\n"),)),
+    # (b) [DIB 7.3's extra; I5D-7].
+    ("extra: a second send_answer call in another LinuxWire method", "(b)", None,
+     ((_NET, "impl PeerOps for LinuxWire {\n", "impl LinuxWire {\n    fn again(&self, peer: PeerId) -> PeerSent {\n"
+       "        self.i01.send_answer(peer, b\"\")\n    }\n}\n\nimpl PeerOps for LinuxWire {\n"),)),
+    ("I5D-7 a loop in send_answer", "(b)", None,
+     ((_LST, "        match channel::send(&held.conn, bytes) {\n",
+       "        match loop { break channel::send(&held.conn, bytes); } {\n"),)),
+    ("I5D-7 changed bytes in send_answer", "(b)", None,
+     ((_LST, "        match channel::send(&held.conn, bytes) {\n", "        match channel::send(&held.conn, &bytes[1..]) {\n"),)),
+    # (c) [DIB 7.3 P5-2, P5-4; G-I01-5's three channel::send spellings, kept as rows here].
+    ("P5-2 a second channel::send( in linux_net.rs", "(c)", None,
+     ((_NET, "use crate::linux_listen::I01Socket;\n", "use crate::linux_listen::I01Socket;\n\n"
+       "fn leak(c: &channel::Conn) {\n    let _ = channel::send(c, b\"x\");\n}\n"),)),
+    ("P5-4 a fn-item reference", "(c)", None,
+     ((_LST, "    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n",
+       "    pub(crate) fn sender(&self) {\n        let _s = channel::send;\n    }\n\n"
+       "    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n"),)),
+    ("G-I01-5's spelling gate_sys :: channel :: send(", "(c)", None,
+     ((_LST, "    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n",
+       "    pub(crate) fn again(&self, c: &channel::Conn) {\n        let _ = gate_sys :: channel :: send(c, b\"x\");\n"
+       "    }\n\n    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n"),)),
+    ("G-I01-5's spelling ::gate_sys::channel::send(", "(c)", None,
+     ((_LST, "    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n",
+       "    pub(crate) fn again(&self, c: &channel::Conn) {\n        let _ = ::gate_sys::channel::send(c, b\"x\");\n"
+       "    }\n\n    /// Closes the held peer and everything kept for it (the close also takes it off the poller).\n"),)),
+    # (d) [DIB 7.3 P5-3, P5-5; the backstops].
+    ("P5-3 a renamed channel", "(d)", None,
+     ((_LST, "use gate_sys::channel::{self, ListenStep};\n", "use gate_sys::channel::{self, ListenStep};\n"
+       "use gate_sys::channel as c;\n\nfn leak(x: &c::Conn) {\n    let _ = c::send(x, b\"x\");\n}\n"),)),
+    # DIB 7.3 names (d) (and G-I01B-6 (d)); its `use super::channel::send;` is also a channel::send path, which (c),
+    # run first, counts: the set is {(c), (d)}, each refusing alone.
+    ("P5-5 a nested module", "(c)", ("(c)", "(d)"),
+     ((_LST, "use gate_sys::channel::{self, ListenStep};\n", "use gate_sys::channel::{self, ListenStep};\n"
+       "mod inner {\n    use super::channel::send;\n}\n"),)),
+    ("(d) a glob import", "(d)", None,
+     ((_LST, "use gate_sys::channel::{self, ListenStep};\n", "use gate_sys::channel::{self, ListenStep};\n"
+       "use gate_sys::peer_wire::*;\n"),)),
+    # (e) [DIB 7.3's extra; X5-1..X5-3; I5D-9].
+    ("extra: a push taking PeerOps", "(e)", None,
+     ((_CLI, "    fn peer_capture_view(&mut self, gate: CaptureGate);\n",
+       "    fn peer_capture_view(&mut self, gate: CaptureGate, ops: &mut dyn PeerOps);\n"),)),
+    ("X5-1 pub type Ops = dyn PeerOps;, a push taking it", "(e)", None,
+     ((_CLI, "pub trait PeerService {\n", "pub type Ops = dyn PeerOps;\n\npub trait PeerService {\n"),
+      (_CLI, "    fn peer_capture_view(&mut self, gate: CaptureGate);\n",
+       "    fn peer_capture_view(&mut self, gate: CaptureGate, ops: &mut Ops);\n"))),
+    ("X5-2 use self::PeerOps as P;, a push taking it", "(e)", None,
+     ((_CLI, "pub trait PeerService {\n", "use self::PeerOps as P;\n\npub trait PeerService {\n"),
+      (_CLI, "    fn peer_capture_view(&mut self, gate: CaptureGate);\n",
+       "    fn peer_capture_view(&mut self, gate: CaptureGate, ops: &mut dyn P);\n"))),
+    ("X5-3 pub trait Ops2: PeerOps {} with a blanket impl, a push taking it", "(e)", None,
+     ((_CLI, "pub trait PeerService {\n", "pub trait Ops2: PeerOps {}\n\nimpl<T: PeerOps> Ops2 for T {}\n\n"
+       "pub trait PeerService {\n"),
+      (_CLI, "    fn peer_capture_view(&mut self, gate: CaptureGate);\n",
+       "    fn peer_capture_view(&mut self, gate: CaptureGate, ops: &mut dyn Ops2);\n"))),
+    ("I5D-9 trait X where Self: PeerOps", "(e)", None,
+     ((_CLI, "pub trait PeerService {\n", "pub trait Hidden where Self: PeerOps {}\n\npub trait PeerService {\n"),)),
+    # (f) [DIB 7.3 N2-3, N2-3b, N2-5, N2-5b and its extra; X5-4, X5-5; I5D-13 (ii); I5E-5, I5F-6].
+    ("N2-3 the Ok arm yields other bytes", "(f)", None,
+     ((_SRV, "            Ok(bytes) => bytes,\n", "            Ok(_) => self.buffer.clone(),\n"),)),
+    ("N2-3 the bytes extended", "(f)", None,
+     ((_SRV, "            Ok(bytes) => bytes,\n", "            Ok(mut bytes) => {\n                bytes.push(b' ');\n"
+       "                bytes\n            }\n"),)),
+    ("N2-3b PeerSent::Sent => {} (the chain not advanced)", "(f)", None,
+     ((_SRV, "            PeerSent::Sent => session.sent(&checked, &bytes, observation, wall_ms),\n",
+       "            PeerSent::Sent => {}\n"),)),
+    ("N2-3b PeerSent::Failed(_) => {} (no close)", "(f)", None,
+     ((_SRV, I01B5_RESPOND_TAIL, "            PeerSent::Failed(_) => {}\n        }\n        None\n"),)),
+    ("extra: a statement between the answer and the self-check", "(f)", None,
+     ((_SRV, I01B5_SELF_CHECK_TEXT, "        let _between = 0;\n" + I01B5_SELF_CHECK_TEXT),)),
+    ("N2-5 the statements in a loop inside respond", "(f)", None,
+     ((_SRV, I01B5_ANSWER_LINE, "        loop {\n" + I01B5_ANSWER_LINE),
+      (_SRV, I01B5_RESPOND_TAIL, "            PeerSent::Failed(_) => return Some(Closed::NotServed),\n        }\n"
+       "        break;\n        }\n        None\n"))),
+    ("N2-5b a second respond call", "(f)", None,
+     ((_SRV, I01B5_RESPOND_CALL_LINE, I01B5_RESPOND_CALL_LINE
+       + "        let _again = self.respond(ops, &mut session, wall_ms, now);\n"),)),
+    ("X5-4 a second trait Kick reached through PeerService, kick calling respond", "(f)", None,
+     ((_CLI, "pub trait PeerService {\n", "pub trait Kick {\n    fn kick(&mut self, ops: &mut dyn PeerOps);\n}\n\n"
+       "pub trait PeerService {\n    fn kicker(&mut self) -> Option<&mut dyn Kick>;\n"),
+      (_SRV, "impl PeerService for I01Service {\n", "impl crate::client::Kick for I01Service {\n"
+       "    fn kick(&mut self, ops: &mut dyn PeerOps) {\n        let Some(mut session) = self.session.take() else { return };\n"
+       "        let _ = self.respond(ops, &mut session, None, Instant::now());\n    }\n}\n\n"
+       "impl PeerService for I01Service {\n"))),
+    ("X5-5 let r = Self::respond;", "(f)", None,
+     ((_SRV, I01B5_RESPOND_CALL_LINE, "        let _r = Self::respond;\n" + I01B5_RESPOND_CALL_LINE),)),
+    ("I5D-13 (ii) the self-check statement altered (no previous)", "(f)", None,
+     ((_SRV, "wall_ms / 1000, session.previous.as_ref()) {", "wall_ms / 1000, None) {"),)),
+    ("I5D-13 (ii) the self-check statement moved after the send", "(f)", None,
+     ((_SRV, I01B5_SELF_CHECK_TEXT + I01B5_SEND_TEXT, I01B5_SEND_TEXT + I01B5_SELF_CHECK_TEXT),)),
+    ("I5E-5 a use .. as json rename reaching the self-check", "(f)", None,
+     ((_SRV, "use i05_protocol::json::Value;\n", "use i05_protocol::json::Value;\nuse crate::i01_request as json;\n"),
+      (_SRV, "::i05_protocol::json::parse(text)", "json::parse(text)"))),
+    ("I5F-6 a std rename reaching the self-check", "(f)", None,
+     ((_SRV, "use i05_protocol::json::Value;\n", "use i05_protocol::json::Value;\nuse crate::i01_request as std;\n"),
+      (_SRV, "::std::str::from_utf8(&bytes)", "std::str::from_utf8(&bytes)"))),
+    # (g) [F6.10].
+    ("(g) a write interest on the I01 listener", "(g)", None,
+     ((_NET, "                self.poller.add(self.i01.watched_listener(), LISTENER_TOKEN, readable)\n",
+       "                self.poller.add(self.i01.watched_listener(), LISTENER_TOKEN, channel::Interest { readable: true, "
+       "writable: true })\n"),)),
+    ("(g) readable rebound", "(g)", None,
+     ((_NET, "    fn watch_i01(&mut self, peers: PeerWatch, woken: &mut Woken) {\n"
+       "        let readable = channel::Interest { readable: true, writable: false };\n",
+       "    fn watch_i01(&mut self, peers: PeerWatch, woken: &mut Woken) {\n"
+       "        let readable = channel::Interest { readable: true, writable: peers.listener };\n"),)),
+    # (h) [DIB 7.3 N2-4].
+    ("N2-4 serve_peer_deadlines from a Client push", "(h)", None,
+     ((_CLI, "    /// The attached service's pending request's receipt (the epoch's request-round trigger).\n",
+       "    pub fn kick(&mut self) {\n        if let Some(service) = self.service.as_deref_mut() {\n"
+       "            service.serve_peer_deadlines(&mut self.wire, None, self.wire.now());\n        }\n    }\n\n"
+       "    /// The attached service's pending request's receipt (the epoch's request-round trigger).\n"),)),
+    ("N2-4 PeerService::serve_peer_deadlines(..)", "(h)", None,
+     ((_CLI, "    /// The attached service's pending request's receipt (the epoch's request-round trigger).\n",
+       "    pub fn kick(&mut self, s: &mut dyn PeerService) {\n"
+       "        PeerService::serve_peer_deadlines(s, &mut self.wire, None, self.wire.now());\n    }\n\n"
+       "    /// The attached service's pending request's receipt (the epoch's request-round trigger).\n"),)),
+    # (i) [I5D-8, I5E-4, I5F-5; E1-E5].
+    ("I5D-8 let f = Chain::answered;", "(i)", None,
+     ((_SRV, I01B5_END, I01B5_END + "        let _f = Chain::answered;\n"),)),
+    ("I5D-8 a second .sent( call", "(i)", None,
+     ((_SRV, I01B5_SERVICE_TAIL, "        session.sent(&checked, &bytes, observation, wall_ms);\n" + I01B5_SERVICE_TAIL),)),
+    ("E1 session.chain = Chain::default();", "(i)", None,
+     ((_SRV, I01B5_WOKE, I01B5_WOKE + "        session.chain = Chain::default();\n"),)),
+    ("E2 std::mem::take(&mut session.chain)", "(i)", None,
+     ((_SRV, I01B5_WOKE, I01B5_WOKE + "        let _ = std::mem::take(&mut session.chain);\n"),)),
+    ("E3 session.previous = None;", "(i)", None,
+     ((_SRV, I01B5_WOKE, I01B5_WOKE + "        session.previous = None;\n"),)),
+    ("E4 session.previous.take();", "(i)", None,
+     ((_SRV, I01B5_WOKE, I01B5_WOKE + "        session.previous.take();\n"),)),
+    ("E5 std::mem::take(&mut session.last_observed)", "(i)", None,
+     ((_SRV, I01B5_WOKE, I01B5_WOKE + "        let _ = std::mem::take(&mut session.last_observed);\n"),)),
+)
+I01B5_STATEMENT_FUNCTIONS = {"(s1)": "statements_s1_check_snapshot", "(s2)": "statements_s2_snapshot_literal",
+                             "(s3)": "statements_s3_capture_push", "(s4)": "statements_s4_passed",
+                             "(s5)": "statements_s5_round_start", "(s6)": "statements_s6_from_view",
+                             "(s7)": "statements_s7_clock", "(s8)": "statements_s8_facts", "(s9)": "statements_s9_order"}
+I01B5_FACTS_ROWS = (("completed: gate.scheduled.is_some(),", "completed: true,"),          # D-2
+                    ("expired: gate.expired,", "expired: false,"),
+                    ("scheduled_after_now: gate.scheduled > Some(now),", "scheduled_after_now: false,"),
+                    ("slots: gate.slots.clone(),", "slots: Vec::new(),"),
+                    ("mono_age_ms: gate.scheduled.filter(|at| *at <= now).map_or(0, |at| ms(now - at)),", "mono_age_ms: 0,"),
+                    ("wall_age_ms: wall_ms as i64 - gate.set_started_ms as i64,", "wall_age_ms: 0,"),
+                    ("record_digest: gate.record_digest.clone(),", "record_digest: String::new(),"))
+I01B5_STATEMENT_ROWS = (
+    # (s1) [B3-6 (1): D-1; I5E-2: A1; rev 5 and MON-I01B5-STOPS (ii)-(iv) as source forms; I5D-3].
+    ("D-1 the quota Value from the binding's values", "(s1)", None,
+     ((_OBS, '        let quota = object([("hard", Some(quota_side(&quotas.pairs, |pair| pair.hard))),\n',
+       '        let quota = self.config.binding().clone();\n'
+       '        let _unused = object([("hard", Some(quota_side(&quotas.pairs, |pair| pair.hard))),\n'),)),
+    ("ADM-4 after the derive", "(s1)", None,
+     ((_OBS, "        let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;\n", ""),
+      (_OBS, "        drop(inputs);\n",
+       "        let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;\n        drop(inputs);\n"))),
+    ("A1 a statement between ADM-4's and the configuration Value", "(s1)", None,
+     ((_OBS, "        let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;\n",
+       "        let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;\n"
+       "        let digest = String::from(\"sha256:00\");\n"),)),
+    ("rev 5 (iv) a fourth sealedAdmission member", "(s1)", None,
+     ((_OBS, '("ipFamily", Some(Value::str(&sealed.ip_family))),',
+       '("ipFamily", Some(Value::str(&sealed.ip_family))), ("namespace", Some(Value::str(&self.config.namespace))),'),)),
+    ("rev 5 (iv) a namespace member in place of ipFamily", "(s1)", None,
+     ((_OBS, '("ipFamily", Some(Value::str(&sealed.ip_family))),',
+       '("namespace", Some(Value::str(&sealed.ip_family))),'),)),
+    ("rev 5 (ii)/(iii) the loaded hash taken from config", "(s1)", None,
+     ((_OBS, "&record.loaded_hash().map_or(Value::Null, Value::str)", "&Value::str(&self.config.pinned_manifest_hash)"),)),
+    ("the no-engine branch with another text", "(s1)", None,
+     ((_OBS, "None => Err(NO_CAPTURE_ENGINE_TEXT),", "None => Err(\"no capture engine\"),"),)),
+    ("I5D-12 the object helper adding a member", "(s1)", None,
+     ((_OBS, "            built.insert(JStr::new(name), member);\n", "            built.insert(JStr::new(name), member);\n"
+       "            built.insert(JStr::new(\"namespace\"), Value::Null);\n"),)),
+    ("I5D-12 the quota helper reading one side for both", "(s1)", None,
+     ((_OBS, "Value::Int(Int::from_u64(side(pair)))", "Value::Int(Int::from_u64(pair.hard))"),)),
+    # (s2) [I5D-11].
+    ("a changed SnapshotView initialiser", "(s2)", None,
+     ((_OBS, "SnapshotView { phase: self.phase, mark, fresh_stamp: stamp, derived }",
+       "SnapshotView { phase: self.phase, mark, fresh_stamp: self.client.now(), derived }"),)),
+    # (s3) [I5D-4, I5E-3: the push reading a local].
+    ("I5E-3 the expiry push reading a forged local", "(s3)", None,
+     ((_OBS, "            captures.expire();\n", "            captures.expire();\n            let forged = forged_cycle();\n"),
+      (_OBS, "            if let Some(captures) = self.captures.as_deref() {\n",
+       "            if let Some(captures) = Some(&forged) {\n"))),
+    # (s4) [I5E-3: a local round; Passed with started from another clock].
+    ("I5E-3 a local round before Passed", "(s4)", None,
+     ((_OBS, I01B5_PASSED_LINE, "                let mut round = self.request_round;\n"
+       "                let passed = round.take()\n"),)),
+    ("Passed with started from another clock", "(s4)", None,
+     ((_OBS, "started: round.started", "started: self.client.now()"),)),
+    # (s5) [I5F-2 (1)].
+    ("I5F-2 (1) the round started from another clock", "(s5)", None,
+     ((_OBS, "        let started = self.client.now();\n        self.request_round = Some(RequestRound {",
+       "        let started = self.last_round_start.unwrap_or(self.client.now());\n"
+       "        self.request_round = Some(RequestRound {"),)),
+    # (s6) [I5D-4; I5E-7].
+    ("I5E-7 a slot name swapped in from_view", "(s6)", None,
+     ((_CLI, "CAPTURE_LIFECYCLE_SLOT.to_string()", "CAPTURE_BACKEND_SLOT_PREFIX.to_string()"),)),
+    ("a CaptureGate slot true for a non-Taken variant", "(s6)", None,
+     ((_CLI, "        let taken = |slot: &Slot| matches!(slot, Slot::Taken { .. });\n",
+       "        let taken = |slot: &Slot| !matches!(slot, Slot::Free);\n"),)),
+    # (s7) [I5E-6: a second clock reading; I5F-4: step 2 removed].
+    ("I5E-6 a second clock reading", "(s7)", None, ((_SRV, I01B5_CLOCK_LINE, I01B5_CLOCK_LINE + I01B5_CLOCK_LINE),)),
+    ("I5F-4 step 2 removed", "(s7)", None, ((_SRV, I01B5_FRESHNESS_LINES, ""),)),
+    # (s8) [B3-6 (2), I3D-12: D-2 and each initialiser changed].
+) + tuple(("B3-6 (2) %s" % ("D-2 completed: true" if new == "completed: true," else "the initialiser " + new), "(s8)",
+           None, ((_SRV, "            %s\n" % old, "            %s\n" % new),)) for old, new in I01B5_FACTS_ROWS) + (
+    # (s9) [I5F-4: the order swapped].
+    ("I5F-4 the order swapped", "(s9)", None,
+     ((_SRV, I01B5_RESPOND_CALL_LINE, ""),
+      (_SRV, "        let closed = if !inside {\n", I01B5_RESPOND_CALL_LINE + "        let closed = if !inside {\n"))),
+)
+I01B5_FOLD_FUNCTIONS = {"I5F-1 (1)": "fold_1_snapshot_names", "I5F-1 (3)": "fold_1_snapshot_call",
+                        "I5F-1 (4)": "fold_1_adm4_arm", "I5F-2 (2)": "fold_2_round_literals",
+                        "I5F-2 (3)": "fold_2_request_round", "I5F-2 (4)": "fold_2_passed_names",
+                        "I5F-3 (1)": "fold_3_capture_counts", "I5F-3 (2)": "fold_3_captures",
+                        "I5F-3 (3)": "fold_3_capture_literals", "I5F-7": "fold_7_respond_clock",
+                        "R1-1 (1)": "fold_r1_1_assignments", "R1-1 (2)": "fold_r1_1_borrows",
+                        "R1-1 (3)": "fold_r1_1_exchanges"}
+# PR review round 1's probes (R1-1, MON-I01B5-R1), planted at the head of fn start.
+I01B5_START_LINE = "        let deadline = after(self.client.now(), OR07_BUDGET);\n"
+I01B5_FOLD_ROWS = (
+    ("A2 a shadowed inputs before the four statements", "I5F-1 (1)", None,
+     ((_OBS, "        let quotas = match inputs.items(Resource::ResourceQuotas) {\n",
+       "        let inputs = forged_inputs();\n        let quotas = match inputs.items(Resource::ResourceQuotas) {\n"),)),
+    ("A3 a shadowed resource_version", "I5F-1 (1)", None,
+     ((_OBS, "        let inputs = match Inputs::new(pairs) {\n",
+       "        let resource_version = \"1\";\n        let inputs = match Inputs::new(pairs) {\n"),)),
+    ("A4 a shadowed quotas between the quota statements", "I5F-1 (1)", None,
+     ((_OBS, "        let quotas = match quotas {\n", "        let quotas = forged_quotas();\n        let quotas = match quotas {\n"),)),
+    ("I5F-1 (3) a forged text at the call", "I5F-1 (3)", None,
+     ((_OBS, "&resource_text, mark, stamp)?;", "\"1\", mark, stamp)?;"),)),
+    ("I5F-1 (4) a config digest in adm4's Match arm", "I5F-1 (4)", None,
+     ((_OBS, "                let digest = record.digest();\n",
+       "                let digest = self.config.pinned_manifest_hash.clone();\n"),)),
+    ("C5 a write to self.request_round before Passed", "I5F-2 (2)", None,
+     ((_OBS, I01B5_PASSED_LINE, "                self.request_round = Some(RequestRound { started: self.client.now(), "
+       "deadline: now, mark: Some(mark) });\n" + I01B5_PASSED_LINE),)),
+    ("C6 the round's started rewritten", "I5F-2 (3)", None,
+     ((_OBS, I01B5_PASSED_LINE, "                if let Some(round) = self.request_round.as_mut() { round.started = "
+       "self.client.now(); }\n" + I01B5_PASSED_LINE),)),
+    ("C7 a shadowed passed and a second Passed literal", "I5F-2 (2)", None,
+     ((_OBS, I01B5_PUSH_PASSED, "                let passed = Some(Passed { started: self.client.now(), mark, stamp: now "
+       "});\n" + I01B5_PUSH_PASSED),)),
+    ("C2 a third push over a CaptureView literal", "I5F-3 (1)", None,
+     ((_OBS, I01B5_DRAINS_DOC, "    fn forge(&mut self) {\n        self.client.push_capture_view(CaptureGate::from_view("
+       "&CaptureView { sequence: 0 }, false));\n    }\n\n" + I01B5_DRAINS_DOC),)),
+    ("C3 a replaced engine", "I5F-3 (2)", None,
+     ((_OBS, "        self.drain_due = true;\n",
+       "        self.drain_due = true;\n        self.captures = Some(Box::new(ForgedCycle::all_taken()));\n"),)),
+    ("a CaptureGate literal in observe.rs", "I5F-3 (3)", None,
+     ((_OBS, I01B5_DRAINS_DOC, "    fn forge(&self) -> Option<CaptureGate> {\n        Some(CaptureGate { scheduled: None, "
+       "set_started_ms: 0, slots: Vec::new(), record_digest: String::new(), expired: false })\n    }\n\n"
+       + I01B5_DRAINS_DOC),)),
+    ("G1 a second wall_ms binding after the clock statement", "I5F-7", None,
+     ((_SRV, I01B5_CLOCK_LINE, I01B5_CLOCK_LINE + "        let wall_ms = wall_ms.saturating_sub(4_000);\n"),)),
+    ("G2 a let now before the CaptureFacts literal", "I5F-7", None,
+     ((_SRV, "        let facts = crate::i01_answer::CaptureFacts {\n",
+       "        let now = std::time::Instant::now();\n        let facts = crate::i01_answer::CaptureFacts {\n"),)),
+    ("R-P6 the pinned manifest hash rewritten", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.config.pinned_manifest_hash = String::new();\n" + I01B5_START_LINE),)),
+    ("R-P7 the sealed values dropped", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.config.sealed = None;\n" + I01B5_START_LINE),)),
+    ("R-P8 the closure replaced", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.closure = Closure::embedded().unwrap();\n" + I01B5_START_LINE),)),
+    ("R-P9 the configuration swapped", "R1-1 (3)", None,
+     ((_OBS, I01B5_START_LINE, "        let mut other = self.config.clone();\n        std::mem::swap(&mut self.config, "
+       "&mut other);\n" + I01B5_START_LINE),)),
+)
+I01B5_SNAPSHOT_FUNCTIONS = {"(i)": "snapshot_view_i_struct", "(ii)": "snapshot_view_ii_literal",
+                            "(iii)": "snapshot_view_iii_impls", "(v)": "snapshot_view_v_names", "(vi)": "snapshot_view_vi_places"}
+I01B5_SNAPSHOT_ROWS = (
+    ("#[derive(Clone)]", "(i)", None,
+     ((_CLI, "#[derive(Debug)]\npub struct SnapshotView {\n", "#[derive(Clone, Debug)]\npub struct SnapshotView {\n"),)),
+    ("a second literal", "(ii)", None,
+     ((_OBS, I01B5_DRAINS_DOC, "    fn forge_view(&self) -> SnapshotView {\n        SnapshotView { phase: 0, mark: 0, "
+       "fresh_stamp: self.client.now(), derived: Err(NO_CAPTURE_ENGINE_TEXT) }\n    }\n\n" + I01B5_DRAINS_DOC),)),
+    ("a PartialEq impl", "(iii)", None,
+     ((_CLI, "#[derive(Debug)]\npub struct SnapshotView {\n", "impl PartialEq for SnapshotView {\n    fn eq(&self, _other: "
+       "&Self) -> bool {\n        true\n    }\n}\n\n#[derive(Debug)]\npub struct SnapshotView {\n"),)),
+    ("a type alias", "(v)", None,
+     ((_CLI, "#[derive(Debug)]\npub struct SnapshotView {\n",
+       "pub type View = SnapshotView;\n\n#[derive(Debug)]\npub struct SnapshotView {\n"),)),
+    ("SnapshotView named in another file", "(vi)", None,
+     (("crates/observer/src/utc.rs", "pub fn wall_millis() -> Option<u64> {\n",
+       "pub fn phase(view: &crate::client::SnapshotView) -> u64 {\n    view.phase\n}\n\npub fn wall_millis() -> Option<u64> "
+       "{\n"),)),
+)
+I01B5_LITERAL_ROWS = (
+    (_OBS, "pub const REQUEST_ROUND_SPACING: Duration = Duration::from_secs(1);\n",
+     "pub const REQUEST_ROUND_SPACING: Duration = Duration::from_secs(2);\n"),
+    (_OBS, "pub const REQUEST_ROUND_DEADLINE: Duration = Duration::from_secs(2);\n",
+     "pub const REQUEST_ROUND_DEADLINE: Duration = Duration::from_secs(3);\n"),
+    (_OBS, "pub const NO_CAPTURE_ENGINE_TEXT: &str = \"no capture engine\";\n",
+     "pub const NO_CAPTURE_ENGINE_TEXT: &str = \"no engine\";\n"),
+    (_SRV, "pub const I01_EXCHANGE_DEADLINE: Duration = Duration::from_secs(2);\n",
+     "pub const I01_EXCHANGE_DEADLINE: Duration = Duration::from_secs(3);\n"),
+    (_CLI, "\"role/BROKER\", \"role/WORKER\"", "\"role/WORKER\", \"role/BROKER\""),
+    (_CLI, "pub const CAPTURE_LIFECYCLE_SLOT: &str = \"lifecycle\";\n", "pub const CAPTURE_LIFECYCLE_SLOT: &str = \"cycle\";\n"),
+    (_CLI, "/// R10-defined (I5E-7): the lifecycle slot's name, i01_gate.rs:37-45's `LIFECYCLE_SLOT`.\n",
+     "/// The lifecycle slot's name.\n"),
+)
+# G-I01B-6 (a) and (c) (section 6.3; DIB 7.4's P6-1..P6-10, N2-6, N2-7, each with the clause that refuses it): the
+# reading over the four socket files, run as G-I01-5, the socket-item rule, G-I01B-6 (e) and G-I01B-7 (c) run them.
+# (a) and (c) are disabled by reading the paths and texts as they are (own_scope_path's and own_scope_strip's identity).
+I01B5_OWN_SCOPE_FUNCTIONS = {"(a)": ("own_scope_path", lambda path, own: path),
+                             "(c)": ("own_scope_strip", lambda text, own: text),
+                             "(e)": ("check_socket_module_aliases", lambda base: 0),
+                             "G-I01B-7 (c)": ("check_i01b_sources", lambda base: 0)}
+_LISTEN_USE, _NET_USE = "use gate_sys::channel::{self, ListenStep};\n", "use crate::linux_listen::I01Socket;\n"
+_OS_USE, _EG_USE = "use crate::linux_net::SharedNet;\n", "use crate::seal::Sealed;\n"
+_SEND_IMPORT, _RENAME = "imports gate-sys's channel send", "renames gate-sys's channel module"
+_ITEM, _ALIAS = "has a pub item naming gate-sys's socket items", "G-I01B-6 \\(e\\)"
+I01B5_OWN_SCOPE_ROWS = (
+    ("P6-1 use crate::linux_listen::channel::{send};", "(a)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate::linux_listen::channel::{send};\n"),), _SEND_IMPORT),
+    ("P6-1 use crate::linux_net::channel::{send}; (linux_net.rs)", "(a)", None,
+     ((_NET, _NET_USE, _NET_USE + "use crate::linux_net::channel::{send};\n"),), _SEND_IMPORT),
+    ("P6-2 use crate::linux_listen::channel as c;", "(a)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate::linux_listen::channel as c;\n"),), _RENAME),
+    ("P6-3 use super::linux_listen::channel::{send};", "(a)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use super::linux_listen::channel::{send};\n"),), _SEND_IMPORT),
+    ("P6-4 use self::channel::send;", "(a)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use self::channel::send;\n"),), _SEND_IMPORT),
+    ("P6-5 use crate::linux_os::Conn as K; pub fn f() -> K (linux_os.rs)", "(a)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "use crate::linux_os::Conn as K;\n\npub fn leak(k: K) -> K {\n    k\n}\n"),),
+     _ITEM),
+    ("P6-5 use crate::linux_net::TcpConn as K; (effect-gate linux_net.rs)", "(a)", None,
+     ((_EGN, _EG_USE, _EG_USE + "use crate::linux_net::TcpConn as K;\n\npub fn leak(k: K) -> K {\n    k\n}\n"),), _ITEM),
+    ("P6-6 use super::linux_os::Conn as K;", "(a)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "use super::linux_os::Conn as K;\n\npub fn leak(k: K) -> K {\n    k\n}\n"),),
+     _ITEM),
+    ("P6-7 use crate::linux_listen as me; use me::channel::send;", "(e)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate::linux_listen as me;\nuse me::channel::send;\n"),), _ALIAS),
+    ("P6-8 -> &self::Conn (linux_os.rs)", "(c)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "\npub fn leak(conn: &self::Conn) -> &self::Conn {\n    conn\n}\n"),), _ITEM),
+    ("P6-8 -> &'static crate::linux_os::Conn", "(c)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "\npub fn leak() -> &'static crate::linux_os::Conn {\n    todo()\n}\n"),), _ITEM),
+    ("P6-8 pub type T = self::channel::Conn; (linux_listen.rs)", "(c)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "\npub type T = self::channel::Conn;\n"),), _ITEM),
+    ("P6-8 -> &super::linux_net::TcpConn (effect-gate linux_net.rs)", "(c)", None,
+     ((_EGN, _EG_USE, _EG_USE + "\npub fn leak(conn: &super::linux_net::TcpConn) -> &super::linux_net::TcpConn {\n"
+       "    conn\n}\n"),), _ITEM),
+    ("P6-9 use crate as r; use r::linux_listen::channel::send;", "(e)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate as r;\nuse r::linux_listen::channel::send;\n"),), _ALIAS),
+    ("P6-10 mod m { use super::channel::send; } (linux_listen.rs)", "G-I01B-7 (c)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "mod m {\n    use super::channel::send;\n}\n"),), "declares a module"),
+    ("N2-6 use crate::linux_os; then -> &linux_os::Conn", "(e)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "use crate::linux_os;\n\npub fn leak(conn: &linux_os::Conn) -> &linux_os::Conn {\n"
+       "    conn\n}\n"),), _ALIAS),
+    ("N2-6 use super::linux_net; then -> &linux_net::TcpConn", "(e)", None,
+     ((_EGN, _EG_USE, _EG_USE + "use super::linux_net;\n"),), _ALIAS),
+    ("N2-6 use crate::linux_listen; (linux_listen.rs)", "(e)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate::linux_listen;\n"),), _ALIAS),
+    ("N2-6 use crate::linux_net; (linux_net.rs)", "(e)", None,
+     ((_NET, _NET_USE, _NET_USE + "use crate::linux_net;\n"),), _ALIAS),
+    ("N2-6 use crate::linux_os::{self};", "(e)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "use crate::linux_os::{self};\n"),), _ALIAS),
+    ("N2-6 use crate::linux_os::{self as m};", "(e)", None,
+     ((gate.LINUX_OS, _OS_USE, _OS_USE + "use crate::linux_os::{self as m};\n"),), _ALIAS),
+    ("N2-7 use crate::*; (linux_listen.rs)", "(e)", None,
+     ((_LST, _LISTEN_USE, _LISTEN_USE + "use crate::*;\n"),), _ALIAS),
+    ("N2-7 use super::*; (linux_net.rs)", "(e)", None, ((_NET, _NET_USE, _NET_USE + "use super::*;\n"),), _ALIAS),
+    ("N2-7 use self::*; (effect-gate linux_net.rs)", "(e)", None, ((_EGN, _EG_USE, _EG_USE + "use self::*;\n"),), _ALIAS),
+)
+
+
+def i01b5_tree(changes=()):
+    """I01B5_TREE with each (file, anchor, replacement) applied once, in order."""
+    texts = dict(I01B5_TREE)
+    for rel, old, new in changes:
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+def i01b6_checks(base):
+    """G-I01B-6's reading over the four socket files, as the gate runs it: G-I01-5 (the observer's two), the socket-item
+    rule (all four, check_socket_modules), G-I01B-6 (e) and G-I01B-7 (c). The number of checks run."""
+    gate.check_observer_no_send(base)
+    gate.check_socket_modules(base)
+    gate.check_socket_module_aliases(base)
+    gate.check_i01b_sources(base)
+    return 4
+
+
+# Each tag is the start of a sub-clause's own message mark (its rule and clause; the citations that follow vary).
+I01B5_SEND_TAG, I01B5_STATEMENT_TAG = "(one send path, G-I01B-5 %s", "(pinned statements, B3-6 %s"
+I01B5_FOLD_TAG, I01B5_SNAPSHOT_TAG = "(round 3's folds, %s", "(SnapshotView closed, B3-7 %s"
+I01B5_PROOF_RULES = (
+    ("G-I01B-5", "check_i01b5_send", I01B5_SEND_FUNCTIONS, I01B5_SEND_ROWS, i01b5_tree, I01B5_SEND_TAG),
+    ("B3-6", "check_i01b5_statements", I01B5_STATEMENT_FUNCTIONS, I01B5_STATEMENT_ROWS, i01b5_tree, I01B5_STATEMENT_TAG),
+    ("I5F", "check_i01b5_folds", I01B5_FOLD_FUNCTIONS, I01B5_FOLD_ROWS, i01b5_tree, I01B5_FOLD_TAG),
+    ("B3-7", "check_i01b5_snapshot_view", I01B5_SNAPSHOT_FUNCTIONS, I01B5_SNAPSHOT_ROWS, i01b5_tree, I01B5_SNAPSHOT_TAG),
+    ("G-I01B-6", i01b6_checks, I01B5_OWN_SCOPE_FUNCTIONS, I01B5_OWN_SCOPE_ROWS, i01b5_tree, "%s"),
+)
+
+
+def patched_functions(functions, enabled):
+    """mock patches that disable every clause function of `functions` but `enabled` (a plain name becomes a no-op; a
+    (name, replacement) pair takes its replacement)."""
+    patches = []
+    for clause, function in functions.items():
+        if clause == enabled:
+            continue
+        name, replacement = function if isinstance(function, tuple) else (function, lambda *args, **kwargs: 0)
+        patches.append(mock.patch.object(gate, name, replacement))
+    return patches
+
+
+class I01b5RuleTests(Tree):
+    """HE-004-I01B5 U4 (DESIGN-I01B5 rev 5 sections 6 and 8) over the real observer sources: G-I01B-5's nine clauses,
+    the nine pinned statements, round 3's ten folds with PR review round 1's three R1-1 clauses (R-P6..R-P9 among the
+    fold rows), SnapshotView closed and the seven new literal pins accept today's sources; each row of I01B5_SEND_ROWS, I01B5_STATEMENT_ROWS, I01B5_FOLD_ROWS and I01B5_SNAPSHOT_ROWS is refused by
+    its rule, and with every other clause of the rule disabled, by its own named sub-clause's message; each literal pin
+    refuses a changed value or citation; and G-I01B-6's rows (P6-1..P6-10, N2-6, N2-7) are refused by the clause the
+    table names, with the message DIB 7.4 gives."""
+
+    TREE = I01B5_TREE
+
+    def plant(self, changes):
+        for rel, text in i01b5_tree(changes).items():
+            self.write(rel, text)
+
+    def test_the_real_sources_and_the_fixture_pass(self):
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_i01b5_send(base), 9)
+            self.assertEqual(gate.check_i01b5_statements(base), 9)
+            self.assertEqual(gate.check_i01b5_folds(base), 13)
+            self.assertEqual(gate.check_i01b5_snapshot_view(base), 5)
+            self.assertEqual(gate.check_i01b5_constants(base), 7)
+            self.assertEqual(i01b6_checks(base), 4)
+        self.assertEqual(gate.check_observer_no_send(self.base), gate.check_observer_no_send(gate.HE))
+
+    def test_the_tables(self):
+        self.assertEqual(len(I01B5_SEND_ROWS), 43)
+        self.assertEqual(len(I01B5_STATEMENT_ROWS), 26)
+        self.assertEqual(len(I01B5_FOLD_ROWS), 17)
+        self.assertEqual(len(I01B5_SNAPSHOT_ROWS), 5)
+        self.assertEqual(len(I01B5_OWN_SCOPE_ROWS), 24)
+        for name, check, functions, rows, builder, tag in I01B5_PROOF_RULES:
+            self.assertTrue(callable(check) or callable(getattr(gate, check)), name)
+            for function in functions.values():
+                self.assertTrue(callable(getattr(gate, function[0] if isinstance(function, tuple) else function)), function)
+            for row in rows:
+                self.assertIn(row[1], functions, row[0])
+                builder(row[3])
+
+    def refuses_each(self, check, functions, rows, tag):
+        for row in rows:
+            label, clause, _, changes = row[:4]
+            message = row[4] if len(row) > 4 else re.escape(tag % clause)
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, message, msg=label):
+                    check(self.base)
+                patches = patched_functions(functions, clause)
+                for patch in patches:
+                    patch.start()
+                try:
+                    with self.assertRaisesRegex(gate.GateError, message, msg=label):
+                        check(self.base)
+                finally:
+                    for patch in patches:
+                        patch.stop()
+            finally:
+                self.plant(())
+
+    def test_g_i01b_5_rows(self):
+        self.refuses_each(gate.check_i01b5_send, I01B5_SEND_FUNCTIONS, I01B5_SEND_ROWS, I01B5_SEND_TAG)
+
+    def test_pinned_statement_rows(self):
+        self.refuses_each(gate.check_i01b5_statements, I01B5_STATEMENT_FUNCTIONS, I01B5_STATEMENT_ROWS,
+                          I01B5_STATEMENT_TAG)
+
+    def test_fold_rows(self):
+        self.refuses_each(gate.check_i01b5_folds, I01B5_FOLD_FUNCTIONS, I01B5_FOLD_ROWS, I01B5_FOLD_TAG)
+
+    def test_snapshot_view_rows(self):
+        self.refuses_each(gate.check_i01b5_snapshot_view, I01B5_SNAPSHOT_FUNCTIONS, I01B5_SNAPSHOT_ROWS,
+                          I01B5_SNAPSHOT_TAG)
+
+    def test_g_i01b_6_rows(self):
+        self.refuses_each(i01b6_checks, I01B5_OWN_SCOPE_FUNCTIONS, I01B5_OWN_SCOPE_ROWS, "%s")
+        # P6-10 in effect-gate's two files: (d), no nested module, is held there by the whole-file pins (F6.8).
+        for rel, anchor in ((gate.LINUX_OS, _OS_USE), (_EGN, _EG_USE)):
+            self.plant(((rel, anchor, anchor + "mod m {\n    use super::channel::send;\n}\n"),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, "differs from its pinned bytes .*R-B3-PIN"):
+                    gate.check_i01b_guarded_pins(self.base)
+            finally:
+                self.plant(())
+
+    def test_the_own_scope_reading_units(self):
+        self.assertEqual(gate.own_scope_path(("crate", "linux_listen", "channel", "send"), "linux_listen"),
+                         ("channel", "send"))
+        self.assertEqual(gate.own_scope_path(("super", "linux_os", "Conn"), "linux_os"), ("Conn",))
+        self.assertEqual(gate.own_scope_path(("self", "channel"), None), ("channel",))
+        self.assertEqual(gate.own_scope_path(("crate", "linux_os"), "linux_os"), ("crate", "linux_os"))
+        self.assertEqual(gate.own_scope_path(("crate", "linux_net", "SharedNet"), "linux_os"),
+                         ("crate", "linux_net", "SharedNet"))
+        self.assertEqual(gate.resolved_uses([(("gate_sys", "channel", "self"), None),
+                                             (("crate", "linux_listen", "channel", "send"), None)], "linux_listen"),
+                         [(("gate_sys", "channel", "self"), None), (("gate_sys", "channel", "send"), None)])
+        self.assertEqual(gate.own_scope_strip("pub fn f() -> &crate::linux_os::Conn { self::g(super::linux_os::x) }",
+                                              "linux_os"), "pub fn f() -> &Conn { g(x) }")
+        self.assertEqual(gate.own_scope_strip("-> &crate::linux_net::SharedNet", "linux_os"),
+                         "-> &crate::linux_net::SharedNet")
+        # Today's four import heads are unchanged by the reading: each file's own paths resolve as before.
+        for rel in gate.SOCKET_FILES:
+            raw = (gate.HE / rel).read_text(encoding="utf-8")
+            uses = gate.source_uses(rel, raw)
+            self.assertEqual(gate.resolved_uses(uses, Path(rel).stem), gate.resolved_uses(uses), rel)
+
+    def test_each_literal_pin_refuses_a_change(self):
+        for rel, old, new in I01B5_LITERAL_ROWS:
+            self.plant(((rel, old, new),))
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(I01B5 literal pins, G-I01B-8)")):
+                    gate.check_i01b5_constants(self.base)
+            finally:
+                self.plant(())
+
+    def test_the_pinned_patterns(self):
+        pattern = gate.pinned_pattern('let x = f("a", b) ;')
+        self.assertTrue(pattern.fullmatch('let x=f( "" ,b);'))
+        self.assertFalse(pattern.fullmatch('letx = f("", b);'))
+        self.assertTrue(gate.pinned_pattern('f("a")', literals=True).fullmatch('f( "a" )'))
+        self.assertFalse(gate.pinned_pattern('f("a")', literals=True).fullmatch('f("b")'))
+        self.assertTrue(gate.named_at("a b a", "a", (("a", 2),)))
+        self.assertFalse(gate.named_at("a b a c", "c", ()))
 
 
 class OutputPrefixTests(unittest.TestCase):

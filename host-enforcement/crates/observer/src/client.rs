@@ -23,6 +23,12 @@
 //! `poll` and `pause`, is the one wire wait inside `Client::wait_serving` (G-I01-2): it watches the service's listener
 //! and peer beside the links, on poller tokens of their own, shortens its timeout to the service's earliest deadline,
 //! routes the links' readiness as before and hands each ready I01 descriptor to the service, one step each.
+//!
+//! HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.4 and 5): the epoch's pushes to the service ([`SnapshotView`],
+//! [`Availability`] with its request round's [`Passed`] or `Failed`, and [`CaptureGate`], built only by
+//! [`CaptureGate::from_view`]) and its pending query go through the client's forwarding methods, none of which takes
+//! the peer operations; the waits read the wall clock in milliseconds ([`Wire::wall_millis`]); and [`PeerOps`] gains its
+//! one send, `peer_send` ([`PeerSent`]), which only the service's answer reaches.
 
 use std::collections::BTreeMap;
 use std::io;
@@ -33,6 +39,7 @@ use gate_sys::inet::InetAddress;
 use gate_sys::peer_wire::parse_control;
 use rustls::{ClientConfig, ClientConnection, ProtocolVersion};
 
+use crate::capture::{CaptureView, Slot};
 use crate::exposition::{Exposition, ExpositionError, ExpositionReader};
 use crate::http::{self, Answer, AnswerReader, Bounds, Progress, Request, StreamReader};
 use crate::tls::server_name;
@@ -219,8 +226,17 @@ pub struct Woken {
     pub peer_faults: Vec<PeerId>,
 }
 
+/// One answer's send on the held peer (HE-004-I01B5, DESIGN-I01B5 rev 5 section 5): sent whole, or failed with its
+/// errno (a short send, EAGAIN and EPIPE among them; a peer not held is EBADF).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PeerSent {
+    Sent,
+    Failed(i32),
+}
+
 /// The I01 operations a wire offers beside [`Wire`] (DESIGN-I01A section 5): `linux_net::LinuxWire` serves them through
-/// its I01 listener, the tests through fakes. No supertrait, and no send operation: nothing leaves I01a.
+/// its I01 listener, the tests through fakes. No supertrait. Its one send, `peer_send` (HE-004-I01B5), is called only
+/// by the service's `respond`, with the bytes `i01_answer::answer` built and `i01_answer::self_check` passed (G-I01B-5).
 pub trait PeerOps {
     /// One accept: a new peer, nothing queued, or a fault.
     fn accept_peer(&mut self) -> AcceptResult;
@@ -238,6 +254,8 @@ pub trait PeerOps {
     fn peer_recv(&mut self, peer: PeerId, buffer: &mut [u8]) -> PeerRecv;
     /// Closes the peer and everything kept with it.
     fn peer_close(&mut self, peer: PeerId);
+    /// HE-004-I01B5: one non-blocking send of exactly `bytes` to the held peer.
+    fn peer_send(&mut self, peer: PeerId, bytes: &[u8]) -> PeerSent;
 }
 
 /// What the I01 service wants of the next wait: the descriptors it watches and its earliest deadline.
@@ -265,18 +283,103 @@ pub enum PeerOutcome {
     ListenerFailed,
 }
 
+// ------------------------------------------------------------------------------------------ the pushes (HE-004-I01B5)
+
+/// One snapshot's view, pushed after `check_snapshot` returns `Ok` (DESIGN-I01B5 rev 5 section 3.1; B3-7): the epoch's
+/// watch phase, the snapshot's mark and freshness stamp, and `i01_answer::derive`'s result. It holds the derive result,
+/// so it derives none of `Clone`, `PartialEq` or `Eq`; `derive`'s refusal is the only unavailable view.
+#[derive(Debug)]
+pub struct SnapshotView {
+    pub phase: u64,
+    pub mark: u64,
+    pub fresh_stamp: Instant,
+    pub derived: Result<crate::i01_answer::Derived, &'static str>,
+}
+
+/// A request round that passed (DESIGN-I01B5 rev 5 section 3.3): its own monotonic start, its list's mark, and when it
+/// passed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Passed {
+    pub started: Instant,
+    pub mark: u64,
+    pub stamp: Instant,
+}
+
+/// A request round's outcome, as one availability push carries it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Round {
+    Passed(Passed),
+    Failed,
+}
+
+/// The epoch's availability at one watch-loop pass (DESIGN-I01B5 rev 5 section 3.4): the watch phase, whether every
+/// stream is established in it, whether the fresh mark is within the freshness bound, and the request round that ended
+/// at this push: `Passed` only in the push right after the round passed, `Failed` while the failed-round latch holds,
+/// `None` otherwise. Each push replaces the earlier one wholesale.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Availability {
+    pub phase: u64,
+    pub established: bool,
+    pub fresh: bool,
+    pub round: Option<Round>,
+}
+
+/// R10-defined (DESIGN-I01B5 rev 5 section 3.4; I5E-7): the capture slots' names as i01_gate.rs:37-45 names them
+/// (`ROLE_SLOTS`, `LIFECYCLE_SLOT`, `BACKEND_SLOT_PREFIX`), checked equal by gate.py; client.rs does not name i01_gate.
+pub const CAPTURE_ROLE_SLOTS: [&str; 5] = ["role/SERVER", "role/OBSERVER", "role/BROKER", "role/WORKER", "role/EFFECT_GATE"];
+/// R10-defined (I5E-7): the lifecycle slot's name, i01_gate.rs:37-45's `LIFECYCLE_SLOT`.
+pub const CAPTURE_LIFECYCLE_SLOT: &str = "lifecycle";
+/// R10-defined (I5E-7): the prefix of a backend component's slot, i01_gate.rs:37-45's `BACKEND_SLOT_PREFIX`.
+pub const CAPTURE_BACKEND_SLOT_PREFIX: &str = "backend/";
+
+/// The latest capture set as the service reads it at an answer (DESIGN-I01B5 rev 5 section 3.4; I5D-4): built only by
+/// [`CaptureGate::from_view`] from the engine's view and the epoch's expiry latch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CaptureGate {
+    pub scheduled: Option<Instant>,
+    pub set_started_ms: u64,
+    pub slots: Vec<(String, bool)>,
+    pub record_digest: String,
+    pub expired: bool,
+}
+
+impl CaptureGate {
+    /// The one constructor (I5D-4): `scheduled`, `set_started_ms` and `record_digest` copied; each slot named as
+    /// i01_gate names it (the five roles in the model's order, `lifecycle`, `backend/<component>`) and `true` only for
+    /// `Slot::Taken { .. }`; and the latch's `expired` (advisory: answer step 4's record window refuses from
+    /// `expiresAt - 3 s` on regardless, I5D-17).
+    pub fn from_view(view: &CaptureView, expired: bool) -> CaptureGate {
+        let taken = |slot: &Slot| matches!(slot, Slot::Taken { .. });
+        let mut slots: Vec<(String, bool)> =
+            CAPTURE_ROLE_SLOTS.iter().zip(view.roles.iter()).map(|(name, slot)| (name.to_string(), taken(slot))).collect();
+        slots.push((CAPTURE_LIFECYCLE_SLOT.to_string(), taken(&view.lifecycle)));
+        slots.extend(view.backends.iter().map(|(component, slot)| (format!("{CAPTURE_BACKEND_SLOT_PREFIX}{component}"), taken(slot))));
+        CaptureGate { scheduled: view.scheduled, set_started_ms: view.set_started_ms, slots,
+                      record_digest: view.record_digest.clone(), expired }
+    }
+}
+
 /// The I01 service the client's waits serve (`i01_service::I01Service`; DESIGN-I01A section 5). It holds session state
 /// only and is handed the peer operations at each call, so it has no tie to the wire.
 pub trait PeerService {
     /// The descriptors the next wait watches and the earliest I01 deadline (the idle and outer bounds, the backoff's
     /// re-add).
     fn peer_plan(&self, now: Instant) -> PeerPlan;
-    /// One ready I01 descriptor, bounded: one accept, or one request read and its checks, then a close. `wall` is the
-    /// wire's wall second (`None` before the epoch), `now` its monotonic clock.
-    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant, ready: PeerReady) -> PeerOutcome;
-    /// Once per wake, after the steps: the deadlines that have come (a session's bounds and the record's window, the
-    /// backoff's end).
-    fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall: Option<u64>, now: Instant);
+    /// One ready I01 descriptor, bounded: one accept, or one request read and its checks. `wall_ms` is the wire's wall
+    /// clock in whole milliseconds (`None` before the epoch; HE-004-I01B5, in place of the wall second), `now` its
+    /// monotonic clock.
+    fn serve_peer_step(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant, ready: PeerReady) -> PeerOutcome;
+    /// Once per wake, after the steps: the deadlines that have come (a session's bounds, the exchange deadline and the
+    /// record's window, the backoff's end) and, when a request is ready, its answer (HE-004-I01B5).
+    fn serve_peer_deadlines(&mut self, ops: &mut dyn PeerOps, wall_ms: Option<u64>, now: Instant);
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the latest snapshot view, replacing the earlier one.
+    fn peer_snapshot_view(&mut self, view: SnapshotView);
+    /// The latest availability, replacing the earlier one.
+    fn peer_availability(&mut self, availability: Availability);
+    /// The latest capture set, replacing the earlier one.
+    fn peer_capture_view(&mut self, gate: CaptureGate);
+    /// The pending request's receipt, on the monotonic clock.
+    fn peer_pending(&self) -> Option<Instant>;
 }
 
 /// The listener's backoff after a fault (DESIGN-I01A section 4).
@@ -353,6 +456,9 @@ pub trait Wire {
     fn now(&self) -> Instant;
     /// The wall clock in whole seconds since the epoch, or `None` before the epoch.
     fn wall_seconds(&self) -> Option<u64>;
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the wall clock in whole milliseconds since the epoch, or `None`
+    /// before the epoch (Linux: `utc::wall_millis`, the capture engine's reading).
+    fn wall_millis(&self) -> Option<u64>;
 }
 
 /// A link's handle (a counter, never reused within the client).
@@ -675,12 +781,40 @@ impl<W: Wire + PeerOps> Client<W> {
         self.listener_failed
     }
 
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the epoch's snapshot view, forwarded to the attached service (none
+    /// takes the peer operations).
+    pub fn push_snapshot_view(&mut self, view: SnapshotView) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_snapshot_view(view);
+        }
+    }
+
+    /// The epoch's availability, forwarded to the attached service.
+    pub fn push_availability(&mut self, availability: Availability) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_availability(availability);
+        }
+    }
+
+    /// The latest capture set, forwarded to the attached service.
+    pub fn push_capture_view(&mut self, gate: CaptureGate) {
+        if let Some(service) = self.service.as_deref_mut() {
+            service.peer_capture_view(gate);
+        }
+    }
+
+    /// The attached service's pending request's receipt (the epoch's request-round trigger).
+    pub fn pending_since(&self) -> Option<Instant> {
+        self.service.as_deref().and_then(|service| service.peer_pending())
+    }
+
     /// The observer's one wire wait (DESIGN-I01A section 5; G-I01-2): `poll` and `pause` wait only through it. With an
     /// I01 service attached, the wait also watches the service's listener and peer and ends no later than the
     /// service's earliest deadline; the connections' readiness goes back to the caller as before; each ready I01
-    /// descriptor is one `serve_peer_step` (the wall second and the monotonic clock passed in, so the tests drive them),
-    /// and the service's due deadlines are served once after them. A fatal listener outcome ends the wait with an error
-    /// that [`Client::listener_failed`] names.
+    /// descriptor is one `serve_peer_step` (one reading of the wall clock, in milliseconds since HE-004-I01B5, and the
+    /// monotonic clock passed in, so the tests drive them), and the service's due deadlines, with any ready answer, are
+    /// served once after them. A fatal listener outcome ends the wait with an error that [`Client::listener_failed`]
+    /// names.
     fn wait_serving(&mut self, interests: &[(ConnId, Interest)], until: Instant)
                     -> Result<Vec<(ConnId, Ready)>, PollError> {
         let now = self.wire.now();
@@ -689,7 +823,7 @@ impl<W: Wire + PeerOps> Client<W> {
         let wake = plan.and_then(|plan| plan.deadline).map_or(until, |deadline| deadline.min(until));
         let woken = self.wire.wait(interests, watch, wake)?;
         let Some(service) = self.service.as_deref_mut() else { return Ok(woken.conns) };
-        let (wall, now) = (self.wire.wall_seconds(), self.wire.now());
+        let (wall_ms, now) = (self.wire.wall_millis(), self.wire.now());
         let mut ready = Vec::new();
         if woken.listener_fault {
             ready.push(PeerReady::ListenerFault);
@@ -699,12 +833,12 @@ impl<W: Wire + PeerOps> Client<W> {
         ready.extend(woken.peers.iter().map(|(peer, found)| PeerReady::Peer(*peer, *found)));
         ready.extend(woken.peer_faults.iter().map(|peer| PeerReady::PeerFault(*peer)));
         for step in ready {
-            if service.serve_peer_step(&mut self.wire, wall, now, step) == PeerOutcome::ListenerFailed {
+            if service.serve_peer_step(&mut self.wire, wall_ms, now, step) == PeerOutcome::ListenerFailed {
                 self.listener_failed = true;
                 return Err(PollError(LISTENER_FAILED_ERRNO));
             }
         }
-        service.serve_peer_deadlines(&mut self.wire, wall, now);
+        service.serve_peer_deadlines(&mut self.wire, wall_ms, now);
         Ok(woken.conns)
     }
 

@@ -3,8 +3,10 @@
 //! with a test binding it names (no binding, I01a's case, refuses). R10's own framing negatives: an empty datagram, one
 //! over 16,384 bytes and one cut short; depth 17; a non-printable or non-ASCII byte, a float, a duplicate key, an integer
 //! out of range; the non-canonical encodings (unsorted keys, whitespace, a `\u` escape, a leading zero, `-0`); an extra
-//! member and a missing one; each schema form; and the chain (sequence 1 after the zero digest first, and no later
-//! request passing in I01a, which answers nothing). The PV replay is U7's. HE-004-I01B2 (DESIGN-I01B rev 3 section
+//! member and a missing one; each schema form; and the chain (sequence 1 after the zero digest first; since
+//! HE-004-I01B5 keyed to the last answered request, checking recording nothing: a continuation after an answer passes,
+//! and a wrong digest, the last answer's reused challenge, a gap, a pipelined sequence 3 and a later request before any
+//! answer each refuse with their text). The PV replay is U7's. HE-004-I01B2 (DESIGN-I01B rev 3 section
 //! 3.4, DESIGN-I01B2 section 8): the test binding is built only through `I01Binding::from_config`, over a test binding
 //! document B whose digest and nonce the request names; B2 (B with one member changed) and another request nonce refuse.
 
@@ -162,18 +164,46 @@ fn the_request_schema_holds_exactly_seven_members_of_their_forms() {
 }
 
 #[test]
-fn the_chain_starts_at_one_after_the_zero_digest_and_no_later_request_passes() {
+fn the_chain_is_keyed_to_the_last_answered_request_and_checking_records_nothing() {
+    // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 4.5; I5D-1 (b), Q-I01B5D-3 (a), I5E-8).
     let mut chain = Chain::default();
     let first_step = RequestRefusal::Chain("a session's first request is sequence 1 after the zero digest");
-    assert_eq!(chain.check(&parsed(&request(2, ZERO_DIGEST))), Err(first_step));
+    assert_eq!(chain.check(&parsed(&request(2, ZERO_DIGEST))), Err(first_step), "a later request before any answer");
     assert_eq!(chain.check(&parsed(&request(1, DIGEST))), Err(first_step));
     assert_eq!(refused(request(2, ZERO_DIGEST).as_bytes()), first_step, "through the whole check");
+    // A first request passes, and checking it records nothing: it passes again, and a sequence 2 still refuses.
     assert_eq!(chain.check(&parsed(&first())), Ok(()));
-    // A later request: the next sequence, a fresh challenge, and the last answer's digest, which I01a never sends.
-    let later = |sequence: u64, challenge: &str| I01Request { challenge: challenge.to_string(), sequence,
-                                                               previous_digest: DIGEST.to_string(), ..parsed(&first()) };
+    assert_eq!(chain.check(&parsed(&first())), Ok(()));
+    assert_eq!(chain, Chain::default());
+    assert_eq!(check_request(first().as_bytes(), false, &mut chain, None), Err(RequestRefusal::Binding));
+    assert_eq!(chain, Chain::default(), "the whole check records nothing either");
+    // After its answer (sequence 1, CHALLENGE, digest D1): the continuation names sequence 2, a challenge other than the
+    // answered one's, and D1.
+    let answered = "sha256:4444444444444444444444444444444444444444444444444444444444444444";
+    chain.answered(1, CHALLENGE, answered);
+    let later = |sequence: u64, challenge: &str, previous: &str| I01Request {
+        challenge: challenge.to_string(), sequence, previous_digest: previous.to_string(), ..parsed(&first())
+    };
     let fresh = "3333333333333333333333333333333333333333333333333333333333333333";
-    assert_eq!(chain.check(&later(3, fresh)), Err(RequestRefusal::Chain("a request out of sequence")));
-    assert_eq!(chain.check(&later(2, CHALLENGE)), Err(RequestRefusal::Chain("a challenge repeated")));
-    assert_eq!(chain.check(&later(2, fresh)), Err(RequestRefusal::Chain("no observation was answered")));
+    assert_eq!(chain.check(&later(2, fresh, answered)), Ok(()));
+    assert_eq!(chain.check(&later(2, fresh, DIGEST)),
+               Err(RequestRefusal::Chain("previousObservationDigest is not the last answer's digest")), "a wrong digest");
+    assert_eq!(chain.check(&later(2, CHALLENGE, answered)), Err(RequestRefusal::Chain("a challenge repeated")),
+               "the last answer's challenge reused");
+    assert_eq!(chain.check(&later(3, fresh, answered)), Err(RequestRefusal::Chain("a request out of sequence")), "a gap");
+    assert_eq!(chain.check(&later(1, fresh, ZERO_DIGEST)), Err(RequestRefusal::Chain("a request out of sequence")),
+               "a replayed first request");
+    // A pipelined sequence 3 (sent while sequence 2 waits for its answer) names the answered digest and refuses: the
+    // chain compares with the last answered request, not the last checked one.
+    assert_eq!(chain.check(&later(2, fresh, answered)), Ok(()));
+    let other = "5555555555555555555555555555555555555555555555555555555555555555";
+    assert_eq!(chain.check(&later(3, other, answered)), Err(RequestRefusal::Chain("a request out of sequence")));
+    // After the second answer the reuse rule is pairwise, as VPO's is: the challenge of two answers back passes the chain,
+    // while sequence and digest pin the continuation to the newest answer.
+    let second = "sha256:6666666666666666666666666666666666666666666666666666666666666666";
+    chain.answered(2, fresh, second);
+    assert_eq!(chain.check(&later(3, CHALLENGE, second)), Ok(()));
+    assert_eq!(chain.check(&later(3, fresh, second)), Err(RequestRefusal::Chain("a challenge repeated")));
+    assert_eq!(chain.check(&later(3, other, answered)),
+               Err(RequestRefusal::Chain("previousObservationDigest is not the last answer's digest")));
 }

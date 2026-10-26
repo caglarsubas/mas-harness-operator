@@ -54,6 +54,21 @@
 //! [`ObserverExit::Listener`] (status 35) instead of the poller's 95. HE-004-I01B2 (DESIGN-I01B2 rev 3 sections 5 and
 //! 6): [`run`] takes a seventh argument, the configuration's binding from `serve`'s one `I01Binding::from_config`, and
 //! hands it to `I01Service::new(server, binding)`.
+//!
+//! HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3) feeds the I01 service through the client's pushes, none of which takes
+//! the peer operations:
+//! - **The snapshot's view.** In the snapshot's checks, ADM-4 runs directly after the quota match; then the
+//!   configuration Value, the quota Value and the one call `i01_answer::derive(..)` (without a capture engine, the view's
+//!   refusal [`NO_CAPTURE_ENGINE_TEXT`]); the view (the watch phase, the mark, the freshness stamp and derive's result)
+//!   is pushed once the snapshot passed, and it clears the failed-round latch.
+//! - **The capture set.** After every set and at the expiry latch, `CaptureGate::from_view` over the engine's view.
+//! - **The request round.** While the service reports a pending receipt, one round at a time (spaced by
+//!   [`REQUEST_ROUND_SPACING`], in the one probe slot) reads `requests::progress()`; it passes once its list answered
+//!   before [`REQUEST_ROUND_DEADLINE`] and every stream is established in the phase with its mark at the list's; its
+//!   `Passed` rides the next availability push. Any other outcome is `Failed` (401 or 403 keep status 82): the latch
+//!   then holds rounds and `Passed` until the next snapshot's view. The round's mark raises the highest mark (a later
+//!   snapshot below it exits 85) and never enters the progress rule.
+//! - **The availability.** At every watch-loop pass: the phase, the streams established, the fresh mark's age, the round.
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -62,12 +77,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
-use i05_protocol::json::Value;
+use i05_protocol::json::{Int, JStr, Object, Value};
 use rustls::ClientConfig;
 
 use crate::admission::{check_loaded_manifest, Adm4Input, Adm4Record, BindingId, MetricSample, ObservationBinding, Verdict};
 use crate::capture::{CaptureCycle, CaptureViewState};
-use crate::client::{Client, Event, Failure, Handle, Kind, PeerOps, PeerService, Scraped, Wire};
+use crate::client::{Availability, CaptureGate, Client, Event, Failure, Handle, Kind, Passed, PeerOps, PeerService, Round, Scraped,
+                    SnapshotView, Wire};
 use crate::config::{ObserverConfig, MAX_WALL_SECONDS};
 use crate::enrolled::ServerIdentity;
 use crate::exposition::Exposition;
@@ -77,7 +93,7 @@ use crate::i01_service::I01Service;
 use crate::inputs::{InputError, Inputs, ListBody, ListInput, Resource};
 use crate::observer_rbac::{self, RbacLists};
 use crate::operational::{check_or02, check_or05, check_or06, OperationalRefusal};
-use crate::quota::{self, Headroom, QuotaError, QuotaPairs};
+use crate::quota::{self, Headroom, Pair, QuotaError, QuotaPairs};
 use crate::rbac::{produce_snapshot, ProduceError};
 use crate::requests::{self, MarkError, Mode};
 use crate::snapshot::Closure;
@@ -119,6 +135,15 @@ pub const NODE_CAP: usize = 1_000_000;
 const IDLE_WAKE: Duration = Duration::from_secs(3_600);
 /// The most zero-timeout polls of one drain after a capture set (R3-2).
 pub const DRAIN_POLLS: u32 = 8;
+/// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.3; Q-I01B5D-1 (a)): the least interval between request-round starts,
+/// COALESCE's source (the least interval between snapshot starts, 1 s).
+pub const REQUEST_ROUND_SPACING: Duration = Duration::from_secs(1);
+/// R10-defined (DESIGN-I01B5 rev 5 section 3.3; I5E-7): a request round's deadline from its own start, i01_gate.rs's
+/// EXCHANGE_DEADLINE_SECONDS (2 s, the monitor's Q-I01B-21 (a)), checked equal by gate.py.
+pub const REQUEST_ROUND_DEADLINE: Duration = Duration::from_secs(2);
+/// R10-defined: no capture engine, so no enrolled record reaches derive (Q-I01B5D-4 (a)). The snapshot view's refusal
+/// when the epoch runs without captures (`run` always attaches them; the tests' epochs may not).
+pub const NO_CAPTURE_ENGINE_TEXT: &str = "no capture engine";
 
 /// Why the epoch ended (section 14's statuses 80-99; `status::observation` maps each).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -286,6 +311,17 @@ enum Task {
     Probe(Resource),
     CycleScrape,
     EndCheck,
+    /// HE-004-I01B5 (Q-I01B5D-2 (a)): a request round's list, in the one probe slot.
+    Request,
+}
+
+/// The request round in flight (DESIGN-I01B5 rev 5 section 3.3; I5F-9): its own monotonic start, its deadline and,
+/// once answered, its list's mark `M`, kept apart from `self.pending` so the progress rule never sees it.
+#[derive(Clone, Copy, Debug)]
+struct RequestRound {
+    started: Instant,
+    deadline: Instant,
+    mark: Option<u64>,
 }
 
 struct Probe {
@@ -333,6 +369,12 @@ pub struct Epoch<W: Wire> {
     drain_due: bool,
     cycle_scheduled: Option<Instant>,
     drains: Vec<u32>,
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.3 and 3.4): the watch-phase counter (advanced at each snapshot), the
+    /// request round in flight, the failed-round latch and the last round's start (the spacing).
+    phase: u64,
+    request_round: Option<RequestRound>,
+    round_failed: bool,
+    last_round_start: Option<Instant>,
 }
 
 /// The number of structural tokens (`{`, `[`, `:` and `,`) outside string literals of a JSON text: every parsed value
@@ -440,6 +482,30 @@ fn after(now: Instant, by: Duration) -> Instant {
     now.checked_add(by).unwrap_or(now)
 }
 
+/// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.1): an i05 object of the members given, in order, each `None` left out
+/// (the configuration Value writes no `sealedAdmission` member without sealed values: I2D-5 (iv), never a default).
+fn object<const N: usize>(members: [(&str, Option<Value>); N]) -> Value {
+    let mut built = Object::new();
+    for (name, member) in members {
+        if let Some(member) = member {
+            built.insert(JStr::new(name), member);
+        }
+    }
+    Value::Object(built)
+}
+
+/// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.1; B3-6 (1)): one side of the quota Value, `side` of each of the
+/// snapshot's recorded pairs under `quota::UNITS`' member names, in their order (the pairs' fields are in that order).
+fn quota_side(pairs: &QuotaPairs, side: fn(&Pair) -> u64) -> Value {
+    let ordered = [pairs.pods, pairs.config_maps, pairs.services, pairs.cpu_millis, pairs.memory_bytes,
+                   pairs.ephemeral_storage_bytes];
+    let mut built = Object::new();
+    for ((unit, _, _), pair) in quota::UNITS.iter().zip(ordered.iter()) {
+        built.insert(JStr::new(unit), Value::Int(Int::from_u64(side(pair))));
+    }
+    Value::Object(built)
+}
+
 impl<W: Wire + PeerOps> Epoch<W> {
     pub fn new(wire: W, config: ObserverConfig, tls: Arc<ClientConfig>, closure: Closure, settings: Settings) -> Epoch<W> {
         let client = Client::new(wire, tls, config.address, &config.authority);
@@ -476,6 +542,10 @@ impl<W: Wire + PeerOps> Epoch<W> {
             drain_due: false,
             cycle_scheduled: None,
             drains: Vec::new(),
+            phase: 0,
+            request_round: None,
+            round_failed: false,
+            last_round_start: None,
         }
     }
 
@@ -514,6 +584,11 @@ impl<W: Wire + PeerOps> Epoch<W> {
         if !self.capture_expired.get() && captures.expired_now() {
             self.capture_expired.set(true);
             captures.expire();
+            // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4; I5E-3): the latch's push, the same pinned statement as
+            // capture_cycle's.
+            if let Some(captures) = self.captures.as_deref() {
+                self.client.push_capture_view(CaptureGate::from_view(captures.view(), self.capture_expired.get()));
+            }
         }
     }
 
@@ -531,6 +606,11 @@ impl<W: Wire + PeerOps> Epoch<W> {
         let (sequence, (taken, not_taken)) = (view.sequence, view.counts());
         self.note(Trace::Captures { sequence, taken, not_taken });
         self.drain_due = true;
+        // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4; I5D-4, I5E-3): the set's push, built only by client.rs's
+        // CaptureGate::from_view from the field's view and the latch.
+        if let Some(captures) = self.captures.as_deref() {
+            self.client.push_capture_view(CaptureGate::from_view(captures.view(), self.capture_expired.get()));
+        }
     }
 
     /// After the batch: zero-timeout polls, each poll's events in order, until one returns no stream event, at most
@@ -624,6 +704,8 @@ impl<W: Wire + PeerOps> Epoch<W> {
                 }
             };
             self.last_snapshot_start = Some(self.client.now());
+            // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.4): the watch phase this snapshot opens.
+            self.phase = self.phase.saturating_add(1);
             self.snapshot(deadline)?;
             self.open_deadline = Some(deadline);
             trigger = Some(self.watch()?);
@@ -873,7 +955,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
             served.push(resource);
             pairs.push(ListInput { spec: resource.spec(), body: ListBody::Served(value) });
         }
-        let Some((_, mark, stamp)) = fresh else {
+        let Some((resource_text, mark, stamp)) = fresh else {
             return Err(self.stop(ObserverExit::Answer, "no list was read"));
         };
         let version = self.snapshot_answer(&requests::version(), SMALL_BODY_LIMIT, false, deadline)?;
@@ -883,12 +965,16 @@ impl<W: Wire + PeerOps> Epoch<W> {
         };
         let (exposition, window) = self.snapshot_scrape(deadline)?;
         self.git_version = git_version;
-        let observation = self.check_snapshot(pairs, exposition.samples, window, mark, stamp)?;
+        let (observation, view) = self.check_snapshot(pairs, exposition.samples, window, &resource_text, mark, stamp)?;
         self.highest_mark = self.highest_mark.max(mark);
         self.served = served;
         self.sequence = observation.sequence;
         self.note(Trace::Snapshot { sequence: observation.sequence, resource_version: mark });
         self.observation = Some(observation);
+        // HE-004-I01B5 (DESIGN-I01B5 rev 5 sections 3.1 and 3.3; I5D-5): the snapshot's view, pushed after Ok; it
+        // clears the failed-round latch.
+        self.client.push_snapshot_view(view);
+        self.round_failed = false;
         Ok(())
     }
 
@@ -956,9 +1042,15 @@ impl<W: Wire + PeerOps> Epoch<W> {
         self.stop(ObserverExit::Inputs, "B1 refused the list inputs")
     }
 
-    /// Section 14's checks in order, on one snapshot's inputs; the observation.
+    /// Section 14's checks in order, on one snapshot's inputs; the observation and, beside it, the snapshot's view
+    /// (HE-004-I01B5, DESIGN-I01B5 rev 5 section 3.1; Q-1b (a), Q-1c (a), I5D-3, I5E-2): ADM-4 runs directly after the
+    /// quota match, and with the configuration Value, the quota Value and the one derive statement it forms four
+    /// adjacent statements before `drop(inputs);`, every derive argument named from its live source: B1's checked
+    /// lists, the read's resourceVersion text, the configuration's values, the ADM-4-bound record's loaded hash, the
+    /// capture engine's enrolled record, I06's closure, the signed binding, the snapshot's quota pairs, and the
+    /// configuration's generation and window. The statuses keep their order (89 before ADM-4's).
     fn check_snapshot(&mut self, pairs: Vec<ListInput>, samples: Vec<MetricSample>, window: (Option<u64>, Option<u64>),
-                      mark: u64, stamp: Instant) -> Result<Observation, Stop> {
+                      resource_version: &str, mark: u64, stamp: Instant) -> Result<(Observation, SnapshotView), Stop> {
         let inputs = match Inputs::new(pairs) {
             Ok(inputs) => inputs,
             Err(error) => return Err(self.input_exit(&error)),
@@ -1011,9 +1103,27 @@ impl<W: Wire + PeerOps> Epoch<W> {
             Err(QuotaError::Unsettled) => return Err(Stop::Restart(Cause::Unsettled)),
             Err(QuotaError::Refused(why)) => return Err(self.stop(ObserverExit::Quota, why)),
         };
-        drop(inputs);
         let (record, digest) = self.adm4(samples, window).map_err(Stop::Exit)?;
-        Ok(Observation {
+        let configuration = object([
+            ("qualificationNamespace", Some(Value::str(&self.config.namespace))),
+            ("pinnedManifestHash", Some(Value::str(&self.config.pinned_manifest_hash))),
+            ("sealedAdmission", self.config.sealed.as_ref().map(|sealed| object([
+                ("ipFamily", Some(Value::str(&sealed.ip_family))),
+                ("serviceCIDR", Some(Value::str(&sealed.service_cidr))),
+                ("defaultTolerationSeconds", Some(Value::int(sealed.default_toleration_seconds as i64))),
+            ]))),
+        ]);
+        let quota = object([("hard", Some(quota_side(&quotas.pairs, |pair| pair.hard))),
+                            ("used", Some(quota_side(&quotas.pairs, |pair| pair.used)))]);
+        let derived = match self.captures.as_deref() {
+            Some(cycle) => crate::i01_answer::derive(&inputs, &Value::str(resource_version), &configuration,
+                                                     &record.loaded_hash().map_or(Value::Null, Value::str), cycle.record(),
+                                                     &self.closure, self.config.binding(), &quota, &self.config.generation,
+                                                     self.config.not_before, self.config.not_after),
+            None => Err(NO_CAPTURE_ENGINE_TEXT),
+        };
+        drop(inputs);
+        Ok((Observation {
             sequence: self.sequence.saturating_add(1),
             resource_version: mark,
             fresh_mark: mark,
@@ -1023,7 +1133,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
             headroom: quotas.headroom,
             quota: quotas.pairs,
             dropped_non_resource_rules: dropped,
-        })
+        }, SnapshotView { phase: self.phase, mark, fresh_stamp: stamp, derived }))
     }
 
     // ------------------------------------------------------------------------------------------ watching
@@ -1070,6 +1180,13 @@ impl<W: Wire + PeerOps> Epoch<W> {
         self.queue.clear();
         self.cycle_active = false;
         self.set_available(false);
+        // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.3): a round in flight cannot pass across a watch phase; the service
+        // is told the phase ended (no stream established), so no answer is served from it.
+        if self.round_state().is_some() {
+            self.fail_round();
+        }
+        self.client.push_availability(Availability { phase: self.phase, established: false, fresh: false,
+                                                     round: self.round_failed.then_some(Round::Failed) });
         trigger
     }
 
@@ -1088,6 +1205,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
             if let Some(trigger) = self.check_progress(now)? {
                 return Ok(trigger);
             }
+            self.queue_round(now);
             if self.probe.is_none() {
                 if self.queue.is_empty() && !self.cycle_active && self.next_cycle.is_some_and(|at| at <= now) {
                     self.start_cycle(now);
@@ -1098,6 +1216,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
             }
             let available = self.view_available(now);
             self.set_available(available);
+            self.push_availability(now);
             let wake = self.wake(now);
             let events = self.client.poll(wake).map_err(|_| self.poll_failed())?;
             for (handle, event) in events {
@@ -1162,6 +1281,15 @@ impl<W: Wire + PeerOps> Epoch<W> {
                 wake = wake.min(at);
             }
         }
+        // HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.3; I5D-6 (iii)): while a receipt is pending, the spacing's end and
+        // the in-flight round's deadline (each only while it is still ahead, so no wake spins).
+        if self.client.pending_since().is_some() {
+            let spaced = self.last_round_start.map(|at| after(at, REQUEST_ROUND_SPACING));
+            let deadline = self.round_state().map(|(deadline, _)| deadline);
+            for at in [spaced, deadline].into_iter().flatten().filter(|at| *at > now) {
+                wake = wake.min(at);
+            }
+        }
         wake.max(now)
     }
 
@@ -1182,6 +1310,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
 
     fn start_probe(&mut self, task: Task) {
         let (request, kind) = match task {
+            Task::Request => return self.start_round(),
             Task::Progress => (requests::progress(), Kind::Answer(SMALL_BODY_LIMIT)),
             Task::Probe(resource) => (requests::list(resource, &Mode::Probe), Kind::Answer(LIST_BODY_LIMIT)),
             Task::CycleScrape | Task::EndCheck => (requests::metrics(), Kind::Scrape),
@@ -1329,6 +1458,7 @@ impl<W: Wire + PeerOps> Epoch<W> {
 
     fn on_probe(&mut self, probe: Probe, event: Event) -> Result<Option<Trigger>, ObserverExit> {
         match probe.task {
+            Task::Request => self.on_round(event),
             Task::Progress | Task::Probe(_) => {
                 let answer = match event {
                     Event::Answer(answer) => answer,
@@ -1398,6 +1528,103 @@ impl<W: Wire + PeerOps> Epoch<W> {
                 Ok(None)
             }
         }
+    }
+
+    // ------------------------------------------------------------------------------------------ the request round
+
+    /// HE-004-I01B5 (DESIGN-I01B5 rev 5 section 3.3; Q-I01B5D-1 (a), Q-I01B5D-2 (a), I5D-5): at each watch-loop pass one
+    /// `Task::Request` is queued, ahead of the cycle's tasks in the one probe slot, when the service reports a pending
+    /// receipt, no round is in flight or queued, the failed-round latch is clear, and the last round started at least
+    /// `REQUEST_ROUND_SPACING` ago.
+    fn queue_round(&mut self, now: Instant) {
+        if self.client.pending_since().is_none() || self.round_failed || self.round_state().is_some() {
+            return;
+        }
+        let spaced = self.last_round_start.is_none_or(|at| now.saturating_duration_since(at) >= REQUEST_ROUND_SPACING);
+        if spaced && !self.queue.contains(&Task::Request) {
+            self.queue.push_front(Task::Request);
+        }
+    }
+
+    /// The round's start (I5F-2): its own monotonic reading, its deadline `REQUEST_ROUND_DEADLINE` after it and no mark
+    /// yet; then its list, `requests::progress()`, in the probe slot.
+    fn start_round(&mut self) {
+        let started = self.client.now();
+        self.request_round = Some(RequestRound { started, deadline: after(started, REQUEST_ROUND_DEADLINE), mark: None });
+        self.last_round_start = Some(started);
+        let handle = self.client.open(&requests::progress(), Kind::Answer(SMALL_BODY_LIMIT));
+        self.probe = Some(Probe { task: Task::Request, handle, started, wall_start: None, covers: Vec::new() });
+    }
+
+    /// The in-flight round's deadline and mark, read without a write (the field's one read).
+    fn round_state(&self) -> Option<(Instant, Option<u64>)> {
+        self.request_round.as_ref().map(|round| (round.deadline, round.mark))
+    }
+
+    /// A failed round (I5D-5; I5D-6 (ii)): the round cleared, the latch set until the next snapshot's view is pushed,
+    /// and its list closed if still open. It never escalates and never exits 85.
+    fn fail_round(&mut self) {
+        self.request_round = None;
+        self.round_failed = true;
+        if let Some(probe) = self.probe.take_if(|probe| probe.task == Task::Request) {
+            self.client.close(probe.handle);
+        }
+    }
+
+    /// A round's list answered (I5D-6 (ii); Q-I01B5D-5 (a)): 401 or 403 keeps the epoch's exit 82, as every apiserver
+    /// read's does; another status, a transport or framing failure, another media type, a mark error or a mark below F
+    /// fails the round; a mark at or above F is the round's `M`, which raises `highest_mark` and leaves `last_f` and
+    /// `self.pending` alone (I5D-6 (i), I5E-10).
+    fn on_round(&mut self, event: Event) -> Result<Option<Trigger>, ObserverExit> {
+        let Event::Answer(answer) = event else {
+            self.fail_round();
+            return Ok(None);
+        };
+        if matches!(answer.status, 401 | 403) {
+            return Err(self.fail(ObserverExit::ReadRefused, "a request round's read was refused (401 or 403)"));
+        }
+        let read = if answer.status == 200 && http::media_is(answer.content_type.as_deref(), http::ACCEPT_JSON) {
+            requests::progress_mark(&answer.body).ok()
+        } else {
+            None
+        };
+        let floor = self.last_f.unwrap_or(0).max(self.resource_version());
+        let Some(mark) = read.filter(|mark| *mark >= floor) else {
+            self.fail_round();
+            return Ok(None);
+        };
+        self.highest_mark = self.highest_mark.max(mark);
+        if let Some(round) = self.request_round.as_mut() {
+            round.mark = Some(mark);
+        }
+        Ok(None)
+    }
+
+    /// The availability push of one watch-loop pass (DESIGN-I01B5 rev 5 sections 3.3 and 3.4): the phase, whether every
+    /// stream is established in it, whether the fresh mark is within `FRESHNESS_BOUND`, and the round. A round whose
+    /// deadline has come fails. One whose list answered `M` passes once every stream is established in this phase and
+    /// every stream's delivered mark has reached `M`: the pinned statement takes it from its field and builds the one
+    /// `Passed` from the round's own record, and the pinned push carries it, this once. Otherwise the push carries
+    /// `Failed` while the latch holds and no round else.
+    fn push_availability(&mut self, now: Instant) {
+        let established = !self.streams.is_empty()
+            && self.streams.iter().all(|stream| stream.state == StreamState::Established);
+        let fresh = self.observation.as_ref().is_some_and(|observation| {
+            now.saturating_duration_since(observation.fresh_stamp) <= FRESHNESS_BOUND
+        });
+        match self.round_state() {
+            Some((deadline, _)) if deadline <= now => self.fail_round(),
+            Some((_, Some(mark))) if established && self.streams.iter().all(|stream| stream.mark >= mark) => {
+                let passed = self.request_round.take()
+                    .and_then(|round| round.mark.map(|mark| Passed { started: round.started, mark, stamp: self.client.now() }));
+                self.client.push_availability(Availability { phase: self.phase, established, fresh,
+                                                             round: passed.map(Round::Passed) });
+                return;
+            }
+            _ => {}
+        }
+        self.client.push_availability(Availability { phase: self.phase, established, fresh,
+                                                     round: self.round_failed.then_some(Round::Failed) });
     }
 }
 

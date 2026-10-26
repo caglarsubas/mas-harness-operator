@@ -3,7 +3,8 @@
 //! seconds since the epoch, and B1's `check_loaded_manifest` takes canonical UTC times. The date is computed with
 //! H. Hinnant's civil-from-days algorithm. A clock before the epoch or past 9999-12-31T23:59:59Z cannot be rendered:
 //! `None`, which the observer maps to status 97 (unreachable with a sane clock, but mapped). Portable and pure except
-//! [`wall_seconds`], which reads the realtime clock (`clock_gettime`, in the OBSERVER row).
+//! [`wall_seconds`] and (HE-004-I01B5) [`wall_millis`], which read the realtime clock (`clock_gettime`, in the OBSERVER
+//! row).
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,6 +13,14 @@ use crate::config::MAX_WALL_SECONDS;
 /// The wall clock in whole seconds since the epoch (floored), or `None` before the epoch.
 pub fn wall_seconds() -> Option<u64> {
     SystemTime::now().duration_since(UNIX_EPOCH).ok().map(|elapsed| elapsed.as_secs())
+}
+
+/// The wall clock in whole milliseconds since the epoch (floored), or `None` before the epoch: the reading the capture
+/// engine's `KernelView::wall_millis` takes on Linux (`linux_capture.rs`), so an answer's wall reading and a capture
+/// set's `set_started_ms` share one clock (HE-004-I01B5, DESIGN-I01B5 rev 5 section 3.2; I5D-14).
+pub fn wall_millis() -> Option<u64> {
+    let elapsed = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
+    u64::try_from(elapsed.as_millis()).ok()
 }
 
 /// The civil date (year, month 1-12, day 1-31) of a day count since 1970-01-01 (H. Hinnant's algorithm, for days in
