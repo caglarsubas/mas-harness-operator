@@ -9064,7 +9064,11 @@ I01B5_FOLD_FUNCTIONS = {"I5F-1 (1)": "fold_1_snapshot_names", "I5F-1 (3)": "fold
                         "I5F-1 (4)": "fold_1_adm4_arm", "I5F-2 (2)": "fold_2_round_literals",
                         "I5F-2 (3)": "fold_2_request_round", "I5F-2 (4)": "fold_2_passed_names",
                         "I5F-3 (1)": "fold_3_capture_counts", "I5F-3 (2)": "fold_3_captures",
-                        "I5F-3 (3)": "fold_3_capture_literals", "I5F-7": "fold_7_respond_clock"}
+                        "I5F-3 (3)": "fold_3_capture_literals", "I5F-7": "fold_7_respond_clock",
+                        "R1-1 (1)": "fold_r1_1_assignments", "R1-1 (2)": "fold_r1_1_borrows",
+                        "R1-1 (3)": "fold_r1_1_exchanges"}
+# PR review round 1's probes (R1-1, MON-I01B5-R1), planted at the head of fn start.
+I01B5_START_LINE = "        let deadline = after(self.client.now(), OR07_BUDGET);\n"
 I01B5_FOLD_ROWS = (
     ("A2 a shadowed inputs before the four statements", "I5F-1 (1)", None,
      ((_OBS, "        let quotas = match inputs.items(Resource::ResourceQuotas) {\n",
@@ -9103,6 +9107,15 @@ I01B5_FOLD_ROWS = (
     ("G2 a let now before the CaptureFacts literal", "I5F-7", None,
      ((_SRV, "        let facts = crate::i01_answer::CaptureFacts {\n",
        "        let now = std::time::Instant::now();\n        let facts = crate::i01_answer::CaptureFacts {\n"),)),
+    ("R-P6 the pinned manifest hash rewritten", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.config.pinned_manifest_hash = String::new();\n" + I01B5_START_LINE),)),
+    ("R-P7 the sealed values dropped", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.config.sealed = None;\n" + I01B5_START_LINE),)),
+    ("R-P8 the closure replaced", "R1-1 (1)", None,
+     ((_OBS, I01B5_START_LINE, "        self.closure = Closure::embedded().unwrap();\n" + I01B5_START_LINE),)),
+    ("R-P9 the configuration swapped", "R1-1 (3)", None,
+     ((_OBS, I01B5_START_LINE, "        let mut other = self.config.clone();\n        std::mem::swap(&mut self.config, "
+       "&mut other);\n" + I01B5_START_LINE),)),
 )
 I01B5_SNAPSHOT_FUNCTIONS = {"(i)": "snapshot_view_i_struct", "(ii)": "snapshot_view_ii_literal",
                             "(iii)": "snapshot_view_iii_impls", "(v)": "snapshot_view_v_names", "(vi)": "snapshot_view_vi_places"}
@@ -9248,8 +9261,8 @@ def patched_functions(functions, enabled):
 
 class I01b5RuleTests(Tree):
     """HE-004-I01B5 U4 (DESIGN-I01B5 rev 5 sections 6 and 8) over the real observer sources: G-I01B-5's nine clauses,
-    the nine pinned statements, round 3's ten folds, SnapshotView closed and the seven new literal pins accept today's
-    sources; each row of I01B5_SEND_ROWS, I01B5_STATEMENT_ROWS, I01B5_FOLD_ROWS and I01B5_SNAPSHOT_ROWS is refused by
+    the nine pinned statements, round 3's ten folds with PR review round 1's three R1-1 clauses (R-P6..R-P9 among the
+    fold rows), SnapshotView closed and the seven new literal pins accept today's sources; each row of I01B5_SEND_ROWS, I01B5_STATEMENT_ROWS, I01B5_FOLD_ROWS and I01B5_SNAPSHOT_ROWS is refused by
     its rule, and with every other clause of the rule disabled, by its own named sub-clause's message; each literal pin
     refuses a changed value or citation; and G-I01B-6's rows (P6-1..P6-10, N2-6, N2-7) are refused by the clause the
     table names, with the message DIB 7.4 gives."""
@@ -9264,7 +9277,7 @@ class I01b5RuleTests(Tree):
         for base in (self.base, gate.HE):
             self.assertEqual(gate.check_i01b5_send(base), 9)
             self.assertEqual(gate.check_i01b5_statements(base), 9)
-            self.assertEqual(gate.check_i01b5_folds(base), 10)
+            self.assertEqual(gate.check_i01b5_folds(base), 13)
             self.assertEqual(gate.check_i01b5_snapshot_view(base), 5)
             self.assertEqual(gate.check_i01b5_constants(base), 7)
             self.assertEqual(i01b6_checks(base), 4)
@@ -9273,7 +9286,7 @@ class I01b5RuleTests(Tree):
     def test_the_tables(self):
         self.assertEqual(len(I01B5_SEND_ROWS), 43)
         self.assertEqual(len(I01B5_STATEMENT_ROWS), 26)
-        self.assertEqual(len(I01B5_FOLD_ROWS), 13)
+        self.assertEqual(len(I01B5_FOLD_ROWS), 17)
         self.assertEqual(len(I01B5_SNAPSHOT_ROWS), 5)
         self.assertEqual(len(I01B5_OWN_SCOPE_ROWS), 24)
         for name, check, functions, rows, builder, tag in I01B5_PROOF_RULES:

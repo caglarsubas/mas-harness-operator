@@ -193,8 +193,9 @@ at its pinned place, the socket files' use-path backstops, PeerOps only in PeerS
 answer, self-check and send statements adjacent and its one call inside serve_peer_deadlines, readable-only
 registrations, serve_peer_deadlines called once, and the chain's words at their places; G-I01B-6 (a) and (c) read a
 socket file's paths in its own scope (resolved_uses, check_socket_items); G-I01-5 keeps its clauses but the two that
-became G-I01B-5's counts. The pinned statements (check_i01b5_statements), round 3's folds (check_i01b5_folds),
-SnapshotView closed (check_i01b5_snapshot_view) and the new literal pins (check_i01b5_constants) hold the epoch's
+became G-I01B-5's counts. The pinned statements (check_i01b5_statements), round 3's folds (check_i01b5_folds, with
+PR review round 1's R1-1: observe.rs never assigns, borrows &mut or exchanges self.config and self.closure), SnapshotView
+closed (check_i01b5_snapshot_view) and the new literal pins (check_i01b5_constants) hold the epoch's
 pushes and the service's answer to their reviewed texts. G-I01B-4 (c) counts `binding: Value::Null` only as the
 ObserverConfig literal's own field, (c5) refuses another binding field in config.rs, and G-I01B-8 (t11) reads answer's
 step 2 exactly. R-B3-PIN re-pins client.rs, i01_service.rs and i01_request.rs, and OBSERVER_HOME_PINS linux_listen.rs
@@ -6302,6 +6303,66 @@ def fold_7_respond_clock(codes: dict[str, str], rule: str) -> None:
             % (OBSERVER_SERVICE, " and ".join(sorted(set(outside))) or "wall_ms", rule))
 
 
+# PR review round 1's R1-1 (MON-I01B5-R1): derive's live sources in observe.rs, self.config and self.closure (and their
+# fields), are never rewritten there. An assignment `=` (compound forms included, `<<=` and `>>=` too; not `==`, `!=`,
+# `<=`, `>=` or `=>`); a derive source as a place; a mutable borrow of one; and std::mem's three exchanging calls, by a
+# bare, `mem::` or `std::`/`core::` path (not a method call).
+I01B5_ASSIGN = re.compile(r"(?:(?<![=!<>])|(?<=<<)|(?<=>>))=(?![=>])")
+I01B5_DERIVE_SOURCE = re.compile(r"\bself\s*\.\s*(?:config|closure)\b")
+I01B5_MUT_SOURCE = re.compile(r"&\s*(?:raw\s+)?mut\b[\s(]*self\s*\.\s*(?:config|closure)\b")
+I01B5_MEM_CALL = re.compile(r"(?<![\w.:])(?:(?:::)?(?:std|core)::)?(?:mem::)?(?:swap|replace|take)\s*\(")
+
+
+def left_side(code: str, index: int) -> str:
+    """The left side of the `=` at `index`: back to the nearest `;`, `{`, `}`, `,`, `|` or `=>` outside brackets, or the
+    `(` or `[` that encloses it (so a closure's or a call's own assignment stops at its parameter list or argument)."""
+    depth, position = 0, index
+    while position > 0:
+        position -= 1
+        char = code[position]
+        if char in ")]":
+            depth += 1
+        elif char in "([":
+            if depth == 0:
+                break
+            depth -= 1
+        elif depth == 0 and (char in "{};,|" or (char == ">" and code[position - 1:position] == "=")):
+            break
+    else:
+        return code[:index]
+    return code[position + 1:index]
+
+
+def fold_r1_1_assignments(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (1), G-I01B-4 (c3)'s left-side reading: in observe.rs no assignment's left side names self.config or
+    self.closure (or a field of either), compound assignments included (R-P6, R-P7, R-P8)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    for found in I01B5_ASSIGN.finditer(code):
+        side = left_side(code, found.start())
+        require(not I01B5_DERIVE_SOURCE.search(side), "%s assigns to %s; derive's sources are never the left side of `=` "
+                "(%s, R1-1 (1), MON-I01B5-R1)" % (OBSERVER_OBSERVE, " ".join(side.split()), rule))
+
+
+def fold_r1_1_borrows(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (2): in observe.rs neither self.config nor self.closure (nor a field of either) is borrowed `&mut` (or `&raw
+    mut`), parenthesised forms included (R-P9)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    found = I01B5_MUT_SOURCE.search(code)
+    require(not found, "%s borrows %s; derive's sources are never borrowed &mut (%s, R1-1 (2), MON-I01B5-R1)"
+            % (OBSERVER_OBSERVE, " ".join(found.group(0).split()) if found else "", rule))
+
+
+def fold_r1_1_exchanges(codes: dict[str, str], rule: str) -> None:
+    """R1-1 (3), G-I01-2's named_at reading of the call: in observe.rs no swap, replace or take call by a bare, `mem::`,
+    `std::mem::` or `core::mem::` path (a method call aside) names self.config or self.closure in its arguments (R-P9)."""
+    code = codes.get(OBSERVER_OBSERVE, "")
+    for found in I01B5_MEM_CALL.finditer(code):
+        arguments = code[found.end() - 1:paren_end(code, found.end() - 1)]
+        require(not I01B5_DERIVE_SOURCE.search(arguments), "%s passes derive's sources to %s; never an argument of "
+                "std::mem::{swap, replace, take} (%s, R1-1 (3), MON-I01B5-R1)"
+                % (OBSERVER_OBSERVE, found.group(0).rstrip("( "), rule))
+
+
 def check_i01b5_folds(base: Path) -> int:
     """HE-004-I01B5, round 3's folds (DESIGN-I01B5 rev 5 section 6.8; I5F-1..3, I5F-7; I5F-4 is (s7) and (s9), I5F-5
     G-I01B-5 (i), I5F-6 (f)'s pinned text), each with its existing construction and its own function: (I5F-1 (1))
@@ -6309,7 +6370,9 @@ def check_i01b5_folds(base: Path) -> int:
     destructuring and call; (I5F-1 (4)) adm4's Match arm; (I5F-2 (2)) the RequestRound and Passed literals once; (I5F-2
     (3)) request_round at seven places; (I5F-2 (4)) passed twice; (I5F-3 (1)) the push words at their places; (I5F-3
     (2)) captures by enclosing fn and with_captures twice; (I5F-3 (3)) the CaptureView and CaptureGate literals' homes;
-    (I5F-7) respond's clock words only in its pinned statements. The number of clauses (ten)."""
+    (I5F-7) respond's clock words only in its pinned statements; and PR review round 1's R1-1 (MON-I01B5-R1), over
+    observe.rs: (R1-1 (1)) derive's sources never the left side of `=`, (R1-1 (2)) never borrowed &mut, (R1-1 (3)) never
+    an argument of std::mem's swap, replace or take. The number of clauses (thirteen)."""
     rule = "round 3's folds"
     codes = observer_code(base, rule)
     for rel in (OBSERVER_OBSERVE, OBSERVER_CLIENT, OBSERVER_SERVICE):
@@ -6324,7 +6387,10 @@ def check_i01b5_folds(base: Path) -> int:
     fold_3_captures(codes, rule)
     fold_3_capture_literals(codes, rule)
     fold_7_respond_clock(codes, rule)
-    return 10
+    fold_r1_1_assignments(codes, rule)
+    fold_r1_1_exchanges(codes, rule)
+    fold_r1_1_borrows(codes, rule)
+    return 13
 
 
 # SnapshotView closed (section 6.5; B3-7; I5D-11), with G-I01B-9's names clauses.
@@ -7780,11 +7846,12 @@ def main() -> int:
             "whole (s6); respond's freshness statement directly before its one clock statement (s7); the CaptureFacts "
             "literal (s8); serve_peer_deadlines' closing statement before its respond call (s9)"
             % check_i01b5_statements(HE))
-        say("I01B5 round 3's folds (HE-004-I01B5, I5F-1..3, I5F-7): %d clauses: check_snapshot's names counted, "
+        say("I01B5 round 3's folds (HE-004-I01B5, I5F-1..3, I5F-7, R1-1): %d clauses: check_snapshot's names counted, "
             "snapshot_once's destructuring and call, adm4's Match arm; the RequestRound and Passed literals once, "
             "request_round at its seven places, passed twice; the push words at their places, captures by enclosing fn "
             "and with_captures twice, the CaptureView and CaptureGate literals' homes; respond's clock words only in its "
-            "pinned statements" % check_i01b5_folds(HE))
+            "pinned statements; R1-1: observe.rs's self.config and self.closure never assigned, borrowed &mut or "
+            "passed to std::mem's swap, replace or take" % check_i01b5_folds(HE))
         say("SnapshotView closed (HE-004-I01B5, B3-7): %d clauses: one definition deriving exactly Debug, one literal, no "
             "impl, no rename or type item, named only at its fixed places" % check_i01b5_snapshot_view(HE))
         say("I01B5 literal pins (HE-004-I01B5, G-I01B-8): %d constants (%s), each a line-anchored pub const with its "
