@@ -409,9 +409,18 @@ LINKED_TREE = {
     # HE-005A0: role-seal's root joins the scanned crates (CRATE_ROOTS), so every tree built on this one holds one more
     # linked and workspace source.
     "crates/role-seal/src/lib.rs": "//! The role-neutral seal.\n#![forbid(unsafe_code)]\n",
-    "crates/broker/src/main.rs": "fn main() {}\n",
+    # HE-005A: the broker's library and binary roots and its one socket file join the scanned crates (CRATE_ROOTS,
+    # SOCKET_FILES), so every tree built on this one holds three more linked sources and two more workspace sources (its
+    # main.rs was one already). The unlinked binary crate of the tests below is containment's.
+    "crates/broker/src/lib.rs": "//! The capacity broker.\n#![forbid(unsafe_code)]\npub mod linux_listen;\n",
+    "crates/broker/src/main.rs": "#![forbid(unsafe_code)]\nfn main() {}\n",
+    "crates/broker/src/linux_listen.rs": "use gate_sys::channel;\n"
+                                         "pub struct LinuxI02 { listener: Option<channel::Listener> }\n"
+                                         "pub fn new(_sealed: &Sealed) -> LinuxI02 { x() }\n",
     "target/debug/build/out.rs": "unsafe fn generated() {}\n",
 }
+# The unlinked binary crate (HE-005A: the broker is linked now): outside every linked-crate scan.
+UNLINKED_MAIN = "crates/containment/src/main.rs"
 
 
 class LinkedSourceTests(unittest.TestCase):
@@ -439,9 +448,9 @@ class LinkedSourceTests(unittest.TestCase):
             (self.base / rel).unlink()
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
-        self.assertEqual(gate.check_unsafe(self.base), 14)
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
+        self.assertEqual(gate.check_unsafe(self.base), 16)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     def test_forbidden_names_in_linked_sources(self):
         for text in ("use std::process::Command;", "let _ = std::env::args_os();", "use std::net::TcpStream;",
@@ -452,8 +461,8 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"] + text + "\n",
                          "linked-source tripwire")
         # Tests and other crates are outside the linked-source tripwire (the start-up lint and the unsafe rule still apply).
-        self.write("crates/broker/src/main.rs", "use std::path::Path;\nfn main() {}\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.write(UNLINKED_MAIN, "use std::path::Path;\nfn main() {}\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_std_fs_items(self):
         source = "crates/effect-gate/src/file_store.rs"
@@ -465,7 +474,7 @@ class LinkedSourceTests(unittest.TestCase):
                      + "use std::os::unix::fs::{FileExt, MetadataExt};\n", "std fs item")
         self.write("crates/gate-sys/src/lib.rs", LINKED_TREE["crates/gate-sys/src/lib.rs"]
                    + "use std::os::unix::fs::FileExt;\nuse std::os::unix::fs::MetadataExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_fd_items_only_in_openat(self):
         for text in ("use std::os::fd::AsRawFd;", "fn f(_: RawFd) {}", "use std::os::unix::io::FromRawFd;",
@@ -480,7 +489,7 @@ class LinkedSourceTests(unittest.TestCase):
                      "use std::io as z;"):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", "renames a std item")
         self.write("crates/i05-protocol/src/json.rs", "use crate::json as j;\nlet x = y as u64;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     # HE-002S PR review round 1, R1-2 (d): a rename through a use of a name imported from std (in any linked source,
     # whatever the order), and a top-level group that renames std.
@@ -503,7 +512,7 @@ class LinkedSourceTests(unittest.TestCase):
         self.write(json, "use crate::json as j;\nuse crate::frame::{Frame as F, self as fr};\n"
                          "fn f<'a>(x: &'a u8) -> impl Sized + use<'a> { x }\n// use std::io; use io as z;\n"
                          "const S: &str = \"use io as z;\";\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     # HE-002S PR review round 2, R2-1: a glob through std or a name imported from std.
     def test_std_globs_through_other_uses(self):
@@ -515,7 +524,7 @@ class LinkedSourceTests(unittest.TestCase):
                           (store, LINKED_TREE[store] + "mod m { pub use super::io::*; }")):
             self.refused(rel, text + "\n", message)
         self.write(json, "use crate::json::*;\n#[cfg(test)]\nmod tests { use super::*; }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_crate_root_attributes(self):
         for rel in gate.CRATE_ROOTS:
@@ -529,12 +538,12 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused(rel, LINKED_TREE.get(rel, "") + "// no unsafe here\n", "contains unsafe outside",
                          check=gate.check_unsafe)
         self.write("crates/effect-gate/src/lib.rs", "#![forbid(unsafe_code)]\n// unsafe_code is a lint name\n")
-        self.assertEqual(gate.check_unsafe(self.base), 14)
+        self.assertEqual(gate.check_unsafe(self.base), 16)
 
     # HE-002S DESIGN section 6: gate-sys's seal.rs is the second file that may contain the word unsafe.
     def test_unsafe_is_also_allowed_in_gate_sys_seal(self):
         self.write("crates/gate-sys/src/seal.rs", "#![allow(unsafe_code)]\nfn f() -> i32 { unsafe { prctl(38, 1) } }\n")
-        self.assertEqual(gate.check_unsafe(self.base), 15)
+        self.assertEqual(gate.check_unsafe(self.base), 17)
         for rel in ("crates/effect-gate/src/seal.rs", "crates/gate-sys/src/seal/raw.rs", "crates/gate-sys/tests/seal.rs"):
             self.refused(rel, "fn f() { unsafe { g() } }\n", "contains unsafe outside crates/gate-sys/src/openat.rs and "
                          "crates/gate-sys/src/seal.rs", check=gate.check_unsafe)
@@ -547,7 +556,7 @@ class LinkedSourceTests(unittest.TestCase):
                          "macro_rules! call { ($m:ident) => { core::arch::$m!(\"\"); } }\ncall!(global_asm);"):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", "uses inline assembly", check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", "fn main() { let global_asmx = 1; let _ = global_asmx; }\n")
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     # HE-002S PR review round 1, R1-4: a renaming import of asm (now possible in seal.rs too), and the word asm in a
     # linked source, where a macro could otherwise assemble the call from its arguments.
@@ -563,14 +572,15 @@ class LinkedSourceTests(unittest.TestCase):
                           ("crates/i05-protocol/src/json.rs", "fn f() { let asm = 1; }")):
             self.refused(rel, text + "\n", "names asm .inline assembly. .linked-source tripwire")
         # Outside the linked crates the word alone passes; the forms above do not.
-        self.write("crates/broker/src/main.rs", "fn main() { let asm = 1; let _ = asm; }\n")
-        self.assertEqual(gate.check_included_code(self.base), 14)
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.write(UNLINKED_MAIN, "fn main() { let asm = 1; let _ = asm; }\n")
+        self.assertEqual(gate.check_included_code(self.base), 17)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     # HE-002S DESIGN section 5 (D7): std APIs that reach a call the EFFECT_GATE filter kills, in effect-gate, gate-sys
     # and (PR review round 1, R1-2) i05-protocol, whose code runs after the seal too; is_terminal joins the list.
     def test_post_seal_std_apis(self):
-        self.assertEqual(gate.check_post_seal_sources(self.base), 8)
+        # HE-005A: the broker's three sources join the gate's eight.
+        self.assertEqual(gate.check_post_seal_sources(self.base), 11)
         for text, name in (("let _ = stream.set_nonblocking(true);", "set_nonblocking"),
                            ("for entry in std::fs::read_dir(x) {}", "read_dir"), ("let _ = current_exe();", "current_exe"),
                            ("let _ = uname(x);", "uname"), ("membarrier(0, 0);", "membarrier"),
@@ -586,10 +596,14 @@ class LinkedSourceTests(unittest.TestCase):
                              check=gate.check_post_seal_sources)
         # The tests and the binary crates run no post-seal code of the gate; try_clone (fcntl) is allowed.
         self.write("crates/effect-gate/tests/files.rs", "fn f(f: &File) { let _ = f.set_len(0); }\n")
-        self.write("crates/broker/src/main.rs", "fn main() { let _ = std::io::stdin().is_terminal(); }\n")
+        self.write(UNLINKED_MAIN, "fn main() { let _ = std::io::stdin().is_terminal(); }\n")
         self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                    + "fn g(f: &File) { let _ = f.try_clone(); let _ = copy_from_slice; let _ = terminal; }\n")
-        self.assertEqual(gate.check_post_seal_sources(self.base), 8)
+        self.assertEqual(gate.check_post_seal_sources(self.base), 11)
+        # HE-005A: the broker's code runs after its seal, so the list refuses there too.
+        self.refused("crates/broker/src/linux_listen.rs", LINKED_TREE["crates/broker/src/linux_listen.rs"]
+                     + "fn f(s: &S) { let _ = s.set_nonblocking(true); }\n", r"set_nonblocking .*\(post-seal check\)",
+                     check=gate.check_post_seal_sources)
 
     # HE-002C PR review round 2, R2-1 and R2-2: std::os paths, nested globs, std aliases, raw identifiers, inline
     # assembly, symlinks and manifest paths.
@@ -603,7 +617,7 @@ class LinkedSourceTests(unittest.TestCase):
                          "std::os item other than")
         self.write("crates/gate-sys/src/openat.rs", LINKED_TREE["crates/gate-sys/src/openat.rs"]
                    + "use std::os::fd::AsRawFd;\nuse std::os::fd::OwnedFd;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_nested_globs_and_std_aliases(self):
         for text, message in (("use std::collections::*;", "nested glob of std"),
@@ -612,7 +626,7 @@ class LinkedSourceTests(unittest.TestCase):
                               ("use {std as s};", "renames std"), ("pub use { std  as  s };", "renames std")):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
         self.write("crates/i05-protocol/src/json.rs", "mod tests { use super::*; }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_raw_identifiers_and_inline_assembly(self):
         for rel in ("crates/i05-protocol/src/json.rs", "crates/broker/src/main.rs", "crates/effect-gate/tests/files.rs"):
@@ -623,7 +637,7 @@ class LinkedSourceTests(unittest.TestCase):
                                   ('fn f() { asm ! ("nop") }', "uses inline assembly")):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", message, check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", 'fn main() { let _ = r#"raw string"#; let asm = 1; }\n')
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     def test_symlinks_and_manifest_paths(self):
         (self.base / "crates/elsewhere").mkdir()
@@ -638,7 +652,7 @@ class LinkedSourceTests(unittest.TestCase):
                                "gives a bin target a path")):
             self.refused("crates/gate/Cargo.toml", text, message, check=gate.check_included_code)
         self.write("crates/gate/Cargo.toml", '[package]\nname = "gate"\n[dependencies]\nhost-common = { path = "../host-common" }\n')
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     # HE-002C PR review round 1, R1-1: the forms that passed the first tripwire.
 
@@ -648,7 +662,7 @@ class LinkedSourceTests(unittest.TestCase):
             self.refused("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                          + text + "\n", "top-level group or glob of std")
         self.write("crates/i05-protocol/src/json.rs", "use std::collections::{BTreeMap, BTreeSet};\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_spaced_paths(self):
         for text, message in (("let _ = std :: process :: Command::new(x);", "std::process"),
@@ -661,7 +675,7 @@ class LinkedSourceTests(unittest.TestCase):
                               ("use std::fs :: File as Handle;", "renames a std item")):
             self.refused("crates/i05-protocol/src/json.rs", text + "\n", message)
         self.write("crates/effect-gate/src/file_store.rs", "use std :: fs :: File;\nuse std::os::unix::fs ::FileExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
 
     def test_extern_crate(self):
         for text in ("extern crate std as s;\nfn f() { let _ = s::net::TcpStream::connect(x); }", "extern  crate alloc;"):
@@ -680,7 +694,7 @@ class LinkedSourceTests(unittest.TestCase):
                          '#[cfg_attr(all(), path = "extra.inc")]\nmod extra;'):
                 self.refused(rel, LINKED_TREE[rel] + text + "\n", "has a path attribute", check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", '#[cfg_attr(test, derive(Debug))]\nstruct S;\nfn main() { let path = "p"; }\n')
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     def test_include_in_a_linked_crate(self):
         for text in ('include!("extra.txt");', 'std::include !("extra.txt");', "use core::include as inc;",
@@ -693,7 +707,7 @@ class LinkedSourceTests(unittest.TestCase):
                      check=gate.check_included_code)
         self.write("crates/broker/src/main.rs", 'const A: &str = include_str!("a.txt");\n'
                                               'const B: &[u8] = include_bytes!("b.bin");\nfn main() {}\n')
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
     def test_non_rs_files_under_src(self):
         for rel in ("crates/gate-sys/src/extra.inc", "crates/gate/src/extra.txt", "crates/effect-gate/src/sub/x.rs.txt"):
@@ -703,7 +717,7 @@ class LinkedSourceTests(unittest.TestCase):
             gate.check_included_code(self.base)
         (self.base / "crates/effect-gate/src/linked").unlink()
         self.write("crates/effect-gate/tests/data.json", "{}\n")
-        self.assertEqual(gate.check_included_code(self.base), 14)
+        self.assertEqual(gate.check_included_code(self.base), 16)
 
 
 SEAL_DECLARATIONS = ("unsafe extern \"C\" {\n    fn prlimit(pid: c_int, resource: c_int, new: *const R, old: *mut R) -> c_int;\n"
@@ -780,7 +794,7 @@ class ForeignItemTests(unittest.TestCase):
             (self.base / rel).unlink()
 
     def test_the_allowlisted_declarations_pass(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
         self.assertEqual(gate.extern_blocks("unsafe extern \"C\" { fn a(); }\nextern {\n fn b(); }"),
                          [" fn a(); ", "\n fn b(); "])
 
@@ -808,8 +822,8 @@ class ForeignItemTests(unittest.TestCase):
         # Function pointer types and Rust-ABI definitions are not foreign items; the binary crates are not linked here.
         self.write("crates/effect-gate/src/file_store.rs", "type Callback = unsafe extern \"C\" fn(i32) -> i32;\n"
                                                            "pub extern \"C\" fn exported() {}\n")
-        self.write("crates/broker/src/main.rs", "unsafe extern \"C\" { fn system(c: *const u8) -> i32; }\nfn main() {}\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.write(UNLINKED_MAIN, "unsafe extern \"C\" { fn system(c: *const u8) -> i32; }\nfn main() {}\n")
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
 
     def test_extern_items_are_private_and_not_safe(self):
         seal = "crates/gate-sys/src/seal.rs"
@@ -820,7 +834,7 @@ class ForeignItemTests(unittest.TestCase):
             self.refused(seal, FOREIGN_TREE[seal].replace(old, new), message)
         # A comment inside the block is not read; the word unsafe before extern is not the word safe.
         self.write(seal, FOREIGN_TREE[seal].replace("    fn prctl(", "    // not pub, not safe\n    fn prctl("))
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
 
     def test_no_link_name(self):
         for rel in ("crates/gate-sys/src/seal.rs", "crates/effect-gate/src/file_store.rs"):
@@ -850,7 +864,7 @@ class ForeignItemTests(unittest.TestCase):
         # A brace or an extern block inside a literal is not code.
         self.write(seal, FOREIGN_TREE[seal] + "const A: &str = \"}\"; const B: char = '}';\n"
                    "const C: &str = r#\"unsafe extern \"C\" { fn kill(); }\"#;\nfn f<'a>(x: &'a str) -> &'a str { x }\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
 
     def test_a_macro_generated_block(self):
         seal, lib = "crates/gate-sys/src/seal.rs", "crates/gate-sys/src/lib.rs"
@@ -873,7 +887,7 @@ class ForeignItemTests(unittest.TestCase):
         # A string literal may hold a $ in seal.rs; a fixed-size array parameter is read.
         self.write(seal, FOREIGN_TREE[seal].replace("fn capget(h: *mut H, d: *mut D)", "fn capget(h: *mut H, d: *mut [D; 2])")
                    + "const D: &str = \"$n macro_rules\";\n")
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
 
     def test_the_reader(self):
         self.assertEqual(gate.rust_code("a /* x /* y */ z */ b // c\nd"), "a   b  \nd")
@@ -1089,10 +1103,19 @@ class ContractTests(unittest.TestCase):
     # four rows, the I01 digest contract's three files and the proxy-contract vectors beside the wire's two (56).
     # HE-004-I01B4 (DESIGN-I01B4 rev 2 sections 1.2 and 5, G-I01B-2): edge record v11's seven rows, the contract v2's three
     # files, admission v4's three and profile v2's vectors, beside the held v1 and admission v3 files (63).
+    # HE-005A (DESIGN-HE005 revision 5 sections 2 and 4): edge record v11's four seccomp-v3 BROKER and WORKER programs (67).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 63)
+            self.assertEqual(len(gate.CONTRACTS), 67)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith(("contracts/seccomp-v3/BROKER", "contracts/seccomp-v3/WORKER"))}, {
+                "contracts/seccomp-v3/BROKER.aarch64.bpf": "bc9c5a3797277ca753b5168e8e55132e1878fed2a726de361fd7d80e0fababf8",
+                "contracts/seccomp-v3/BROKER.x86_64.bpf": "95221bd0db753aa22ead2eb49eeac8dae3d24c3dad72811de86c9392f4894dcc",
+                "contracts/seccomp-v3/WORKER.aarch64.bpf": "cc04a4710495d3794b0d295613a2f2bd330524a328cb6963a819565bac2acb40",
+                "contracts/seccomp-v3/WORKER.x86_64.bpf": "5616c9099324e441674f8e589b6c705ae95f6a4a697f10e761565d0735689d45"})
+            self.assertEqual(sorted(gate.BROKER_PROGRAMS.values()), ["contracts/seccomp-v3/BROKER.aarch64.bpf",
+                                                                     "contracts/seccomp-v3/BROKER.x86_64.bpf"])
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith("contracts/i01-v1/")}, {
                 "contracts/i01-v1/channel.schema.json": "fb69b77201d9b6275a19667a5f5770537f382ddb11309095733628c8430bdc0e",
@@ -1246,13 +1269,13 @@ class ChannelModuleTests(Tree):
     TREE = FOREIGN_TREE
 
     def test_unsafe_is_also_allowed_in_gate_sys_channel(self):
-        self.assertEqual(gate.check_unsafe(self.base), 18)
+        self.assertEqual(gate.check_unsafe(self.base), 20)
         for rel in ("crates/gate-sys/src/channel/raw.rs", "crates/effect-gate/src/channel.rs",
                     "crates/effect-gate/src/substrate.rs", "crates/gate-sys/src/peer_wire.rs"):
             self.refused(gate.check_unsafe, rel, "fn f() { unsafe { g() } }\n", "contains unsafe outside .*channel.rs")
 
     def test_the_channel_module_declares_exactly_its_twelve_symbols(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
         self.assertEqual(len(gate.FOREIGN_ITEMS[CHANNEL]), 12)
         message = "channel.rs declares the foreign items .* not exactly"
         for text in (FOREIGN_TREE[CHANNEL].replace("    fn ppoll(", "    fn poll("),
@@ -1274,7 +1297,7 @@ class ChannelModuleTests(Tree):
         with_fd = (FOREIGN_TREE[CHANNEL] + "use std::fs::File;\nuse std::os::fd::AsRawFd;\nuse std::os::fd::FromRawFd;\n"
                    "use std::os::fd::OwnedFd;\n")
         self.write(CHANNEL, with_fd)
-        self.assertEqual(gate.check_linked_sources(self.base), 16)
+        self.assertEqual(gate.check_linked_sources(self.base), 19)
         message = "std::os::fd item outside crates/gate-sys/src/openat.rs and crates/gate-sys/src/channel.rs"
         for rel in ("crates/gate-sys/src/peer_wire.rs", "crates/effect-gate/src/substrate.rs",
                     "crates/effect-gate/src/linux_os.rs"):
@@ -1360,7 +1383,7 @@ DEBUG_TREE = {
                                            "#[derive(Debug)]\npub(crate) enum SetupError { Poller(io::Error), "
                                            "Listener { side: Listen, error: ListenError } }\n"
                                            "#[derive(Debug)]\nstruct Unit;\n#[derive(Debug)]\nstruct Conn(u8);\n",
-    "crates/broker/src/main.rs": "#[derive(Debug)]\nstruct S { f: std::fs::File }\nfn main() {}\n",
+    UNLINKED_MAIN: "#[derive(Debug)]\nstruct S { f: std::fs::File }\nfn main() {}\n",
 }
 
 
@@ -1372,7 +1395,7 @@ class DebugDeriveTests(Tree):
     TREE = DEBUG_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_debug_derives(self.base), 13)
+        self.assertEqual(gate.check_debug_derives(self.base), 16)
 
     def test_hazardous_field_types_refuse(self):
         rel = "crates/effect-gate/src/extra.rs"
@@ -1394,7 +1417,7 @@ class DebugDeriveTests(Tree):
         self.write("crates/effect-gate/src/extra.rs", "#[derive(Debug)]\nenum E { File, Dir }\n"
                    "/* #[derive(Debug)] struct S { f: File } */\nconst A: &str = \"#[derive(Debug)] struct S { f: File }\";\n"
                    "impl fmt::Debug for FileStores { fn fmt() {} }\n")
-        self.assertEqual(gate.check_debug_derives(self.base), 14)
+        self.assertEqual(gate.check_debug_derives(self.base), 17)
 
 
 WORKSPACE_TREE = {
@@ -1511,7 +1534,7 @@ class TcpModuleTests(Tree):
     TREE = FOREIGN_TREE
 
     def test_the_tcp_module_declares_exactly_its_ten_symbols(self):
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
         self.assertEqual(gate.FOREIGN_ITEMS[TCP], {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt",
                                                     "recv", "send", "shutdown", "syscall"})
         message = "tcp.rs declares the foreign items .* not exactly"
@@ -1532,11 +1555,11 @@ class TcpModuleTests(Tree):
             gate.check_foreign_items(self.base)
 
     def test_unsafe_and_fd_items_are_allowed_in_tcp(self):
-        self.assertEqual(gate.check_unsafe(self.base), 18)
+        self.assertEqual(gate.check_unsafe(self.base), 20)
         self.write(TCP, FOREIGN_TREE[TCP] + "use std::os::fd::AsRawFd;\nuse std::os::fd::OwnedFd;\n"
                         "fn f() { unsafe { g() } }\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 16)
-        self.assertEqual(gate.check_unsafe(self.base), 18)
+        self.assertEqual(gate.check_linked_sources(self.base), 19)
+        self.assertEqual(gate.check_unsafe(self.base), 20)
         self.refused(gate.check_unsafe, "crates/gate-tls/src/i04.rs", "fn f() { unsafe { g() } }\n",
                      "contains unsafe outside")
 
@@ -1746,7 +1769,7 @@ class SecretDebugTests(Tree):
     TREE = SECRET_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_debug_derives(self.base), 14)
+        self.assertEqual(gate.check_debug_derives(self.base), 17)
 
     def test_secret_names_and_fields_refuse(self):
         rel = "crates/gate-tls/src/extra.rs"
@@ -2041,7 +2064,7 @@ class SocketModuleTests(Tree):
     TREE = SOCKET_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
     def test_the_bypass_forms_refuse(self):
         message = "socket-module check"
@@ -2059,7 +2082,7 @@ class SocketModuleTests(Tree):
                      SOCKET_TREE["crates/effect-gate/src/linux_os.rs"] + "pub(crate) use gate_sys::channel::Conn;\n", "re-exports")
         # A comment or a literal is not a path.
         self.write("crates/gate-tls/src/upstream.rs", "// gate_sys::tcp\nconst A: &str = \"gate_sys::channel\";\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 19)
+        self.assertEqual(gate.check_socket_modules(self.base), 22)
 
     def test_threads_refuse_in_every_linked_crate(self):
         for rel in ("crates/gate-sys/src/channel.rs", "crates/i05-protocol/src/json.rs", gate.GATE_MAIN,
@@ -2069,7 +2092,7 @@ class SocketModuleTests(Tree):
                              "names std::thread or thread::")
         self.write("crates/effect-gate/src/linux_os.rs", SOCKET_TREE["crates/effect-gate/src/linux_os.rs"]
                    + "// one thread::\nconst T: &str = \"thread-self\";\nfn threads() {}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
 
 class SocketItemTests(Tree):
@@ -2087,8 +2110,8 @@ class SocketItemTests(Tree):
                                                   "pub fn new(_s: &Sealed) -> Result<u8, SetupError> { z() }\n"}
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
-        self.assertEqual(gate.check_macros(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
+        self.assertEqual(gate.check_macros(self.base), 21)
 
     def test_pub_items_naming_socket_items_refuse(self):
         message = "pub item naming gate-sys's socket items"
@@ -2114,10 +2137,11 @@ class SocketItemTests(Tree):
     def test_items_through_a_crate_or_module_alias_refuse(self):
         # HE-004-I01A2 (HE-004-I01a PR review round 1, R1-3): the use paths are read with the source's aliases followed,
         # so a socket item imported or named through a rename of gate_sys or of a socket module refuses in a pub item as
-        # its direct form does, in every socket file (effect-gate's two and the observer's two).
+        # its direct form does, in every socket file (effect-gate's two, the observer's two and, from HE-005A, the
+        # broker's one).
         message = "pub item naming gate-sys's socket items"
         for rel in ("crates/effect-gate/src/linux_os.rs", "crates/effect-gate/src/linux_net.rs", gate.OBSERVER_LINUX_NET,
-                    gate.OBSERVER_LINUX_LISTEN):
+                    gate.OBSERVER_LINUX_LISTEN, gate.BROKER_LINUX_LISTEN):
             for text in ("use gate_sys as gs;\nuse gs::channel::{Conn};\npub fn f() -> Conn { x() }\n",
                          "use gate_sys::{self as gs};\nuse gs::{channel::{Poller as P}};\npub type Wire = P;\n",
                          "use gate_sys as gs;\npub fn f() -> gs::channel::Poller { x() }\n",
@@ -2132,7 +2156,7 @@ class SocketItemTests(Tree):
         os_rs = "crates/effect-gate/src/linux_os.rs"
         self.write(os_rs, "use gate_sys as gs;\nuse gs::channel::{ListenError, Poller};\nfn private(p: Poller) {}\n"
                    "pub fn new(_s: &Sealed) -> Result<u8, ListenError> { z() }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
     def test_aliases_fields_and_fn_pointers_refuse(self):
         # PR review round 2, R2-1 (the reviewer's Q6, Q7, Q9, Q15 and their kin).
@@ -2154,7 +2178,7 @@ class SocketItemTests(Tree):
         self.write(os_rs, base + "pub struct Held { poller: Poller, pub n: u8, pub e: ListenError, f: fn() }\n"
                    "pub type Shared = Rc<RefCell<u8>>;\npub const BACKLOG: u16 = 16;\nstruct Unit;\n"
                    "pub struct Pair(u8, Poller);\nfn private() -> fn() { f }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
     def test_fn_traits_fn_pointers_and_pub_enum_variants_refuse(self):
         # HE-003D PR review round 2 confirmation, N1 (HE-003A2 DESIGN section 6, Q-A2-9 (a), D1-3, D2-1).
@@ -2218,10 +2242,10 @@ class SocketItemTests(Tree):
             "fn port_request(&self, request: impl FnOnce(&Poller, Watched<'_>) -> io::Result<()>) -> bool { r() }\n"
             "struct Hidden { f: Box<dyn Fn()>, g: fn() }\n")
         self.write(net_rs, self.TREE[net_rs] + "enum Stream {\n    Listener(TcpListener),\n    Conn(TcpConn),\n}\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
         # Comments are not code; the reader refuses an enum it cannot read.
         self.write(os_rs, self.TREE[os_rs] + "// pub enum Leak { P(Poller) }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
         self.refused(gate.check_socket_modules, os_rs, self.TREE[os_rs] + "pub enum Broken { A(u8)\n", "cannot read")
 
     def test_macros_refuse_in_every_linked_crate(self):
@@ -2237,7 +2261,7 @@ class SocketItemTests(Tree):
         # Comments, literals and the tests are not definitions.
         self.write("crates/effect-gate/src/substrate.rs", "// no macro_rules here\nconst S: &str = \"macro_rules! m\";\n")
         self.write("crates/effect-gate/tests/m.rs", "macro_rules! m { () => {} }\n")
-        self.assertEqual(gate.check_macros(self.base), 19)
+        self.assertEqual(gate.check_macros(self.base), 22)
 
 
 class StructAngleTests(Tree):
@@ -2303,7 +2327,7 @@ class StructAngleTests(Tree):
                      "pub struct S<T = [u8; N >> 1]> { a: T, pub p: Poller }"):
             self.refused(gate.check_socket_modules, os_rs, base + text + "\n", "pub field naming gate-sys's socket items")
         self.write(os_rs, base + "pub struct S<T> where T: Copy;\npub struct Q<T = [u8; N >> 1]> { a: T, p: Poller }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
     def test_an_unreadable_struct_or_a_field_default_refuses(self):
         os_rs = "crates/effect-gate/src/linux_os.rs"
@@ -2369,7 +2393,7 @@ class ObservationRuleTests(Tree):
     TREE = OBSERVATION_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_observation(self.base), 16)
+        self.assertEqual(gate.check_observation(self.base), 19)
 
     def test_the_callers_are_pinned_by_exact_call_forms(self):
         os_rs, openat = self.TREE[gate.LINUX_OS], self.TREE[gate.OPENAT]
@@ -2437,7 +2461,7 @@ class ObservationRuleTests(Tree):
                      "use crate::observation::WorkerObserver as W;\nimpl W for X {}\n", "renames or aliases")
         self.write("crates/effect-gate/src/substrate.rs",
                    "fn f(o: impl WorkerObserver, r: &dyn KernelReads<Pidfd = u8>) -> impl FnOnce() -> u8 { x() }\n")
-        self.assertEqual(gate.check_observation(self.base), 17)
+        self.assertEqual(gate.check_observation(self.base), 20)
 
     def test_the_fake_kernel_is_confined(self):
         message = "names the fake kernel outside a strict"
@@ -2477,7 +2501,7 @@ class ObservationRuleTests(Tree):
     def test_the_cgroup_root_open_is_the_linked_tripwire_s_one_fs_exception(self):
         # HE-003A3 (R96): the exact `KernelRoot::open_kernel_root("/sys/fs/cgroup")` once in linux_os.rs; another
         # `fs` word there, or the same expression in another file, still refuses.
-        self.assertEqual(gate.check_linked_sources(self.base), 16)
+        self.assertEqual(gate.check_linked_sources(self.base), 19)
         os_rs = self.TREE[gate.LINUX_OS]
         message = "names a std fs item other than its allowed ones"
         for rel, text in ((gate.LINUX_OS, os_rs + 'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n'),
@@ -2632,7 +2656,7 @@ class ObservationPathTests(Tree):
             self.refused(gate.check_observation, gate.OBSERVATION_RS, text, message)
         # A strict in-source test module may hold its own helpers, even one named like an observer.
         self.write(gate.OBSERVATION_RS, observation + "#[cfg(test)]\nmod tests {\n    struct Unobserved;\n    fn t() {}\n}\n")
-        self.assertEqual(gate.check_observation(self.base), 16)
+        self.assertEqual(gate.check_observation(self.base), 19)
 
 
 class DebugKernelRootTests(Tree):
@@ -2653,8 +2677,8 @@ class PreMainAndPrintTests(Tree):
     TREE = LINKED_TREE
 
     def test_the_tree_passes(self):
-        self.assertEqual(gate.check_pre_main(self.base), 12)
-        self.assertEqual(gate.check_prints(self.base), 12)
+        self.assertEqual(gate.check_pre_main(self.base), 15)
+        self.assertEqual(gate.check_prints(self.base), 15)
 
     def test_code_before_main_refuses(self):
         for rel in (gate.GATE_MAIN, "crates/effect-gate/src/file_store.rs", "crates/gate-tls/src/lib.rs"):
@@ -2664,7 +2688,7 @@ class PreMainAndPrintTests(Tree):
                                ("#[unsafe(export_name = \"main\")]\nfn f() {}", "export_name")):
                 self.refused(gate.check_pre_main, rel, LINKED_TREE[rel] + text + "\n", name + " .code before main")
         self.write(gate.GATE_MAIN, LINKED_TREE[gate.GATE_MAIN] + "// no link_section, #[used] or no_mangle here\n")
-        self.assertEqual(gate.check_pre_main(self.base), 12)
+        self.assertEqual(gate.check_pre_main(self.base), 15)
 
     def test_printing_refuses(self):
         for rel in (gate.GATE_MAIN, "crates/gate-sys/src/openat.rs", "crates/i05-protocol/src/json.rs"):
@@ -2676,7 +2700,7 @@ class PreMainAndPrintTests(Tree):
                 self.refused(gate.check_prints, rel, LINKED_TREE[rel] + text + "\n", re.escape(name) + " .print rule")
         self.write(gate.GATE_MAIN, LINKED_TREE[gate.GATE_MAIN] + "// a panic message may reach stderr\n"
                    "const S: &str = \"stdout\";\nfn f() { let _ = format!(\"x\"); let reprint = 1; }\n")
-        self.assertEqual(gate.check_prints(self.base), 12)
+        self.assertEqual(gate.check_prints(self.base), 15)
 
 
 class LinkedBinaryTests(Tree):
@@ -2689,9 +2713,9 @@ class LinkedBinaryTests(Tree):
         main = gate.GATE_MAIN
         good = LINKED_TREE[main] + "use std::process::ExitCode;\nfn run() -> ExitCode { ExitCode::from(2) }\n"
         self.write(main, good)
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
         self.write(main, LINKED_TREE[main] + "use std :: process ::\n    ExitCode ;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
         for text in (good + "use std::process::ExitCode;\n", good + "fn f() { std::process::exit(1); }\n",
                      good + "use std::process::Command;\n", good + "fn f() { let _ = std::env::args_os(); }\n",
                      LINKED_TREE[main] + "use std::process;\n", LINKED_TREE[main] + "use std::process::{ExitCode};\n"):
@@ -2850,7 +2874,7 @@ class OpenatReadLinkTests(Tree):
 
     def test_the_openat_module_declares_exactly_its_two_symbols(self):
         self.assertEqual(gate.FOREIGN_ITEMS[gate.OPENAT], {"openat", "readlinkat"})
-        self.assertEqual(gate.check_foreign_items(self.base), 16)
+        self.assertEqual(gate.check_foreign_items(self.base), 19)
         message = "openat.rs declares the foreign items .* not exactly"
         openat = self.TREE[gate.OPENAT]
         readlinkat = "    fn readlinkat(dirfd: c_int, path: *const c_char, buffer: *mut c_char, size: usize) -> isize;\n"
@@ -3132,18 +3156,18 @@ class ObserverLinkedCrateTests(Tree):
 
     def test_the_tree_passes(self):
         self.assertEqual(gate.SCANNED_CRATES, gate.LINKED_CRATES + ("crates/observer", "crates/observer-sys",
-                                                                    "crates/role-seal"))
+                                                                    "crates/role-seal", "crates/broker"))
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
                                                        "crates/observer-sys", "crates/role-seal"))
         # 13 sources of the gate's linked crates, 6 of the observer's (HE-004C: its socket module; HE-004-I01a: its I01
-        # listener file), 2 of observer-sys's (HE-004D1) and role-seal's 1 (HE-005A0).
+        # listener file), 2 of observer-sys's (HE-004D1), role-seal's 1 (HE-005A0) and the broker's 3 (HE-005A).
         for check in (gate.check_linked_sources, gate.check_foreign_items, gate.check_debug_derives, gate.check_socket_modules,
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
-            self.assertEqual(check(self.base), 22, check.__name__)
+            self.assertEqual(check(self.base), 25, check.__name__)
         # HE-004B1: the observer's (5 with HE-004C's socket module, 6 with HE-004-I01a's listener file) and i05-protocol's
-        # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1.
+        # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1. The gate's list: its 13 and, from HE-005A, the broker's 3.
         self.assertEqual(gate.check_observer_post_seal(self.base), 11)
-        self.assertEqual(gate.check_post_seal_sources(self.base), 13, "the gate's post-seal crates do not include the observer")
+        self.assertEqual(gate.check_post_seal_sources(self.base), 16, "the gate's post-seal crates do not include the observer")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_LIB], "#![forbid(unsafe_code)]")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_MAIN], "#![forbid(unsafe_code)]")
 
@@ -3202,7 +3226,7 @@ class ObserverLinkedCrateTests(Tree):
 
     def test_the_observer_exit_import_once_in_main(self):
         main = gate.OBSERVER_MAIN
-        self.assertEqual(gate.check_linked_sources(self.base), 22)
+        self.assertEqual(gate.check_linked_sources(self.base), 25)
         for text in (GOOD_OBSERVER_MAIN + "use std::process::ExitCode;\n",
                      GOOD_OBSERVER_MAIN + "fn f() { std::process::exit(1); }\n",
                      GOOD_OBSERVER_MAIN + "fn f() { let _ = std::env::args_os(); }\n"):
@@ -4114,7 +4138,7 @@ class ObserverSocketModuleTests(Tree):
         # HE-004-I01a (DESIGN-I01A section 4): the I01 listener file is the observer's second socket file.
         self.assertIn(gate.OBSERVER_LINUX_LISTEN, gate.SOCKET_FILES)
         self.assertEqual(gate.OBSERVER_LINUX_LISTEN, "crates/observer/src/linux_listen.rs")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
 
     def test_every_other_observer_source_refuses_the_socket_modules(self):
         for rel in ("crates/observer/src/client.rs", "crates/observer/src/observe.rs", gate.OBSERVER_MAIN,
@@ -4150,7 +4174,7 @@ class ObserverSocketModuleTests(Tree):
                               ("type Held = channel::Conn;", "private type alias")):
             self.refused(gate.check_socket_modules, rel, OBSERVER_LINUX_LISTEN_TEXT + text + "\n", message)
         self.write(rel, OBSERVER_LINUX_LISTEN_TEXT + "pub(crate) fn peer(s: &I01Socket) -> Option<channel::Watched<'_>> { None }\n")
-        self.assertEqual(gate.check_socket_modules(self.base), 18)
+        self.assertEqual(gate.check_socket_modules(self.base), 21)
         (self.base / rel).unlink()
         with self.assertRaisesRegex(gate.GateError, "crates/observer/src/linux_listen.rs is missing .socket-module check"):
             gate.check_socket_modules(self.base)
@@ -4736,7 +4760,7 @@ class ObserverSysWorkspaceTests(Tree):
 
     def test_the_closure_and_the_lists(self):
         self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 8)
-        self.assertEqual(gate.SCANNED_CRATES[-2:], ("crates/observer-sys", "crates/role-seal"))
+        self.assertEqual(gate.SCANNED_CRATES[-3:], ("crates/observer-sys", "crates/role-seal", "crates/broker"))
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_SYS_LIB], "#![deny(unsafe_code)]")
         self.assertIn("crates/observer-sys", gate.OBSERVER_POST_SEAL_CRATES)
 
@@ -4759,7 +4783,7 @@ class ObserverSysWorkspaceTests(Tree):
         tree = {**LINKED_TREE}
         for rel, text in tree.items():
             self.write(rel, text)
-        self.assertEqual(gate.check_linked_sources(self.base), 12)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
         for text in ("//! Kernel reads.\n#![allow(unsafe_code)]\n", "//! Kernel reads.\n"):
             self.refused(gate.check_linked_sources, gate.OBSERVER_SYS_LIB, text, "lacks #!\\[deny")
 
@@ -4774,9 +4798,9 @@ class ObserverSysUnsafeTests(Tree):
         self.assertEqual(gate.FOREIGN_ITEMS[KERNEL], {"syscall"})
         self.assertIn(KERNEL, gate.UNSAFE_FILES)
         self.assertIn(KERNEL, gate.FD_FILES)
-        self.assertEqual(gate.check_foreign_items(self.base), 19)
-        self.assertEqual(gate.check_unsafe(self.base), 21)
-        self.assertEqual(gate.check_linked_sources(self.base), 19)
+        self.assertEqual(gate.check_foreign_items(self.base), 22)
+        self.assertEqual(gate.check_unsafe(self.base), 23)
+        self.assertEqual(gate.check_linked_sources(self.base), 22)
 
     def test_unsafe_outside_kernel_rs_refuses(self):
         for rel in (gate.OBSERVER_SYS_LIB, OBSERVER_SYS_DIRENT, "crates/observer-sys/tests/dirent.rs", LINUX_CAPTURE):
@@ -4798,7 +4822,7 @@ class ObserverSysUnsafeTests(Tree):
         for rel in (CAPTURE_RS, LINUX_CAPTURE):
             self.refused(gate.check_linked_sources, rel, self.TREE[rel] + "use std::os::unix::fs::MetadataExt;\n", message)
         self.write(OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT + "use std::os::unix::fs::MetadataExt;\n")
-        self.assertEqual(gate.check_linked_sources(self.base), 19)
+        self.assertEqual(gate.check_linked_sources(self.base), 22)
         self.write(OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT)
         self.refused(gate.check_linked_sources, OBSERVER_SYS_DIRENT, OBSERVER_SYS_DIRENT_TEXT + "use std::os::fd::OwnedFd;\n",
                      "std::os::fd item outside")
@@ -4933,13 +4957,13 @@ class ObserverRootConstantTests(Tree):
                           'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";',
                           'const CGROUP_ROOT: &str = "/sys/fs/cgroup";', 'const CGROUP_ROOT: &str = "/sys/fs/cgroup";',
                           'const PIN_ROOT: &str = "/sys/fs/bpf/planeon";'])
-        self.assertEqual(gate.check_sources(self.base), 23)
-        self.assertEqual(gate.check_linked_sources(self.base), 21)
+        self.assertEqual(gate.check_sources(self.base), 25)
+        self.assertEqual(gate.check_linked_sources(self.base), 24)
         # A rustfmt-wrapped expression is removed once (both scans).
         self.write(self.ENROLLED, self.ENROLLED_TEXT.replace('const PIN_ROOT: &str = "/sys/fs/bpf/planeon";',
                                                              'const PIN_ROOT: &str =\n    "/sys/fs/bpf/planeon";'))
-        self.assertEqual(gate.check_sources(self.base), 23)
-        self.assertEqual(gate.check_linked_sources(self.base), 21)
+        self.assertEqual(gate.check_sources(self.base), 25)
+        self.assertEqual(gate.check_linked_sources(self.base), 24)
 
     def forms(self, rel, text, old):
         """Each refused form of `old` (one of `rel`'s expressions) in `text`."""
@@ -4982,7 +5006,7 @@ class ObserverRootConstantTests(Tree):
                          message)
         # R96's one cgroup2-root open in linux_os.rs still passes beside them.
         self.write(gate.LINUX_OS, 'fn f() { let _ = KernelRoot::open_kernel_root("/sys/fs/cgroup"); }\n')
-        self.assertEqual(gate.check_linked_sources(self.base), 22)
+        self.assertEqual(gate.check_linked_sources(self.base), 25)
 
 
 class ObserverCaptureCallerTests(Tree):
@@ -5123,8 +5147,9 @@ class ObserverNativeProfileTests(Tree):
         # HE-004D2 (G-D2-1, G-D2-3): edge records v6 and v7 make 46; the v5 schema's two items and its one use join.
         # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50; unit U7's
         # two I01 wire files (HE-004-I01A2, edge record v9) 52; HE-004-I01B1's four (edge record v10, none embedded) 56;
-        # HE-004-I01B4's seven (edge record v11, none embedded) 63.
-        self.assertEqual(len(gate.CONTRACTS), 63)
+        # HE-004-I01B4's seven (edge record v11, none embedded) 63; HE-005A's four seccomp-v3 programs (edge record v11,
+        # BROKER embedded by the broker's seal) 67.
+        self.assertEqual(len(gate.CONTRACTS), 67)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5672,6 +5697,9 @@ I01B_V11_CONTRACTS = ("contracts/i01-digests-v2/definitions.json", "contracts/i0
                       "contracts/i01-digests-v2/README.md", "contracts/admission-v4/README.md",
                       "contracts/admission-v4/vectors.json", "contracts/admission-v4/admission-manifests/planeon-a2.json",
                       "contracts/i01-v2/proxy-profile-v2-vectors.json")
+# HE-005A: edge record v11's four seccomp-v3 rows for HE-005 (artifacts 17, 18, 29 and 30).
+HE005A_V11_CONTRACTS = ("contracts/seccomp-v3/BROKER.aarch64.bpf", "contracts/seccomp-v3/BROKER.x86_64.bpf",
+                        "contracts/seccomp-v3/WORKER.aarch64.bpf", "contracts/seccomp-v3/WORKER.x86_64.bpf")
 
 
 class D2ContractCountTests(unittest.TestCase):
@@ -5699,14 +5727,16 @@ class D2ContractCountTests(unittest.TestCase):
         # HE-004-I01a unit U1 (DESIGN-I01A section 3): edge record v8's two seccomp-v5 programs make 48; unit U6
         # (section 10): its two I06 v4 files make 50; unit U7 (HE-004-I01A2, sections 3 and 7): edge record v9's two
         # I01 wire files make 52; HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four make 56;
-        # HE-004-I01B4 (DESIGN-I01B4 rev 2 section 1.2, G-I01B-2): edge record v11's seven make 63.
-        self.assertEqual(len(gate.CONTRACTS), 63)
+        # HE-004-I01B4 (DESIGN-I01B4 rev 2 section 1.2, G-I01B-2): edge record v11's seven make 63; HE-005A (DESIGN-HE005
+        # revision 5 section 2): its four seccomp-v3 BROKER and WORKER rows make 67.
+        self.assertEqual(len(gate.CONTRACTS), 67)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS
-                            + I01B_V11_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 63)
+                            + I01B_V11_CONTRACTS + HE005A_V11_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 67)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
-        for rel in D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS + I01B_V11_CONTRACTS:
+        for rel in (D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS + I01B_V11_CONTRACTS
+                    + HE005A_V11_CONTRACTS):
             path = self.base / rel
             data = path.read_bytes()
             path.unlink()
@@ -5725,14 +5755,16 @@ class D2ContractCountTests(unittest.TestCase):
                     "contracts/i01-digests-v1/policy_observation_digests.py",
                     # HE-004-I01B4: the contract v2's model, which no record registers (edge record v11's notes), in
                     # the same place beside the contract v2's own files.
-                    "contracts/i01-digests-v2/policy_observation_digests_v2.py"):
+                    "contracts/i01-digests-v2/policy_observation_digests_v2.py",
+                    # HE-005A: a third role's program, which no record registers, beside the four.
+                    "contracts/seccomp-v3/WRITER.x86_64.bpf"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 63)
+        self.assertEqual(gate.check_contracts(self.base), 67)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -6931,7 +6963,8 @@ class I01bContractFileTests(Tree):
             gate.check_i01b_contracts(self.base)
 
     def test_the_tree_and_the_real_files_pass(self):
-        self.assertEqual(len(gate.CONTRACTS), 63)
+        # HE-005A: edge record v11's four seccomp-v3 rows join the 63 (outside the I01b rows this rule reads).
+        self.assertEqual(len(gate.CONTRACTS), 67)
         self.assertEqual(tuple(gate.I01B_EDGE_V10_ROWS), I01B_V10_CONTRACTS)
         self.assertEqual([row[0] for row in gate.I01B_EDGE_V10_ROWS.values()], [69, 70, 71, 72])
         self.assertEqual([row[1] for row in gate.I01B_EDGE_V10_ROWS.values()],
@@ -8889,7 +8922,11 @@ class I01b5TextTests(I01b3AnswerTreeTests):
 I01B5_TREE = {**{path.relative_to(gate.HE).as_posix(): path.read_text(encoding="utf-8")
                  for path in sorted((gate.HE / gate.OBSERVER_CRATE / "src").rglob("*.rs"))},
               **{rel: (gate.HE / rel).read_text(encoding="utf-8")
-                 for rel in (gate.EFFECT_GATE_LIB, gate.LINUX_OS, "crates/effect-gate/src/linux_net.rs")}}
+                 for rel in (gate.EFFECT_GATE_LIB, gate.LINUX_OS, "crates/effect-gate/src/linux_net.rs")},
+              # HE-005A: the broker's real sources, its linux_listen.rs the fifth socket file the socket-module rule
+              # requires.
+              **{path.relative_to(gate.HE).as_posix(): path.read_text(encoding="utf-8")
+                 for path in sorted((gate.HE / gate.BROKER_CRATE / "src").rglob("*.rs"))}}
 _OBS, _CLI, _SRV = gate.OBSERVER_OBSERVE, gate.OBSERVER_CLIENT, gate.OBSERVER_SERVICE
 _NET, _LST, _EGN = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN, "crates/effect-gate/src/linux_net.rs"
 I01B5_SELF_CHECK_TEXT = re.search(r"        let observation = match ::std::str.*?\n        \};\n", I01B5_TREE[_SRV], re.S).group(0)
@@ -9479,7 +9516,9 @@ class RoleSealRuleTests(Tree):
 
     def test_the_real_copy_passes(self):
         self.assertEqual(gate.check_role_seal(self.base), 18)
-        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1])
+        # HE-005A: (e) reads lib.rs (this tree holds no broker source), (f) finds no type item and (g) one fn whose return
+        # type names u8, LinuxOps's own_status, with no byte literal.
+        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1, 1, 0, 1])
         self.assertEqual(len(gate.ROLE_SEAL_PUBLIC), 18)
         self.assertEqual(self.TREE[gate.ROLE_SEAL_LIB].count(self.TESTS), 1)
         # The seven fixture items sit inside the strict test block, where clause (c) does not read.
@@ -9556,6 +9595,660 @@ class RoleSealRuleTests(Tree):
         for text in rows:
             self.refused(gate.check_role_seal, ROLE_SEAL_MANIFEST, text,
                          re.escape("Cargo.toml's dependencies are not exactly gate-sys by path (role-seal rule (d))"))
+
+
+# --- HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; MON-HE005A-PLAN2, MON-HE005A0-U4, MON-HE005A0-PUSH,
+# MON-HE005A-LAUNCH) ---------------------------------------------------------------------------------------------------
+# The real sources the HE-005A rules read: role-seal's lib.rs and manifest, the observer's and the broker's sources, the
+# broker's manifest, and effect-gate's lib.rs and two socket files (the socket-module rule requires every socket file).
+# Each blocking obligation's rows are (label, the named sub-clause, changes); a change is (file, anchor, replacement),
+# an empty anchor appending. The build's mutation proof reads HE005A_PROOF_RULES, records each row's actual refusing
+# set and runs the single-clause or each-alone proof.
+HE005A_TREE = {**{path.relative_to(gate.HE).as_posix(): path.read_text(encoding="utf-8")
+                  for crate in (gate.OBSERVER_CRATE, gate.BROKER_CRATE)
+                  for path in sorted((gate.HE / crate / "src").rglob("*.rs"))},
+               **{rel: (gate.HE / rel).read_text(encoding="utf-8")
+                  for rel in (gate.ROLE_SEAL_LIB, ROLE_SEAL_MANIFEST, "crates/broker/Cargo.toml", gate.EFFECT_GATE_LIB,
+                              gate.LINUX_OS, "crates/effect-gate/src/linux_net.rs")}}
+_RSL, _BSEAL, _BSTATUS = gate.ROLE_SEAL_LIB, gate.BROKER_SEAL_RS, gate.BROKER_STATUS
+_BLIB, _BMAIN, _BLISTEN = gate.BROKER_LIB, gate.BROKER_MAIN, gate.BROKER_LINUX_LISTEN
+_OSEAL, _OCLIENT, _OSTATUS = gate.OBSERVER_SEAL_RS, gate.OBSERVER_CLIENT, gate.OBSERVER_STATUS
+_RS_TESTS = "#[cfg(test)]\nmod tests {"
+_STAGE1_DEF = "#[derive(Debug)]\n#[must_use]\npub struct Stage1 {\n    plan: Plan,\n}"
+_SEALED_DEF = "#[derive(Debug)]\n#[must_use]\npub struct Sealed {\n    _sealed: (),\n}"
+_STAGE1_SIGNATURE = "pub fn seal_stage1(spec: RoleSpec) -> Result<Stage1, SealError> {"
+_STAGE2_SIGNATURE = "pub fn seal_stage2(stage1: Stage1) -> Result<Sealed, SealError> {"
+_STAGE1_BODY = "    run_stage1(&mut LinuxOps, spec).map(|plan| Stage1 { plan })"
+_BROKER_STAGE1 = "    role_seal::seal_stage1(spec(RUNNING_ARCH)).map_err(SealError::Seal)"
+_BROKER_STAGE2 = "    role_seal::seal_stage2(stage1).map_err(SealError::Seal)"
+_BROKER_X86 = 'include_bytes!("../../../contracts/seccomp-v3/BROKER.x86_64.bpf")'
+_BROKER_ARM = 'include_bytes!("../../../contracts/seccomp-v3/BROKER.aarch64.bpf")'
+
+
+def he005a_tree(changes=()):
+    """HE005A_TREE with each (file, anchor, replacement) applied once, in order; an empty anchor appends."""
+    texts = dict(HE005A_TREE)
+    for rel, old, new in changes:
+        if not old:
+            texts[rel] = texts[rel] + new
+            continue
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+def role_seal_planted(text):
+    """A change planting `text` at role-seal's top level, right before its strict test block."""
+    return (_RSL, _RS_TESTS, text + "\n\n" + _RS_TESTS)
+
+
+# Clause (e) of check_role_seal (MON-HE005A0-U4): formatting a token, or unwrapping an error carrying one.
+HE005A_E_ROWS = (
+    ("e1 format! of a Stage1", "(e)", (role_seal_planted('fn show(stage1: &Stage1) -> String {\n    format!("{stage1:?}")\n}'),)),
+    ("e2 write! of a Sealed", "(e)",
+     (role_seal_planted('fn show(sealed: &Sealed, out: &mut String) {\n    let _ = write!(out, "{:?}", sealed);\n}'),)),
+    ("e3 writeln! of a Sealed", "(e)",
+     (role_seal_planted('fn show(sealed: &Sealed, out: &mut String) {\n    let _ = writeln!(out, "{sealed:?}");\n}'),)),
+    ("e4 format_args! with {:#?}", "(e)",
+     (role_seal_planted('fn show(stage1: &Stage1) -> usize {\n    format_args!("{:#?}", stage1).as_str().map_or(0, str::len)\n}'),)),
+    ("e5 a Display impl calling Debug::fmt", "(e)",
+     (role_seal_planted("struct Shown<'a>(&'a Stage1);\nimpl core::fmt::Display for Shown<'_> {\n"
+                        "    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {\n"
+                        "        core::fmt::Debug::fmt(self.0, f)\n    }\n}"),)),
+    ("e6 unwrap_err on a result carrying a Stage1 (A0's gap)", "(e)",
+     (role_seal_planted("fn token(result: Result<u8, Stage1>) -> Stage1 {\n    result.unwrap_err()\n}"),)),
+    ("e7 expect_err on a result carrying a Sealed (A0's gap)", "(e)",
+     (role_seal_planted('fn token(result: Result<u8, Sealed>) -> Sealed {\n    result.expect_err("a token")\n}'),)),
+    ("e8 a Debug specifier in a literal", "(e)", (role_seal_planted('const SHOWN: &str = "{:?}";'),)),
+    ("e9 an alternate hex Debug specifier", "(e)", (role_seal_planted('const SHOWN: &str = "{stage1:#x?}";'),)),
+    ("e10 format! in the broker's seal.rs", "(e)",
+     ((_BSEAL, "", '\nfn show(stage1: &Stage1) -> String {\n    format!("{stage1:?}")\n}\n'),)),
+    ("e11 unwrap_err in the broker's lib.rs", "(e)",
+     ((_BLIB, "", "\nfn token(result: Result<u8, Stage1>) -> Stage1 {\n    result.unwrap_err()\n}\n"),)),
+    ("e12 a Debug specifier in the broker's status.rs", "(e)", ((_BSTATUS, "", '\nconst SHOWN: &str = "{:?}";\n'),)),
+)
+# Clause (f) (R1-2): bytes behind a type alias or a renamed u8.
+HE005A_F_ROWS = (
+    ("f1 bytes behind a type alias (probe E-1)", "(f)", (role_seal_planted("type Bytes = [u8; 8];\nstatic S: Bytes = [0; 8];"),)),
+    ("f2 a slice alias", "(f)", (role_seal_planted("type Program = &'static [u8];"),)),
+    ("f3 u8 aliased by its primitive path", "(f)",
+     (role_seal_planted("type Byte = core::primitive::u8;\nstatic S: [Byte; 8] = [0; 8];"),)),
+    ("f4 u8 renamed in a use", "(f)", (role_seal_planted("use core::primitive::u8 as Byte;\nstatic S: [Byte; 8] = [0; 8];"),)),
+    ("f5 u8 renamed in a grouped use", "(f)", (role_seal_planted("use std::primitive::{u16, u8 as B};\nconst P: &[B] = &[6, 0];"),)),
+    ("f6 an associated type naming u8", "(f)",
+     (role_seal_planted("trait Source {\n    type Unit;\n}\nimpl Source for Plan {\n    type Unit = u8;\n}"),)),
+)
+# Clause (g) (R1-3): a fn returning a byte-array literal.
+HE005A_G_ROWS = (
+    ("g1 a byte-array literal (probe E-2)", "(g)",
+     (role_seal_planted("fn program() -> &'static [u8] {\n    &[0x20, 0, 0, 0, 4, 0, 0, 0]\n}"),)),
+    ("g2 an owned byte array", "(g)", (role_seal_planted("fn program() -> [u8; 8] {\n    [6, 0, 0, 0, 0, 0, 0xFF, 0x7F]\n}"),)),
+    ("g3 a byte string", "(g)",
+     (role_seal_planted('fn program() -> Vec<u8> {\n    b"\\x06\\0\\0\\0\\0\\0\\xff\\x7f".to_vec()\n}'),)),
+    ("g4 an optional slice", "(g)",
+     (role_seal_planted("fn program() -> Option<&'static [u8]> {\n    Some(&[6, 0, 0, 0, 0, 0, 0xFF, 0x7F])\n}"),)),
+    ("g5 a generic fn with a where-clause", "(g)",
+     (role_seal_planted("fn program<T>() -> &'static [u8]\nwhere\n    T: Copy,\n{\n    &[6, 0, 0, 0]\n}"),)),
+    ("g6 a method", "(g)", (role_seal_planted("impl Plan {\n    fn bytes(&self) -> &'static [u8] {\n        &[6, 0, 0, 0]\n    }\n}"),)),
+)
+# R1-1: the tokens closed (check_seal_tokens).
+HE005A_TOKEN_ROWS = (
+    ("t1 a unit-struct Sealed", "(i)", ((_RSL, _SEALED_DEF, "#[derive(Debug)]\n#[must_use]\npub struct Sealed;"),)),
+    ("t2 a Default derive", "(i)", ((_RSL, _STAGE1_DEF, _STAGE1_DEF.replace("derive(Debug)", "derive(Debug, Default)")),)),
+    ("t3 a Clone derive on Sealed", "(i)", ((_RSL, _SEALED_DEF, _SEALED_DEF.replace("derive(Debug)", "derive(Clone, Debug)")),)),
+    ("t4 a cfg_attr derive", "(i)", ((_RSL, _SEALED_DEF, "#[cfg_attr(test, derive(Default))]\n" + _SEALED_DEF),)),
+    ("t5 a visible field", "(i)", ((_RSL, _STAGE1_DEF, _STAGE1_DEF.replace("    plan: Plan,", "    pub(crate) plan: Plan,")),)),
+    ("t6 a tuple Sealed", "(i)", ((_RSL, _SEALED_DEF, "#[derive(Debug)]\n#[must_use]\npub struct Sealed(());"),)),
+    ("t7 a second Stage1 literal", "(ii)",
+     (role_seal_planted("fn forge(plan: Plan) -> Option<Stage1> {\n    Some(Stage1 { plan })\n}"),)),
+    ("t8 a Self literal", "(ii)",
+     (role_seal_planted("impl Plan {\n    fn again(&self) -> Self {\n        Self { spec: self.spec, length: self.length }\n    }\n}"),)),
+    ("t9 the Stage1 literal outside its stage", "(ii)",
+     ((_RSL, _STAGE1_BODY, "    run_stage1(&mut LinuxOps, spec).map(wrap)"),
+      role_seal_planted("fn wrap(plan: Plan) -> Stage1 {\n    Stage1 { plan }\n}"))),
+    ("t10 a Sealed literal in the observer", "(ii)",
+     ((_OSEAL, "", "\nfn forge() -> role_seal::Sealed {\n    role_seal::Sealed { _sealed: () }\n}\n"),)),
+    ("t11 a Stage1 literal in the broker", "(ii)", ((_BSEAL, "", "\nfn forge(plan: u8) -> Stage1 {\n    Stage1 { plan }\n}\n"),)),
+    ("t12 stage 1 generic over SealOps", "(iii)",
+     ((_RSL, _STAGE1_SIGNATURE + "\n" + _STAGE1_BODY,
+       "pub fn seal_stage1<O: SealOps>(ops: &mut O, spec: RoleSpec) -> Result<Stage1, SealError> {\n"
+       "    run_stage1(ops, spec).map(|plan| Stage1 { plan })"),)),
+    ("t13 stage 2 taking a reference", "(iii)",
+     ((_RSL, _STAGE2_SIGNATURE, "pub fn seal_stage2(stage1: &Stage1) -> Result<Sealed, SealError> {"),)),
+    ("t14 a second call of stage 1 inside role-seal", "(iii)",
+     (role_seal_planted("fn again(spec: RoleSpec) -> bool {\n    seal_stage1(spec).is_ok()\n}"),)),
+    ("t15 a Default impl for Sealed", "(iv)",
+     (role_seal_planted("impl Default for Sealed {\n    fn default() -> Sealed {\n        loop {}\n    }\n}"),)),
+    ("t16 From for Stage1", "(iv)",
+     (role_seal_planted("impl From<Plan> for Stage1 {\n    fn from(_plan: Plan) -> Stage1 {\n        loop {}\n    }\n}"),)),
+    ("t17 an inherent impl of Stage1", "(iv)",
+     (role_seal_planted("impl Stage1 {\n    fn length(&self) -> u16 {\n        self.plan.length\n    }\n}"),)),
+    ("t18 Clone for Sealed in the observer", "(iv)",
+     ((_OSEAL, "", "\nimpl Clone for role_seal::Sealed {\n    fn clone(&self) -> role_seal::Sealed {\n        loop {}\n    }\n}\n"),)),
+    ("t19 a trait impl in the broker", "(iv)", ((_BLIB, "", "\npub trait Token {}\nimpl Token for Sealed {}\n"),)),
+    ("t20 an alias of Sealed in role-seal", "(v)", (role_seal_planted("type Token = Sealed;"),)),
+    ("t21 a rename of Stage1 in role-seal", "(v)", (role_seal_planted("use crate::Stage1 as First;"),)),
+    ("t22 a rename in the broker", "(v)", ((_BSEAL, "", "\npub use role_seal::Stage1 as First;\n"),)),
+    ("t23 an alias in the observer", "(v)", ((_OSEAL, "", "\ntype Done = role_seal::Sealed;\n"),)),
+)
+# R1-5: the calls of role-seal's stages (check_role_seal_stage_calls).
+HE005A_STAGE_ROWS = (
+    ("s1 a stage imported in an observer module", "(a)", ((_OCLIENT, "", "\nuse role_seal::seal_stage1;\n"),)),
+    ("s2 role_seal renamed", "(a)", ((_OCLIENT, "", "\nuse role_seal as rs;\n"),)),
+    ("s3 role_seal renamed through self", "(a)", ((_OCLIENT, "", "\nuse role_seal::{self as rs};\n"),)),
+    ("s4 a glob of role_seal", "(a)", ((_BLIB, "", "\nuse role_seal::*;\n"),)),
+    ("s5 a stage renamed and re-exported", "(a)", ((_BLIB, "", "\npub use role_seal::{seal_stage2 as raw_stage2};\n"),)),
+    ("s6 a stage imported in the role's own seal.rs", "(a)", ((_BSEAL, "", "\nuse role_seal::seal_stage1 as stage_one;\n"),)),
+    ("s7 an alias chain to a stage", "(a)", ((_OCLIENT, "", "\nuse role_seal as rs;\nuse rs::seal_stage2;\n"),)),
+    ("s8 a stage called from an observer module", "(b)",
+     ((_OCLIENT, "", "\nfn again() -> bool {\n    role_seal::seal_stage1(spec()).is_ok()\n}\n"),)),
+    ("s9 a stage as a fn item in the broker's status.rs", "(b)",
+     ((_BSTATUS, "", "\nfn stage() {\n    let _ = ::role_seal::seal_stage2;\n}\n"),)),
+    ("s10 a spaced stage path in the broker's main.rs", "(b)",
+     ((_BMAIN, "", "\nfn again() {\n    let _ = role_seal :: seal_stage1;\n}\n"),)),
+    ("s11 a second call in the broker's seal.rs", "(c)",
+     ((_BSEAL, "", "\nfn again() -> bool {\n    role_seal::seal_stage1(spec(Arch::X86_64)).is_ok()\n}\n"),)),
+    ("s12 the call moved out of the wrapper", "(c)",
+     ((_BSEAL, _BROKER_STAGE1, "    raw(spec(RUNNING_ARCH)).map_err(SealError::Seal)"),
+      (_BSEAL, "", "\nfn raw(spec: role_seal::RoleSpec) -> Result<Stage1, role_seal::SealError> {\n"
+                   "    role_seal::seal_stage1(spec)\n}\n"))),
+    ("s13 a stage as a fn item in the observer's seal.rs", "(c)",
+     ((_OSEAL, "    role_seal::seal_stage2(stage1)", "    (role_seal::seal_stage2)(stage1)"),)),
+    ("s14 the broker's wrapper without its stage", "(c)",
+     ((_BSEAL, _BROKER_STAGE2, "    Err(SealError::Start(StartCheck::Status))"),)),
+    # HE-005A PR review round 1, R1-1 (MON-HE005A-R1): the reviewer's four probe forms, each through a seal.rs that
+    # re-exports the role_seal crate, and the re-export forms alone.
+    ("s15 a crate-relative call in the broker's lib.rs (probe p1)", "(b)",
+     ((_BSEAL, "", "\npub(crate) use role_seal;\n"),
+      (_BLIB, "", "\nfn forged() -> bool {\n    crate::seal::role_seal::seal_stage1(seal::spec(seal::Arch::X86_64)).is_ok()\n}\n"))),
+    ("s16 super::seal::role_seal:: in the broker's status.rs (probe p1b)", "(b)",
+     ((_BSEAL, "", "\npub use role_seal;\n"),
+      (_BSTATUS, "", "\nfn forged() {\n    let _ = super::seal::role_seal::seal_stage2;\n}\n"))),
+    ("s17 an alias of the re-export, then rs::seal_stage1 (probe p1c)", "(a)",
+     ((_BSEAL, "", "\npub(crate) use role_seal::{self};\n"),
+      (_BLIB, "", "\nuse crate::seal::role_seal as rs;\nfn forged() -> bool {\n"
+                  "    rs::seal_stage1(seal::spec(seal::Arch::X86_64)).is_ok()\n}\n"))),
+    ("s18 the observer's client.rs through its seal.rs (probe p2)", "(b)",
+     ((_OSEAL, "", "\npub(crate) use role_seal;\n"),
+      (_OCLIENT, "", "\nfn forged(spec: role_seal::RoleSpec) -> bool {\n    crate::seal::role_seal::seal_stage1(spec).is_ok()\n}\n"))),
+    ("s19 pub(crate) use role_seal; in the broker's seal.rs", "(a)", ((_BSEAL, "", "\npub(crate) use role_seal;\n"),)),
+    ("s20 pub use role_seal; in the observer's seal.rs", "(a)", ((_OSEAL, "", "\npub use role_seal;\n"),)),
+    ("s21 pub(crate) use role_seal::{self}; in the broker's seal.rs", "(a)",
+     ((_BSEAL, "", "\npub(crate) use role_seal::{self};\n"),)),
+    ("s22 a private, rooted and renamed re-export in the observer's seal.rs", "(a)",
+     ((_OSEAL, "", "\nuse ::role_seal as seal_crate;\n"),)),
+    ("s23 an item imported through another path in the broker's lib.rs", "(a)",
+     ((_BLIB, "", "\nuse crate::seal::role_seal::RoleSpec;\n"),)),
+    ("s24 a second stage path after a segment in the observer's seal.rs", "(c)",
+     ((_OSEAL, "", "\nfn again() {\n    let _ = self::role_seal::seal_stage2;\n}\n"),)),
+)
+# R1-2's broker form (check_broker_bytes): bytes outside seal.rs.
+HE005A_BYTES_ROWS = (
+    ("b1 a status table as a byte array", ((_BSTATUS, "", "\npub const STAGES: [u8; 2] = [NOT_LINUX, NOT_YET_SERVING];\n"),)),
+    ("b2 program bytes in lib.rs", ((_BLIB, "", "\npub static PROGRAM: &[u8] = &[6, 0, 0, 0, 0, 0, 0xFF, 0x7F];\n"),)),
+    ("b3 bytes behind a type alias", ((_BLISTEN, "", "\ntype Frame = [u8; 16];\nstatic EMPTY: Frame = [0; 16];\n"),)),
+    ("b4 u8 renamed", ((_BLIB, "", "\nuse core::primitive::u8 as Byte;\nstatic PROGRAM: [Byte; 8] = [0; 8];\n"),)),
+    ("b5 a byte string in main.rs", ((_BMAIN, "", '\nstatic FRAME: &[u8; 4] = b"\\x06\\0\\0\\0";\n'),)),
+)
+# HE-005A U5 (MON-HE005A-U5, MON-HE005A-U5-1): the broker rules' rows, shared by BrokerRuleTests and the mutation proof
+# (HE005A_PROOF_RULES), each check its own one clause. A row is (label, clause, changes) or, where the self-test matches
+# a row's own message, (label, clause, changes, message); the proof reads the first three.
+_BSTAGE2 = "    let sealed = match seal_stage2(stage1) {"
+_BTAIL = "    ExitCode::from(serve(&sealed))\n}"
+_BSERVE_USE = "    use planeon_broker::serve_unanswered;\n"
+_FILTER_ARM = "        SealStep::Filter => 66,"
+_TWO_ARMS = "        SealStep::UserIds => 41,\n        SealStep::GroupIds => 42,"
+# The broker's seal-order site (check_seal_order with BROKER_SEAL_SITE; Q-HE5A-1 (a)).
+HE005A_SITE_ROWS = (
+    ("m1 a statement between the stages", "(site)", ((_BMAIN, _BSTAGE2, "    let _x = 1;\n" + _BSTAGE2),),
+     "runs something between the seal's stages|seal-order grammar"),
+    ("m2 a call between the stages", "(site)", ((_BMAIN, _BSTAGE2, "    let _ = early();\n" + _BSTAGE2),),
+     "seal-order grammar"),
+    ("m3 another tail", "(site)", ((_BMAIN, _BTAIL, "    ExitCode::from(status::LISTENER)\n}"),), "seal-order grammar"),
+    ("m4 a pinned import dropped", "(site)", ((_BMAIN, _BSERVE_USE, ""),), "pinned set"),
+    ("m5 an import added", "(site)", ((_BMAIN, _BSERVE_USE, _BSERVE_USE + "    use planeon_broker::seal;\n"),),
+     "pinned set"),
+    ("m6 another fn", "(site)", ((_BMAIN, "", "\nfn other() {}\n"),), "functions other than"),
+    ("m7 a const item", "(site)", ((_BMAIN, "", "\nconst C: u8 = 0;\n"),), "defines a const item"),
+    ("m8 code in the stage-2 arm", "(site)", ((_BMAIN, "Ok(sealed) => sealed,", "Ok(sealed) => { early(); sealed }"),),
+     "second stage is not exactly"),
+)
+# The broker's include rule (check_broker_includes): its change rows; the missing seal.rs stays BrokerRuleTests' own.
+HE005A_INCLUDE_ROWS = (
+    ("i1 a WORKER program embedded", "(includes)",
+     ((_BSEAL, "", '\npub static W: &[u8; 1496] = include_bytes!("../../../contracts/seccomp-v3/WORKER.x86_64.bpf");\n'),)),
+    ("i2 the OBSERVER program in BROKER's place", "(includes)",
+     ((_BSEAL, _BROKER_X86, 'include_bytes!("../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf")'),)),
+    ("i3 a concat! path", "(includes)",
+     ((_BSEAL, _BROKER_ARM, 'include_bytes!(concat!("../../../contracts/seccomp-v3/", "BROKER.aarch64.bpf"))'),)),
+    ("i4 include_str! of a program", "(includes)",
+     ((_BSEAL, _BROKER_ARM, _BROKER_ARM.replace("include_bytes", "include_str")),)),
+    ("i5 a program embedded in lib.rs", "(includes)",
+     ((_BLIB, "", '\npub static P: &[u8] = include_bytes!("../../../contracts/seccomp-v3/BROKER.x86_64.bpf");\n'),)),
+    ("i6 include_str! in status.rs", "(includes)",
+     ((_BSTATUS, "", '\nconst P: &str = include_str!("../../../contracts/seccomp-v3/WORKER.aarch64.bpf");\n'),)),
+)
+# The status-table text rule (check_broker_status_table; Q-HE5A-2 (a)).
+HE005A_TABLE_ROWS = (
+    ("q1 the broker's Filter status moved", "(table)", ((_BSTATUS, _FILTER_ARM, "        SealStep::Filter => 67,"),)),
+    ("q2 the observer's Filter status moved", "(table)", ((_OSTATUS, _FILTER_ARM, "        SealStep::Filter => 67,"),)),
+    ("q3 NOT_YET_SERVING moved", "(table)",
+     ((_BSTATUS, "pub const NOT_YET_SERVING: u8 = 10;", "pub const NOT_YET_SERVING: u8 = 11;"),)),
+    ("q4 NOT_LINUX moved", "(table)", ((_BSTATUS, "pub const NOT_LINUX: u8 = 2;", "pub const NOT_LINUX: u8 = 3;"),)),
+    ("q5 two arms swapped", "(table)",
+     ((_BSTATUS, _TWO_ARMS, "        SealStep::GroupIds => 42,\n        SealStep::UserIds => 41,"),)),
+    ("q6 the parameter renamed", "(table)",
+     ((_BSTATUS, "pub fn seal_step(step: SealStep) -> u8 {", "pub fn seal_step(stage: SealStep) -> u8 {"),)),
+)
+# The channel home: the socket-module rule (check_socket_modules) and its alias rule (check_socket_module_aliases).
+HE005A_MODULE_ROWS = (
+    ("c1 a channel import in status.rs", "(modules)", ((_BSTATUS, "", "\nuse gate_sys::channel::Poller;\n"),),
+     "socket-module check"),
+    ("c2 a channel path in seal.rs", "(modules)", ((_BSEAL, "", "\nfn f() { let _ = gate_sys::channel::accept; }\n"),),
+     "socket-module check"),
+    ("c3 a re-export from linux_listen.rs", "(modules)", ((_BLISTEN, "", "\npub use gate_sys::channel::Conn;\n"),),
+     "re-exports"),
+    ("c4 a pub fn handing out the listener", "(modules)",
+     ((_BLISTEN, "", "\npub fn raw(i: &LinuxI02) -> &channel::Listener { x() }\n"),),
+     "pub item naming gate-sys's socket items"),
+    ("c5 a thread in linux_listen.rs", "(modules)", ((_BLISTEN, "", "\nfn f() { std::thread::spawn(g); }\n"),),
+     "names std::thread"),
+)
+HE005A_ALIAS_ROWS = (
+    ("c6 lib.rs re-exporting through linux_listen", "(aliases)", ((_BLIB, "", "\npub use linux_listen::LinuxI02;\n"),),
+     "re-exports a path through a socket module"),
+    ("c7 main.rs importing linux_listen", "(aliases)", ((_BMAIN, "", "\nuse planeon_broker::linux_listen;\n"),),
+     "imports the socket module linux_listen itself"),
+    ("c8 a rename of the library root", "(aliases)", ((_BMAIN, "", "\nuse planeon_broker as b;\n"),),
+     "imports or renames a scope root"),
+)
+# HE-005A PR review round 1, R1-4 (folded under MON-HE005A-R1): the broker's never-unlink rule (check_broker_never_unlinks,
+# G-I01-1's I01_REMOVALS form), one clause: the reviewer's probe p4 and the rule's other removal words.
+HE005A_UNLINK_ROWS = (
+    ("u1 an unlink call in linux_listen.rs (probe p4)", "(unlink)",
+     ((_BLISTEN, "", "\nfn clear() {\n    unlink(I02_PATH);\n}\n"),)),
+    ("u2 remove_file of the I02 path", "(unlink)",
+     ((_BLISTEN, "", "\nfn clear() {\n    let _ = std::fs::remove_file(I02_PATH);\n}\n"),)),
+    ("u3 remove_dir in lib.rs", "(unlink)", ((_BLIB, "", "\nfn clear(dir: &str) {\n    let _ = std::fs::remove_dir(dir);\n}\n"),)),
+    ("u4 remove_dir_all in main.rs", "(unlink)",
+     ((_BMAIN, "", "\nfn clear(dir: &str) {\n    let _ = std::fs::remove_dir_all(dir);\n}\n"),)),
+    ("u5 rename in seal.rs", "(unlink)",
+     ((_BSEAL, "", "\nfn moved(from: &str, to: &str) {\n    let _ = std::fs::rename(from, to);\n}\n"),)),
+    ("u6 hard_link in status.rs", "(unlink)",
+     ((_BSTATUS, "", "\nfn linked(from: &str, to: &str) {\n    let _ = std::fs::hard_link(from, to);\n}\n"),)),
+)
+# HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1): the broker's serve (check_broker_serve, G5's form), its
+# clauses (a) the calls named once each, in order, and (b) the exact body: the reviewer's probe p5, and forms that skip,
+# repeat or wrap the listener seam.
+_BSERVE_CALL = "    status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)))"
+HE005A_SERVE_ROWS = (
+    ("w1 no listener, NOT_YET_SERVING after the seal (probe p5)", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = sealed;\n    status::NOT_YET_SERVING"),)),
+    ("w2 the listener built but never served", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = LinuxI02::new(sealed);\n    status::LISTENER"),)),
+    ("w3 the seam run twice", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = serve_unanswered(&mut LinuxI02::new(sealed));\n" + _BSERVE_CALL),)),
+    ("w4 the call wrapped in a loop", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    loop {\n        status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)));\n    }"),)),
+    ("w5 the status discarded and another returned", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)));\n"
+                             "    status::NOT_YET_SERVING"),)),
+    ("w6 the call inside a branch", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    if ready() {\n        status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)))\n"
+                             "    } else {\n        status::NOT_LINUX\n    }"),)),
+)
+ROLE_SEAL_TAGS = {"(e)": "(role-seal rule (e), clause (e))", "(f)": "(role-seal rule (f), R1-2)",
+                  "(g)": "(role-seal rule (g), R1-3)"}
+SEAL_TOKEN_FUNCTIONS = {"(i)": "tokens_i_definition", "(ii)": "tokens_ii_construction",
+                        "(iii)": "tokens_iii_signatures", "(iv)": "tokens_iv_impls", "(v)": "tokens_v_names"}
+STAGE_CALL_FUNCTIONS = {"(a)": "stage_calls_a_uses", "(b)": "stage_calls_b_elsewhere", "(c)": "stage_calls_c_sites"}
+SERVE_FUNCTIONS = {"(a)": "serve_a_calls_once", "(b)": "serve_b_body_exact"}
+
+
+def role_seal_patches(enabled=None, disabled=()):
+    """check_role_seal's clauses are function objects in ROLE_SEAL_CLAUSES, so one patch of the table: with `enabled`
+    every other clause a no-op, and every clause of `disabled` a no-op."""
+    clauses = tuple((name, clause if (enabled is None or "(%s)" % name == enabled) and "(%s)" % name not in disabled
+                     else (lambda base: 0)) for name, clause in gate.ROLE_SEAL_CLAUSES)
+    return [mock.patch.object(gate, "ROLE_SEAL_CLAUSES", clauses)]
+
+
+def named_patches(functions):
+    """For a check that calls its clause functions by name: patches making every clause but `enabled`, and every clause
+    of `disabled`, a no-op."""
+    def patches(enabled=None, disabled=()):
+        return [mock.patch.object(gate, name, lambda *args, **kwargs: 0) for clause, name in functions.items()
+                if (enabled is not None and clause != enabled) or clause in disabled]
+    return patches
+
+
+# (rule, check, its clauses, rows, the named clause's message, any clause's message, the patches).
+HE005A_PROOF_RULES = (
+    ("clause (e), R1-2, R1-3", gate.check_role_seal, tuple("(%s)" % name for name, _ in gate.ROLE_SEAL_CLAUSES),
+     HE005A_E_ROWS + HE005A_F_ROWS + HE005A_G_ROWS, lambda clause: ROLE_SEAL_TAGS[clause], r"\(role-seal rule \([a-g]\)",
+     role_seal_patches),
+    ("R1-1", gate.check_seal_tokens, tuple(SEAL_TOKEN_FUNCTIONS), HE005A_TOKEN_ROWS,
+     lambda clause: "(seal tokens closed, R1-1 %s)" % clause, r"\(seal tokens closed, R1-1 \(", named_patches(SEAL_TOKEN_FUNCTIONS)),
+    ("R1-5", gate.check_role_seal_stage_calls, tuple(STAGE_CALL_FUNCTIONS), HE005A_STAGE_ROWS,
+     lambda clause: "(role-seal stage calls, R1-5 %s)" % clause, r"\(role-seal stage calls, R1-5 \(",
+     named_patches(STAGE_CALL_FUNCTIONS)),
+    # HE-005A U5 (MON-HE005A-U5, MON-HE005A-U5-1): R1-2's broker form and the broker rules. None of these checks has
+    # clause functions of its own (check_seal_order's check_main_shape and check_socket_modules' check_socket_items are
+    # helpers called between inline clauses), so each is its own one clause: a by-name wrapper, switched off by a name
+    # patch.
+    ("R1-2 broker form", lambda base: gate.check_broker_bytes(base), ("(bytes)",),
+     tuple((label, "(bytes)", changes) for label, changes in HE005A_BYTES_ROWS), lambda clause: "(broker bytes, R1-2)",
+     re.escape("(broker bytes, R1-2)"), named_patches({"(bytes)": "check_broker_bytes"})),
+    ("broker seal site", lambda base: gate.check_seal_order(base, gate.BROKER_SEAL_SITE), ("(site)",),
+     tuple(row[:3] for row in HE005A_SITE_ROWS), lambda clause: "(seal-order grammar)",
+     re.escape("(seal-order grammar)"), named_patches({"(site)": "check_seal_order"})),
+    ("broker includes", lambda base: gate.check_broker_includes(base), ("(includes)",), HE005A_INCLUDE_ROWS,
+     lambda clause: "(broker includes)", re.escape("(broker includes)"),
+     named_patches({"(includes)": "check_broker_includes"})),
+    ("broker status table", lambda base: gate.check_broker_status_table(base), ("(table)",), HE005A_TABLE_ROWS,
+     lambda clause: "(broker status table, Q-HE5A-2)", re.escape("(broker status table, Q-HE5A-2)"),
+     named_patches({"(table)": "check_broker_status_table"})),
+    ("channel home", lambda base: gate.check_socket_modules(base), ("(modules)",),
+     tuple(row[:3] for row in HE005A_MODULE_ROWS), lambda clause: "(socket-module check)",
+     re.escape("(socket-module check)"), named_patches({"(modules)": "check_socket_modules"})),
+    ("channel home aliases", lambda base: gate.check_socket_module_aliases(base), ("(aliases)",),
+     tuple(row[:3] for row in HE005A_ALIAS_ROWS), lambda clause: "(socket-module aliases, G-I01B-6 (e))",
+     re.escape("(socket-module aliases, G-I01B-6 (e))"), named_patches({"(aliases)": "check_socket_module_aliases"})),
+    # HE-005A PR review round 1 (MON-HE005A-R1): R1-4's never-unlink rule, one clause, and R1-5's serve rule, whose two
+    # clauses are its own functions.
+    ("broker never unlinks", lambda base: gate.check_broker_never_unlinks(base), ("(unlink)",), HE005A_UNLINK_ROWS,
+     lambda clause: "(broker never unlinks, R1-4)", re.escape("(broker never unlinks, R1-4)"),
+     named_patches({"(unlink)": "check_broker_never_unlinks"})),
+    ("broker serve", gate.check_broker_serve, tuple(SERVE_FUNCTIONS), HE005A_SERVE_ROWS,
+     lambda clause: "(broker serve, R1-5 %s)" % clause, r"\(broker serve, R1-5 \(", named_patches(SERVE_FUNCTIONS)),
+)
+
+
+class He005aObligationTests(Tree):
+    """HE-005A's blocking obligations over copies of the real sources (HE005A_TREE): check_role_seal's clauses (e)
+    (MON-HE005A0-U4), (f) (R1-2) and (g) (R1-3), check_seal_tokens (R1-1) and check_role_seal_stage_calls (R1-5) accept
+    today's sources; each row is refused by its rule, and with every other clause of the rule disabled, by its own named
+    clause's message; and check_broker_bytes refuses R1-2's broker rows."""
+
+    TREE = HE005A_TREE
+
+    def plant(self, changes):
+        for rel, text in he005a_tree(changes).items():
+            self.write(rel, text)
+
+    def test_the_real_sources_and_the_fixture_pass(self):
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_role_seal(base), 18)
+            self.assertEqual(gate.check_seal_tokens(base), 5)
+            self.assertEqual(gate.check_role_seal_stage_calls(base), 2)
+            self.assertEqual(gate.check_broker_bytes(base), 4)
+        # (e) reads role-seal's lib.rs and the broker's five sources; (g) finds LinuxOps's own_status.
+        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1, 6, 0, 1])
+        self.assertEqual(gate.ROLE_SEAL_SITES, (gate.OBSERVER_SEAL_RS, gate.BROKER_SEAL_RS))
+
+    def test_the_tables(self):
+        self.assertEqual((len(HE005A_E_ROWS), len(HE005A_F_ROWS), len(HE005A_G_ROWS)), (12, 6, 6))
+        self.assertEqual((len(HE005A_TOKEN_ROWS), len(HE005A_STAGE_ROWS), len(HE005A_BYTES_ROWS)), (23, 24, 5))
+        self.assertEqual(tuple(len(rows) for rows in (HE005A_SITE_ROWS, HE005A_INCLUDE_ROWS, HE005A_TABLE_ROWS,
+                                                      HE005A_MODULE_ROWS, HE005A_ALIAS_ROWS)), (8, 6, 6, 5, 3))
+        self.assertEqual((len(HE005A_UNLINK_ROWS), len(HE005A_SERVE_ROWS)), (6, 6))
+        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 116)
+        for name, check, clauses, rows, tag, any_tag, patches in HE005A_PROOF_RULES:
+            self.assertTrue(callable(check), name)
+            for row in rows:
+                self.assertIn(row[1], clauses, row[0])
+                he005a_tree(row[2])
+        for function in (list(SEAL_TOKEN_FUNCTIONS.values()) + list(STAGE_CALL_FUNCTIONS.values())
+                         + list(SERVE_FUNCTIONS.values())):
+            self.assertTrue(callable(getattr(gate, function)), function)
+        for row in HE005A_BYTES_ROWS:
+            he005a_tree(row[1])
+
+    def refuses_each(self, check, rows, tag, any_tag, patches):
+        for label, clause, changes in rows:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                    check(self.base)
+                active = patches(enabled=clause)
+                for patch in active:
+                    patch.start()
+                try:
+                    with self.assertRaisesRegex(gate.GateError, re.escape(tag(clause)), msg=label):
+                        check(self.base)
+                finally:
+                    for patch in active:
+                        patch.stop()
+            finally:
+                self.plant(())
+
+    def test_clause_e_f_and_g_rows(self):
+        _, check, _, rows, tag, any_tag, patches = HE005A_PROOF_RULES[0]
+        self.refuses_each(check, rows, tag, any_tag, patches)
+
+    def test_r1_1_rows(self):
+        _, check, _, rows, tag, any_tag, patches = HE005A_PROOF_RULES[1]
+        self.refuses_each(check, rows, tag, any_tag, patches)
+
+    def test_r1_5_rows(self):
+        _, check, _, rows, tag, any_tag, patches = HE005A_PROOF_RULES[2]
+        self.refuses_each(check, rows, tag, any_tag, patches)
+
+    def test_r1_2_broker_rows(self):
+        for label, changes in HE005A_BYTES_ROWS:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("(broker bytes, R1-2)"), msg=label):
+                    gate.check_broker_bytes(self.base)
+            finally:
+                self.plant(())
+
+    def test_r1_4_and_r1_5_folds(self):
+        # HE-005A PR review round 1 (MON-HE005A-R1): the broker's never-unlink rule (R1-4) and serve rule (R1-5) accept
+        # today's sources, refuse each row with only its own clause on, and pass a comment, a literal and spacing.
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_broker_never_unlinks(base), 5)
+            self.assertEqual(gate.check_broker_serve(base), 3)
+        rules = {rule[0]: rule for rule in HE005A_PROOF_RULES}
+        for name in ("broker never unlinks", "broker serve"):
+            _, check, _, rows, tag, any_tag, patches = rules[name]
+            self.refuses_each(check, rows, tag, any_tag, patches)
+        for changes, check in (
+                (((_BLISTEN, "", "\n// HE-008's unit unlinks a stale socket, never the broker\n"),), gate.check_broker_never_unlinks),
+                (((_BLISTEN, "", '\nconst NOTE: &str = "never unlink, rename or remove_file";\n'),),
+                 gate.check_broker_never_unlinks),
+                (((_BMAIN, _BSERVE_CALL, "    // the one seam\n    status::listener( & serve_unanswered ( &mut LinuxI02::new(sealed) ) )"),),
+                 gate.check_broker_serve)):
+            self.plant(changes)
+            try:
+                check(self.base)
+            finally:
+                self.plant(())
+
+    def test_forms_the_rules_pass(self):
+        # Comments, a Display-only literal, a fn taking bytes, a fn returning bytes it was given, the strict test block
+        # (which formats Stage1 and builds its fixture), a type item without u8, and the broker's u8 status constants.
+        for changes, checks in (
+                ((role_seal_planted('// format!("{:?}", stage1), unwrap_err, impl Default for Sealed\n'
+                                    'const SHOWN: &str = "{}";\ntype Count = u64;\n'
+                                    "fn count(program: &[u8]) -> usize {\n    program[..].len()\n}\n"
+                                    "fn same(program: &'static [u8]) -> &'static [u8] {\n    program\n}"),),
+                 (gate.check_role_seal, gate.check_seal_tokens)),
+                (((_BSTATUS, "", "\n// pub const STAGES: [u8; 2] = [2, 10];\npub const EXTRA: u8 = 99;\n"),),
+                 (gate.check_broker_bytes, gate.check_role_seal))):
+            self.plant(changes)
+            try:
+                for check in checks:
+                    check(self.base)
+            finally:
+                self.plant(())
+
+    def test_the_reading_helpers(self):
+        self.assertEqual(gate.return_type("<O: SealOps>(ops: &mut O) -> io::Result<Vec<u8>> where O: Copy "),
+                         " io::Result<Vec<u8>> ")
+        self.assertEqual(gate.return_type("(program: &[u8]) "), "")
+        self.assertEqual(gate.return_type("(f: impl Fn(u8) -> u8) -> u16 "), " u16 ")
+        self.assertEqual(gate.masked_literals('a("{", \'}\') {'), 'a("_", \'_\') {')
+        self.assertEqual(gate.resolved_uses([(("role_seal",), "rs"), (("rs", "seal_stage1"), None)], root="role_seal"),
+                         [(("role_seal",), "rs"), (("role_seal", "seal_stage1"), None)])
+        self.assertEqual(gate.resolved_uses([(("role_seal",), "rs"), (("rs", "x"), None)]),
+                         [(("role_seal",), "rs"), (("rs", "x"), None)], "gate_sys by default")
+
+
+class BrokerRuleTests(Tree):
+    """HE-005A's other rules over copies of the real sources: the broker's include rule, its no-panic list, its status
+    table against the observer's (Q-HE5A-2 (a)), its seal-order site (Q-HE5A-1 (a)) and its one socket file."""
+
+    TREE = HE005A_TREE
+
+    def plant(self, changes):
+        for rel, text in he005a_tree(changes).items():
+            self.write(rel, text)
+
+    def refuses(self, check, changes, message):
+        self.plant(changes)
+        try:
+            with self.assertRaisesRegex(gate.GateError, message, msg=repr(changes)[:120]):
+                check(self.base)
+        finally:
+            self.plant(())
+
+    def test_the_real_sources_and_the_fixture_pass(self):
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_broker_includes(base), 2)
+            self.assertEqual(gate.check_broker_no_panic(base), 5)
+            self.assertEqual(gate.check_broker_status_table(base), 22)
+            self.assertEqual(gate.check_seal_order(base, gate.BROKER_SEAL_SITE),
+                             "Err, ExitCode::from, Ok, status::seal (and the tuple-variant patterns none)")
+        self.assertGreater(gate.check_socket_modules(self.base), 0)
+        self.assertGreater(gate.check_socket_module_aliases(self.base), 0)
+        self.assertEqual(gate.BROKER_SEAL_SITE["calls"], gate.OBSERVER_SEAL_CALLS)
+        self.assertIn(gate.BROKER_LINUX_LISTEN, gate.SOCKET_FILES)
+        self.assertEqual(gate.SOCKET_CRATE_MODULES[gate.BROKER_CRATE], ("linux_listen",))
+        self.assertIn(gate.BROKER_CRATE, gate.POST_SEAL_CRATES)
+        self.assertEqual((gate.CRATE_ROOTS[gate.BROKER_LIB], gate.CRATE_ROOTS[gate.BROKER_MAIN]),
+                         ("#![forbid(unsafe_code)]", "#![forbid(unsafe_code)]"))
+
+    def test_the_include_rule(self):
+        message = re.escape("(broker includes)")
+        for _, _, changes in HE005A_INCLUDE_ROWS:
+            self.refuses(gate.check_broker_includes, changes, message)
+        (self.base / _BSEAL).unlink()
+        with self.assertRaisesRegex(gate.GateError, "seal.rs is missing .broker includes"):
+            gate.check_broker_includes(self.base)
+
+    def test_the_no_panic_list(self):
+        message = r"outside a strict #\[cfg\(test\)\] mod tests block .broker no-panic tripwire"
+        for changes in (((_BLISTEN, "", "\nfn first(v: &[u8]) -> u8 {\n    *v.first().unwrap()\n}\n"),),
+                        ((_BLIB, "", '\nfn f(x: Option<u8>) -> u8 {\n    x.expect("x")\n}\n'),),
+                        ((_BSEAL, "", "\nconst _: () = assert!({ INSTRUCTIONS_X86_64 } == 326);\n"),),
+                        ((_BSTATUS, "", "\nfn f(x: u8) {\n    assert!(x < 200);\n}\n"),),
+                        ((_BMAIN, "", "\nfn f() {\n    panic!();\n}\n"),)):
+            self.refuses(gate.check_broker_no_panic, changes, message)
+        self.plant(((_BLIB, "", "\n// unwrap() and panic! in a comment\n"),))
+        self.assertEqual(gate.check_broker_no_panic(self.base), 5)
+
+    def test_the_status_table_is_the_observers(self):
+        message = re.escape("(broker status table, Q-HE5A-2)")
+        for _, _, changes in HE005A_TABLE_ROWS:
+            self.refuses(gate.check_broker_status_table, changes, message)
+        # Comments and spacing are not text the rule compares.
+        self.plant(((_BSTATUS, _FILTER_ARM, "        SealStep::Filter  =>  66, // the install"),))
+        self.assertEqual(gate.check_broker_status_table(self.base), 22)
+
+    def test_the_seal_order_site(self):
+        site = lambda base: gate.check_seal_order(base, gate.BROKER_SEAL_SITE)
+        for _, _, changes, message in HE005A_SITE_ROWS:
+            self.refuses(site, changes, message)
+
+    def test_the_one_socket_file(self):
+        for check, rows in ((gate.check_socket_modules, HE005A_MODULE_ROWS),
+                            (gate.check_socket_module_aliases, HE005A_ALIAS_ROWS)):
+            for _, _, changes, message in rows:
+                self.refuses(check, changes, message)
+
+
+class BrokerLinkedTests(Tree):
+    """HE-005A: the broker's crate is linked (its main.rs's one exit import, its roots' attribute) and joins the gate's
+    post-seal list; containment stays the unlinked binary."""
+
+    TREE = LINKED_TREE
+
+    def test_the_broker_is_scanned(self):
+        main = gate.BROKER_MAIN
+        good = LINKED_TREE[main] + "use std::process::ExitCode;\n"
+        self.write(main, good)
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
+        for text in (good + "use std::process::ExitCode;\n", good + "fn f() { std::process::exit(1); }\n",
+                     LINKED_TREE[main] + "fn f() { let _ = std::env::args_os(); }\n"):
+            self.refused(gate.check_linked_sources, main, text, "linked-source tripwire")
+        self.refused(gate.check_linked_sources, gate.BROKER_LIB, LINKED_TREE[gate.BROKER_LIB] + "use std::process::ExitCode;\n",
+                     "std::process")
+        self.refused(gate.check_linked_sources, gate.BROKER_LIB, "pub mod linux_listen;\n", "lacks #!\\[forbid")
+        self.refused(gate.check_debug_derives, gate.BROKER_LIB, LINKED_TREE[gate.BROKER_LIB]
+                     + "#[derive(Debug)]\npub struct Held { listener: Listener }\n", "Debug check")
+        self.refused(gate.check_foreign_items, gate.BROKER_LINUX_LISTEN, LINKED_TREE[gate.BROKER_LINUX_LISTEN]
+                     + "unsafe extern \"C\" { fn setresuid(r: u32, e: u32, s: u32) -> i32; }\n", "declares the foreign items")
+        self.refused(gate.check_prints, gate.BROKER_LIB, LINKED_TREE[gate.BROKER_LIB] + "fn f() { eprintln!(\"x\"); }\n",
+                     "print rule")
+        self.write(UNLINKED_MAIN, "use std::process::Command;\nfn main() { let _ = Command::new(\"x\"); }\n")
+        self.assertEqual(gate.check_linked_sources(self.base), 15)
+
+
+class BrokerClosureTests(Tree):
+    """HE-005A (H5D-12): planeon-broker links exactly BROKER_LINKED_CRATES (itself, role-seal and gate-sys): host-common,
+    i05-protocol (HE-005B's) or any other workspace crate in its closure refuses."""
+
+    TREE = {**WORKSPACE_TREE,
+            "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]', '"crates/gate-tls", "crates/broker", '
+                                                                                   '"crates/role-seal"]'),
+            "crates/broker/Cargo.toml": '[package]\nname = "planeon-broker"\nedition.workspace = true\n',
+            "crates/role-seal/Cargo.toml": '[package]\nname = "role-seal"\nedition.workspace = true\n'}
+    GOOD = {**WORKSPACE, "planeon-broker": {"gate-sys", "role-seal"}, "role-seal": {"gate-sys"}}
+
+    def test_the_closure_is_exact(self):
+        self.assertEqual(gate.BROKER_LINKED_CRATES, ("crates/broker", "crates/role-seal", "crates/gate-sys"))
+        self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 7)
+        self.assertEqual(gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": {"role-seal"}}), 7)
+        for dependencies in (set(), {"gate-sys"}, {"gate-sys", "role-seal", "host-common"},
+                             {"gate-sys", "role-seal", "i05-protocol"}, {"gate-sys", "role-seal", "effect-gate"}):
+            with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
+                gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": dependencies, "host-common": set()})
+        with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
+            gate.check_workspace_shape(self.base, {**self.GOOD, "role-seal": {"gate-sys", "i05-protocol"}})
+        without = {name: dependencies for name, dependencies in self.GOOD.items() if name != "planeon-broker"}
+        with self.assertRaisesRegex(gate.GateError, "no planeon-broker crate in the workspace"):
+            gate.check_workspace_shape(self.base, without)
+
+
+class BrokerBinaryTests(unittest.TestCase):
+    """HE-005A (DESIGN-HE005 sections 3.5 and 4): each built planeon-broker holds its BROKER program once, no membarrier
+    and none of section 3.5's symbols."""
+
+    PROGRAM = bytes(range(16)) * 2
+
+    def test_the_program_once_and_no_refused_symbol(self):
+        raw = b"\x7fELF" + b"\0" * 64 + self.PROGRAM + b"\0" * 16
+        self.assertEqual(gate.check_broker_binary({"main", "read", "__membarrier_init", "setresuid_x"}, raw, self.PROGRAM), 32)
+        for name in gate.MEMBARRIER:
+            with self.assertRaisesRegex(gate.GateError, "links .*membarrier.* .membarrier check"):
+                gate.check_broker_binary({"read", name}, raw, self.PROGRAM)
+        for name in gate.BROKER_ABSENT_SYMBOLS:
+            with self.assertRaisesRegex(gate.GateError, "links \\['%s'\\] .DESIGN-HE005 section 3.5 symbol check" % name):
+                gate.check_broker_binary({"read", name}, raw, self.PROGRAM)
+        for count in (0, 2, 3):
+            with self.assertRaisesRegex(gate.GateError, "holds its BROKER program %d times, not exactly once" % count):
+                gate.check_broker_binary({"read"}, b"\0" * 8 + self.PROGRAM * count + b"\0", self.PROGRAM)
+        with self.assertRaisesRegex(gate.GateError, "an empty BROKER program"):
+            gate.check_broker_binary({"read"}, raw, b"")
+
+    def test_each_target_names_its_pinned_program(self):
+        self.assertEqual(set(gate.BROKER_PROGRAMS), set(gate.MACHINE))
+        self.assertTrue(set(gate.BROKER_PROGRAMS.values()) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.BROKER_ABSENT_SYMBOLS, ("__synccall", "setresuid", "setresgid", "setuid", "setgid",
+                                                      "pthread_create", "fork", "posix_spawn"))
+        self.assertIn("planeon-broker", gate.BINARIES)
 
 
 class OutputPrefixTests(unittest.TestCase):

@@ -3665,3 +3665,210 @@ amendment: the carrier kind, exception 4 and the build's departures, accepted) a
 (d)'s failing rows in the mutation proof, the two Stage1-format forms as a stated residual) are the build brief's addenda
 1, 2 and 3 (`8f433a86…`, `835ec8af…`, `dfe36016…`). The complete messages are recorded in the operator's
 `tools/w03/he005/OWNER_DECISIONS.md`.
+
+## HE-005A: the broker's seal, programs and I02 listener (`crates/broker`; the four `contracts/seccomp-v3/` BROKER and WORKER programs and `contracts/PROVENANCE.md`; `Cargo.lock`; `tools/gate.py`)
+
+HE-005A is the rest of DESIGN-HE005 revision 5 §4 HE-005A after step A0 (sha256 `0335ce2d…`), with the scope notes of
+`DESIGN-HE005.NOTES.md` (Q-HE5A-1 (a): nothing between the stages; §3.1's signed configuration and the HOLD derivation
+move to HE-005C), built as the HE-005A plan (`427eb860…`) states it under MON-HE005A-PLAN2, on A0's merged base
+`ebc22393`. It is HE-005's second packet and role-seal's second user. It vendors edge record v11's four seccomp-v3 BROKER
+and WORKER programs (CONTRACTS 63 → 67; BROKER embedded, WORKER held for HE-005C); it turns HE-001's planeon-broker
+scaffold into a library and a binary in the observer's form, sealed by role-seal's two stages with the broker's role
+specification and a start-state pre-check of its own; after the seal it binds the I02 listener and closes every
+connection unanswered. It meets the five blocking obligations HE-005A0 carried (clause (e), R1-1, R1-2, R1-3 and R1-5;
+MON-HE005A0-U4, MON-HE005A0-PUSH) as gate rules with failing rows. It holds no broker logic: the configuration, HOLD,
+the lifecycle W1-W6 and every I02, I03 and I05 frame are HE-005B's to HE-005D's. Only planeon-broker's bytes are to
+change; role-seal's code is untouched. Its rules are R233-R245.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R233 | **The four programs vendored.** `contracts/seccomp-v3/BROKER.aarch64.bpf`, `BROKER.x86_64.bpf`, `WORKER.aarch64.bpf` and `WORKER.x86_64.bpf`, mode 100644, each written with `git show "d7a3cda5:architecture/compiled-filter-programs/programs/<file>"` from harness-onion and checked against its edge record v11 row (`operator-harness-engineering-v11.json`, sha256 `9188980f…`, 41534 bytes; the rows labelled HE-005, REGISTERED_BEFORE_USE, BYTE_IDENTICAL, provider packet MET-ENFORCE-025, null `providerCommit`): BROKER aarch64 `bc9c5a37…` (2488 bytes, 311 instructions), BROKER x86_64 `95221bd0…` (2608, 326), WORKER aarch64 `cc04a471…` (1376, 172), WORKER x86_64 `5616c909…` (1496, 187). `CONTRACTS` registers the four, 63 → 67. `contracts/PROVENANCE.md` gains one section, "Compiled BROKER and WORKER programs (HE-005A)", after the HE-004-I01B4 section and before the NIST vectors, with the four lines in the file's line form; no existing line changes (MON-HE005A-PROV). Only BROKER is embedded (R235); the WORKER programs are vendored only, for HE-005C's worker filter | DESIGN-HE005 §2, §4 HE-005A; MON-HE005A0-MERGED; MON-HE005A-PROV |
+| R234 | **planeon-broker, a library and a binary,** in the observer's form: `src/lib.rs` (`#![forbid(unsafe_code)]`; the modules `seal`, `status` and, on Linux only, `linux_listen`; `ListenerError`; the `I02Listener` seam and `serve_unanswered`, R238), `src/seal.rs` (R235, R236), `src/status.rs` (R237), `src/linux_listen.rs` (R238) and `src/main.rs` (`#![forbid(unsafe_code)]`; R235). Its manifest drops `host-common` (H5D-12) and depends on gate-sys and role-seal by path, nothing else: planeon-broker links exactly {crates/broker, crates/role-seal, crates/gate-sys} (`BROKER_LINKED_CRATES`), with no registry crate, build script or feature. `Cargo.lock` changes only planeon-broker's dependency list (host-common out, gate-sys and role-seal in): path entries only | §4 HE-005A; H5D-12; the notes (Q-HE5A-1 (a)); MON-HE005A0-MERGED |
+| R235 | **The broker's seal** (`seal.rs`, `main.rs`). `CAP_SETGID` 6, `CAP_SETUID` 7, `CAP_NET_ADMIN` 12 and `CAP_BPF` 39, and `KEPT`, their four bits (HI-7's BROKER row, O4); the two BROKER programs embedded with `include_bytes!` as `&[u8; 2608]` (x86_64) and `&[u8; 2488]` (aarch64), with their counts 326 and 311 pinned by compile-time asserts against `role_seal::INSTRUCTION_BYTES`; `Arch`, `RUNNING_ARCH`; and `spec(arch)`, `RoleSpec { bounding: KEPT, kept: KEPT, program: arch.program(), instructions: arch.instructions() }`. Bounding = kept: the start bounding set must already equal the four, permitted must hold them and ambient must be empty, and no capability is dropped. The stages are role-seal's (R226-R228; R87's steps, checks and read-backs unchanged): the public `seal_stage1()` runs the pre-check (R236) and then `role_seal::seal_stage1(spec(RUNNING_ARCH))`; `seal_stage2(stage1)` is `role_seal::seal_stage2(stage1)`. Both return the broker's own `SealError` (`Start(StartCheck)` or `Seal(role_seal::SealError)`), so `main` maps either through one `status::seal`. `main.rs` runs stage 1 as its first statement and stage 2 as the next, with nothing between them (Q-HE5A-1 (a)), then `ExitCode::from(serve(&sealed))`; `serve` builds the Linux listener from `&Sealed` and returns `status::listener(&serve_unanswered(..))`. On other targets the stub exits with `NOT_LINUX` | O1, O4, O15; §4 HE-005A; Q-HE5A-1 (a) |
+| R236 | **The start-state pre-check.** role-seal checks one thread, real, effective and saved uid and gid 0 (`getresuid`, `getresgid`) and the capability sets, not the filesystem ids (O-W03-PEER-EXE) or the supplementary groups (SEC-5, A1-GROUPS). So the broker's `seal_stage1` first makes one read of the process's own status (`gate_sys::seal::own_status`), and `pre_check` requires, in this order: the read succeeded (36); the one `Uid:` line holds exactly four decimal fields and the fourth, the filesystem uid, is 0 (37); the same for the one `Gid:` line and the filesystem gid (38); the one `Groups:` line lists nothing, only tabs and spaces after its prefix (39). A missing or repeated line refuses. It makes no write, and a refusal makes no write; role-seal's stage 1 runs only after it passes. role-seal's code is unchanged, and the gate's seal-order site still sees `seal_stage1()` first. `StartCheck` (`Status`, `FsUid`, `FsGid`, `Groups`) is the broker's own type, and `status::start` maps it to 36-39, outside the seal's ranges (40-59 for stage 1, 60-79 for stage 2). Each refusal has a failing test (R244) | O2, O11; MON-HE005A-LAUNCH |
+| R237 | **The exit statuses** (`status.rs`): one distinct, non-zero status below 200 per failure point, and no status 0. `seal_step` is the observer's table, token for token (stage 1 40-54, stage 2 60-66; R243's text rule); `NOT_LINUX` 2 (the non-Linux stub) and `NOT_YET_SERVING` 10, kept as the observer's (`main` does not reach it, since it serves); the pre-check's `START_STATUS` 36, `START_FS_UID` 37, `START_FS_GID` 38 and `START_GROUPS` 39; and **the listener error, `LISTENER` 24**, for every `ListenerError` (`Listen`, `Register`, `Wait`, `Accept`). No status is held in a byte array (R241's broker form). The monitor's ruling: "The statuses (pre-check 36-39, listener 24) are noted for MODEL_DEFINED." (MON-HANDOVER-8-PRI) | Q-HE5A-2 (a); Q-HE5A-3 (a); MON-HANDOVER-8-PRI |
+| R238 | **`serve`, unanswered.** `I02Listener` (in `lib.rs`) offers `listen`, `wait`, `accept` (a connection's number, or none queued) and `close`, and no read or write. `serve_unanswered`, single-threaded, calls `listen` once, then loops: a wait, one accept, and an accepted connection closed at once; it returns only a listener error. `linux_listen.rs`, the one broker file that names gate-sys's `channel`, holds `LinuxI02` (private fields, no `Debug`, built only by `new(&Sealed)`): `listen` binds `/run/planeon/live-proxy/capacity-broker.sock` through `channel::listen_seqpacket_plain`, after the seal, and registers it alone with a `Poller` for readability; `wait` waits with no timeout; `accept` is gate-sys's `accept`, holding at most one connection; `close` drops it, with no `sendmsg` and no `recvmsg` made on it. The broker never unlinks the path: an existing one fails `bind` (24), and HE-008's unit clears it before the start (owner: systemd cleans sockets). Nothing reads a peer's credentials or bytes, and no frame is written | O12; Q-HE5A-3 (a); MON-HE005A-PLAN2 |
+| R239 | **Blocking obligation 1, clause (e), as built:** `check_role_seal` (e), `role_seal_formatting`. Outside strict test blocks, role-seal's `lib.rs` and every `crates/broker/src` source hold, read without comments and with literal contents emptied, none of `format!`, `format_args!`, `write!`, `writeln!`, the word `fmt`, `unwrap_err` and `expect_err`, and no string literal holds a Debug format specifier (`{:?}`, `{:#?}`, `{:x?}` and any `{..:..?}`). This is stricter than written ("`format!`, `write!` and `{:?}` of `Stage1` or `Sealed`"): a text rule cannot tell a token's value from another's, so it refuses each form in both crates. The tokens have no impl at all (R240 (iv)), so with the print rule and the no-panic rules this leaves neither crate a way to put a token's Debug text anywhere. Ruled: "Clause (e) built stricter than written is accepted." (MON-HANDOVER-8-PRI). It closes A0's stated residual, the two Stage1-format forms | MON-HE005A0-U4; MON-HANDOVER-8-PRI |
+| R240 | **Blocking obligation 2, R1-1, the tokens closed:** `check_seal_tokens`, check_i01b_binding's constructions over role-seal's `lib.rs` (its strict test block aside) and the observer's and the broker's non-test sources, five clauses, each its own function. (i) The definitions: `struct Stage1` and `struct Sealed` once each, their fields exactly `plan: Plan` and `_sealed: ()` with no visibility, their attributes exactly `#[derive(Debug)]` and `#[must_use]`, so neither is a unit or tuple struct and neither derives `Default`, `Clone`, `Copy` or another trait. (ii) No `Self {` or `Self(` in role-seal's `lib.rs`; each token's literal exactly once there, inside `fn seal_stage1` and `fn seal_stage2` respectively, and in no observer or broker source. (iii) The exact signatures `pub fn seal_stage1(spec: RoleSpec) -> Result<Stage1, SealError>` and `pub fn seal_stage2(stage1: Stage1) -> Result<Sealed, SealError>`, each once, concrete (not generic over `SealOps`), each name once. (iv) No impl header names either token: no `impl From<..> for`, no other trait impl and no inherent impl. (v) Neither is renamed with `as` or named by a type alias | MON-HE005A0-PUSH; HE-005A0 PR review round 1, R1-1 |
+| R241 | **Blocking obligations 3 and 4, R1-2 and R1-3.** `check_role_seal` (f), `role_seal_type_items` (R1-2): outside the strict test block, role-seal's `lib.rs` holds no `type` item naming `u8` (read to its `;` at bracket depth 0) and renames `u8` in no use path, beside clause (c)'s const and static rule. `check_broker_bytes`, R1-2's broker form: outside `seal.rs`, the broker's non-test sources hold no const or static whose type names `u8` other than a lone `u8` (an exit status), no such `type` item and no `u8` rename, so the program bytes live in `seal.rs` alone, under its include rule (R243). `check_role_seal` (g), `role_seal_byte_functions` (R1-3, by a rule): no fn of role-seal's `lib.rs` whose return type names `u8` holds an array expression or a byte-string literal in its body | MON-HE005A0-PUSH; MON-HE005A-PLAN2 |
+| R242 | **Blocking obligation 5, R1-5, the stage calls confined:** `check_role_seal_stage_calls`, over the observer's and the broker's non-test sources, in check_observer_no_send's item form with `resolved_uses` rooted at `role_seal` (H5E-12's form): (a) no use path imports the role_seal crate itself (`role_seal`, `role_seal::{self}` or `::role_seal`; renamed or not; `pub`, `pub(crate)` or private), holds `role_seal` as a segment after its head (`crate::seal::role_seal`, `self::role_seal`, `super::seal::role_seal`), renames or globs `role_seal`, or imports either stage; imports of role-seal's other items stay allowed; (b) no `role_seal::seal_stage1` or `role_seal::seal_stage2` path, whatever precedes it (`::`, a path segment or nothing), outside each role's `seal.rs`; (c) in each of the two `seal.rs`, each stage named exactly once, whatever precedes it, as a call inside its own fn of the same name. As built at U2, (b) and (c) skipped a stage path preceded by `::` and (a) read only use paths headed by `role_seal`, so a `seal.rs` re-exporting the crate (`pub(crate) use role_seal;`) let another source call `crate::seal::role_seal::seal_stage1(..)`: HE-005A PR review round 1's R1-1 (class A), fixed in U6 (MON-HE005A-R1). `resolved_uses` gains an optional root (its default, gate-sys's, unchanged), and `MAIN_LIBRARY_ROOTS` names each binary's library for the alias rule | MON-HE005A0-PUSH; H5E-12; MON-HE005A-R1 |
+| R243 | **The broker's other gate rules.** crates/broker joins `SCANNED_CRATES` (the linked-source tripwire, foreign items, Debug, socket modules, macros, code before main, prints), the gate's post-seal list (`POST_SEAL_CRATES`), `CRATE_ROOTS` (`lib.rs` and `main.rs`, `#![forbid(unsafe_code)]`) and its own no-panic list (`BROKER_NO_PANIC`, its five sources, the two length asserts aside); `LINKED_EXCEPTIONS` allows `main.rs`'s one `use std::process::ExitCode;`. `check_workspace_shape` holds planeon-broker's closure to exactly `BROKER_LINKED_CRATES`. `BROKER_SEAL_SITE` holds `main.rs` to the seal-order grammar with the observer's parameters: stage 1 first and exact, nothing between, the exact stage-2 statement, the exact tail `ExitCode::from(serve(&<the stage-2 binding>))`, its pinned imports, two `fn main` and `fn serve`. `linux_listen.rs` is the broker's one socket file (`SOCKET_FILES`, `SOCKET_CRATE_MODULES`), re-exporting nothing. `check_broker_includes`: only `seal.rs` embeds, exactly the two BROKER programs, with `include_bytes!`. `check_broker_status_table` (Q-HE5A-2 (a)): the broker's `seal_step`, `NOT_LINUX` and `NOT_YET_SERVING` equal the observer's token for token. And, for each built planeon-broker, `check_broker_binary`: its architecture's BROKER bytes exactly once, no `membarrier` or `__membarrier`, and none of §3.5's `__synccall`, `setresuid`, `setresgid`, `setuid`, `setgid`, `pthread_create`, `fork` and `posix_spawn` in its `.symtab` (the MEMBARRIER form). Folded from HE-005A PR review round 1 (MON-HE005A-R1): `check_broker_never_unlinks` (R1-4, G-I01-1's form): the broker's non-test sources, read without comments, literal contents or strict test blocks, name none of `I01_REMOVALS`' `unlink`, `remove_file`, `remove_dir`, `remove_dir_all`, `rename` and `hard_link`, so the I02 path is never removed by the broker (O12); and `check_broker_serve` (R1-5, G5's form, as `check_observer_serve` reads the observer's serve), two clauses: (a) `serve`'s body names `status::listener`, `serve_unanswered` and `LinuxI02` exactly once each, in that order; (b) the body is token for token `{ status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }`, so `serve` reaches the listener seam once and returns only its status (Q-HE5A-3 (a)) | §3.5; §4 HE-005A; MON-HE005A-PLAN2; MON-HE005A0-MERGED; MON-HE005A-R1 |
+| R244 | **The tests.** Under `crates/broker/tests/`: `broker_seal.rs` (the test's own SHA-256 against published vectors, so no dev-dependency joins; the embedded programs are the published bytes, by sha256, length and count; the specification's values; the pre-check's passing root start state, its four refusals and their order); `broker_status.rs` (the seal table in its stage ranges, the pre-check's own statuses outside them, the one listener status, every status distinct, non-zero and below 200); `broker_listener.rs` (over a recording fake: every accepted connection closed with nothing written or read; a listen failure ends serving before any wait or accept; an accept failure ends it with nothing open; a wake with nothing queued only waits again). In `tools/test_gate.py`: `He005aObligationTests`, each blocking obligation's failing rows over copies of the real sources (clause (e) e1-e12, (f) f1-f6, (g) g1-g6; R1-1 t1-t23; R1-5 s1-s24; R1-2's broker form b1-b5), with the disabled-clause proof (`HE005A_PROOF_RULES`, which the build's scratch `mutation_proof.py` reads); `BrokerRuleTests`, `BrokerLinkedTests`, `BrokerClosureTests` and `BrokerBinaryTests` for R243. U6 (MON-HE005A-R1) adds R1-5's s15-s24 (the PR review round 1 probes p1, p1b, p1c and p2, each through a `seal.rs` re-exporting the crate; the re-export forms `pub(crate) use role_seal;`, `pub use role_seal;`, `pub(crate) use role_seal::{self};` and a private rooted rename; an item imported through another path; a second stage path after a segment in a `seal.rs`), the never-unlink rows u1-u6 (the round's probe p4 and the other five removal words) and the serve rows w1-w6 (the round's probe p5, the seam skipped, run twice, looped, its status discarded, branched), with `test_r1_4_and_r1_5_folds`; `test_the_tables` now counts 24 stage rows, 6 and 6, and 116 proof rows. Every moved self-test count (the broker's sources join `LINKED_TREE`; containment's `main.rs` becomes the unlinked binary) is in the build record with its reason. The runs: `cargo test` 804 passed, 0 failed, 0 ignored, in 123 test binaries (the broker's 17 tests among them: 9, 4 and 4); the gate's self-test, 447 tests, OK (446 at U5 and U6's one); the mutation proof, 116 of 116 rows killed, 103 with a one-clause refusing set and 13 with two (clause (e), (f) and (g) 24, R1-1 23, R1-5 24; and, each check its own one clause, R1-2's broker form b1-b5 5, the broker's seal-order site 8, its include rule 6, its status-table text rule 6 and the channel home 8, the socket-module rule 5 and its alias rule 3; and U6's never-unlink rule 6, one clause, and serve rule 6, two clauses: s15, s16, s18 and w1-w3 refuse under two clauses each). Three groups stay self-test rows only, since `he005a_tree` edits only files `HE005A_TREE` holds and can add or remove none. `BrokerLinkedTests`' 8 rows (their tree needs every crate root) are set-membership entries, crates/broker in `SCANNED_CRATES` and its `lib.rs` and `main.rs` in `CRATE_ROOTS`, in the linked-crate scans whose membership form HE-005A0's proof covered (R230, R232: "the linked-crate 17"); its `main.rs`'s `LINKED_EXCEPTIONS` entry, the exit-import allowance, has no recorded mutation proof. `BrokerClosureTests`' rows (dependency maps for `check_workspace_shape`, which reads the workspace manifest) test the broker's exact-set block, new in HE-005A in the form of the observer's block that HE-005A0's proof covered (R232: "the closure 2"), so no earlier proof covers the broker's own block. The include rule's missing-`seal.rs` case trips `check_broker_includes`' first clause (`seal.rs` must be a file); the rule is new in HE-005A and its proof rows are i1-i6 above, so that clause has only the self-test row | MON-HE005A-PLAN2; MON-HE005A-LAUNCH; MON-HE005A0-PUSH |
+| R245 | **The observer answer** (MON-HE005A-LAUNCH's item: whether O-W03-PEER-EXE and SEC-5/A1-GROUPS bind the observer's start state too). Read by exact path at harness-onion `d7a3cda5`: `architecture/w03-plan-v2/plan.json:666-670`, SEC-5: "The broker runs with no supplementary groups."; the same file `:784-788`, A1-GROUPS: "The broker runs with no supplementary groups; W3 checks an empty Groups: line."; `architecture/host-interface-amendment-hs43/amendment.json:362-366`, O-W03-PEER-EXE (owner "W03 (the gate, the broker and the host policy's file contexts)"), its fs-id clause: "run the broker with filesystem uid and gid 0, equal to the gate's uids and gids". Each names the broker (W3 is the broker's check of its child; O-W03-PEER-EXE's other clauses bind the gate's dumpability and ids, the broker's peer pidfds and the broker's label), and none names the observer or binds the observer's start state. No finding is carried for the observer; its seal (R227) is unchanged | MON-HE005A-LAUNCH |
+
+### Binaries
+
+The binary statement (MON-HE005A0-MERGED; the plan): **planeon-broker's bytes change**, as HE-001's scaffold becomes the
+sealed broker: x86_64 and aarch64 sha256 and SBOMs (x86_64 `b7601d51f7616e0e6cdf23ada16618bee0d2200d764ee30c6cb5fea2d3002078`, SBOM `370d0938167ef7d75d91e36a5fb36107d3d16e08403d8ef152bfd201871beff5`; aarch64 `0a5c446aaae15e15a702d465f557da0a28072b50779476a970ab74777537ab05`, SBOM `c4d04134fa70c35ba963d56b01a839bead387b5068e4d7128185eeea4190080f`; against HE-001's `3ae4f143…` and `5508d7d5…`), each holding its BROKER program exactly once
+with none of §3.5's symbols (R243) (the gate's per-binary lines: the 2608 and 2488 BROKER bytes exactly once, no `membarrier` or `__membarrier`, none of the eight symbols). planeon-gate, planeon-observer (at `ebc22393`'s bytes: x86_64
+`a317a7b5…`, aarch64 `daa9482a…`), planeon-containment and planeon-writer stay byte-identical with their SBOMs: nothing
+they link changes, since role-seal's code is untouched and the gate's changes are text rules (the gate's binary lines equal the A0 sim's at `f85a3c9b`, binary and SBOM, on both targets: x86_64 `f534bd63…`, `a317a7b5…`, `77886c4b…`, `684149d7…`; aarch64 `2d62ef0a…`, `daa9482a…`, `8fd74ad0…`, `cfb11b59…`).
+`Cargo.lock` gains path entries only (R234).
+
+### Superseded and discharged
+
+- **HE-005A0's carried "To HE-005A"** (the broker's seal over role-seal with BROKER's specification, the four programs
+  vendored with CONTRACTS 63 → 67, the I02 listener; role-seal's second user): built (R233-R238).
+- **HE-005A0's stated residual "Two Stage1-format forms, not refused"** (`format!` into a `String` inside role-seal;
+  `unwrap_err` or `expect_err` carrying a `Stage1`): closed by clause (e) (R239).
+- **MON-HE005A0-PUSH's blocking obligations** R1-1, R1-2, R1-3 and R1-5, with MON-HE005A0-U4's clause (e): each met by a
+  rule with failing rows (R239-R242); the mutation proof over those rows is 116 of 116 killed (U5, MON-HE005A-U5 and MON-HE005A-U5-1; then U6, MON-HE005A-R1, which closed R1-5's re-export route; three groups are self-test rows only, R244).
+- **HE-001's broker scaffold** (its `host-common` dependency) is replaced by R234's library and binary.
+
+### Evidence
+
+At build, light (`python3 -I -B` text checks, no cargo): the brief's, its addendum 1's, the plan's and the design's
+digests (`fe553305…`, `b788a783…`, `427eb860…`, `0335ce2d…`); the four programs' sha256, lengths, instruction counts and
+modes against edge record v11's rows, and each `cmp`-equal to `git show "d7a3cda5:<provider path>"` (R233), and the four
+PROVENANCE.md lines re-checked against the files by script; every source-text check taking only the tree, 68, run over
+the worktree at U2 by importing `tools/gate.py` read-only, passing (among them check_contracts 67, check_role_seal 18
+public items, check_seal_tokens 5 clauses, check_role_seal_stage_calls 2 sites, check_broker_includes 2,
+check_broker_bytes 4, check_broker_no_panic 5, check_broker_status_table 22 arms and the three seal-order sites), and
+check_contracts (67) and check_i01b_contracts (11) again at U3, after the PROVENANCE.md section; the privacy scan
+(`privacy_scan.py`, harness-onion's `scripts/review_record.py` `privacy_hits` at `f9882c1a`) over the 18 files the
+packet changes and over their added lines: every count 0 in the added lines (name tokens, the legacy term, absolute home
+paths, e-mail shapes), and each whole-file count that is not 0 (`contracts/PROVENANCE.md` names 3, `tools/gate.py`
+absolute paths 3, `tools/test_gate.py` absolute paths 7) equal to the same file's at `ebc22393`, older lines kept under
+"Record, no scrub" (MON-PRI-CORR); and the zero-bill scan, light (`ci/zero_bill_scan.py`), passed (rc 0).
+
+The heavy evidence, through the build's `heavy.zsh`, one step at a time, on the monitor's word: `cargo test`, both musl
+release builds, `he-gate: passed` with its contracts, workspace shape and binary lines, the gate's self-test, the
+mutation proof, the span check and `tests/verify`: `cargo test` 804 passed, 0 failed, 0 ignored, in 123 test binaries (A0's 787 in 118, with the broker's 17 tests in 6 binaries in place of its scaffold's 1), 156 s, with only the vendored ring warnings; both musl release builds (22 s and 21 s); `he-gate: passed` (60 s) with 67 contracts, the workspace shape's 12 members (planeon-broker linking exactly crates/broker, crates/role-seal and crates/gate-sys), the linked sources 97, the post-seal sources 52, the observer post-seal sources 55, check_role_seal's 18 public items, the seal tokens' 5 clauses, the stage calls' 2 sites, the broker's includes 2, bytes 4, no-panic 5 and status table 22 arms, the three seal-order sites, and the binary lines above; the gate's self-test, 446 tests (A0's 428 and these 18), OK (54 s); the mutation proof, 94 of 94 rows killed, 87 with a one-clause refusing set and 7 with two (26 s; at U4 61 of 61 in 24 s, before U5's 33 rows), and the self-test re-run after U5, 446 tests, OK (53 s); after U6 (MON-HE005A-R1), the whole gate passed again (62 s; its binary lines equal U4's, since no Rust source changed), the self-test 447 tests, OK (54 s), and the mutation proof 116 of 116 rows killed, 103 with a one-clause refusing set and 13 with two (30 s); the span check, 8 words, 13 files read at HEAD (the vendored contract files skipped) against 13 baselines at `2043cc27` and `f9882c1a`: 21880 words read, 0 shared spans; `tests/verify`, 13 tests, OK. The sim, the verify and their timings are the
+author's.
+
+### Code and audit
+
+- `contracts/seccomp-v3/BROKER.aarch64.bpf`, `BROKER.x86_64.bpf`, `WORKER.aarch64.bpf` and `WORKER.x86_64.bpf` (new) and
+  `contracts/PROVENANCE.md` (one new section) (R233); `crates/broker/Cargo.toml`, `src/lib.rs`, `src/seal.rs`,
+  `src/status.rs`, `src/linux_listen.rs` and `src/main.rs` (R234-R238); `crates/broker/tests/broker_seal.rs`,
+  `broker_status.rs` and `broker_listener.rs` (new; R244); `Cargo.lock` (path entries only); `tools/gate.py` and
+  `tools/test_gate.py` (R239-R244); this section. No other file: role-seal's code, the observer, effect-gate's sources,
+  gate-sys, every other contract, `ci/` and the vendored crates are untouched.
+
+### Stated residuals
+
+- **R3, the textual reading's limits** (DESIGN-HE005 §8): clause (e) and R1-1 to R1-5 read text, not Rust. A form they
+  do not read stays code review's, beside the whole-file pins: for example a fn of role-seal building bytes by a loop or
+  a `Vec`'s pushes (R1-3's rule refuses only an array expression or a byte-string literal).
+- **Clause (e) is a whole-crate form:** it refuses `format!`, `write!`, `fmt` and Debug specifiers in all of the broker's
+  non-test code, not only on a token; a later broker packet whose non-test code needs one of them changes the rule in
+  its own packet, with failing rows.
+- **The pre-check reads text:** the `Uid:`, `Gid:` and `Groups:` lines of the process's own status, parsed strictly. A
+  real start state (filesystem ids 0 and an empty `Groups:` line under HE-008's unit) is first seen on Linux (T04).
+- **The binary symbols:** whether the static musl link leaves out every one of §3.5's symbols is first shown by the
+  builds (both U4 builds: none of the eight is in either planeon-broker's `.symtab`, R243).
+
+### Carried
+
+- **HE-005B** (after slot 270 (EDGE-V12; renumbered from 269, MON-SLOT-269-GOV005) merges): I02's and I03's codec and
+  checks against the registered schema and vectors, the I05 client's frames and the gate's qualification as pure
+  functions; `BROKER_LINKED_CRATES` gains `i05-protocol`, unchanged. **Slot 270 (EDGE-V12; renumbered from 269,
+  MON-SLOT-269-GOV005)** (MON-EV12-PLAN): edge record v12's two broker-handoff-v1 rows (Q-HE5-1's registration) and
+  `architecture/host-interface-amendment-he5/` with H5E-10's errata list.
+- **LINKED-EXCEPTIONS-PROOF** (MON-HE005A-U5-2): a mutation-proof form for the `LINKED_EXCEPTIONS` allowance across the
+  gate, the observer and the broker; it predates the proofs for every binary. Successor: the next packet that edits
+  gate.py's linked scans, or HE-008's pass. Under it, HE-005A PR review round 1's R1-6: loosening the allowance's
+  regular expression (to `std::process::\w+`, say) goes undetected by the self-test, though the allowance refuses the
+  reviewer's seven fixtures. The PR body also names R244's two items: the broker's closure block (gate.py's
+  `check_workspace_shape`) and the broker `main.rs`'s allowance.
+- **HE-005A PR review round 1's R1-2 and R1-3** (CARRY, R3's textual class): R1-2's broker form refuses only u8-typed
+  items, so a `&str` constant, or on paper a `[u16; N]` or `[i8; N]`, holding program-like bytes outside `seal.rs`
+  passes (the round's probe p3); and literal program bytes in either role's `seal.rs`, used by its specification, pass
+  the include and bytes rules (probe p8). The per-binary check proves the BROKER bytes present once, not installed (O1
+  stays T04's). The round's suggested forms: pin each specification's program to the included statics, and allow
+  outside `seal.rs` only the lone-u8 statuses and named items.
+- **HE-005C:** §3.1's signed configuration (ring with its pinned registry line, and R69's `black_box`) and the HOLD
+  derivation (§3.4), moved from A by Q-HE5A-1 (a); the WORKER programs embedded for W4; broker-sys and the lifecycle.
+- **HE-005D:** the live wiring, the I02 frames answered and the start-reference decision (O21).
+- **T04:** the installed BROKER filter (`Seccomp_filters: 1`) and its start-up traces; O-T04-AMEND (`Groups:` empty, a
+  pidfd signal fails); the broker's real start state through its pre-check (filesystem ids 0, an empty `Groups:` line);
+  TR-SETXID's trace; and R87's items for the broker's seal (`PR_CAPBSET_READ(41)` EINVAL, TSYNC and dumpability at
+  exec).
+- **HE-008:** the broker's unit: started with uid, gid and filesystem ids 0, no supplementary group and the four
+  capabilities; the `ExecStartPre=` removal of its stale socket; `StandardInput=null`, `StandardOutput=null` and
+  `StandardError=null` (H5E-11).
+- **R2, the remaining seal copy** (DESIGN-HE005 §8): effect-gate's `seal.rs` keeps its copy beside role-seal until its
+  successor (HE-005A0's carried item, unchanged).
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-26 and 2026-10-27)
+
+> MON-HE005A0-PUSH: push HE-005A0 at f85a3c9b and open the PR with the body exactly as hashed.
+>
+> What I checked:
+> - the record is d0351f1c, PASS_FOR_PUSH, with 2 FOLD, 1 CARRY and 4 NOTE; privacy 0;
+> - the worktree head is f85a3c9b;
+> - PR_BODY_HE005A0.md is 3fe87f5b. I read it in full: privacy 0, no placeholders. It states the re-pin and its symbol-path-only proof, the other four binaries identical, gate material, the pure-move table and the carried forms.
+>
+> Rulings:
+> - **R1-1, R1-2 and R1-3 carry to HE-005A,** as the lane and the reviewer recommend. None is in A0's code, A0 is a pure move, and HE-005A extends the same role-seal rules. In HE-005A they are named obligations with failing rows, and they block it: R1-1 with the I01B binding constructions on Stage1, Sealed and the stages; R1-2 with `type` items; R1-3 by stated argument or a rule.
+> - **R1-5:** HE-005A also carries an item rule confining calls to role_seal's stages to the one seal.rs per role (H5E-12's form).
+> - R1-4, R1-6 and R1-7 are noted, with no action.
+> - Add all of these to DESIGN-HE005.NOTES.md beside clause (e), as you planned.
+>
+> Then do your steps: push, `gh pr create --body-file`, check the head and the JSON-string body hash, bind, record, checkpoint, and send me the PR number. The verify runs at override 12/10. If the verifier asks for a transport approval, I take it to the owner. The merge is the owner's, bound to the head.
+
+> MON-HE005A0-MERGED: R10 PR #30 is merged as ebc22393, on the owner's head-bound approval ("Merge (Recommended)", gate material).
+>
+> - The verify passed 9/9 in 244 s (check run 121656305380), and no transport approval was requested.
+> - The new main's parent is f4b05e9c and its tree is dbbc047b, the approved tree.
+> - Merge record: handoff/merge-decisions/2026-10-26-mas-harness-operator-PR30.json, checkpointed as 2492a44d and pushed.
+>
+> Next:
+> 1. Update LANE-PRIMARY and your memory, editing only your own lines. Do a ref-only fetch in your worktree and check that origin/main is ebc22393.
+> 2. **HE-005A** goes on A0's merged base ebc22393. Send me its plan before any agent launch:
+>    - the brief's blocking obligations: clause (e), R1-1, R1-2, R1-3 and R1-5, each with failing rows;
+>    - CONTRACTS 63 → 67, the four seccomp-v3 files vendored byte-identical, with only BROKER embedded;
+>    - BROKER_LINKED_CRATES exactly {broker, role-seal, gate-sys}, and the seal with nothing between the stages (Q-HE5A-1 (a));
+>    - the binary statement: only planeon-broker's bytes change, and gate, observer (at ebc22393's bytes), containment and writer stay identical;
+>    - the symbol absences, and the broker's channel use from one file.
+>    Light work can start now. Heavy steps wait for my word.
+> 3. **Slot 269's contract text** (light) can go on in parallel.
+
+> MON-HE005A-PLAN2: the HE-005A plan (427eb860, privacy 0) is accepted. Q-HE5A-2 and Q-HE5A-3 are both ruled (a) under the owner's delegation.
+>
+> - **Q-HE5A-2 (a):** the broker has its own status.rs with the observer's SealStep → 40-59 numbers, plus NOT_LINUX 2 and NOT_YET_SERVING 10. Pin it by a gate rule that compares the broker's table with the observer's by text, so the two can't drift without a refusal.
+> - **Q-HE5A-3 (a):** serve returns only on a listener error, with a distinct status, and closes every connection unanswered with no frame and no read of the peer's bytes. State the status number in MODEL_DEFINED. Add a test that a connection is closed with nothing written.
+> - **The readiness doc:** carried and byte-identical, on your cited rule (FROZEN_PATHS :390-397, the sha256 pin at :493, HS53's SUPERSEDED precedent). That is correct for slot 269.
+> - **R1-3:** a rule, as you recommend.
+>
+> The stop rules stand as written. A forced role-seal code change is a stop, not a fold, because the observer's bytes would move.
+>
+> Write BUILD_BRIEF_HE005A.md, the YAML draft, the worktree mas-harness-operator-he005a from ebc22393, the kit and the launch prompt. Send me their digests before launch. Light units only until my heavy word.
+
+> MON-HE005A-LAUNCH: launch the HE-005A build agent for the light units only. Stop and report before any heavy step.
+>
+> What I checked:
+> - the brief is fe553305, the YAML draft 627f6572, the launch prompt 300000f6;
+> - names, legacy term and e-mails are 0 in the brief and the prompt, and the absolute paths are operating paths only;
+> - the worktree is at ebc22393 and clean;
+> - the kit's counts match the accepted A0 and I01B5 kits.
+>
+> On the design point: the broker's wrapper pre-check is accepted.
+> - seal_stage1 does one read of its own status before role-seal's stage 1, requiring fsuid and fsgid 0 (the fourth field of Uid:/Gid:) and an empty Groups: line, with no write.
+> - Its refusals get their own statuses outside 40-59, stated in MODEL_DEFINED, each with a failing test.
+> - role-seal stays unchanged, so the observer's bytes stay put.
+>
+> Add one item to the build's report: say whether O-W03-PEER-EXE (fsuid/fsgid) and SEC-5/A1-GROUPS bind the observer's start state too. Cite the obligation text.
+> - If they do, the observer has the same gap today. Record it as a carried finding, not a fix in A: it belongs to role-seal's successor, with the observer's re-pin or a wrapper like the broker's.
+> - If they don't, say so with the citation.
+>
+> The broker test files' exact names are fixed at the YAML commit: accepted. The heavy slot is free, no verify is queued, and the parallel lane is on light design work. I'll give the heavy word when you report the light units.
+
+> MON-HANDOVER-8-PRI: verified. he005a is at 8b13085e (tree 1440481b), clean, with U1 1b44c931 and U2 8b13085e. edgev12 is at d7a3cda5 (tree 70fb659e), clean. Your LANE-PRIMARY section goes into my handover checkpoint.
+>
+> One ruling now, so the next session doesn't wait: **MON-HE005A-PROV.** contracts/PROVENANCE.md joins HE-005A's allowedPaths, carrying the four provenance lines for the seccomp-v3 files. This follows the vendoring packets #26, #25, #24 and #23, which all edited it. Record it verbatim on resume. It is also in STATE.md's HANDOVER 8 block.
+>
+> Clause (e) built stricter than written is accepted. The statuses (pre-check 36-39, listener 24) are noted for MODEL_DEFINED. Stay idle until the owner resumes you.
+
+MON-HE005A0-U4 (clause (e) carried to HE-005A as a named obligation with a failing row) is cited by its id, as the
+HE-005A0 section cites it (the HE-005A0 build brief's addendum 3, `dfe36016…`). MON-H8-PRIMARY-GO
+(2026-10-28: the light GO for U3, with the stop rule standing: any role-seal code change stops) is cited by its id and
+the HE-005A build brief's addendum 1 (`b788a783…`), which records it. The build brief is `fe553305…`. Cited by id
+(all 2026-10-28): MON-HE005A-U4-GO (the heavy GO for U4 on
+`e700062d`); MON-HE005A-U5 and MON-HE005A-U5-1 (U5's proof rows; three groups self-test rows only, R244);
+MON-HE005A-U5-2 (R244's two items accepted, LINKED-EXCEPTIONS-PROOF carried, the sim on `594b7623`);
+MON-SLOT-269-GOV005 (EDGE-V12 renumbered to slot 270); and MON-HE005A-R1 (PR review round 1's R1-1 fixed and R1-4 and
+R1-5 folded in U6, the build brief's addendum 5). The complete messages are recorded in the operator's
+`tools/w03/he005/OWNER_DECISIONS.md`.
