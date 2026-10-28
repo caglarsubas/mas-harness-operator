@@ -9766,6 +9766,78 @@ HE005A_BYTES_ROWS = (
     ("b4 u8 renamed", ((_BLIB, "", "\nuse core::primitive::u8 as Byte;\nstatic PROGRAM: [Byte; 8] = [0; 8];\n"),)),
     ("b5 a byte string in main.rs", ((_BMAIN, "", '\nstatic FRAME: &[u8; 4] = b"\\x06\\0\\0\\0";\n'),)),
 )
+# HE-005A U5 (MON-HE005A-U5, MON-HE005A-U5-1): the broker rules' rows, shared by BrokerRuleTests and the mutation proof
+# (HE005A_PROOF_RULES), each check its own one clause. A row is (label, clause, changes) or, where the self-test matches
+# a row's own message, (label, clause, changes, message); the proof reads the first three.
+_BSTAGE2 = "    let sealed = match seal_stage2(stage1) {"
+_BTAIL = "    ExitCode::from(serve(&sealed))\n}"
+_BSERVE_USE = "    use planeon_broker::serve_unanswered;\n"
+_FILTER_ARM = "        SealStep::Filter => 66,"
+_TWO_ARMS = "        SealStep::UserIds => 41,\n        SealStep::GroupIds => 42,"
+# The broker's seal-order site (check_seal_order with BROKER_SEAL_SITE; Q-HE5A-1 (a)).
+HE005A_SITE_ROWS = (
+    ("m1 a statement between the stages", "(site)", ((_BMAIN, _BSTAGE2, "    let _x = 1;\n" + _BSTAGE2),),
+     "runs something between the seal's stages|seal-order grammar"),
+    ("m2 a call between the stages", "(site)", ((_BMAIN, _BSTAGE2, "    let _ = early();\n" + _BSTAGE2),),
+     "seal-order grammar"),
+    ("m3 another tail", "(site)", ((_BMAIN, _BTAIL, "    ExitCode::from(status::LISTENER)\n}"),), "seal-order grammar"),
+    ("m4 a pinned import dropped", "(site)", ((_BMAIN, _BSERVE_USE, ""),), "pinned set"),
+    ("m5 an import added", "(site)", ((_BMAIN, _BSERVE_USE, _BSERVE_USE + "    use planeon_broker::seal;\n"),),
+     "pinned set"),
+    ("m6 another fn", "(site)", ((_BMAIN, "", "\nfn other() {}\n"),), "functions other than"),
+    ("m7 a const item", "(site)", ((_BMAIN, "", "\nconst C: u8 = 0;\n"),), "defines a const item"),
+    ("m8 code in the stage-2 arm", "(site)", ((_BMAIN, "Ok(sealed) => sealed,", "Ok(sealed) => { early(); sealed }"),),
+     "second stage is not exactly"),
+)
+# The broker's include rule (check_broker_includes): its change rows; the missing seal.rs stays BrokerRuleTests' own.
+HE005A_INCLUDE_ROWS = (
+    ("i1 a WORKER program embedded", "(includes)",
+     ((_BSEAL, "", '\npub static W: &[u8; 1496] = include_bytes!("../../../contracts/seccomp-v3/WORKER.x86_64.bpf");\n'),)),
+    ("i2 the OBSERVER program in BROKER's place", "(includes)",
+     ((_BSEAL, _BROKER_X86, 'include_bytes!("../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf")'),)),
+    ("i3 a concat! path", "(includes)",
+     ((_BSEAL, _BROKER_ARM, 'include_bytes!(concat!("../../../contracts/seccomp-v3/", "BROKER.aarch64.bpf"))'),)),
+    ("i4 include_str! of a program", "(includes)",
+     ((_BSEAL, _BROKER_ARM, _BROKER_ARM.replace("include_bytes", "include_str")),)),
+    ("i5 a program embedded in lib.rs", "(includes)",
+     ((_BLIB, "", '\npub static P: &[u8] = include_bytes!("../../../contracts/seccomp-v3/BROKER.x86_64.bpf");\n'),)),
+    ("i6 include_str! in status.rs", "(includes)",
+     ((_BSTATUS, "", '\nconst P: &str = include_str!("../../../contracts/seccomp-v3/WORKER.aarch64.bpf");\n'),)),
+)
+# The status-table text rule (check_broker_status_table; Q-HE5A-2 (a)).
+HE005A_TABLE_ROWS = (
+    ("q1 the broker's Filter status moved", "(table)", ((_BSTATUS, _FILTER_ARM, "        SealStep::Filter => 67,"),)),
+    ("q2 the observer's Filter status moved", "(table)", ((_OSTATUS, _FILTER_ARM, "        SealStep::Filter => 67,"),)),
+    ("q3 NOT_YET_SERVING moved", "(table)",
+     ((_BSTATUS, "pub const NOT_YET_SERVING: u8 = 10;", "pub const NOT_YET_SERVING: u8 = 11;"),)),
+    ("q4 NOT_LINUX moved", "(table)", ((_BSTATUS, "pub const NOT_LINUX: u8 = 2;", "pub const NOT_LINUX: u8 = 3;"),)),
+    ("q5 two arms swapped", "(table)",
+     ((_BSTATUS, _TWO_ARMS, "        SealStep::GroupIds => 42,\n        SealStep::UserIds => 41,"),)),
+    ("q6 the parameter renamed", "(table)",
+     ((_BSTATUS, "pub fn seal_step(step: SealStep) -> u8 {", "pub fn seal_step(stage: SealStep) -> u8 {"),)),
+)
+# The channel home: the socket-module rule (check_socket_modules) and its alias rule (check_socket_module_aliases).
+HE005A_MODULE_ROWS = (
+    ("c1 a channel import in status.rs", "(modules)", ((_BSTATUS, "", "\nuse gate_sys::channel::Poller;\n"),),
+     "socket-module check"),
+    ("c2 a channel path in seal.rs", "(modules)", ((_BSEAL, "", "\nfn f() { let _ = gate_sys::channel::accept; }\n"),),
+     "socket-module check"),
+    ("c3 a re-export from linux_listen.rs", "(modules)", ((_BLISTEN, "", "\npub use gate_sys::channel::Conn;\n"),),
+     "re-exports"),
+    ("c4 a pub fn handing out the listener", "(modules)",
+     ((_BLISTEN, "", "\npub fn raw(i: &LinuxI02) -> &channel::Listener { x() }\n"),),
+     "pub item naming gate-sys's socket items"),
+    ("c5 a thread in linux_listen.rs", "(modules)", ((_BLISTEN, "", "\nfn f() { std::thread::spawn(g); }\n"),),
+     "names std::thread"),
+)
+HE005A_ALIAS_ROWS = (
+    ("c6 lib.rs re-exporting through linux_listen", "(aliases)", ((_BLIB, "", "\npub use linux_listen::LinuxI02;\n"),),
+     "re-exports a path through a socket module"),
+    ("c7 main.rs importing linux_listen", "(aliases)", ((_BMAIN, "", "\nuse planeon_broker::linux_listen;\n"),),
+     "imports the socket module linux_listen itself"),
+    ("c8 a rename of the library root", "(aliases)", ((_BMAIN, "", "\nuse planeon_broker as b;\n"),),
+     "imports or renames a scope root"),
+)
 ROLE_SEAL_TAGS = {"(e)": "(role-seal rule (e), clause (e))", "(f)": "(role-seal rule (f), R1-2)",
                   "(g)": "(role-seal rule (g), R1-3)"}
 SEAL_TOKEN_FUNCTIONS = {"(i)": "tokens_i_definition", "(ii)": "tokens_ii_construction",
@@ -9800,6 +9872,28 @@ HE005A_PROOF_RULES = (
     ("R1-5", gate.check_role_seal_stage_calls, tuple(STAGE_CALL_FUNCTIONS), HE005A_STAGE_ROWS,
      lambda clause: "(role-seal stage calls, R1-5 %s)" % clause, r"\(role-seal stage calls, R1-5 \(",
      named_patches(STAGE_CALL_FUNCTIONS)),
+    # HE-005A U5 (MON-HE005A-U5, MON-HE005A-U5-1): R1-2's broker form and the broker rules. None of these checks has
+    # clause functions of its own (check_seal_order's check_main_shape and check_socket_modules' check_socket_items are
+    # helpers called between inline clauses), so each is its own one clause: a by-name wrapper, switched off by a name
+    # patch.
+    ("R1-2 broker form", lambda base: gate.check_broker_bytes(base), ("(bytes)",),
+     tuple((label, "(bytes)", changes) for label, changes in HE005A_BYTES_ROWS), lambda clause: "(broker bytes, R1-2)",
+     re.escape("(broker bytes, R1-2)"), named_patches({"(bytes)": "check_broker_bytes"})),
+    ("broker seal site", lambda base: gate.check_seal_order(base, gate.BROKER_SEAL_SITE), ("(site)",),
+     tuple(row[:3] for row in HE005A_SITE_ROWS), lambda clause: "(seal-order grammar)",
+     re.escape("(seal-order grammar)"), named_patches({"(site)": "check_seal_order"})),
+    ("broker includes", lambda base: gate.check_broker_includes(base), ("(includes)",), HE005A_INCLUDE_ROWS,
+     lambda clause: "(broker includes)", re.escape("(broker includes)"),
+     named_patches({"(includes)": "check_broker_includes"})),
+    ("broker status table", lambda base: gate.check_broker_status_table(base), ("(table)",), HE005A_TABLE_ROWS,
+     lambda clause: "(broker status table, Q-HE5A-2)", re.escape("(broker status table, Q-HE5A-2)"),
+     named_patches({"(table)": "check_broker_status_table"})),
+    ("channel home", lambda base: gate.check_socket_modules(base), ("(modules)",),
+     tuple(row[:3] for row in HE005A_MODULE_ROWS), lambda clause: "(socket-module check)",
+     re.escape("(socket-module check)"), named_patches({"(modules)": "check_socket_modules"})),
+    ("channel home aliases", lambda base: gate.check_socket_module_aliases(base), ("(aliases)",),
+     tuple(row[:3] for row in HE005A_ALIAS_ROWS), lambda clause: "(socket-module aliases, G-I01B-6 (e))",
+     re.escape("(socket-module aliases, G-I01B-6 (e))"), named_patches({"(aliases)": "check_socket_module_aliases"})),
 )
 
 
@@ -9828,6 +9922,9 @@ class He005aObligationTests(Tree):
     def test_the_tables(self):
         self.assertEqual((len(HE005A_E_ROWS), len(HE005A_F_ROWS), len(HE005A_G_ROWS)), (12, 6, 6))
         self.assertEqual((len(HE005A_TOKEN_ROWS), len(HE005A_STAGE_ROWS), len(HE005A_BYTES_ROWS)), (23, 14, 5))
+        self.assertEqual(tuple(len(rows) for rows in (HE005A_SITE_ROWS, HE005A_INCLUDE_ROWS, HE005A_TABLE_ROWS,
+                                                      HE005A_MODULE_ROWS, HE005A_ALIAS_ROWS)), (8, 6, 6, 5, 3))
+        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 94)
         for name, check, clauses, rows, tag, any_tag, patches in HE005A_PROOF_RULES:
             self.assertTrue(callable(check), name)
             for row in rows:
@@ -9943,12 +10040,7 @@ class BrokerRuleTests(Tree):
 
     def test_the_include_rule(self):
         message = re.escape("(broker includes)")
-        for changes in (((_BSEAL, "", '\npub static W: &[u8; 1496] = include_bytes!("../../../contracts/seccomp-v3/WORKER.x86_64.bpf");\n'),),
-                        ((_BSEAL, _BROKER_X86, 'include_bytes!("../../../contracts/seccomp-v5/OBSERVER.x86_64.bpf")'),),
-                        ((_BSEAL, _BROKER_ARM, 'include_bytes!(concat!("../../../contracts/seccomp-v3/", "BROKER.aarch64.bpf"))'),),
-                        ((_BSEAL, _BROKER_ARM, _BROKER_ARM.replace("include_bytes", "include_str")),),
-                        ((_BLIB, "", '\npub static P: &[u8] = include_bytes!("../../../contracts/seccomp-v3/BROKER.x86_64.bpf");\n'),),
-                        ((_BSTATUS, "", '\nconst P: &str = include_str!("../../../contracts/seccomp-v3/WORKER.aarch64.bpf");\n'),)):
+        for _, _, changes in HE005A_INCLUDE_ROWS:
             self.refuses(gate.check_broker_includes, changes, message)
         (self.base / _BSEAL).unlink()
         with self.assertRaisesRegex(gate.GateError, "seal.rs is missing .broker includes"):
@@ -9967,51 +10059,22 @@ class BrokerRuleTests(Tree):
 
     def test_the_status_table_is_the_observers(self):
         message = re.escape("(broker status table, Q-HE5A-2)")
-        filter_arm = "        SealStep::Filter => 66,"
-        two_arms = "        SealStep::UserIds => 41,\n        SealStep::GroupIds => 42,"
-        for changes in (((_BSTATUS, filter_arm, "        SealStep::Filter => 67,"),),
-                        ((_OSTATUS, filter_arm, "        SealStep::Filter => 67,"),),
-                        ((_BSTATUS, "pub const NOT_YET_SERVING: u8 = 10;", "pub const NOT_YET_SERVING: u8 = 11;"),),
-                        ((_BSTATUS, "pub const NOT_LINUX: u8 = 2;", "pub const NOT_LINUX: u8 = 3;"),),
-                        ((_BSTATUS, two_arms, "        SealStep::GroupIds => 42,\n        SealStep::UserIds => 41,"),),
-                        ((_BSTATUS, "pub fn seal_step(step: SealStep) -> u8 {", "pub fn seal_step(stage: SealStep) -> u8 {"),)):
+        for _, _, changes in HE005A_TABLE_ROWS:
             self.refuses(gate.check_broker_status_table, changes, message)
         # Comments and spacing are not text the rule compares.
-        self.plant(((_BSTATUS, filter_arm, "        SealStep::Filter  =>  66, // the install"),))
+        self.plant(((_BSTATUS, _FILTER_ARM, "        SealStep::Filter  =>  66, // the install"),))
         self.assertEqual(gate.check_broker_status_table(self.base), 22)
 
     def test_the_seal_order_site(self):
         site = lambda base: gate.check_seal_order(base, gate.BROKER_SEAL_SITE)
-        before = "    let sealed = match seal_stage2(stage1) {"
-        tail = "    ExitCode::from(serve(&sealed))\n}"
-        for changes, message in (
-                (((_BMAIN, before, "    let _x = 1;\n" + before),), "runs something between the seal's stages|seal-order grammar"),
-                (((_BMAIN, before, "    let _ = early();\n" + before),), "seal-order grammar"),
-                (((_BMAIN, tail, "    ExitCode::from(status::LISTENER)\n}"),), "seal-order grammar"),
-                (((_BMAIN, "    use planeon_broker::serve_unanswered;\n", ""),), "pinned set"),
-                (((_BMAIN, "    use planeon_broker::serve_unanswered;\n",
-                   "    use planeon_broker::serve_unanswered;\n    use planeon_broker::seal;\n"),), "pinned set"),
-                (((_BMAIN, "", "\nfn other() {}\n"),), "functions other than"),
-                (((_BMAIN, "", "\nconst C: u8 = 0;\n"),), "defines a const item"),
-                (((_BMAIN, "Ok(sealed) => sealed,", "Ok(sealed) => { early(); sealed }"),), "second stage is not exactly")):
+        for _, _, changes, message in HE005A_SITE_ROWS:
             self.refuses(site, changes, message)
 
     def test_the_one_socket_file(self):
-        for check, changes, message in (
-                (gate.check_socket_modules, ((_BSTATUS, "", "\nuse gate_sys::channel::Poller;\n"),), "socket-module check"),
-                (gate.check_socket_modules, ((_BSEAL, "", "\nfn f() { let _ = gate_sys::channel::accept; }\n"),),
-                 "socket-module check"),
-                (gate.check_socket_modules, ((_BLISTEN, "", "\npub use gate_sys::channel::Conn;\n"),), "re-exports"),
-                (gate.check_socket_modules, ((_BLISTEN, "", "\npub fn raw(i: &LinuxI02) -> &channel::Listener { x() }\n"),),
-                 "pub item naming gate-sys's socket items"),
-                (gate.check_socket_modules, ((_BLISTEN, "", "\nfn f() { std::thread::spawn(g); }\n"),), "names std::thread"),
-                (gate.check_socket_module_aliases, ((_BLIB, "", "\npub use linux_listen::LinuxI02;\n"),),
-                 "re-exports a path through a socket module"),
-                (gate.check_socket_module_aliases, ((_BMAIN, "", "\nuse planeon_broker::linux_listen;\n"),),
-                 "imports the socket module linux_listen itself"),
-                (gate.check_socket_module_aliases, ((_BMAIN, "", "\nuse planeon_broker as b;\n"),),
-                 "imports or renames a scope root")):
-            self.refuses(check, changes, message)
+        for check, rows in ((gate.check_socket_modules, HE005A_MODULE_ROWS),
+                            (gate.check_socket_module_aliases, HE005A_ALIAS_ROWS)):
+            for _, _, changes, message in rows:
+                self.refuses(check, changes, message)
 
 
 class BrokerLinkedTests(Tree):
