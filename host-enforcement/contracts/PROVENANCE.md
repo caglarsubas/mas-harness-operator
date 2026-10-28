@@ -379,6 +379,24 @@ Not registered and not vendored (edge record v11's notes): profile v2's `profile
 `status.json`; admission v4's `allowlists.json` and `status.json`; and `scripts/proxy_profile_v2.py`. R10 runs no
 profile v2 validator (G-I01B4-1).
 
+## Compiled BROKER and WORKER programs (HE-005A)
+
+Copied byte for byte from the harness-onion repository's `architecture/compiled-filter-programs/programs/`, packet
+MET-ENFORCE-025 (merge commit `5da126570973293e1075459efe7cf99038f378c9`), the same 14-program publication as the
+HE-002S and HE-004A sections above. Read at harness-onion `d7a3cda5` with `git show "d7a3cda5:<path>"`, mode 100644.
+All four are registered before use in edge registry record v11
+(`architecture/artifact-edges/operator-harness-engineering-v11.json`, sha256
+`9188980f0ce211e2939d431d900a7aff77262de3a973009666ed13f3ef3cbd77`, 41534 bytes: status REGISTERED_BEFORE_USE, relation
+BYTE_IDENTICAL, provider packet MET-ENFORCE-025 with a null `providerCommit`, consumer packet `HE-005`, consumer paths
+exactly these four). HE-005A consumes the rows labelled HE-005 (the edge rule binds bytes, modes and versions, not the
+label). `crates/broker/src/seal.rs` embeds both BROKER programs and installs the running architecture's; the two WORKER
+programs are vendored only, for HE-005C's worker filter.
+
+- `contracts/seccomp-v3/BROKER.aarch64.bpf` from `architecture/compiled-filter-programs/programs/BROKER.aarch64.bpf`, sha256 `bc9c5a3797277ca753b5168e8e55132e1878fed2a726de361fd7d80e0fababf8`, 2488 bytes (311 instructions)
+- `contracts/seccomp-v3/BROKER.x86_64.bpf` from `architecture/compiled-filter-programs/programs/BROKER.x86_64.bpf`, sha256 `95221bd0db753aa22ead2eb49eeac8dae3d24c3dad72811de86c9392f4894dcc`, 2608 bytes (326 instructions)
+- `contracts/seccomp-v3/WORKER.aarch64.bpf` from `architecture/compiled-filter-programs/programs/WORKER.aarch64.bpf`, sha256 `cc04a4710495d3794b0d295613a2f2bd330524a328cb6963a819565bac2acb40`, 1376 bytes (172 instructions)
+- `contracts/seccomp-v3/WORKER.x86_64.bpf` from `architecture/compiled-filter-programs/programs/WORKER.x86_64.bpf`, sha256 `5616c9099324e441674f8e589b6c705ae95f6a4a697f10e761565d0735689d45`, 1496 bytes (187 instructions)
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256
