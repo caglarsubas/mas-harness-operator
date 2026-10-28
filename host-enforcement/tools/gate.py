@@ -227,7 +227,10 @@ obligations carried from HE-005A0 (MON-HE005A0-U4, MON-HE005A0-PUSH): check_role
 the seal's tokens in role-seal's or the broker's non-test code; (f), R1-2's type items and u8 renames; and (g), R1-3's
 fn returning a byte-array literal. check_seal_tokens holds Stage1 and Sealed closed in check_i01b_binding's
 constructions (R1-1), and check_role_seal_stage_calls confines the calls of role-seal's two stages to the one seal.rs
-per role, aliases followed (R1-5, check_observer_no_send's item form).
+per role, aliases followed (R1-5, check_observer_no_send's item form). HE-005A's PR review round 1 (MON-HE005A-R1):
+R1-1 closes the stage-call rule's re-export route (no source imports the role_seal crate itself or reaches it through
+another path, and every role_seal::<stage> counts, whatever precedes it); R1-4 folds G-I01-1's never-unlink form over
+crates/broker (check_broker_never_unlinks); R1-5 folds G5's form over the broker's serve (check_broker_serve).
 
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
@@ -1406,13 +1409,25 @@ SEAL_STAGE_SIGNATURES = (
                 r"\s*\{"), "pub fn seal_stage2(stage1: Stage1) -> Result<Sealed, SealError>"))
 # HE-005A, check_role_seal_stage_calls (R1-5, MON-HE005A0-PUSH: "an item rule confining calls to role_seal's stages to the
 # one seal.rs per role (H5E-12's form)"): the two stages, each role's seal.rs, and a role_seal::<stage> path in code.
+# HE-005A PR review round 1, R1-1 (class A; MON-HE005A-R1): the path counts whatever precedes `role_seal` (`::`, a path
+# segment or nothing), so `crate::seal::role_seal::seal_stage1` through a re-export is counted as `role_seal::seal_stage1`
+# is; only a longer identifier ending in role_seal (`my_role_seal`) is another name.
 ROLE_SEAL_STAGES = ("seal_stage1", "seal_stage2")
 ROLE_SEAL_SITES = (OBSERVER_SEAL_RS, BROKER_SEAL_RS)
-ROLE_SEAL_STAGE_PATH = re.compile(r"(?<![\w:])(?:::)?role_seal::(seal_stage1|seal_stage2)\b")
+ROLE_SEAL_STAGE_PATH = re.compile(r"\brole_seal::(seal_stage1|seal_stage2)\b")
 # HE-005A: the broker's no-panic list (its five sources, each read with its item-level compile-time asserts removed, as
 # observer-sys's are), and the status items whose text the broker's status.rs shares with the observer's (Q-HE5A-2 (a)).
 BROKER_NO_PANIC = (BROKER_LIB, BROKER_MAIN, BROKER_SEAL_RS, BROKER_STATUS, BROKER_LINUX_LISTEN)
 BROKER_STATUS_CONSTANTS = ("NOT_LINUX", "NOT_YET_SERVING")
+# HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1; Q-HE5A-3 (a)): the broker's serve in G5's form
+# (check_observer_serve): its body, read as serve_body reads the observer's, names each of these exactly once and in this
+# order (a), and is token for token BROKER_SERVE_BODY (b), so serve reaches the listener seam once and returns only the
+# listener's status.
+BROKER_SERVE_CALLS = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bstatus::listener\b", "status::listener"), (r"\bserve_unanswered\b", "serve_unanswered"),
+    (r"\bLinuxI02\b", "LinuxI02")))
+BROKER_SERVE_BODY = "{ status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }"
+BROKER_SERVE_TOKEN = re.compile(r"[A-Za-z_]\w*|::|\S")
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -2391,11 +2406,11 @@ def check_observer_includes(base: Path) -> int:
     return count
 
 
-def serve_body(base: Path, rule: str) -> str:
+def serve_body(base: Path, rule: str, rel: str = OBSERVER_MAIN) -> str:
     """The observer's main.rs fn serve body as check_observer_serve reads it (HE-004C; shared with G-I01B-4 since
     HE-004-I01B2): comments removed, literal contents emptied, the whitespace around `::` removed, and the body from its
-    `{` to its `}` with every use declaration replaced by one space. One fn serve with a body, or it refuses (`rule`)."""
-    rel = OBSERVER_MAIN
+    `{` to its `}` with every use declaration replaced by one space. One fn serve with a body, or it refuses (`rule`).
+    HE-005A (R1-5): `rel` names the main.rs, the observer's by default and the broker's for check_broker_serve."""
     require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
     try:
         code = PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8")))
@@ -2880,7 +2895,10 @@ def stage_calls_a_uses(codes: dict[str, str], rule: str) -> None:
     """R1-5 (a): no use path of the observer's or the broker's sources, read with each source's aliases of role_seal
     followed (resolved_uses with root role_seal, check_observer_no_send's item form), renames role_seal itself, globs it,
     or imports seal_stage1 or seal_stage2 from it; so a stage is spelled only as a role_seal::<stage> path, which (b) and
-    (c) count."""
+    (c) count. HE-005A PR review round 1, R1-1 (MON-HE005A-R1): and none imports the role_seal crate itself (`role_seal`,
+    `role_seal::{self}` or `::role_seal`; renamed or not; pub, pub(crate) or private), so no source re-exports it, and
+    none holds role_seal as a segment after its head (`crate::seal::role_seal`, `self::role_seal`, `super::..`), so no
+    path reaches role-seal through another module. Imports of role-seal's items stay allowed, but for the stages."""
     for rel, code in sorted(codes.items()):
         if rel == ROLE_SEAL_LIB:
             continue
@@ -2890,6 +2908,11 @@ def stage_calls_a_uses(codes: dict[str, str], rule: str) -> None:
                 uses.extend(use_paths(declaration.group(1)))
             except GateError:
                 raise GateError("%s holds a use declaration the stage-call rule cannot read (%s (a))" % (rel, rule)) from None
+        for path, _ in uses:
+            require("role_seal" not in path[1:], "%s reaches role_seal through another path, `%s` (%s (a))"
+                    % (rel, "::".join(path), rule))
+            require(path not in (("role_seal",), ("role_seal", "self")),
+                    "%s imports the role_seal crate itself (%s (a))" % (rel, rule))
         for path, rename in resolved_uses(uses, root="role_seal"):
             if path[:1] != ("role_seal",):
                 continue
@@ -2901,7 +2924,8 @@ def stage_calls_a_uses(codes: dict[str, str], rule: str) -> None:
 
 def stage_calls_b_elsewhere(codes: dict[str, str], rule: str) -> None:
     """R1-5 (b): outside each role's seal.rs (ROLE_SEAL_SITES), no observer or broker source names a role_seal::<stage>
-    path (ROLE_SEAL_STAGE_PATH), called or not."""
+    path (ROLE_SEAL_STAGE_PATH), called or not, whatever precedes it (since HE-005A PR review round 1, R1-1: `::`, a
+    path segment such as `crate::seal::` or `super::seal::`, or nothing)."""
     for rel, code in sorted(codes.items()):
         if rel == ROLE_SEAL_LIB or rel in ROLE_SEAL_SITES:
             continue
@@ -2913,7 +2937,8 @@ def stage_calls_b_elsewhere(codes: dict[str, str], rule: str) -> None:
 def stage_calls_c_sites(codes: dict[str, str], rule: str) -> None:
     """R1-5 (c): each role's seal.rs (ROLE_SEAL_SITES, each required) names each stage's role_seal::<stage> path exactly
     once, as a call (`role_seal::<stage>(`), inside the body of its own fn of the same name, so the one call of each of
-    role-seal's stages is that role's wrapper's, with that role's specification."""
+    role-seal's stages is that role's wrapper's, with that role's specification. Since HE-005A PR review round 1, R1-1,
+    every occurrence counts, whatever precedes it."""
     for rel in ROLE_SEAL_SITES:
         require(rel in codes, "%s is missing (%s (c))" % (rel, rule))
         code = codes[rel]
@@ -2930,7 +2955,10 @@ def check_role_seal_stage_calls(base: Path) -> int:
     stage 1 with another RoleSpec), in H5E-12's item form: over the observer's and the broker's non-test sources
     (seal_token_codes), each clause its own function: (a) no use path, its aliases of role_seal followed, renames or globs
     role_seal or imports a stage; (b) no role_seal::<stage> path outside each role's seal.rs; (c) in each, each stage
-    called exactly once, inside its own wrapper. The number of seal.rs sites."""
+    called exactly once, inside its own wrapper. HE-005A PR review round 1, R1-1 (class A; MON-HE005A-R1): a seal.rs that
+    re-exported the role_seal crate let another source call `crate::seal::role_seal::seal_stage1(..)`, which (b) and (c)
+    skipped; now (a) refuses importing the crate itself or reaching it through another path, and (b) and (c) count every
+    role_seal::<stage>, whatever precedes it. The number of seal.rs sites."""
     rule = "role-seal stage calls, R1-5"
     codes = seal_token_codes(base, rule)
     stage_calls_a_uses(codes, rule)
@@ -3051,6 +3079,60 @@ def check_broker_status_table(base: Path) -> int:
     require(broker == observer, "%s's seal_step table, NOT_LINUX or NOT_YET_SERVING differs from %s's (%s)"
             % (BROKER_STATUS, OBSERVER_STATUS, rule))
     return arms
+
+
+def check_broker_never_unlinks(base: Path) -> int:
+    """HE-005A PR review round 1, R1-4 (folded under MON-HE005A-R1; DESIGN-HE005 O12): the broker form of G-I01-1
+    (check_observer_never_unlinks). crates/broker's non-test sources (its linux_listen.rs required), read as observer_code
+    reads the observer's (comments removed, literal contents emptied, the whitespace around `::` removed, strict test
+    blocks blanked), name none of I01_REMOVALS' words: unlink, remove_file, remove_dir, remove_dir_all, rename and
+    hard_link. The broker binds its I02 path after the seal and never removes it: HE-008's unit clears it before the start
+    (owner: systemd cleans sockets), and the BROKER row has no unlinkat. The number of sources."""
+    rule = "broker never unlinks, R1-4"
+    require((base / BROKER_LINUX_LISTEN).is_file(), "%s is missing (%s)" % (BROKER_LINUX_LISTEN, rule))
+    sources = observer_sources(base, (BROKER_CRATE,))
+    for rel, raw in sources:
+        try:
+            code = blank_test_blocks(PATH_SPACE.sub("::", rust_code(raw)))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        found = I01_REMOVALS.search(code)
+        require(not found, "%s names %s; the broker never removes or renames a path (%s)"
+                % (rel, found.group(0) if found else "", rule))
+    return len(sources)
+
+
+def serve_a_calls_once(body: str, rule: str) -> None:
+    """R1-5 (a), G5's call-exactly-once construction (check_observer_serve): the broker's serve body names each of
+    BROKER_SERVE_CALLS (status::listener, serve_unanswered, LinuxI02) exactly once, called or not, and in that order."""
+    positions = []
+    for pattern, name in BROKER_SERVE_CALLS:
+        found = list(pattern.finditer(body))
+        require(len(found) == 1, "the broker's serve names %s other than exactly once (%s (a))" % (name, rule))
+        positions.append(found[0].start())
+    require(positions == sorted(positions), "the broker's serve does not name %s in this order (%s (a))"
+            % (", ".join(name for _, name in BROKER_SERVE_CALLS), rule))
+
+
+def serve_b_body_exact(body: str, rule: str) -> None:
+    """R1-5 (b): the broker's serve body is token for token (BROKER_SERVE_TOKEN) BROKER_SERVE_BODY, so serve runs the
+    listener seam once and returns only its status: no statement before or after it, no loop, branch or closure around
+    it, and no other value returned."""
+    require(BROKER_SERVE_TOKEN.findall(body) == BROKER_SERVE_TOKEN.findall(BROKER_SERVE_BODY),
+            "the broker's serve body is not exactly `%s` (%s (b))" % (BROKER_SERVE_BODY, rule))
+
+
+def check_broker_serve(base: Path) -> int:
+    """HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1; Q-HE5A-3 (a)): the broker's main.rs holds one fn
+    serve, read as serve_body reads the observer's (comments removed, literal contents emptied, the whitespace around
+    `::` removed, use declarations dropped), and each clause is its own function: (a) its body names status::listener,
+    serve_unanswered and LinuxI02 exactly once each, in that order (G5's form); (b) its body is exactly BROKER_SERVE_BODY.
+    Its imports are BROKER_SEAL_SITE's pinned set and main calls it once, as the tail. The number of named calls."""
+    rule = "broker serve, R1-5"
+    body = serve_body(base, rule, BROKER_MAIN)
+    serve_a_calls_once(body, rule)
+    serve_b_body_exact(body, rule)
+    return len(BROKER_SERVE_CALLS)
 
 
 def check_unsafe(base: Path) -> int:
@@ -8473,9 +8555,10 @@ def main() -> int:
             "signatures, the stages named once each (iii); no impl names either token (iv); neither is renamed or aliased (v)"
             % (check_seal_tokens(HE), ROLE_SEAL_LIB, " and ".join(fields[0] for fields, _ in SEAL_TOKENS.values()),
                " and ".join(SEAL_TOKEN_ATTRIBUTES), " and ".join(signature for _, signature in SEAL_STAGE_SIGNATURES)))
-        say("role-seal stage calls (HE-005A, R1-5): over the observer's and the broker's sources, no use path (role_seal's "
-            "aliases followed) renames or globs role_seal or imports a stage (a), no role_seal::seal_stage1 or ::seal_stage2 "
-            "path lies outside the %d seal.rs files %s (b), and each calls each stage exactly once, inside its own "
+        say("role-seal stage calls (HE-005A, R1-5; PR review round 1, R1-1): over the observer's and the broker's sources, "
+            "no use path (role_seal's aliases followed) imports the role_seal crate itself, reaches it through another "
+            "path, renames or globs it or imports a stage (a), no role_seal::seal_stage1 or ::seal_stage2 path, whatever "
+            "precedes it, lies outside the %d seal.rs files %s (b), and each calls each stage exactly once, inside its own "
             "wrapper (c)" % (check_role_seal_stage_calls(HE), " and ".join(ROLE_SEAL_SITES)))
         say("broker includes (HE-005A): %d embedded files, both in %s, exactly %s with include_bytes!; no other broker "
             "source embeds" % (check_broker_includes(HE), BROKER_SEAL_RS, " and ".join(sorted(BROKER_PROGRAMS.values()))))
@@ -8486,6 +8569,13 @@ def main() -> int:
             % (check_broker_no_panic(HE), ", ".join(BROKER_NO_PANIC)))
         say("broker status table (HE-005A, Q-HE5A-2 (a)): %s's seal_step (%d arms), NOT_LINUX and NOT_YET_SERVING equal "
             "%s's token for token" % (BROKER_STATUS, check_broker_status_table(HE), OBSERVER_STATUS))
+        say("broker never unlinks (HE-005A, PR review round 1, R1-4; G-I01-1's form): %d broker sources name none of "
+            "unlink, remove_file, remove_dir, remove_dir_all, rename or hard_link outside strict test blocks"
+            % check_broker_never_unlinks(HE))
+        say("broker serve (HE-005A, PR review round 1, R1-5; G5's form): %s's fn serve names %d calls exactly once each, "
+            "in order (%s) (a), and its body is exactly `%s` (b)" % (BROKER_MAIN, check_broker_serve(HE),
+                                                                 ", ".join(name for _, name in BROKER_SERVE_CALLS),
+                                                                 BROKER_SERVE_BODY))
         say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
             "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
             "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "

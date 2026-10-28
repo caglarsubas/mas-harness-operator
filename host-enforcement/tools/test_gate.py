@@ -9757,6 +9757,31 @@ HE005A_STAGE_ROWS = (
      ((_OSEAL, "    role_seal::seal_stage2(stage1)", "    (role_seal::seal_stage2)(stage1)"),)),
     ("s14 the broker's wrapper without its stage", "(c)",
      ((_BSEAL, _BROKER_STAGE2, "    Err(SealError::Start(StartCheck::Status))"),)),
+    # HE-005A PR review round 1, R1-1 (MON-HE005A-R1): the reviewer's four probe forms, each through a seal.rs that
+    # re-exports the role_seal crate, and the re-export forms alone.
+    ("s15 a crate-relative call in the broker's lib.rs (probe p1)", "(b)",
+     ((_BSEAL, "", "\npub(crate) use role_seal;\n"),
+      (_BLIB, "", "\nfn forged() -> bool {\n    crate::seal::role_seal::seal_stage1(seal::spec(seal::Arch::X86_64)).is_ok()\n}\n"))),
+    ("s16 super::seal::role_seal:: in the broker's status.rs (probe p1b)", "(b)",
+     ((_BSEAL, "", "\npub use role_seal;\n"),
+      (_BSTATUS, "", "\nfn forged() {\n    let _ = super::seal::role_seal::seal_stage2;\n}\n"))),
+    ("s17 an alias of the re-export, then rs::seal_stage1 (probe p1c)", "(a)",
+     ((_BSEAL, "", "\npub(crate) use role_seal::{self};\n"),
+      (_BLIB, "", "\nuse crate::seal::role_seal as rs;\nfn forged() -> bool {\n"
+                  "    rs::seal_stage1(seal::spec(seal::Arch::X86_64)).is_ok()\n}\n"))),
+    ("s18 the observer's client.rs through its seal.rs (probe p2)", "(b)",
+     ((_OSEAL, "", "\npub(crate) use role_seal;\n"),
+      (_OCLIENT, "", "\nfn forged(spec: role_seal::RoleSpec) -> bool {\n    crate::seal::role_seal::seal_stage1(spec).is_ok()\n}\n"))),
+    ("s19 pub(crate) use role_seal; in the broker's seal.rs", "(a)", ((_BSEAL, "", "\npub(crate) use role_seal;\n"),)),
+    ("s20 pub use role_seal; in the observer's seal.rs", "(a)", ((_OSEAL, "", "\npub use role_seal;\n"),)),
+    ("s21 pub(crate) use role_seal::{self}; in the broker's seal.rs", "(a)",
+     ((_BSEAL, "", "\npub(crate) use role_seal::{self};\n"),)),
+    ("s22 a private, rooted and renamed re-export in the observer's seal.rs", "(a)",
+     ((_OSEAL, "", "\nuse ::role_seal as seal_crate;\n"),)),
+    ("s23 an item imported through another path in the broker's lib.rs", "(a)",
+     ((_BLIB, "", "\nuse crate::seal::role_seal::RoleSpec;\n"),)),
+    ("s24 a second stage path after a segment in the observer's seal.rs", "(c)",
+     ((_OSEAL, "", "\nfn again() {\n    let _ = self::role_seal::seal_stage2;\n}\n"),)),
 )
 # R1-2's broker form (check_broker_bytes): bytes outside seal.rs.
 HE005A_BYTES_ROWS = (
@@ -9838,11 +9863,47 @@ HE005A_ALIAS_ROWS = (
     ("c8 a rename of the library root", "(aliases)", ((_BMAIN, "", "\nuse planeon_broker as b;\n"),),
      "imports or renames a scope root"),
 )
+# HE-005A PR review round 1, R1-4 (folded under MON-HE005A-R1): the broker's never-unlink rule (check_broker_never_unlinks,
+# G-I01-1's I01_REMOVALS form), one clause: the reviewer's probe p4 and the rule's other removal words.
+HE005A_UNLINK_ROWS = (
+    ("u1 an unlink call in linux_listen.rs (probe p4)", "(unlink)",
+     ((_BLISTEN, "", "\nfn clear() {\n    unlink(I02_PATH);\n}\n"),)),
+    ("u2 remove_file of the I02 path", "(unlink)",
+     ((_BLISTEN, "", "\nfn clear() {\n    let _ = std::fs::remove_file(I02_PATH);\n}\n"),)),
+    ("u3 remove_dir in lib.rs", "(unlink)", ((_BLIB, "", "\nfn clear(dir: &str) {\n    let _ = std::fs::remove_dir(dir);\n}\n"),)),
+    ("u4 remove_dir_all in main.rs", "(unlink)",
+     ((_BMAIN, "", "\nfn clear(dir: &str) {\n    let _ = std::fs::remove_dir_all(dir);\n}\n"),)),
+    ("u5 rename in seal.rs", "(unlink)",
+     ((_BSEAL, "", "\nfn moved(from: &str, to: &str) {\n    let _ = std::fs::rename(from, to);\n}\n"),)),
+    ("u6 hard_link in status.rs", "(unlink)",
+     ((_BSTATUS, "", "\nfn linked(from: &str, to: &str) {\n    let _ = std::fs::hard_link(from, to);\n}\n"),)),
+)
+# HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1): the broker's serve (check_broker_serve, G5's form), its
+# clauses (a) the calls named once each, in order, and (b) the exact body: the reviewer's probe p5, and forms that skip,
+# repeat or wrap the listener seam.
+_BSERVE_CALL = "    status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)))"
+HE005A_SERVE_ROWS = (
+    ("w1 no listener, NOT_YET_SERVING after the seal (probe p5)", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = sealed;\n    status::NOT_YET_SERVING"),)),
+    ("w2 the listener built but never served", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = LinuxI02::new(sealed);\n    status::LISTENER"),)),
+    ("w3 the seam run twice", "(a)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = serve_unanswered(&mut LinuxI02::new(sealed));\n" + _BSERVE_CALL),)),
+    ("w4 the call wrapped in a loop", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    loop {\n        status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)));\n    }"),)),
+    ("w5 the status discarded and another returned", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    let _ = status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)));\n"
+                             "    status::NOT_YET_SERVING"),)),
+    ("w6 the call inside a branch", "(b)",
+     ((_BMAIN, _BSERVE_CALL, "    if ready() {\n        status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)))\n"
+                             "    } else {\n        status::NOT_LINUX\n    }"),)),
+)
 ROLE_SEAL_TAGS = {"(e)": "(role-seal rule (e), clause (e))", "(f)": "(role-seal rule (f), R1-2)",
                   "(g)": "(role-seal rule (g), R1-3)"}
 SEAL_TOKEN_FUNCTIONS = {"(i)": "tokens_i_definition", "(ii)": "tokens_ii_construction",
                         "(iii)": "tokens_iii_signatures", "(iv)": "tokens_iv_impls", "(v)": "tokens_v_names"}
 STAGE_CALL_FUNCTIONS = {"(a)": "stage_calls_a_uses", "(b)": "stage_calls_b_elsewhere", "(c)": "stage_calls_c_sites"}
+SERVE_FUNCTIONS = {"(a)": "serve_a_calls_once", "(b)": "serve_b_body_exact"}
 
 
 def role_seal_patches(enabled=None, disabled=()):
@@ -9894,6 +9955,13 @@ HE005A_PROOF_RULES = (
     ("channel home aliases", lambda base: gate.check_socket_module_aliases(base), ("(aliases)",),
      tuple(row[:3] for row in HE005A_ALIAS_ROWS), lambda clause: "(socket-module aliases, G-I01B-6 (e))",
      re.escape("(socket-module aliases, G-I01B-6 (e))"), named_patches({"(aliases)": "check_socket_module_aliases"})),
+    # HE-005A PR review round 1 (MON-HE005A-R1): R1-4's never-unlink rule, one clause, and R1-5's serve rule, whose two
+    # clauses are its own functions.
+    ("broker never unlinks", lambda base: gate.check_broker_never_unlinks(base), ("(unlink)",), HE005A_UNLINK_ROWS,
+     lambda clause: "(broker never unlinks, R1-4)", re.escape("(broker never unlinks, R1-4)"),
+     named_patches({"(unlink)": "check_broker_never_unlinks"})),
+    ("broker serve", gate.check_broker_serve, tuple(SERVE_FUNCTIONS), HE005A_SERVE_ROWS,
+     lambda clause: "(broker serve, R1-5 %s)" % clause, r"\(broker serve, R1-5 \(", named_patches(SERVE_FUNCTIONS)),
 )
 
 
@@ -9921,16 +9989,18 @@ class He005aObligationTests(Tree):
 
     def test_the_tables(self):
         self.assertEqual((len(HE005A_E_ROWS), len(HE005A_F_ROWS), len(HE005A_G_ROWS)), (12, 6, 6))
-        self.assertEqual((len(HE005A_TOKEN_ROWS), len(HE005A_STAGE_ROWS), len(HE005A_BYTES_ROWS)), (23, 14, 5))
+        self.assertEqual((len(HE005A_TOKEN_ROWS), len(HE005A_STAGE_ROWS), len(HE005A_BYTES_ROWS)), (23, 24, 5))
         self.assertEqual(tuple(len(rows) for rows in (HE005A_SITE_ROWS, HE005A_INCLUDE_ROWS, HE005A_TABLE_ROWS,
                                                       HE005A_MODULE_ROWS, HE005A_ALIAS_ROWS)), (8, 6, 6, 5, 3))
-        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 94)
+        self.assertEqual((len(HE005A_UNLINK_ROWS), len(HE005A_SERVE_ROWS)), (6, 6))
+        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 116)
         for name, check, clauses, rows, tag, any_tag, patches in HE005A_PROOF_RULES:
             self.assertTrue(callable(check), name)
             for row in rows:
                 self.assertIn(row[1], clauses, row[0])
                 he005a_tree(row[2])
-        for function in list(SEAL_TOKEN_FUNCTIONS.values()) + list(STAGE_CALL_FUNCTIONS.values()):
+        for function in (list(SEAL_TOKEN_FUNCTIONS.values()) + list(STAGE_CALL_FUNCTIONS.values())
+                         + list(SERVE_FUNCTIONS.values())):
             self.assertTrue(callable(getattr(gate, function)), function)
         for row in HE005A_BYTES_ROWS:
             he005a_tree(row[1])
@@ -9971,6 +10041,28 @@ class He005aObligationTests(Tree):
             try:
                 with self.assertRaisesRegex(gate.GateError, re.escape("(broker bytes, R1-2)"), msg=label):
                     gate.check_broker_bytes(self.base)
+            finally:
+                self.plant(())
+
+    def test_r1_4_and_r1_5_folds(self):
+        # HE-005A PR review round 1 (MON-HE005A-R1): the broker's never-unlink rule (R1-4) and serve rule (R1-5) accept
+        # today's sources, refuse each row with only its own clause on, and pass a comment, a literal and spacing.
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_broker_never_unlinks(base), 5)
+            self.assertEqual(gate.check_broker_serve(base), 3)
+        rules = {rule[0]: rule for rule in HE005A_PROOF_RULES}
+        for name in ("broker never unlinks", "broker serve"):
+            _, check, _, rows, tag, any_tag, patches = rules[name]
+            self.refuses_each(check, rows, tag, any_tag, patches)
+        for changes, check in (
+                (((_BLISTEN, "", "\n// HE-008's unit unlinks a stale socket, never the broker\n"),), gate.check_broker_never_unlinks),
+                (((_BLISTEN, "", '\nconst NOTE: &str = "never unlink, rename or remove_file";\n'),),
+                 gate.check_broker_never_unlinks),
+                (((_BMAIN, _BSERVE_CALL, "    // the one seam\n    status::listener( & serve_unanswered ( &mut LinuxI02::new(sealed) ) )"),),
+                 gate.check_broker_serve)):
+            self.plant(changes)
+            try:
+                check(self.base)
             finally:
                 self.plant(())
 
