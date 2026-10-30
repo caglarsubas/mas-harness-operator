@@ -26,6 +26,7 @@ pub mod status;
 
 // HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; MON-HE005B-PLAN): the broker's pure logic modules, named only
 // here and by each other; nothing in main.rs, serve, seal.rs, status.rs or linux_listen.rs names them (G-HE5B-1).
+pub mod gate_peer;
 pub mod i02;
 pub mod i03;
 pub mod i05_client;
