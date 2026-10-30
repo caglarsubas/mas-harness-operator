@@ -1,7 +1,7 @@
 //! The capacity broker's raw calls (HE-005C; DESIGN-HE005 revision 5 sections 3.2, 3.5 and 4.0; the frozen seam note
 //! DESIGN-HE005.SEAM-C revision 4, `ad6d3a75`, MON-SEAM-FREEZE). A std-only crate that planeon-broker alone links, in
 //! observer-sys's form: `raw` holds the one foreign item, `syscall`, the calls it issues by number, their constants and
-//! layouts, one `// SAFETY:` argument per unsafe block, the clone3 span and the child path, generic over one raw-call
+//! layouts, one `// SAFETY:` argument per audited block, the clone3 span and the child path, generic over one raw-call
 //! trait, and the safe API the broker's lifecycle drives. This file holds the seam note's plain types and re-exports
 //! the rest.
 //!
@@ -34,8 +34,8 @@ pub use raw::sleep_monotonic;
 #[cfg(target_os = "linux")]
 pub use raw::spawn;
 
-/// The leaf's three valid writes (seam note section 2, SM-R1-18): `Freeze` writes "1" and `Thaw` writes "0" to
-/// cgroup.freeze, and `Kill` writes "1" to cgroup.kill.
+/// The leaf's three valid writes (seam note section 2, SM-R1-18): `Freeze` writes "1" and `Thaw` writes "0" to the
+/// leaf's freeze control, and `Kill` writes "1" to its kill control. `raw.rs` alone holds the two names (H5E-2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LeafWrite {
     Freeze,

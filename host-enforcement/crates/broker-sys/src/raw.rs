@@ -109,9 +109,10 @@ compile_error!("broker-sys pins the system call numbers for x86_64 and aarch64 o
 
 use numbers::*;
 
-// Open flags (gate-sys `openat.rs`'s values) and the three sets this file uses. The leaf directory and the child's
-// descriptor directory are read-only opens (duty 17, and duty 5's mask too); the control opener is O_WRONLY, which only
-// duty 17's mask (O_CREAT, O_TRUNC, __O_TMPFILE) admits.
+// Open flags and the three sets this file uses: O_RDONLY and O_CLOEXEC as gate-sys `openat.rs` defines them, O_WRONLY
+// as the vendored libc's `linux_like/mod.rs` does (openat.rs defines none), and O_DIRECTORY and O_NOFOLLOW per target
+// above. The leaf directory and the child's descriptor directory are read-only opens (duty 17, and duty 5's mask too);
+// the control opener is O_WRONLY, which duty 17's mask admits and the masks of duties 5 and 22 refuse.
 const O_RDONLY: c_long = 0;
 const O_WRONLY: c_long = 1;
 const O_CLOEXEC: c_long = 0o2000000;
@@ -189,7 +190,8 @@ const WORKER_UID_MIN: u32 = 10_000;
 const WORKER_UID_MAX: u32 = 2_147_483_647;
 const BPF_INSTRUCTION_BYTES: usize = 8;
 const BPF_MAX_INSTRUCTIONS: usize = 4_096;
-/// The capability header's version (`_LINUX_CAPABILITY_VERSION_3`), whose data is two 32-bit sets.
+/// The capability header's version (`_LINUX_CAPABILITY_VERSION_3`), whose data is two structs of three u32 sets
+/// (effective, permitted, inheritable): the low and high halves of the 64-bit sets.
 const CAPABILITY_VERSION_3: u32 = 0x2008_0522;
 
 /// fd_table's bound (seam note section 2): directory entries returned in total, "." and ".." included.
@@ -596,10 +598,11 @@ impl RawCalls for Kernel {
     #[inline(always)]
     fn call(&mut self, number: c_long, args: [c_long; 6]) -> c_long {
         let [first, second, third, fourth, fifth, sixth] = args;
-        // SAFETY: `number` is one of this file's pinned numbers, and each argument is what that call's one site states:
-        // a descriptor this process owns, a size, flags, or the address of memory laid out as the kernel reads (or
-        // writes) it, which lives until the call returns (the statics, ChildData in its Box, or a local of the caller).
-        // musl's `syscall` reads six `long` arguments, so the unused ones are zero.
+        // SAFETY: `number` is one of this file's pinned numbers, and each argument is what that call's one site passes:
+        // a plain value (a signal or call number, an id, a size, flags, AT_FDCWD or NULL), which carries no memory
+        // obligation; a descriptor this process owns; or the address of memory laid out as the kernel reads (or
+        // writes) it, which lives until the call returns (the statics, ChildData in its Box, or a local of the
+        // caller). musl's `syscall` reads six `long` arguments, so the unused ones are zero.
         unsafe { syscall(number, first, second, third, fourth, fifth, sixth) }
     }
 }
@@ -817,11 +820,13 @@ mod tests {
 
     use super::*;
 
-    /// The recording fake (H5F-5): it records every call, answers clone3 as told, fails execveat, and ends the child
-    /// path's exit_group by unwinding, so the test can read what was recorded.
+    /// The recording fake (H5F-5): it records every call, fails the call at `fail_at` (its index in the record) if one
+    /// is set, answers clone3 as told, fails execveat, and ends the child path's exit_group by unwinding, so the test
+    /// can read what was recorded.
     struct Recording {
         calls: Vec<(c_long, [c_long; 6])>,
         clone_answer: c_long,
+        fail_at: Option<usize>,
     }
 
     impl RawCalls for Recording {
@@ -829,6 +834,9 @@ mod tests {
             self.calls.push((number, args));
             if number == SYS_EXIT_GROUP {
                 panic!("exit_group");
+            }
+            if self.fail_at == Some(self.calls.len() - 1) {
+                return -1;
             }
             if number == SYS_CLONE3 {
                 return self.clone_answer;
@@ -860,31 +868,26 @@ mod tests {
     }
 
     fn recording(clone_answer: c_long) -> Recording {
-        Recording { calls: Vec::new(), clone_answer }
+        Recording { calls: Vec::new(), clone_answer, fail_at: None }
     }
 
-    #[test]
-    fn child_path_signal_order() {
-        // The parent's side: the all-ones block before clone3, the restore after it.
-        let mut parent = recording(4242);
-        assert_eq!(clone_span(&mut parent, &values()), Cloned::Parent { pid: 4242, restored: true });
-        let block = (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0x2000, SIGSET_BYTES, 0, 0]);
-        let clone = (SYS_CLONE3, [0x4000, CLONE_ARGS_BYTES, 0, 0, 0, 0]);
-        let restore = (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x2000, 0, SIGSET_BYTES, 0, 0]);
-        assert_eq!(parent.calls, vec![block, clone, restore]);
+    fn failing(clone_answer: c_long, fail_at: usize) -> Recording {
+        Recording { calls: Vec::new(), clone_answer, fail_at: Some(fail_at) }
+    }
 
-        // The child's side: block, reset (62 signals, never 9 or 19), dup3, dup3, close_range, unblock, setresgid, then
-        // the rest, and exit_group(127) after the failed execveat.
-        let mut child = recording(0);
-        let ended = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            clone_span(&mut child, &values());
-        }));
-        assert!(ended.is_err());
-        let mut expected = vec![block, clone, (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0, SIGSET_BYTES, 0, 0])];
+    /// The whole record of a child's run: the parent's block and clone3 (answered 0), then the child path's block, the
+    /// 62 resets (never 9 or 19), dup3, dup3, close_range, unblock, setresgid and the rest, and exit_group(127) after
+    /// the failed execveat.
+    fn child_sequence() -> Vec<(c_long, [c_long; 6])> {
+        let mut calls = vec![
+            (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0x2000, SIGSET_BYTES, 0, 0]),
+            (SYS_CLONE3, [0x4000, CLONE_ARGS_BYTES, 0, 0, 0, 0]),
+            (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0, SIGSET_BYTES, 0, 0]),
+        ];
         for signal in RESET_SIGNALS {
-            expected.push((SYS_RT_SIGACTION, [signal, 0x3000, 0, SIGSET_BYTES, 0, 0]));
+            calls.push((SYS_RT_SIGACTION, [signal, 0x3000, 0, SIGSET_BYTES, 0, 0]));
         }
-        expected.extend([
+        calls.extend([
             (SYS_DUP3, [7, 3, 0, 0, 0, 0]),
             (SYS_DUP3, [8, 4, 0, 0, 0, 0]),
             (SYS_CLOSE_RANGE, [5, 0xFFFF_FFFF, 0, 0, 0, 0]),
@@ -897,11 +900,50 @@ mod tests {
             (SYS_EXECVEAT, [4, 0x7000, 0x8000, 0x9000, 0x1000, 0]),
             (SYS_EXIT_GROUP, [127, 0, 0, 0, 0, 0]),
         ]);
-        assert_eq!(child.calls, expected);
+        calls
+    }
+
+    /// Runs the span as the child (clone3 answers 0) until its exit_group unwinds, and returns what was recorded.
+    fn run_child(mut child: Recording) -> Vec<(c_long, [c_long; 6])> {
+        let ended = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            clone_span(&mut child, &values());
+        }));
+        assert!(ended.is_err());
+        child.calls
+    }
+
+    #[test]
+    fn child_path_signal_order() {
+        // The parent's side: the all-ones block before clone3, the restore after it.
+        let mut parent = recording(4242);
+        assert_eq!(clone_span(&mut parent, &values()), Cloned::Parent { pid: 4242, restored: true });
+        let block = (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0x2000, SIGSET_BYTES, 0, 0]);
+        let clone = (SYS_CLONE3, [0x4000, CLONE_ARGS_BYTES, 0, 0, 0, 0]);
+        let restore = (SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x2000, 0, SIGSET_BYTES, 0, 0]);
+        assert_eq!(parent.calls, vec![block, clone, restore]);
+
+        // The child's side, the whole record.
+        let calls = run_child(recording(0));
+        assert_eq!(calls, child_sequence());
         let reset: Vec<c_long> =
-            child.calls.iter().filter(|call| call.0 == SYS_RT_SIGACTION).map(|call| call.1[0]).collect();
+            calls.iter().filter(|call| call.0 == SYS_RT_SIGACTION).map(|call| call.1[0]).collect();
         assert_eq!(reset.len(), 62);
         assert!(!reset.contains(&9) && !reset.contains(&19));
+    }
+
+    #[test]
+    fn a_failed_child_step_exits_at_once() {
+        // Each of the child path's 72 checked calls (its block, the 62 resets, both dup3s, close_range, the unblock,
+        // setresgid, setresuid, capset, no_new_privs and the filter) fails in turn: exit_group(127) follows it
+        // directly, and nothing after it runs.
+        let whole = child_sequence();
+        let execveat = whole.len() - 2;
+        assert_eq!(execveat - 2, 72);
+        for failed in 2..execveat {
+            let mut expected = whole[..=failed].to_vec();
+            expected.push((SYS_EXIT_GROUP, [127, 0, 0, 0, 0, 0]));
+            assert_eq!(run_child(failing(0, failed)), expected, "the failed call at {}", failed);
+        }
     }
 
     #[test]
@@ -910,6 +952,23 @@ mod tests {
         assert_eq!(clone_span(&mut parent, &values()), Cloned::Failed);
         let numbers: Vec<c_long> = parent.calls.iter().map(|call| call.0).collect();
         assert_eq!(numbers, vec![SYS_RT_SIGPROCMASK, SYS_CLONE3, SYS_RT_SIGPROCMASK]);
+    }
+
+    #[test]
+    fn a_failed_block_never_clones() {
+        let mut parent = failing(4242, 0);
+        assert_eq!(clone_span(&mut parent, &values()), Cloned::NotBlocked);
+        assert_eq!(parent.calls, vec![(SYS_RT_SIGPROCMASK, [SIG_SETMASK, 0x1000, 0x2000, SIGSET_BYTES, 0, 0])]);
+    }
+
+    #[test]
+    fn a_failed_restore_is_reported() {
+        let mut parent = failing(4242, 2);
+        assert_eq!(clone_span(&mut parent, &values()), Cloned::Parent { pid: 4242, restored: false });
+        let numbers: Vec<c_long> = parent.calls.iter().map(|call| call.0).collect();
+        assert_eq!(numbers, vec![SYS_RT_SIGPROCMASK, SYS_CLONE3, SYS_RT_SIGPROCMASK]);
+        let mut failed = failing(-1, 2);
+        assert_eq!(clone_span(&mut failed, &values()), Cloned::Failed);
     }
 
     #[test]
@@ -945,6 +1004,20 @@ mod tests {
         assert_eq!(STAT, X86_64_STAT);
         #[cfg(target_arch = "aarch64")]
         assert_eq!(STAT, AARCH64_STAT);
+    }
+
+    #[test]
+    fn stat_fields_read_the_pinned_offsets() {
+        let (dev, ino, mode) = STAT;
+        let mut bytes = [0u8; 256];
+        bytes[dev..dev + 8].copy_from_slice(&7u64.to_ne_bytes());
+        bytes[ino..ino + 8].copy_from_slice(&42u64.to_ne_bytes());
+        bytes[mode..mode + 4].copy_from_slice(&0o140_777u32.to_ne_bytes());
+        assert_eq!(stat_fields(&bytes).unwrap(), (7, 42, 0o140_777));
+        assert_eq!(stat_fields(&bytes[..mode + 3]).unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(read_u64(&bytes, 249).unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(read_u32(&bytes, 252).unwrap(), 0);
+        assert_eq!(read_u32(&bytes, 253).unwrap_err().kind(), io::ErrorKind::InvalidData);
     }
 
     fn dirent(name: &[u8], record: u16) -> Vec<u8> {
