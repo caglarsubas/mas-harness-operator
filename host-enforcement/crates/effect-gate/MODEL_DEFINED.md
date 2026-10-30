@@ -4034,7 +4034,12 @@ HE-005A's on both targets, by the digests above; with the four `pub mod` lines a
 is byte-identical to HE-005A's on both targets; there is no new reachable source (G-HE5B-1, R296; G-HE5B-6, R301); the
 difference comes from the new edge and the unreachable modules (crate metadata and symbol hashes, and reachable
 functions' machine code may differ through optimiser effects; the run does not say which). Reproducibility: "a second
-clean build of B's broker gives the same two digests" `<pending the sim's heavy slot>`.
+clean build of B's broker gives the same two digests": **PASS** (MON-R10-HE005B-SIM-OK). The sim of `98f51cfd` (the
+packet YAML commit; packet digest `dc9d58c8…`) ran rc 0 with all nine inherited commands passing; its clean build gave
+planeon-broker x86_64 `18589a172ec196477138c341028a4b14804e3ac3d2dfb9701bd36317c1a24f5d` and aarch64
+`dbd3293d5d32cf26d224b61393c33110017e9323dbc413acd4781eff2f571747`, the same as the heavy slot's, and all ten binary
+lines, sha256 and SBOM, identical to the heavy slot's (the kit's redacted sim log `sim/out-b-98f51cf.log`, sha256
+`137b5c32d0682d7a827bb2803733667077346e68cb64e8e11ff4df4095c42fba`).
 
 ### Superseded and discharged
 
@@ -4091,7 +4096,8 @@ the verify are the author's.
 - **The I05 transcript frames are built, not read:** the I05 vector files hold events and response payloads, so the
   differential test and the broker-side replay build each frame as effect-gate's replay support does (R248, R286); a byte
   row's bytearray and str inputs are compared on their bytes, since the I02 decode takes bytes only.
-- **The early check ran on macOS only;** the Linux and musl paths are the heavy slot's.
+- **The early check ran on macOS only;** the Linux and musl paths ran in the heavy slot and again in the sim, with the
+  same digests.
 
 ### Carried
 
