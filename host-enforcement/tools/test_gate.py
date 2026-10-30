@@ -10373,6 +10373,27 @@ HE005B_PURE_ROWS = (
     ("d3 the digest-mismatch form removed", "(c)",
      ((_BDIFF, 'const DIGEST_MISMATCH: &str = "digest mismatch";', 'const DIGEST_MISMATCH: &str = "chain";'),
       (_BDIFF, '    assert_eq!(DIGEST_MISMATCH, "digest mismatch");', '    assert_eq!(DIGEST_MISMATCH, "chain");'))),
+    # HE-005B PR review round 1, R1-3 and R1-4 (Q-HE5B-R1-2 (a)): the observer logic-module words (d) and path
+    # whitelist (e), with the reviewer's three escape forms (a hashed collection, a clock, a crate:: path into the
+    # broker's own I/O code), each where the reviewer's static probe planted it.
+    ("q1 a HashSet type in i02.rs, not imported", "(d)",
+     ((_BI02, "", "\nfn probe(set: &HashSet<u8>) -> usize {\n    set.len()\n}\n"),)),
+    ("q2 std::collections::HashSet imported in i02.rs (probe)", "(d)", ((_BI02, "", "\nuse std::collections::HashSet;\n"),)),
+    ("q3 RandomState imported in gate_peer.rs", "(d)",
+     ((_BPEER, "", "\nuse std::collections::hash_map::RandomState;\n"),)),
+    ("q4 Instant::now in i05_client.rs (probe)", "(e)",
+     ((_BI05, "", "\nfn probe() -> std::time::Instant {\n    std::time::Instant::now()\n}\n"),)),
+    ("q5 SystemTime::now, imported, in i03.rs (probe)", "(e)",
+     ((_BI03, "", "\nuse std::time::SystemTime;\nfn probe() -> SystemTime {\n    SystemTime::now()\n}\n"),)),
+    ("q6 crate::seal_stage1 in i03.rs (probe)", "(e)", ((_BI03, "", "\nfn probe() {\n    let _ = crate::seal_stage1;\n}\n"),)),
+    ("q7 crate::linux_listen::LinuxI02::new in i02.rs (probe)", "(e)",
+     ((_BI02, "", "\nfn probe() {\n    let _ = crate::linux_listen::LinuxI02::new;\n}\n"),)),
+    ("q8 crate::serve_unanswered in gate_peer.rs (probe)", "(e)",
+     ((_BPEER, "", "\nfn probe() {\n    let _ = crate::serve_unanswered;\n}\n"),)),
+    ("q9 a super:: path in i03.rs", "(e)", ((_BI03, "", "\nfn probe() -> u8 {\n    super::status::LISTENER\n}\n"),)),
+    ("q10 an import renamed in i05_client.rs", "(e)", ((_BI05, "", "\nuse std::collections::BTreeSet as Set;\n"),)),
+    ("q11 a glob import in gate_peer.rs", "(e)", ((_BPEER, "", "\nuse std::collections::*;\n"),)),
+    ("q12 i05-protocol's regex in i02.rs", "(e)", ((_BI02, "", "\nuse i05_protocol::regex::Regex;\n"),)),
 )
 # G-HE5B-4, the include rule (check_broker_includes, one clause): i02.rs's schema and the vectors.
 HE005B_INCLUDE_ROWS = (
@@ -10425,7 +10446,8 @@ HE005B_TOKEN_ROWS = (
 )
 HE005B_ISOLATION_FUNCTIONS = {"(a)": "isolation_a_names", "(b)": "isolation_b_types", "(c)": "isolation_c_impls",
                               "(d)": "isolation_d_uses"}
-HE005B_PURE_FUNCTIONS = {"(a)": "pure_a_names", "(b)": "pure_b_decode_order", "(c)": "pure_c_presence"}
+HE005B_PURE_FUNCTIONS = {"(a)": "pure_a_names", "(b)": "pure_b_decode_order", "(c)": "pure_c_presence",
+                         "(d)": "pure_d_words", "(e)": "pure_e_paths"}
 HE005B_TOKEN_FUNCTIONS = {"(i)": "gate_token_i_definition", "(ii)": "gate_token_ii_literal",
                           "(iii)": "gate_token_iii_signature", "(iv)": "gate_token_iv_impls", "(v)": "gate_token_v_names"}
 
@@ -10529,8 +10551,8 @@ class He005bRuleTests(Tree):
 
     def test_the_tables(self):
         self.assertEqual(tuple(len(rows) for rows in (HE005B_ISOLATION_ROWS, HE005B_PURE_ROWS, HE005B_CLOSURE_ROWS,
-                                                      HE005B_INCLUDE_ROWS, HE005B_TOKEN_ROWS)), (14, 22, 5, 9, 19))
-        self.assertEqual(sum(len(rule[3]) for rule in HE005B_PROOF_RULES), 69)
+                                                      HE005B_INCLUDE_ROWS, HE005B_TOKEN_ROWS)), (14, 34, 5, 9, 19))
+        self.assertEqual(sum(len(rule[3]) for rule in HE005B_PROOF_RULES), 81)
         for name, check, clauses, rows, tag, any_tag, patches, tree in HE005B_PROOF_RULES:
             self.assertTrue(callable(check), name)
             for row in rows:
@@ -10565,12 +10587,12 @@ class He005bRuleTests(Tree):
 
     def test_forms_the_rules_pass(self):
         # Comments and literals naming the modules, std::fs, the token or vectors.json are not code; a strict test block
-        # in a module may name gate_sys; lib.rs's own module comment names them.
+        # in a module may hold an extern block ((a) sets it aside; since round 1, (e) reads every path of the file, as
+        # check_observer_logic does, so a gate_sys path there would refuse); lib.rs's own module comment names them.
         for changes in (
                 ((_BMAIN, "", "\n// planeon_broker::i02 and Transcript are HE-005B's, unreachable here\n"),),
                 ((_BI02, "", '\n// std::fs::read and unsafe stay out of i02\nconst NOTE: &str = "i03 std::fs GateQualified";\n'),),
-                ((_BPEER, "", "\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn named() {\n        let _ = gate_sys::peer_wire::same_lines;\n"
-                              "    }\n}\n"),),
+                ((_BPEER, "", "\n#[cfg(test)]\nmod tests {\n    extern \"C\" {\n        fn getpid() -> i32;\n    }\n}\n"),),
                 ((_BLIB, "", "\n// pub use gate_peer::GateQualified as G; include_bytes!(\"vectors.json\")\n"),)):
             self.plant(changes)
             try:

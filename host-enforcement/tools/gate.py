@@ -241,7 +241,8 @@ main, serve, seal.rs, status.rs and linux_listen.rs. G-HE5B-1 (check_broker_isol
 resolved_uses): the modules are named only by each other and by lib.rs's four `pub mod` lines, their types by no other
 broker source, with no alias, re-export or glob. G-HE5B-2 (check_broker_pure): they name no I/O, system-call or foreign
 item and join the no-panic list; i02.rs's decode keeps decode_frame's order under I02's limits (condition 1's order
-clause), and tests/i02_differential.rs is present with every named form (its presence clause). G-HE5B-3: planeon-broker's
+clause), and tests/i02_differential.rs is present with every named form (its presence clause); PR review round 1
+(R1-3, R1-4) folds in the observer logic-module words and path whitelist (HE005B_LOGIC_PATHS). G-HE5B-3: planeon-broker's
 closure is exactly the four crates (check_workspace_shape; Cargo.lock's one path edge). G-HE5B-4 (check_broker_includes):
 seal.rs embeds exactly the two BROKER programs and i02.rs exactly the channel schema, once each with include_bytes!, and
 no broker source names vectors.json. G-HE5B-5 (check_he005b_token): GateQualified is closed in R240's five clauses, in
@@ -1504,6 +1505,19 @@ HE005B_REFUSED_NAMES = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bstd::fs\b", "std::fs"), (r"\bstd::net\b", "std::net"), (r"\bstd::os\b", "std::os"), (r"\bstd::io\b", "std::io"),
     (r"\bstd::process\b", "std::process"), (r"\bstd::thread\b", "std::thread"), (r"\bgate_sys\b", "gate_sys"),
     (r"\brole_seal\b", "role_seal"), (r"\bextern\b", "extern (a foreign item)"), (r"\bunsafe\b", "unsafe")))
+# HE-005B PR review round 1, R1-3 and R1-4 (Q-HE5B-R1-2 (a), MON-R10-HE005B-R1): G-HE5B-2 folds the observer
+# logic-module construction the plan cites (check_observer_logic's, by reference, its items unchanged: the first entry of
+# OBSERVER_LOGIC_WORDS, CRATE_PATH_ROOTS, CODE_PATH and allowed_logic_path) over the four modules, with B's own
+# whitelist: crate:: and self:: paths only to the four modules themselves, i05-protocol's items they use (the plan's
+# json, sha256, base64 and schema, the brief's FrameError, and i05_client's decode_frame, i05_v3_schema and Datagram),
+# std's ordered collections and std::str. So std::time, std's hashed collections, super:: paths and the broker's own
+# seal, listener and lib.rs items are refused. OBSERVER_LOGIC_WORDS' include entry stays G-HE5B-4's (i02.rs embeds).
+HE005B_LOGIC_PATHS = (tuple(("crate", name) for name in HE005B_MODULES) + tuple(("self", name) for name in HE005B_MODULES)
+                      + tuple(("i05_protocol", name) for name in ("json", "sha256", "base64", "schema", "FrameError",
+                                                                    "decode_frame", "i05_v3_schema", "Datagram"))
+                      + tuple(("std", "collections", name) for name in ("BTreeMap", "BTreeSet", "VecDeque"))
+                      + (("std", "str"),))
+HE005B_LOGIC_WORDS = OBSERVER_LOGIC_WORDS[:1]
 # G-HE5B-5 (Q-HE5B-5 (a), condition 2): the gate-qualification token, its one file and its one minting function, with
 # that function's exact signature (R240's clauses in G-D2-8's form).
 HE005B_TOKEN = "GateQualified"
@@ -3397,15 +3411,54 @@ def pure_c_presence(base: Path, rule: str) -> None:
         require(form in literals, "%s does not name the form %r (%s (c))" % (rel, form, rule))
 
 
+def pure_d_words(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (d), check_observer_logic's words (HE-005B PR review round 1, R1-3): no module of the four names HashMap,
+    HashSet or RandomState (HE005B_LOGIC_WORDS, OBSERVER_LOGIC_WORDS' first entry: std's default hasher asks getrandom),
+    read as check_observer_logic reads a logic module."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (d))" % (rel, rule))
+        for pattern, name in HE005B_LOGIC_WORDS:
+            require(not pattern.search(codes[rel]), "%s names %s (%s (d))" % (rel, name, rule))
+
+
+def pure_e_paths(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (e), check_observer_logic's path whitelist (HE-005B PR review round 1, R1-3 and R1-4): in each of the four
+    modules, read as check_observer_logic reads a logic module (comments removed, literal contents emptied, the whitespace
+    around `::` removed), every use path has no rename and no glob and every use path and every crate-rooted code path
+    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged)."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (e))" % (rel, rule))
+        code = codes[rel]
+        for declaration in USE_DECLARATION.finditer(code):
+            try:
+                uses = use_paths(declaration.group(1))
+            except GateError:
+                raise GateError("%s holds a use declaration the logic rule cannot read (%s (e))" % (rel, rule)) from None
+            for path, rename in uses:
+                require(rename is None, "%s renames an import (%s (e))" % (rel, rule))
+                require(path[-1] != "*", "%s imports a glob (%s (e))" % (rel, rule))
+                require(allowed_logic_path(path, False, HE005B_LOGIC_PATHS), "%s imports %s, outside the HE-005B logic "
+                        "whitelist (%s (e))" % (rel, "::".join(path), rule))
+        for match in CODE_PATH.finditer(USE_DECLARATION.sub(" ", code)):
+            leading, root, tail = match.groups()
+            path = (root,) + tuple(tail.split("::")[1:])
+            require(allowed_logic_path(path, bool(leading), HE005B_LOGIC_PATHS), "%s names %s%s, outside the HE-005B "
+                    "logic whitelist (%s (e))" % (rel, leading or "", "::".join(path), rule))
+
+
 def check_broker_pure(base: Path) -> int:
     """HE-005B G-HE5B-2 (MON-HE005B-PLAN; Q-HE5B-3 (a), condition 1): the four pure logic modules join BROKER_NO_PANIC
     (check_broker_no_panic) and (a) name no I/O, system-call or foreign item; (b) i02.rs's decode keeps decode_frame's
-    order and I02's limits; (c) the differential test is present with every named form. The number of modules."""
+    order and I02's limits; (c) the differential test is present with every named form. HE-005B PR review round 1, R1-3
+    and R1-4 (Q-HE5B-R1-2 (a)): the observer logic-module construction folded in, (d) its words and (e) its path
+    whitelist with HE005B_LOGIC_PATHS. The number of modules."""
     rule = "HE-005B pure, G-HE5B-2"
     codes = he005b_codes(base, rule)
     pure_a_names(codes, rule)
     pure_b_decode_order(codes, rule)
     pure_c_presence(base, rule)
+    pure_d_words(codes, rule)
+    pure_e_paths(codes, rule)
     return len(HE005B_FILES)
 
 
@@ -8988,10 +9041,11 @@ def main() -> int:
         say("HE-005B pure (G-HE5B-2): the %d modules name no std::fs, std::net, std::os, std::io, std::process, "
             "std::thread, gate_sys, role_seal, extern or unsafe and join the no-panic list (a); %s's fn %s names its %d "
             "steps once each, in decode_frame's order, its limits are %s, and decode runs the kind limit after it (b); "
-            "%s calls decode_frame and %s and names the forms %s (c)"
+            "%s calls decode_frame and %s and names the forms %s (c); PR review round 1: they name no HashMap, HashSet "
+            "or RandomState (d), and every path they import or root starts with one of %d whitelist entries (e)"
             % (check_broker_pure(HE), BROKER_I02, HE005B_DECODE_FUNCTION, len(HE005B_DECODE_STEPS),
                ", ".join(name for _, name in HE005B_LIMITS), HE005B_DIFFERENTIAL, HE005B_DECODE_FUNCTION,
-               ", ".join(HE005B_FORMS)))
+               ", ".join(HE005B_FORMS), len(HE005B_LOGIC_PATHS)))
         say("gate-qualification token (G-HE5B-5; R240's clauses in G-D2-8's form): %d clauses over the broker's sources: "
             "%s is defined once, in %s, with private fields of %s and exactly %s (i); its one literal lies inside fn %s, "
             "and no `Self{` or `Self(` (ii); `%s` once (iii); no impl names it (iv); no rename, alias or re-export (v)"

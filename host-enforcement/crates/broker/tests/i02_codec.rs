@@ -587,6 +587,49 @@ fn cleanup_and_terminal_bind_the_receipt() {
     assert_eq!(run.feed(&after).unwrap_err(), Breach::Ended);
 }
 
+/// The H5G-4 case (DESIGN-HE005 section 3.3 step 10; PR review round 1, R1-2; MON-R10-HE005B-R1 and
+/// MON-R10-HE005B-H5G4): an exec failure after STARTED, so the worker sends no receipt. Today's transcript gives such a
+/// run no ending through steps 12-14: CLEANUP_RECORDED needs a chunk, TERMINAL needs CLEANUP_RECORDED, and a REFUSED
+/// after STARTED is refused, so the broker's only ending is closing the channel without a TERMINAL (the lost-terminal
+/// path). ABORT is the server's frame, not the broker's ending, and is not exercised here. HE-005D adopts EDGE-V13's
+/// no-receipt TERMINAL before live wiring and replaces this vector with steps 12-14.
+#[test]
+fn h5g4_exec_failure_after_started() {
+    let positive = vector(0);
+    let frames = frames(&positive);
+    let schemas = schemas();
+    // STARTED, then no RECEIPT_CHUNK: the worker never execs.
+    let mut run = Run::new(&positive);
+    run.feed_all(&frames[..1]);
+    assert!(!run.transcript.is_over(), "STARTED leaves the run open");
+    // CLEANUP_RECORDED is refused: with no chunk the receipt is not complete.
+    let cleanup = run.next_frame("CLEANUP_RECORDED", member(&frames[2], "payload").clone());
+    assert_eq!(run.feed(&cleanup).unwrap_err(), Breach::ChunksIncomplete);
+    // TERMINAL is unreachable: the builder refuses it before CLEANUP_RECORDED, whatever its status, and a received one
+    // is refused the same way.
+    for status in [TerminalStatus::Completed, TerminalStatus::Failed, TerminalStatus::Unavailable] {
+        let mut run = Run::new(&positive);
+        run.feed_all(&frames[..1]);
+        assert_eq!(run.transcript.terminal(&schemas, status).unwrap_err(), Breach::TerminalBeforeCleanup, "{status:?}");
+    }
+    let mut run = Run::new(&positive);
+    run.feed_all(&frames[..1]);
+    let terminal = run.next_frame("TERMINAL", member(&frames[3], "payload").clone());
+    assert_eq!(run.feed(&terminal).unwrap_err(), Breach::TerminalBeforeCleanup);
+    // A REFUSED after STARTED is refused, built or received.
+    let mut run = Run::new(&positive);
+    run.feed_all(&frames[..1]);
+    assert_eq!(run.transcript.refused(&schemas, RefusedReason::Unavailable).unwrap_err(), Breach::RefusedNotFirst);
+    let mut run = Run::new(&positive);
+    run.feed_all(&frames[..1]);
+    let refused = run.next_frame("REFUSED", reason("UNAVAILABLE"));
+    assert_eq!(run.feed(&refused).unwrap_err(), Breach::RefusedNotFirst);
+    // So no frame the broker can build ends the run: it stays open until the channel is closed without a TERMINAL.
+    let mut run = Run::new(&positive);
+    run.feed_all(&frames[..1]);
+    assert!(!run.transcript.is_over(), "the broker's only ending is the channel's close (the lost-terminal path)");
+}
+
 #[test]
 fn at_most_one_abort() {
     let positive = vector(0);

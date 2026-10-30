@@ -423,7 +423,7 @@ positive only (DATA_CHECK_ONLY): R10 states its own negative cases in those test
 - `contracts/broker-handoff-v1/channel.schema.json` from `architecture/broker-handoff-inputs/channel.schema.json`, sha256 `e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9`, 42572 bytes
 - `contracts/broker-handoff-v1/vectors.json` from `architecture/broker-handoff-inputs/vectors.json`, sha256 `80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4`, 47254 bytes
 
-Not registered and not vendored (edge record v12's notes): the readiness guide
+Not registered and not vendored (`architecture/artifact-edges/README-v12.md` :33-35): the readiness guide
 `docs/alpha-2/BROKER_HANDOFF_READINESS.md`, which is not a consumer artefact.
 
 ## NIST CAVP SHA-256 test vectors
