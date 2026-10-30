@@ -3872,3 +3872,247 @@ MON-HE005A-U5-2 (R244's two items accepted, LINKED-EXCEPTIONS-PROOF carried, the
 MON-SLOT-269-GOV005 (EDGE-V12 renumbered to slot 270); and MON-HE005A-R1 (PR review round 1's R1-1 fixed and R1-4 and
 R1-5 folded in U6, the build brief's addendum 5). The complete messages are recorded in the operator's
 `tools/w03/he005/OWNER_DECISIONS.md`.
+
+## HE-005B: I02's and I03's codec and checks, the I05 client's frames and the gate's qualification (`crates/broker/src/i02.rs`, `i03.rs`, `i05_client.rs`, `gate_peer.rs`; `contracts/broker-handoff-v1/`; `tools/gate.py`)
+
+HE-005B is DESIGN-HE005 revision 5 §1 (O10-O14, O18, O20, O21), §3.1, §3.3 and §4 HE-005B (sha256 `0335ce2d…`), built as
+the HE-005B plan (`02d778ed…`) states it under MON-HE005B-PLAN (Q-HE5B-1..6 (a), with two conditions) and the plan's
+rulings file (`4afb4be2…`), by the build brief (`3cf3206f…`) and its addendum 1 (`33205801…`), on HE-005A's merged base
+`abde6fc5`. It vendors edge record v12's two broker handoff rows (CONTRACTS 67 → 69) and adds four pure logic modules to
+crates/broker: I02's codec and checks (`i02.rs`), I03's START (`i03.rs`), the broker's side of I05 (`i05_client.rs`) and
+the gate's qualification (`gate_peer.rs`). Each is pure (no I/O, no system call, safe Rust only, no panic) and
+unreachable: nothing in `main`, `serve`, `seal.rs`, `status.rs` or `linux_listen.rs` names it, so planeon-broker's
+behaviour stays HE-005A's. planeon-broker's closure gains i05-protocol, unchanged. B goes before C as a consequence of
+the owner's pause of HE-005C, not as a design change (R305). Its rules are R246-R306.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R246 | **The two vendored rows.** `contracts/broker-handoff-v1/channel.schema.json` (sha256 `e7e9558f…56f9`, 42,572 bytes) and `vectors.json` (`80d8da95…03c4`, 47,254 bytes), mode 100644, written with `git show "dd000fef:<provider path>"`, byte-identical to edge record v12's rows 80 and 81 (BYTE_IDENTICAL, REGISTERED_BEFORE_USE, consumer HE-005B, provider commit `8f3cc3a8`, no provider packet). CONTRACTS 67 → 69 with their digests; `contracts/PROVENANCE.md` gains their section. The schema is embedded once, by `i02.rs`; the vectors are read only under `crates/broker/tests/`. `crates/broker/Cargo.toml` gains `i05-protocol = { path = "../i05-protocol" }` and `Cargo.lock`'s planeon-broker entry the one dependency name, written by hand, offline; `BROKER_LINKED_CRATES` becomes exactly crates/broker, crates/role-seal, crates/gate-sys and crates/i05-protocol | Q-HE5-1 (a); edge record v12 (`operator-harness-engineering-v12.json`, `3587488b…`); §4 HE-005B (H5D-12); MON-R10-HE005B-U1 |
+| R247 | **The schemas.** `Schemas::embedded()` loads the one embedded `channel.schema.json` (`include_bytes!` inside the function, so no byte-typed item lies outside `seal.rs`) three ways: the whole channel schema, and its `binding` and `workerStart` definitions, each as a document whose root is a `$ref` to the definition beside the same `$defs`, the subset i05-protocol's `Schema` reads. The schema's 19 keywords and 5 patterns lie inside that subset (checked by script) | The plan's checks at plan time; i05-protocol `schema.rs:4-10` |
+| R248 | **I02's decode** (`decode_datagram`): one received datagram under a size limit and a schema, in i05-protocol's `decode_frame` order (`frame.rs:64-85`, then its `check_structure`), built from its public primitives unchanged: the size limit (F02), UTF-8 (F06), `json::parse` (F03 for a refused constant, F05 for a duplicate key, F06 otherwise), `json::canonical` compared byte for byte (F06), depth at most 16 (F01), no float (F03), no control character (F04), the schema (F00); it returns i05-protocol's `FrameError`. Production (`decode`) fixes the limit at 65,536 and the schema at the embedded one, then the kind limit (R249). The differential test (`tests/i02_differential.rs`, condition 1) runs it with the limit 16,384 against `decode_frame` with the same schema: the same canonical value or the same code on every frame of the three I05 vector files (34 frame rows, 14 byte rows, and 988, 50 and 180 frames built from the transcripts' events and responses as effect-gate's replay support builds them), on every message of the broker handoff vectors (22), on one case of each named form built from a vector frame of each contract (oversize, truncated, trailing byte, not UTF-8, duplicate key, float, control character, depth 17, schema miss), and on the digest-mismatch form (decode_frame followed by the test's own check over `check_frame_encoded`'s bytes; one changed `previousDigest` at each frame of the two I02 transcripts, 18 cases, each refused at that frame by both). **The one difference allowed:** a valid frame of 16,385 to 65,536 bytes, which `decode_frame` refuses F02 only (pinned at exactly 16,385 bytes and at the largest valid RECEIPT_CHUNK) | Q-HE5B-3 (a) and its condition (MON-HE005B-PLAN); MON-R10-KIT (a); the build brief's condition 1; MON-R10-HE005B-U2-OK, departure 2 |
+| R249 | **The kind limit is a backstop that cannot fire through decode.** After the schema step, a DISPATCH or a RESOURCE_ACTION of more than 16,384 canonical bytes is refused F02 (`check_control_size`). But both are closed and bounded by the schema (a DISPATCH is at most about 750 bytes, a RESOURCE_ACTION about 1,000), so a 16,385-byte one is refused F00 by the schema step first; and no schema-valid I02 message reaches 65,536 bytes (the largest, a RECEIPT_CHUNK of 32,768 base64 characters, is about 33.7 KB). The pinned limit cases: a 65,536-byte datagram passes the size step and is refused F00 by the schema, and one of 65,537 bytes F02; under a schema that admits anything, 65,536 bytes are admitted; a 16,385-byte DISPATCH and RESOURCE_ACTION are each refused F00, and `check_control_size` refuses each F02 at 16,385 and passes it at 16,384 | O21 (readiness guide :197); MON-R10-HE005B-U2-OK, departure 1 |
+| R250 | **The DISPATCH and its binding** (`check_dispatch`, Q-HE5B-2 (a)): the datagram through `decode`; a DISPATCH (else `NotDispatch`; a refused datagram is `Frame(code)` and nothing can echo it, so nothing is answered); then the binding document, an input, decoded under `$defs/binding` with I02's limits (canonical, at most 64 KiB, depth 16), its SHA-256 equal to the DISPATCH's `bindingDigest`, and its four broker and worker digests equal to `ConfiguredDigests` (a plain value the signed configuration fills, HE-005C); any difference is `Authority(echo)`, answered REFUSED INVALID_AUTHORITY. Only the four are compared: the profile and observation-binding digests are not among §3.1's members. A checked `Dispatch` holds the echo and the bound case's resource set; nothing in it selects a file, a uid or an executable | §3.1 (O19); Q-HE5B-2 (a); readiness guide :76-80 |
+| R251 | **The transcript** (`Transcript`), a pure state machine over both directions: one execution id chosen by the caller; the sequence from 1, plus 1 per frame in either direction; the all-zero previous digest first and the previous frame's canonical SHA-256 after; every frame echoing the DISPATCH's eight fields; the direction by kind (the broker's STARTED, RESOURCE_ACTION, RECEIPT_CHUNK, TERMINAL and REFUSED; the server's RESOURCE_RESULT, CLEANUP_RECORDED and ABORT); the first frame STARTED or REFUSED; RESOURCE_RESULT answering the outstanding action; no action outstanding when another action, a chunk, CLEANUP_RECORDED or TERMINAL arrives; chunk indexes contiguous from 0, each canonical base64 of at most 24 KiB decoded, at most 171 chunks and 4 MiB in all; CLEANUP_RECORDED once, with the chunks complete; TERMINAL only after it, binding the receipt's size and SHA-256 and echoing its cleanup digest, with `workerReaped` true; nothing after TERMINAL or REFUSED; at most one ABORT. Any breach (`Breach`) ends the transcript, and every later frame is `Ended`, with no repair or retry | The plan's item 2; O12, O20, O21; readiness guide :155, :174-193, :202 |
+| R252 | **A RESOURCE_ACTION stays in the bound case:** its manifest digest must be in the DISPATCH's case set, the binding's `caseResourceDigests` entry for its `caseId` (`ManifestOutsideCase`); with an empty set (zero-resource mode) every RESOURCE_ACTION is refused | Readiness guide :181-182 ("one manifestDigest in that case's already-bound set") and :213-214 (zero-resource mode refuses every RESOURCE_ACTION); U2 choice, MON-R10-HE005B-U2-OK |
+| R253 | **No RESOURCE_ACTION after the server's ABORT** (`ActionAfterAbort`); a RESOURCE_RESULT may still answer an action outstanding at the ABORT, and chunks, CLEANUP_RECORDED and TERMINAL may follow it | R10-defined, fail-closed: readiness guide :202-203 (one ABORT, the broker still enforcing expiry and invalidation); U2 choice |
+| R254 | **Nothing new after CLEANUP_RECORDED:** no RESOURCE_ACTION (`ActionAfterCleanup`) and no RECEIPT_CHUNK (`ChunkAfterCleanup`); only ABORT and TERMINAL may follow it | Readiness guide :193 ("extra frames cannot complete the operation") and :234 (CLEANUP_RECORDED only once no action is outstanding and the chunks are complete); U2 choice |
+| R255 | **CLEANUP_RECORDED needs at least one chunk** (`ChunksIncomplete`): the chunks are complete only when there are some, since TERMINAL's `receiptSize` has the schema's minimum 1 | The receiptSize floor (`channel.schema.json`, TERMINAL's `receiptSize` minimum 1); readiness guide :234; U2 choice |
+| R256 | **A refusing transcript and the execution id's form:** a DISPATCH refused at its binding check gets `Transcript::refusing`, whose one frame is REFUSED (STARTED is `FirstFrame`); a transcript's execution id must be 64 lowercase hexadecimal digits (`ExecutionIdForm`) | Readiness guide :174 (a 256-bit execution id chosen by the broker) and :179 (the first frame); the schema's `executionId` pattern; U2 choice |
+| R257 | **The builders:** STARTED, RESOURCE_ACTION, RECEIPT_CHUNK (the next index), TERMINAL (status; size, digest and cleanup digest from the transcript) and REFUSED, each built canonical and taken through `Transcript::accept` before it is returned, so it passes the same checks; the vectors' broker frames are rebuilt byte for byte | The plan's item 2 |
+| R258 | **The refusal map, HOLD at step 1 or step 4's re-read** (`Failure::Held`) → REFUSED CAPACITY_HELD | §3.3 step 1, §3.4; H5E-4 |
+| R259 | **The refusal map, the DISPATCH's binding check** (`BindingMismatch`) → REFUSED INVALID_AUTHORITY | §3.1, §3.3 step 1; Q-HE5B-2 (a); H5E-4 |
+| R260 | **The refusal map, the gate's qualification** (`GateQualification`, step 2; O10, O11) → REFUSED UNAVAILABLE | §3.3 step 2; H5E-4 (before step 5: UNAVAILABLE, INVALID_AUTHORITY or CAPACITY_HELD) |
+| R261 | **The refusal map, the I05 channel's opening exchange** (`GateChannel`, step 2: GENERATION_STATUS failed or was refused) → REFUSED UNAVAILABLE | §3.3 step 2; H5E-4 |
+| R262 | **The refusal map, the W5 check** (`ScriptCheck`, step 3) → REFUSED UNAVAILABLE | §3.3 step 3; H5E-4 |
+| R263 | **The refusal map, W1** (`LeafCheck`, step 4) → REFUSED UNAVAILABLE | §3.3 step 4; H5E-4 |
+| R264 | **The refusal map, W2 and W3** (`Spawn`, steps 5 and 6, the leaf then shown empty by W6) → REFUSED UNAVAILABLE | §3.3 failure rules; H5E-4 (from step 5 up to STARTED: UNAVAILABLE once W6 has shown the leaf empty) |
+| R265 | **The refusal map, BIND_EXECUTION refused NOT_ACTIVE** (step 7) → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) (every BIND refusal maps to UNAVAILABLE) |
+| R266 | **The refusal map, BIND_EXECUTION refused ACTION_OUTSTANDING** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R267 | **The refusal map, BIND_EXECUTION refused EXECUTION_REPLAY** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R268 | **The refusal map, BIND_EXECUTION refused GENERATION_MISMATCH** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R269 | **The refusal map, BIND_EXECUTION refused UNKNOWN_BINDING** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R270 | **The refusal map, BIND_EXECUTION refused CERTIFICATE_MISMATCH** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R271 | **The refusal map, BIND_EXECUTION refused MANIFEST_REUSED** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R272 | **The refusal map, BIND_EXECUTION refused WORKER_NOT_OBSERVED** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R273 | **The refusal map, BIND_EXECUTION refused STORAGE_FAILURE** → REFUSED UNAVAILABLE | H5E-4; Q-HE5B-U2-1 (a) |
+| R274 | **The refusal map, no valid BIND_EXECUTION answer** (`BindChannel`, step 7) → REFUSED UNAVAILABLE | H5E-4 |
+| R275 | **The refusal map, the leaf not shown empty** (`LeafNotEmpty`, from step 5) → nothing: the broker enters HOLD and sends no frame | §3.4 (HOLD sends nothing); H5E-4 |
+| R276 | **REFUSED REPLAY: decoded, never built by the broker (H5E-4).** The transcript accepts it as a frame kind and `RefusedReason` names it, but no failure class maps to it | Q-HE5B-U2-1 (a); MON-R10-HE005B-U2-OK |
+| R277 | **REFUSED GENERATION_MISMATCH: decoded, never built by the broker (H5E-4).** As R276 | Q-HE5B-U2-1 (a); MON-R10-HE005B-U2-OK |
+| R278 | **I03's START** (`i03::start`): built only from a checked `Dispatch` and the broker's execution id: `planeon.internal.broker-worker/v1`, operation START, and exactly `executionId`, `bindingDigest`, `caseId`, `requestDigest` and `generation`; canonical, at most 16 KiB, and valid under `$defs/workerStart` before it is returned, or the refusal its check gives. It is no I02 frame (`NotFrame`) | O13, O21 (readiness guide :110-112, "START carries only the closed execution/case/binding/request/generation identifiers", and :197); the plan's item 3 |
+| R279 | **The I05 client** (`I05Client`): one gate generation's channel from the broker's side, over i05-protocol's `i05_v3_schema()` (loaded by `open`; nothing embedded) and `decode_frame` as they are. The opening request is GENERATION_STATUS with sequence 1, the all-zero digest, and the caller's generation and fresh 256-bit challenge (each 64 lowercase hexadecimal digits, else `Form`); odd sequences the broker's, even the gate's, one response per request, no unsolicited gate frame; the builders for GENERATION_STATUS, BIND_EXECUTION (`Bind`, with `peerQualificationDigest` and the worker's pid and start ticks), ARM_ACTION, ACTION_OUTCOME and CLOSE_GENERATION, each checked by `decode_frame` before it is returned; each response decoded by `decode_frame`, then its direction, sequence, chain, generation, challenge and operation checked. Any deviation is the channel's end (`ChannelEnd`); a refused BIND's reason feeds the refusal map (`Response::bind_refusal`). The I05 vectors replay from the broker's side: v3 491 requests reached and 485 answered, the supplement 25 and 25, v4 92 and 88 | O14, O18; i05-v3 README :44-76 ("The broker verifies the gate's frames the same way"); the plan's item 4 |
+| R280 | **An OK answer repeats its request's ids:** BIND_EXECUTION's `executionId`, and ARM_ACTION's and ACTION_OUTCOME's `actionId`, else `Answer` | The i05-v3 README's Operations table (each OK response names its request's execution or action); every vector answer does (checked by script); U3 choice, MON-R10-HE005B-EARLY-GO |
+| R281 | **A request that fails its own check ends the channel,** as a bad response does: the broker sends nothing it could not have received | i05-v3 README :76 (any deviation is peer failure); U3 choice |
+| R282 | **GENERATION_STATUS may be sent again after the opening** | The i05-v3 vectors (136 GENERATION_STATUS requests across 120 transcripts); README :82; U3 choice |
+| R283 | **The client reuses i02.rs's `Verb`, `BindRefusal` and `ZERO_DIGEST`** rather than copies | G-HE5B-1 (the four modules name each other); U3 choice |
+| R284 | **START's execution-id form is left to `$defs/workerStart`** (F00), not checked before | The schema's `executionId` pattern; U3 choice |
+| R285 | **`Bind` is a plain value;** where the server certificate digest comes from is HE-005D's and HE-008's | The plan's "Not B's"; U3 choice |
+| R286 | **The broker-side replay's channel boundaries:** one client per channel, a channel ending at a CHANNEL_LOST, PEER_CHANGED or GATE_RESTART event, a mutated frame or a request the gate does not answer (the five requests the client refuses to build are all ones the gate leaves unanswered, checked by script); a config naming no generation or broker challenge (the supplement's) takes v3 ACTIVE's | effect-gate's replay support (`tests/support/mod.rs`); U3 choice |
+| R287 | **The gate's qualification** (`qualify_gate`), over observed values (`GateObservation`: SO_PEERCRED, the socket pidfd's origin, the `exe` link, `attr/current`, the `cgroup` file, the `stat` line, and whether the pidfd fired after the reads) and the signed `gateExecutablePath`, in effect-gate's own qualification order: SO_PEERCRED's pid (positive), uid and gid; the label; the cgroup; the executable; the `stat` line's pid (equal to SO_PEERCRED's) and start time; last, the pidfd not fired. The pidfd is the socket's only (O11): `SocketPidfd` has SO_PEERPIDFD and SCM_PIDFD variants and none for a `pidfd_open` of SO_PEERCRED's pid | O10, O11; HS53 §4.3 (:304-312); hs43 H1 (:134); the plan's item 5 |
+| R288 | **The token and the per-frame comparison** (condition 2): `GateQualified` is minted only by `qualify_gate`; it has private fields `pid: i64` and `start_ticks: u64`, exactly `#[derive(Debug)]` and `#[must_use]`, and no impl at all, so no Clone, Copy, Default, From or getter; `compare_start_time(&GateQualified, stat, exited)` is a free function comparing a later frame's `stat` pid and start time and the pidfd. G-HE5B-5 holds this in the source (R300) | Q-HE5B-5 (a) and its condition (MON-HE005B-PLAN); the build brief's condition 2; HS53 §4.3 |
+| R289 | **The expected label, ids and cgroup are R10 constants** in effect-gate's `peers.rs` form: `system_u:system_r:planeon_gate_t:s0`, uid 0, gid 0, and the cgroup line `0::/planeon.slice/planeon-effect-gate.service`; `tests/gate_peer.rs` reads them from the vendored schema. T04 confirms them on the real gate | native-profile v4's EFFECT_GATE role constants (`contracts/native-profile-v4/qualification.schema.json`, `$defs/roles`); hs43 H1 (uids and gids 0); §3.1 holds only `gateExecutablePath`; U4 choice 1, MON-R10-HE005B-U4-OK |
+| R290 | **The token has no impl, so no getters**: D reads nothing from it but the per-frame comparison | The build brief's condition 2, clause (iv), over G-D2-8's getter form; U4 choice 2 |
+| R291 | **The four readers are pure copies of gate-sys's** (`label_matches`, `line_set`, `same_lines`, `stat_start_time`), since the module names no gate-sys item; `tests/gate_peer_parity.rs` compares each with gate-sys's original on shared inputs (9 labels against 4 expected, 12 cgroup texts pairwise, 16 `stat` lines) | G-HE5B-2; U4 choice 3 with its condition, met in U5 (MON-R10-HE005B-U5-OK) |
+| R292 | **The `stat` line's pid equals SO_PEERCRED's at qualification;** each later frame compares the pid, the start time and the pidfd | HS53 §4.3 (a reference taken without a race at the first frame); U4 choice 4 |
+| R293 | **The `exe` link equals the signed path byte for byte:** a ` (deleted)` suffix, another path and an empty signed path are each refused | HS53 §4.3 (the artifact check reads the gate's exe link); §3.1; U4 choice 5 |
+| R294 | **The label is read from `attr/current` only;** SO_PEERSEC is carried to HE-005D/HE-008 | Q-HE5B-U4-1 (a) (MON-R10-HE005B-U4-OK) |
+| R295 | **Per frame, the pid, the start time and the pidfd only:** no SCM_CREDENTIALS per frame | Q-HE5B-U4-2 (a) (MON-R10-HE005B-U4-OK); HS53 §4.3 ("A peer's start time is compared on every frame") |
+| R296 | **G-HE5B-1, isolation** (`check_broker_isolation`, module_isolation's construction with `resolved_uses`): (a) the four module files present and their names outside them only in lib.rs's four line-anchored `pub mod` lines; (b) their type set (28 names) defined once among them and named in no other broker source; (c) every impl in them `impl <own type> {`; (d) no `pub use` in them, and no use path of theirs through the modules or their types renamed or globbed, aliases of crate paths followed | The plan's G-HE5B-1; G-D2-5, G-I01B-1 |
+| R297 | **G-HE5B-2, pure** (`check_broker_pure`; the four files join `BROKER_NO_PANIC`): (a) no `std::fs`, `std::net`, `std::os`, `std::io`, `std::process`, `std::thread`, `gate_sys`, `role_seal`, `extern` or `unsafe` outside strict test blocks; (b) condition 1's order clause, `check_broker_serve`'s order form: `decode_datagram` names its twelve steps once each in `decode_frame`'s order, `MAX_DATAGRAM_BYTES` 65,536, `MAX_CONTROL_BYTES` 16,384 and `MAX_DEPTH` 16 are each defined once, `decode` runs `decode_datagram` under the datagram bound and then the kind limit, and `check_control_size` compares with `MAX_CONTROL_BYTES` and refuses F02; (c) the presence clause: `tests/i02_differential.rs` exists, calls `decode_frame` and `decode_datagram`, and names each of the ten forms as a string literal | The plan's G-HE5B-2; the build brief's condition 1 |
+| R298 | **G-HE5B-3, the closure** (`check_workspace_shape`'s broker block): planeon-broker links exactly the four crates; the block takes proof rows for the first time, over a manifest fixture (A's three crates, an added crate, a crate reached through role-seal, role-seal dropped) | The plan's G-HE5B-3; Q-HE5B-6 (a) |
+| R299 | **G-HE5B-4, the contracts and the include rule** (`check_contracts`, 69; `check_broker_includes`, `BROKER_EMBEDS`): `seal.rs` embeds exactly the two BROKER programs and `i02.rs` exactly the channel schema, once each with `include_bytes!`, both files required; no other broker source embeds anything; no broker source names `vectors.json` in code or a literal | The plan's G-HE5B-4; the build brief |
+| R300 | **G-HE5B-5, the token** (`check_he005b_token`): R240's five clauses in G-D2-8's form with `resolved_uses`: (i) one `struct GateQualified`, in `gate_peer.rs`, named private fields of `TOKEN_FIELD_TYPES`, exactly `#[derive(Debug)]` and `#[must_use]`; (ii) no `Self {` or `Self(` there and its one literal inside `qualify_gate`, none in another source; (iii) the exact signature `pub fn qualify_gate(observed: &GateObservation, gate_executable_path: &str) -> Result<GateQualified, GateRefusal>` once, concrete; (iv) no impl header naming it; (v) no `as` rename, no type alias, and no `pub use` through `gate_peer` or naming it | Q-HE5B-5 (a) and its condition; R240, R242; G-D2-8 |
+| R301 | **G-HE5B-6, the symbol check** (`check_he005b_absent`, check_d2_absent's form), in the gate's per-binary path for planeon-broker: no `.symtab` symbol has an item path or a first-crate-root path in `planeon_broker::<one of the four modules>`; A's per-binary rules (`check_broker_binary`) are unchanged | The plan's G-HE5B-6; G-D2-7 |
+| R302 | **The rows.** Self-test rows refused by each rule and, with every other clause off, by their own clause, and the same rows as proof rows (`HE005B_PROOF_RULES`, read by the build's `mutation_proof.py`): G-HE5B-1 14, G-HE5B-2 22 (the order clause's: two steps swapped twice, the comparison dropped, the schema step dropped, a mapping changed, the kind limit raised, compared with the datagram bound or not run, the datagram bound raised; the presence clause's: the test removed, a named form removed, the digest-mismatch form removed), G-HE5B-3 5, G-HE5B-4 9, G-HE5B-5 19 (every forgery form condition 2 lists): 69. G-HE5B-6's are self-test rows only (5 refused and 7 passing symbols): the fixture holds no binary. U1's contract and closure rows stay self-test rows | The build brief's U5; MON-R10-HE005B-U5-OK |
+| R303 | **HE-005A's count pins moved by the four new broker sources:** `check_broker_bytes` 4 → 8, `check_role_seal`'s clause (e) 6 → 10, `check_broker_never_unlinks` 5 → 9, `check_broker_includes` 2 → 3 (i02.rs's schema), `check_broker_no_panic` 5 → 9 (twice); no HE-005A rule changed but `check_broker_includes`, extended as R299 states | MON-R10-HE005B-U5-OK, departure 1 |
+| R304 | **The tests** under `crates/broker/tests/`: `i02_codec.rs`, `i02_differential.rs`, `i03_start.rs`, `i05_client.rs`, `gate_peer.rs` and `gate_peer_parity.rs`; the vectors are read only there | The plan's item 6 |
+| R305 | **B before C** (Q-HE5B-1 (a)): HE-005B is built while HE-005C stays paused; this follows from the owner's "Keep paused (Recommended)", not from a design change, and §4's order text stays A → C → B → D. If C resumes, it rebases on B's merge | Q-HE5B-1 (a), MON-HE005B-PLAN; the owner's decision on HE-005C (2026-10-28) |
+| R306 | **START only** (Q-HE5B-4 (a)): edge record v12 registers only the broker's START (`$defs/workerStart`); the worker's own leg on FD3 is not registered, and its registered shape is R00's, queued by the monitor as a prerequisite of HE-005D | Q-HE5B-4 (a), MON-HE005B-PLAN; readiness guide :184-185 (the plan's :185-186, read at slot 270's c2) |
+
+### R10 negatives (the plan's item 6: one failing case each)
+
+| Case | Refused as | Test |
+|---|---|---|
+| An oversize datagram (65,537 bytes) | F02, in the transcript and at the DISPATCH | `i02_codec.rs`, `i02_differential.rs` |
+| An oversize frame (a DISPATCH or RESOURCE_ACTION of 16,385 bytes) | F00 through `decode` (R249); F02 by `check_control_size` | `i02_codec.rs`, `i02_differential.rs` |
+| Non-canonical bytes | F06 | `i02_codec.rs` |
+| A duplicate key | F05 | `i02_codec.rs` |
+| A float | F03 | `i02_codec.rs` |
+| A control character | F04 | `i02_codec.rs` |
+| Depth 17 | F01 | `i02_codec.rs` |
+| A broken chain (each frame of the 14-frame vector) | `Chain` | `i02_codec.rs` |
+| A skipped sequence | `Sequence` | `i02_codec.rs` |
+| A repeated sequence | `Sequence` | `i02_codec.rs` |
+| The wrong direction (either peer's kind from the other) | `Direction` | `i02_codec.rs` |
+| A changed generation | `Echo` | `i02_codec.rs` |
+| A changed challenge | `Echo` | `i02_codec.rs` |
+| A changed execution id | `Execution` | `i02_codec.rs` |
+| An action outstanding at a chunk | `ActionOutstanding` | `i02_codec.rs` |
+| A chunk gap | `ChunkIndex` | `i02_codec.rs` |
+| An oversize chunk (24,577 bytes decoded) | F00: the schema's base64 bound (`ChunkSize` stays behind it) | `i02_codec.rs` |
+| A 172nd chunk (index 171) | F00: the schema's index bound (`ChunkCount` stays behind it) | `i02_codec.rs` |
+| More than 4 MiB (the 171st full chunk) | `ReceiptTooLarge` | `i02_codec.rs` |
+| TERMINAL before CLEANUP_RECORDED (received and built) | `TerminalBeforeCleanup` | `i02_codec.rs` |
+| A receipt size mismatch | `ReceiptSize` | `i02_codec.rs` |
+| A receipt digest mismatch | `ReceiptDigest` | `i02_codec.rs` |
+| A cleanup digest mismatch | `CleanupDigest` | `i02_codec.rs` |
+| A frame after TERMINAL | `Ended` | `i02_codec.rs` |
+| A second ABORT | `SecondAbort` | `i02_codec.rs` |
+| A REFUSED that is not first | `RefusedNotFirst` | `i02_codec.rs` |
+| The DISPATCH's `bindingDigest` not the binding's SHA-256 | `Authority` (REFUSED INVALID_AUTHORITY) | `i02_codec.rs` |
+| `brokerManifestDigest` not the configured one | `Authority` | `i02_codec.rs` |
+| `brokerExecutableDigest` not the configured one | `Authority` | `i02_codec.rs` |
+| `workerManifestDigest` not the configured one | `Authority` | `i02_codec.rs` |
+| `workerArtifactDigest` not the configured one | `Authority` | `i02_codec.rs` |
+| A binding whose bytes are not canonical | `Authority` | `i02_codec.rs` |
+| A binding outside `$defs/binding` (with its own digest in the DISPATCH) | `Authority` | `i02_codec.rs` |
+| SO_PEERCRED's pid not positive | `GateRefusal::Pid` | `gate_peer.rs` |
+| Another uid | `GateRefusal::Uid` | `gate_peer.rs` |
+| Another gid | `GateRefusal::Gid` | `gate_peer.rs` |
+| Another label (another type or level, two NULs, a newline, empty) | `GateRefusal::Label` | `gate_peer.rs` |
+| Another cgroup (another unit, a child, a second line, empty) | `GateRefusal::Cgroup` | `gate_peer.rs` |
+| Another executable (another path, ` (deleted)`, an empty signed path) | `GateRefusal::Executable` | `gate_peer.rs` |
+| An unreadable `stat` line | `GateRefusal::Stat` | `gate_peer.rs` |
+| A `stat` pid other than SO_PEERCRED's (or, per frame, the qualified one) | `GateRefusal::StatPid` | `gate_peer.rs` |
+| The pidfd fired after the reads (at qualification or per frame) | `GateRefusal::Exited` | `gate_peer.rs` |
+| A later frame's start time changed | `GateRefusal::StartTime` | `gate_peer.rs` |
+
+### Obligations (HE-005B's share)
+
+- **O10, O11:** the gate's qualification and the socket-only pidfd, as pure functions (R287-R295); reading the values is HE-005D's.
+- **O12, O20, O21:** I02's codec, the transcript, the limits and TERMINAL's binding of the receipt and the cleanup
+  digest, with `workerReaped` true (R246-R277); the I02 sockets, the clocks and the sticky HELD are HE-005D's.
+- **O13:** I03's START (R278); the worker's own leg stays R00's (R306).
+- **O14, O18:** the I05 client's frames, BIND carrying the worker's pid and start ticks and `peerQualificationDigest`
+  (R279-R286); the reaping and the live worker are HE-005C's and HE-005D's.
+
+### Binaries
+
+The binary statement (MON-I01B3-BIN's four-part form; the plan, with addendum 1's (iv)):
+- (i) G-HE5B-1's source isolation (R296): the four modules are named only by each other and lib.rs's `pub mod` lines.
+- (ii) G-HE5B-6's symbol check, as proof, on both targets: `<pending heavy step>`.
+- (iii) planeon-gate, planeon-observer, planeon-containment and planeon-writer byte-identical, sha256 and SBOM, to
+  HE-005A's on both targets (the build kit's `reference-binlines-HE005A.txt`, compared by script): `<pending heavy step>`.
+- (iv) planeon-broker's binary sha256, on both targets, equal to the reference's two broker lines; its SBOM different
+  from A's by exactly the i05-protocol workspace component (removed, `serialNumber` recomputed as `sbom()` does, the
+  canonical bytes' sha256 then equal to the reference line's; `sbom()` emits components only, MON-R10-HE005B-ADD1):
+  `<pending heavy step>`. If the binary sha256 differs, the heavy slot's removal diagnostic removes the four `pub mod`
+  lines and the i05-protocol edge and shows byte identity restored, the residual recorded in I01B3's form.
+
+### Superseded and discharged
+
+- **HE-005A's carried "HE-005B"** (I02's and I03's codec and checks against the registered schema and vectors, the I05
+  client's frames and the gate's qualification as pure functions; `BROKER_LINKED_CRATES` gaining i05-protocol): built
+  (R246-R306).
+- **The broker closure block's missing proof rows** (HE-005A's R244 item, carried uncited at `gate.py`'s
+  `check_workspace_shape` broker block): taken by G-HE5B-3's rows (R298, Q-HE5B-6 (a)).
+
+### Evidence
+
+At build, light (`python3 -I -B` text checks, no cargo): the brief's, addendum 1's, the plan's, the rulings file's and the
+design's digests (`3cf3206f…`, `33205801…`, `02d778ed…`, `4afb4be2…`, `0335ce2d…`); the two vendored files' sha256,
+lengths and modes against edge record v12's rows 80 and 81 (key by key), their bytes at `8f3cc3a8` equal to those at
+`dd000fef`, and v12's first 79 rows equal to v11's (R246); the schema's keywords and patterns inside i05-protocol's subset
+(R247); every source-text check taking only the tree, run over the worktree by importing `tools/gate.py` read-only: 72
+passing at U5 (among them check_contracts 69, check_broker_includes 3,
+check_broker_no_panic 9, check_broker_isolation 28 type names, check_broker_pure 4, check_he005b_token 5,
+check_seal_tokens 5, check_broker_bytes 8), and at U1 check_vendor, check_workspace and check_workspace_shape (12
+members, planeon-broker linking exactly the four crates); every one of the 69 proof rows built in memory with its anchors found once;
+and the privacy scan (`privacy_scan.py`) over each unit's added lines, every count 0 (U1's whole-file counts that are
+not 0, `contracts/PROVENANCE.md` names 3, `tools/gate.py` absolute paths 3 and `tools/test_gate.py` absolute paths 7,
+equal to the same files' at `abde6fc5`). The early check (MON-R10-HE005B-EARLY-GO, on the macOS host, at `feab7088`):
+`cargo check --offline -p planeon-broker --all-targets` rc 0, and `cargo test --offline -p planeon-broker` rc 0, 60
+passed, 0 failed, 0 warnings (i02_codec 22, i02_differential 8, i03_start 3, i05_client 10), the lockfile unchanged.
+
+The heavy evidence, through the build's `heavy.zsh`, on the monitor's word: `cargo test` `<pending heavy step>`; both
+musl release builds `<pending heavy step>`; `he-gate: passed` with its contracts, workspace shape and binary lines
+`<pending heavy step>`; the gate's self-test `<pending heavy step>`; the mutation proof (69 rows) `<pending heavy step>`;
+the binary statement (iii) and (iv) `<pending heavy step>`; `tests/verify` `<pending heavy step>`. The sim and the verify
+are the author's.
+
+### Code and audit
+
+- `contracts/broker-handoff-v1/channel.schema.json` and `vectors.json` (new) and `contracts/PROVENANCE.md` (one new
+  section) (R246); `Cargo.lock` (planeon-broker's one dependency name); `crates/broker/Cargo.toml` (the path dependency
+  and its comment); `crates/broker/src/lib.rs` (the four `pub mod` lines and their comment); `crates/broker/src/i02.rs`,
+  `i03.rs`, `i05_client.rs` and `gate_peer.rs` (new; R247-R295); `crates/broker/tests/i02_codec.rs`,
+  `i02_differential.rs`, `i03_start.rs`, `i05_client.rs`, `gate_peer.rs` and `gate_peer_parity.rs` (new; R304);
+  `tools/gate.py` and `tools/test_gate.py` (R296-R303); this section. No other file: i05-protocol, gate-sys, role-seal,
+  effect-gate's sources, the gate, gate-tls, the observer, observer-sys, containment, writer, every other contract, `ci/`
+  and the vendored crates are untouched.
+
+### Stated residuals
+
+- **R3, the textual reading's limits** (DESIGN-HE005 §8): G-HE5B-1, -2, -4 and -5 read text, not Rust; a form they do not
+  read stays code review's (the order clause pins each step's expression and order, and the differential test the codes).
+- **The backstops behind the schema:** the kind limit (R249), `ChunkSize` and `ChunkCount` cannot fire through `decode`,
+  since the schema refuses first; each is kept and its own case is pinned.
+- **The I05 transcript frames are built, not read:** the I05 vector files hold events and response payloads, so the
+  differential test and the broker-side replay build each frame as effect-gate's replay support does (R248, R286); a byte
+  row's bytearray and str inputs are compared on their bytes, since the I02 decode takes bytes only.
+- **The early check ran on macOS only;** the Linux and musl paths are the heavy slot's.
+
+### Carried
+
+- **The worker's leg on FD3** (Q-HE5B-4 (a)): a registered shape for it is R00's item, queued by the monitor as a
+  prerequisite of HE-005D (R306).
+- **The binding bytes' source and the server certificate digest:** HE-005D's and HE-008's (R250, R285).
+- **SO_PEERSEC** (Q-HE5B-U4-1 (a)): carried to HE-005D/HE-008 as a named item: D may add it as a further observed input,
+  compared with the same label, if the BROKER seccomp row admits `getsockopt(SO_PEERSEC)`. Its sources: HS53 §4.3's
+  text and effect-gate's two-input form (the process and the socket label).
+- **LINKED-EXCEPTIONS-PROOF and R1-3's pin:** HE-005C's (Q-HE5C-5 (a)).
+- **HE-005A PR review round 1's R1-2 and round 2's R2-1:** carried, unchanged.
+- **The HE5 citation for C's resumption brief** (MON-R10-HE005B-U1): carried with HE-005C.
+- **HE-005C** (paused by the owner): §3.1's signed configuration, which fills `ConfiguredDigests`, the HOLD derivation,
+  broker-sys and the lifecycle W1-W6.
+- **HE-005D:** the live wiring: the I02 sockets and the transcript in `serve`, the gate's qualification read from the
+  kernel, the I05 client over its socket, O21's start-reference decision, the 2-second and 900-second clocks and the
+  sticky HELD.
+- **T04:** the gate's real label, cgroup line and ids against R289's constants.
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-28)
+
+> Monitor: owner decision on HE-005C after the second classifier stop (2026-10-28, via the lane monitor), verbatim: "Keep paused (Recommended)". Record it as owner (via lane monitor).
+> - HE-005C stays PAUSED. No agent attempts the raw layer again, and the he005c worktree stays clean at abde6fc5 (keep it; don't delete it).
+> - R10 does light work only: HE-005B plan prep against slot 270's edge record v12 (R00's EDGE-V12, now at c2 in contract review). HE-005B still waits for 270's merge before any build.
+> - No agent launch, heavy step or push without my word. Send me one message when the HE-005B plan is ready.
+
+> Monitor: HE-005B plan rulings (MON-HE005B-PLAN), recorded as "lane monitor (owner delegation 2026-10-22)": Q-HE5B-1..6 are all (a), with two conditions. No reviewer has disagreed on any of them.
+> - Checked: the plan is 02d778ed…9231. Folded into the checkpoint now: your LANE-PRIMARY bullet.
+> - Q-HE5B-1 (a): B builds once 270 merges, with C paused. Record the departure from §4's order as following from the owner's "Keep paused", not as a design change.
+> - Q-HE5B-3 (a), condition: the 64 KiB I02 decode path needs a differential test. On every vector frame of 16 KiB or less it must agree with decode_frame, and it must refuse everything decode_frame refuses, including the oversize, truncated, trailing-byte and digest-mismatch forms. Add proof rows for its gate rule. The PR review brief names it as an explicit check.
+> - Q-HE5B-5 (a), condition: the minted token must not be constructible outside the module. Apply the R1-1 no-pub forgery-form rule, with failing rows.
+> - Q-HE5B-2, -4, -6 (a). For Q-HE5B-4, I've queued "a registered shape for the worker leg on FD3" as an R00 item (prerequisite of HE-005D) and will raise it with R00 after 270.
+> - At 270's merge: re-read both v12 rows on merged main before the brief, as you planned, and send me the brief, kit and launch prompt digests before any launch.
+
+Cited by id: MON-HE005A-MERGED (2026-10-28: HE-005A merged as `abde6fc5`, HE-005B to wait for EDGE-V12) and
+MON-R10-PRESTAGE (2026-10-29: the brief, kit and launch prompt pre-staged, light); MON-R10-KIT and MON-R10-SCRATCH
+(2026-10-29: the kit accepted, the digest-mismatch reference and the scratch rules); the slot renumbering of 2026-10-29
+(EDGE-V12 moved to slot 271); MON-R10-HE005B-GO (slot 271 merged as `dd000fef`); MON-R10-HE005B-U1 (Cargo.lock offline
+only); MON-R10-HE005B-U1-OK (Q-HE5B-U1-1 (a) and Q-HE5B-U1-2 (a), addendum 1); MON-R10-HE005B-ADD1 (`sbom()` emits
+components only); MON-R10-HE005B-U2-OK (Q-HE5B-U2-1 (a); departures 1-3); MON-R10-HE005B-EARLY-CHECK,
+MON-R10-HE005B-EARLY-GO and MON-R10-HE005B-EARLY-OK (U3 accepted, the early check); MON-R10-HE005B-U4-OK
+(Q-HE5B-U4-1 (a), Q-HE5B-U4-2 (a)); and MON-R10-HE005B-U5-OK (departures 1-6, the parity condition met). All are
+2026-10-30 unless dated above. The complete messages are recorded in the operator's `tools/w03/he005/OWNER_DECISIONS.md`.
