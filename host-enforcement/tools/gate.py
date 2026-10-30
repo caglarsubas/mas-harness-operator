@@ -1311,7 +1311,10 @@ LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + 
 # G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
 D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
 PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
-CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
+# HE-GATE-001 (HE-005B PR review round 2, R2-1 and R2-2): a match never starts inside a path (after a word character or
+# after `::`), and a path right after a lone colon (`t:std::..`, and `t:::std::..`, PATH_SPACE's form of `t: ::std::..`)
+# is read.
+CODE_PATH = re.compile(r"(?<!\w)(?<!::)(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
 OBSERVER_LOGIC_WORDS = ((re.compile(r"\b(?:HashMap|HashSet|RandomState)\b"), "HashMap, HashSet or RandomState (getrandom)"),
                         (re.compile(r"\binclude_(?:bytes|str)\s*!"), "include_bytes! or include_str! (only contracts.rs embeds)"))
 PANICS = tuple((re.compile(pattern), name) for pattern, name in (
@@ -2437,7 +2440,10 @@ def check_observer_logic(base: Path) -> int:
     read with comments removed, literal contents emptied and the whitespace around `::` removed: every use path (no
     rename, no glob) and every crate-rooted code path starts with an OBSERVER_LOGIC_PATHS entry; none of
     OBSERVER_LOGIC_WORDS; and, outside strict #[cfg(test)] mod tests blocks, none of PANICS. HE-004D1 (G-D1-10): D1's
-    three logic modules too, each path starting with a D1_LOGIC_PATHS entry (LOGIC_MODULES). The number of modules."""
+    three logic modules too, each path starting with a D1_LOGIC_PATHS entry (LOGIC_MODULES). HE-GATE-001: a crate-rooted
+    path right after a lone colon (a parameter, let, static, const or field type, a struct-literal value, a closure
+    parameter, a bound, or the spaced leading `: ::path` or `:::path`) is read as any other code path. The number of
+    modules."""
     for rel, _ in LOGIC_MODULES:
         require((base / rel).is_file(), "%s is missing (observer logic rules)" % rel)
     for rel, prefixes in LOGIC_MODULES:
@@ -3425,7 +3431,9 @@ def pure_e_paths(codes: dict[str, str], rule: str) -> None:
     """G-HE5B-2 (e), check_observer_logic's path whitelist (HE-005B PR review round 1, R1-3 and R1-4): in each of the four
     modules, read as check_observer_logic reads a logic module (comments removed, literal contents emptied, the whitespace
     around `::` removed), every use path has no rename and no glob and every use path and every crate-rooted code path
-    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged)."""
+    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged). HE-GATE-001: a
+    crate-rooted path right after a lone colon (a parameter, let, static, const or field type, a struct-literal value, a
+    closure parameter, a bound, or the spaced leading `: ::path` or `:::path`) is read as any other code path."""
     for rel in HE005B_FILES:
         require(rel in codes, "%s is missing (%s (e))" % (rel, rule))
         code = codes[rel]
