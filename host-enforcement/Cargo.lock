@@ -81,6 +81,7 @@ name = "planeon-broker"
 version = "0.1.0"
 dependencies = [
  "gate-sys",
+ "i05-protocol",
  "role-seal",
 ]
 

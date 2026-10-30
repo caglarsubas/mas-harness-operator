@@ -1104,10 +1104,17 @@ class ContractTests(unittest.TestCase):
     # HE-004-I01B4 (DESIGN-I01B4 rev 2 sections 1.2 and 5, G-I01B-2): edge record v11's seven rows, the contract v2's three
     # files, admission v4's three and profile v2's vectors, beside the held v1 and admission v3 files (63).
     # HE-005A (DESIGN-HE005 revision 5 sections 2 and 4): edge record v11's four seccomp-v3 BROKER and WORKER programs (67).
+    # HE-005B (DESIGN-HE005 revision 5 section 4, G-HE5B-4): edge record v12's two broker handoff rows 80 and 81 (69).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 67)
+            self.assertEqual(len(gate.CONTRACTS), 69)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/broker-handoff-v1/")}, {
+                "contracts/broker-handoff-v1/channel.schema.json":
+                    "e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9",
+                "contracts/broker-handoff-v1/vectors.json":
+                    "80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith(("contracts/seccomp-v3/BROKER", "contracts/seccomp-v3/WORKER"))}, {
                 "contracts/seccomp-v3/BROKER.aarch64.bpf": "bc9c5a3797277ca753b5168e8e55132e1878fed2a726de361fd7d80e0fababf8",
@@ -5148,8 +5155,8 @@ class ObserverNativeProfileTests(Tree):
         # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50; unit U7's
         # two I01 wire files (HE-004-I01A2, edge record v9) 52; HE-004-I01B1's four (edge record v10, none embedded) 56;
         # HE-004-I01B4's seven (edge record v11, none embedded) 63; HE-005A's four seccomp-v3 programs (edge record v11,
-        # BROKER embedded by the broker's seal) 67.
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # BROKER embedded by the broker's seal) 67; HE-005B's two broker handoff files (edge record v12) 69.
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5700,6 +5707,8 @@ I01B_V11_CONTRACTS = ("contracts/i01-digests-v2/definitions.json", "contracts/i0
 # HE-005A: edge record v11's four seccomp-v3 rows for HE-005 (artifacts 17, 18, 29 and 30).
 HE005A_V11_CONTRACTS = ("contracts/seccomp-v3/BROKER.aarch64.bpf", "contracts/seccomp-v3/BROKER.x86_64.bpf",
                         "contracts/seccomp-v3/WORKER.aarch64.bpf", "contracts/seccomp-v3/WORKER.x86_64.bpf")
+# HE-005B (G-HE5B-4): edge record v12's two broker handoff rows 80 and 81.
+HE005B_V12_CONTRACTS = ("contracts/broker-handoff-v1/channel.schema.json", "contracts/broker-handoff-v1/vectors.json")
 
 
 class D2ContractCountTests(unittest.TestCase):
@@ -5728,15 +5737,16 @@ class D2ContractCountTests(unittest.TestCase):
         # (section 10): its two I06 v4 files make 50; unit U7 (HE-004-I01A2, sections 3 and 7): edge record v9's two
         # I01 wire files make 52; HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four make 56;
         # HE-004-I01B4 (DESIGN-I01B4 rev 2 section 1.2, G-I01B-2): edge record v11's seven make 63; HE-005A (DESIGN-HE005
-        # revision 5 section 2): its four seccomp-v3 BROKER and WORKER rows make 67.
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # revision 5 section 2): its four seccomp-v3 BROKER and WORKER rows make 67; HE-005B (section 4, G-HE5B-4): edge
+        # record v12's two broker handoff rows make 69.
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS
-                            + I01B_V11_CONTRACTS + HE005A_V11_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 67)
+                            + I01B_V11_CONTRACTS + HE005A_V11_CONTRACTS + HE005B_V12_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 69)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
         for rel in (D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS + I01B_V11_CONTRACTS
-                    + HE005A_V11_CONTRACTS):
+                    + HE005A_V11_CONTRACTS + HE005B_V12_CONTRACTS):
             path = self.base / rel
             data = path.read_bytes()
             path.unlink()
@@ -5757,14 +5767,17 @@ class D2ContractCountTests(unittest.TestCase):
                     # the same place beside the contract v2's own files.
                     "contracts/i01-digests-v2/policy_observation_digests_v2.py",
                     # HE-005A: a third role's program, which no record registers, beside the four.
-                    "contracts/seccomp-v3/WRITER.x86_64.bpf"):
+                    "contracts/seccomp-v3/WRITER.x86_64.bpf",
+                    # HE-005B: the readiness guide, which edge record v12 leaves unregistered (not a consumer
+                    # artefact), beside the two broker handoff files.
+                    "contracts/broker-handoff-v1/BROKER_HANDOFF_READINESS.md"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 67)
+        self.assertEqual(gate.check_contracts(self.base), 69)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -6963,8 +6976,9 @@ class I01bContractFileTests(Tree):
             gate.check_i01b_contracts(self.base)
 
     def test_the_tree_and_the_real_files_pass(self):
-        # HE-005A: edge record v11's four seccomp-v3 rows join the 63 (outside the I01b rows this rule reads).
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # HE-005A: edge record v11's four seccomp-v3 rows join the 63 (outside the I01b rows this rule reads). HE-005B:
+        # edge record v12's two broker handoff rows make 69 (also outside them).
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertEqual(tuple(gate.I01B_EDGE_V10_ROWS), I01B_V10_CONTRACTS)
         self.assertEqual([row[0] for row in gate.I01B_EDGE_V10_ROWS.values()], [69, 70, 71, 72])
         self.assertEqual([row[1] for row in gate.I01B_EDGE_V10_ROWS.values()],
@@ -9982,9 +9996,11 @@ class He005aObligationTests(Tree):
             self.assertEqual(gate.check_role_seal(base), 18)
             self.assertEqual(gate.check_seal_tokens(base), 5)
             self.assertEqual(gate.check_role_seal_stage_calls(base), 2)
-            self.assertEqual(gate.check_broker_bytes(base), 4)
-        # (e) reads role-seal's lib.rs and the broker's five sources; (g) finds LinuxOps's own_status.
-        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1, 6, 0, 1])
+            # HE-005B: the four logic modules are broker sources outside seal.rs too (4 + 4).
+            self.assertEqual(gate.check_broker_bytes(base), 8)
+        # (e) reads role-seal's lib.rs and the broker's five sources (HE-005B: and its four logic modules, so ten); (g)
+        # finds LinuxOps's own_status.
+        self.assertEqual([clause(self.base) for _, clause in gate.ROLE_SEAL_CLAUSES], [1, 18, 6, 1, 10, 0, 1])
         self.assertEqual(gate.ROLE_SEAL_SITES, (gate.OBSERVER_SEAL_RS, gate.BROKER_SEAL_RS))
 
     def test_the_tables(self):
@@ -10048,7 +10064,7 @@ class He005aObligationTests(Tree):
         # HE-005A PR review round 1 (MON-HE005A-R1): the broker's never-unlink rule (R1-4) and serve rule (R1-5) accept
         # today's sources, refuse each row with only its own clause on, and pass a comment, a literal and spacing.
         for base in (self.base, gate.HE):
-            self.assertEqual(gate.check_broker_never_unlinks(base), 5)
+            self.assertEqual(gate.check_broker_never_unlinks(base), 9)  # HE-005B: and the four logic modules
             self.assertEqual(gate.check_broker_serve(base), 3)
         rules = {rule[0]: rule for rule in HE005A_PROOF_RULES}
         for name in ("broker never unlinks", "broker serve"):
@@ -10116,8 +10132,9 @@ class BrokerRuleTests(Tree):
 
     def test_the_real_sources_and_the_fixture_pass(self):
         for base in (self.base, gate.HE):
-            self.assertEqual(gate.check_broker_includes(base), 2)
-            self.assertEqual(gate.check_broker_no_panic(base), 5)
+            # HE-005B (G-HE5B-4, G-HE5B-2): i02.rs's one schema beside seal.rs's two programs; four more no-panic files.
+            self.assertEqual(gate.check_broker_includes(base), 3)
+            self.assertEqual(gate.check_broker_no_panic(base), 9)
             self.assertEqual(gate.check_broker_status_table(base), 22)
             self.assertEqual(gate.check_seal_order(base, gate.BROKER_SEAL_SITE),
                              "Err, ExitCode::from, Ok, status::seal (and the tuple-variant patterns none)")
@@ -10147,7 +10164,7 @@ class BrokerRuleTests(Tree):
                         ((_BMAIN, "", "\nfn f() {\n    panic!();\n}\n"),)):
             self.refuses(gate.check_broker_no_panic, changes, message)
         self.plant(((_BLIB, "", "\n// unwrap() and panic! in a comment\n"),))
-        self.assertEqual(gate.check_broker_no_panic(self.base), 5)
+        self.assertEqual(gate.check_broker_no_panic(self.base), 9)
 
     def test_the_status_table_is_the_observers(self):
         message = re.escape("(broker status table, Q-HE5A-2)")
@@ -10198,25 +10215,30 @@ class BrokerLinkedTests(Tree):
 
 class BrokerClosureTests(Tree):
     """HE-005A (H5D-12): planeon-broker links exactly BROKER_LINKED_CRATES (itself, role-seal and gate-sys): host-common,
-    i05-protocol (HE-005B's) or any other workspace crate in its closure refuses."""
+    i05-protocol (HE-005B's) or any other workspace crate in its closure refuses. HE-005B (G-HE5B-3; Q-HE5B-6 (a)):
+    i05-protocol joins the set, unchanged, so A's three crates (i05-protocol missing) refuse, as does host-common,
+    effect-gate or any other workspace crate, directly or through role-seal."""
 
     TREE = {**WORKSPACE_TREE,
             "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]', '"crates/gate-tls", "crates/broker", '
                                                                                    '"crates/role-seal"]'),
             "crates/broker/Cargo.toml": '[package]\nname = "planeon-broker"\nedition.workspace = true\n',
             "crates/role-seal/Cargo.toml": '[package]\nname = "role-seal"\nedition.workspace = true\n'}
-    GOOD = {**WORKSPACE, "planeon-broker": {"gate-sys", "role-seal"}, "role-seal": {"gate-sys"}}
+    GOOD = {**WORKSPACE, "planeon-broker": {"gate-sys", "role-seal", "i05-protocol"}, "role-seal": {"gate-sys"}}
 
     def test_the_closure_is_exact(self):
-        self.assertEqual(gate.BROKER_LINKED_CRATES, ("crates/broker", "crates/role-seal", "crates/gate-sys"))
+        self.assertEqual(gate.BROKER_LINKED_CRATES, ("crates/broker", "crates/role-seal", "crates/gate-sys",
+                                                     "crates/i05-protocol"))
         self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 7)
-        self.assertEqual(gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": {"role-seal"}}), 7)
-        for dependencies in (set(), {"gate-sys"}, {"gate-sys", "role-seal", "host-common"},
-                             {"gate-sys", "role-seal", "i05-protocol"}, {"gate-sys", "role-seal", "effect-gate"}):
+        self.assertEqual(gate.check_workspace_shape(self.base, {**self.GOOD,
+                                                                "planeon-broker": {"role-seal", "i05-protocol"}}), 7)
+        for dependencies in (set(), {"gate-sys"}, {"gate-sys", "role-seal"}, {"gate-sys", "i05-protocol"},
+                             {"gate-sys", "role-seal", "i05-protocol", "host-common"},
+                             {"gate-sys", "role-seal", "i05-protocol", "effect-gate"}):
             with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
                 gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": dependencies, "host-common": set()})
         with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
-            gate.check_workspace_shape(self.base, {**self.GOOD, "role-seal": {"gate-sys", "i05-protocol"}})
+            gate.check_workspace_shape(self.base, {**self.GOOD, "role-seal": {"gate-sys", "effect-gate"}})
         without = {name: dependencies for name, dependencies in self.GOOD.items() if name != "planeon-broker"}
         with self.assertRaisesRegex(gate.GateError, "no planeon-broker crate in the workspace"):
             gate.check_workspace_shape(self.base, without)
@@ -10249,6 +10271,389 @@ class BrokerBinaryTests(unittest.TestCase):
         self.assertEqual(gate.BROKER_ABSENT_SYMBOLS, ("__synccall", "setresuid", "setresgid", "setuid", "setgid",
                                                       "pthread_create", "fork", "posix_spawn"))
         self.assertIn("planeon-broker", gate.BINARIES)
+
+
+# --- HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; MON-HE005B-PLAN; the build brief's conditions 1 and 2) -------
+# The real sources the HE-005B rules read: HE005A_TREE (the observer's and the broker's sources, the manifests A's rules
+# read) and the differential test. A change is (file, anchor, replacement) as in he005a_tree, or (file, None, None),
+# which removes the file. The build's mutation proof reads HE005B_PROOF_RULES with each rule's own tree builder.
+HE005B_TREE = {**HE005A_TREE, gate.HE005B_DIFFERENTIAL: (gate.HE / gate.HE005B_DIFFERENTIAL).read_text(encoding="utf-8")}
+_BI02, _BI03, _BI05, _BPEER = gate.HE005B_FILES
+_BDIFF = gate.HE005B_DIFFERENTIAL
+_I02_INCLUDE = 'include_bytes!("../../../contracts/broker-handoff-v1/channel.schema.json")'
+_I02_DEPTH_FLOAT = ("    if json::depth(&value) > MAX_DEPTH {\n        return Err(FrameError::F01);\n    }\n"
+                    "    if json::contains_float(&value) {\n        return Err(FrameError::F03);\n    }\n")
+_I02_FLOAT_CONTROL = ("    if json::contains_float(&value) {\n        return Err(FrameError::F03);\n    }\n"
+                      "    if json::contains_control(&value) {\n        return Err(FrameError::F04);\n    }\n")
+_I02_COMPARE = "    if encoded != raw {\n        return Err(FrameError::F06);\n    }\n"
+_I02_SCHEMA_STEP = "    if !schema.is_valid(&value) {\n        return Err(FrameError::F00);\n    }\n"
+_I03_USE = "use crate::i02::{decode_datagram, Dispatch, Schemas, MAX_CONTROL_BYTES};"
+_I05_USE = "use crate::i02::{BindRefusal, Verb, ZERO_DIGEST};"
+_GQ_DEF = "#[derive(Debug)]\n#[must_use]\npub struct GateQualified {\n    pid: i64,\n    start_ticks: u64,\n}"
+_GQ_MINT = ("pub fn qualify_gate(observed: &GateObservation, gate_executable_path: &str) -> Result<GateQualified, "
+            "GateRefusal> {")
+
+
+def he005b_tree(changes=()):
+    """HE005B_TREE with each (file, anchor, replacement) applied once, in order (an empty anchor appends), and each
+    (file, None, None) removing the file."""
+    texts = dict(HE005B_TREE)
+    for rel, old, new in changes:
+        if old is None:
+            del texts[rel]
+            continue
+        if not old:
+            texts[rel] = texts[rel] + new
+            continue
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+# G-HE5B-1, the isolation (check_broker_isolation): the names (a), the type set (b), the impls (c), the uses (d).
+HE005B_ISOLATION_ROWS = (
+    ("n1 lib.rs declaring i02 without pub", "(a)", ((_BLIB, "pub mod i02;\n", "mod i02;\n"),)),
+    ("n2 main.rs reaching i02 through the library root", "(a)",
+     ((_BMAIN, "", "\nfn probe() {\n    let _ = planeon_broker::i02::decode;\n}\n"),)),
+    ("n3 seal.rs importing i03", "(a)", ((_BSEAL, "", "\nuse crate::i03::start;\n"),)),
+    ("n4 lib.rs re-exporting from i02", "(a)", ((_BLIB, "", "\npub use i02::decode;\n"),)),
+    ("n5 status.rs naming gate_peer's refusal", "(a)",
+     ((_BSTATUS, "", "\nfn probe(_: &crate::gate_peer::GateRefusal) {}\n"),)),
+    ("n6 the i03 module file removed", "(a)", ((_BI03, None, None),)),
+    ("n7 linux_listen.rs naming a type of i02", "(b)", ((_BLISTEN, "", "\nfn probe(_: &Transcript) {}\n"),)),
+    ("n8 main.rs naming the I05 client's type", "(b)", ((_BMAIN, "", "\nfn probe(_: I05Client) {}\n"),)),
+    ("n9 a Default impl in i02.rs", "(c)",
+     ((_BI02, "", "\nimpl Default for Kind {\n    fn default() -> Kind {\n        Kind::Started\n    }\n}\n"),)),
+    ("n10 a Display impl in i05_client.rs", "(c)",
+     ((_BI05, "", "\nimpl core::fmt::Display for Operation {\n    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> "
+                  "core::fmt::Result {\n        f.write_str(self.wire())\n    }\n}\n"),)),
+    ("n11 a re-export in i03.rs", "(d)", ((_BI03, "", "\npub use crate::i02::Dispatch;\n"),)),
+    ("n12 an item renamed in i05_client.rs", "(d)",
+     ((_BI05, _I05_USE, "use crate::i02::{BindRefusal, Verb as Action, ZERO_DIGEST};"),)),
+    ("n13 a glob in gate_peer.rs", "(d)", ((_BPEER, "", "\nuse crate::i02::*;\n"),)),
+    ("n14 a module alias in i03.rs", "(d)", ((_BI03, _I03_USE, "use crate::i02 as wire;\n" + _I03_USE),)),
+)
+# G-HE5B-2, pure (check_broker_pure): the names (a), the decode order and limits (b), the differential test (c).
+HE005B_PURE_ROWS = (
+    ("p1 std::fs in i02.rs", "(a)", ((_BI02, "", "\nfn probe() -> bool {\n    std::fs::metadata(\"x\").is_ok()\n}\n"),)),
+    ("p2 std::net in i05_client.rs", "(a)", ((_BI05, "", "\nfn probe() {\n    let _ = std::net::TcpStream::connect;\n}\n"),)),
+    ("p3 std::os in gate_peer.rs", "(a)", ((_BPEER, "", "\nuse std::os::fd::OwnedFd;\n"),)),
+    ("p4 std::io in i03.rs", "(a)", ((_BI03, "", "\nuse std::io::Read;\n"),)),
+    ("p5 std::process in i02.rs", "(a)", ((_BI02, "", "\nfn probe() -> u32 {\n    std::process::id()\n}\n"),)),
+    ("p6 std::thread in gate_peer.rs", "(a)", ((_BPEER, "", "\nfn probe() {\n    let _ = std::thread::current();\n}\n"),)),
+    ("p7 gate_sys in i05_client.rs", "(a)", ((_BI05, "", "\nuse gate_sys::channel::Conn;\n"),)),
+    ("p8 role_seal in i03.rs", "(a)", ((_BI03, "", "\nuse role_seal::RoleSpec;\n"),)),
+    ("p9 a foreign item in gate_peer.rs", "(a)", ((_BPEER, "", "\nextern \"C\" {\n    fn getpid() -> i32;\n}\n"),)),
+    ("p10 unsafe in i02.rs", "(a)",
+     ((_BI02, "", "\nfn probe(value: &u8) -> u8 {\n    unsafe { *(value as *const u8) }\n}\n"),)),
+    ("o1 two steps swapped: float before depth", "(b)",
+     ((_BI02, _I02_DEPTH_FLOAT, _I02_DEPTH_FLOAT[_I02_DEPTH_FLOAT.index("    if json::contains_float"):]
+       + _I02_DEPTH_FLOAT[:_I02_DEPTH_FLOAT.index("    if json::contains_float")]),)),
+    ("o2 two steps swapped: control before float", "(b)",
+     ((_BI02, _I02_FLOAT_CONTROL, _I02_FLOAT_CONTROL[_I02_FLOAT_CONTROL.index("    if json::contains_control"):]
+       + _I02_FLOAT_CONTROL[:_I02_FLOAT_CONTROL.index("    if json::contains_control")]),)),
+    ("o3 the canonical comparison dropped", "(b)", ((_BI02, _I02_COMPARE, "    let _ = &encoded;\n"),)),
+    ("o4 the schema step dropped", "(b)", ((_BI02, _I02_SCHEMA_STEP, "    let _ = schema;\n"),)),
+    ("o5 a duplicate key mapped to F06", "(b)",
+     ((_BI02, "        ParseError::Duplicate => FrameError::F05,", "        ParseError::Duplicate => FrameError::F06,"),)),
+    ("o6 the 16 KiB kind limit raised", "(b)",
+     ((_BI02, "pub const MAX_CONTROL_BYTES: usize = 16_384;", "pub const MAX_CONTROL_BYTES: usize = 32_768;"),)),
+    ("o7 the kind limit compared with the datagram bound", "(b)",
+     ((_BI02, "    if control && canonical_length > MAX_CONTROL_BYTES {",
+       "    if control && canonical_length > MAX_DATAGRAM_BYTES {"),)),
+    ("o8 the kind limit not run by decode", "(b)", ((_BI02, "    check_control_size(&value, raw.len())?;\n", ""),)),
+    ("o9 the datagram bound raised", "(b)",
+     ((_BI02, "pub const MAX_DATAGRAM_BYTES: usize = 65_536;", "pub const MAX_DATAGRAM_BYTES: usize = 131_072;"),)),
+    ("d1 the differential test removed", "(c)", ((_BDIFF, None, None),)),
+    ("d2 a named form removed (float)", "(c)",
+     ((_BDIFF, '    ("float", FrameError::F03),\n', ""),
+      (_BDIFF, '        "float" => canonical(&with(frame, &["sequence"], Value::Float(1.0))),\n', ""),
+      (_BDIFF, '"duplicate key", "float",\n', '"duplicate key",\n'))),
+    ("d3 the digest-mismatch form removed", "(c)",
+     ((_BDIFF, 'const DIGEST_MISMATCH: &str = "digest mismatch";', 'const DIGEST_MISMATCH: &str = "chain";'),
+      (_BDIFF, '    assert_eq!(DIGEST_MISMATCH, "digest mismatch");', '    assert_eq!(DIGEST_MISMATCH, "chain");'))),
+    # HE-005B PR review round 1, R1-3 and R1-4 (Q-HE5B-R1-2 (a)): the observer logic-module words (d) and path
+    # whitelist (e), with the reviewer's three escape forms (a hashed collection, a clock, a crate:: path into the
+    # broker's own I/O code), each where the reviewer's static probe planted it.
+    ("q1 a HashSet type in i02.rs, not imported", "(d)",
+     ((_BI02, "", "\nfn probe(set: &HashSet<u8>) -> usize {\n    set.len()\n}\n"),)),
+    ("q2 std::collections::HashSet imported in i02.rs (probe)", "(d)", ((_BI02, "", "\nuse std::collections::HashSet;\n"),)),
+    ("q3 RandomState imported in gate_peer.rs", "(d)",
+     ((_BPEER, "", "\nuse std::collections::hash_map::RandomState;\n"),)),
+    ("q4 Instant::now in i05_client.rs (probe)", "(e)",
+     ((_BI05, "", "\nfn probe() -> std::time::Instant {\n    std::time::Instant::now()\n}\n"),)),
+    ("q5 SystemTime::now, imported, in i03.rs (probe)", "(e)",
+     ((_BI03, "", "\nuse std::time::SystemTime;\nfn probe() -> SystemTime {\n    SystemTime::now()\n}\n"),)),
+    ("q6 crate::seal_stage1 in i03.rs (probe)", "(e)", ((_BI03, "", "\nfn probe() {\n    let _ = crate::seal_stage1;\n}\n"),)),
+    ("q7 crate::linux_listen::LinuxI02::new in i02.rs (probe)", "(e)",
+     ((_BI02, "", "\nfn probe() {\n    let _ = crate::linux_listen::LinuxI02::new;\n}\n"),)),
+    ("q8 crate::serve_unanswered in gate_peer.rs (probe)", "(e)",
+     ((_BPEER, "", "\nfn probe() {\n    let _ = crate::serve_unanswered;\n}\n"),)),
+    ("q9 a super:: path in i03.rs", "(e)", ((_BI03, "", "\nfn probe() -> u8 {\n    super::status::LISTENER\n}\n"),)),
+    ("q10 an import renamed in i05_client.rs", "(e)", ((_BI05, "", "\nuse std::collections::BTreeSet as Set;\n"),)),
+    ("q11 a glob import in gate_peer.rs", "(e)", ((_BPEER, "", "\nuse std::collections::*;\n"),)),
+    ("q12 i05-protocol's regex in i02.rs", "(e)", ((_BI02, "", "\nuse i05_protocol::regex::Regex;\n"),)),
+)
+# G-HE5B-4, the include rule (check_broker_includes, one clause): i02.rs's schema and the vectors.
+HE005B_INCLUDE_ROWS = (
+    ("k1 the schema embedded twice in i02.rs", "(includes)",
+     ((_BI02, "", "\npub fn again() -> Result<Schemas, SchemaError> {\n    Schemas::from_json(%s)\n}\n" % _I02_INCLUDE),)),
+    ("k2 include_str! of the schema", "(includes)", ((_BI02, _I02_INCLUDE, _I02_INCLUDE.replace("include_bytes", "include_str")),)),
+    ("k3 the vectors in the schema's place", "(includes)",
+     ((_BI02, _I02_INCLUDE, _I02_INCLUDE.replace("channel.schema.json", "vectors.json")),)),
+    ("k4 the schema embedded in i05_client.rs", "(includes)", ((_BI05, "", "\nconst SCHEMA: &[u8] = %s;\n" % _I02_INCLUDE),)),
+    ("k5 another contract in the schema's place", "(includes)",
+     ((_BI02, _I02_INCLUDE, 'include_bytes!("../../../contracts/i05-v3/channel.schema.json")'),)),
+    ("k6 a vectors.json path in i03.rs", "(includes)",
+     ((_BI03, "", '\nconst VECTORS: &str = "../../../contracts/broker-handoff-v1/vectors.json";\n'),)),
+    ("k7 i02.rs removed", "(includes)", ((_BI02, None, None),)),
+    ("k8 the schema embedded in gate_peer.rs", "(includes)", ((_BPEER, "", "\nstatic SCHEMA: &[u8] = %s;\n" % _I02_INCLUDE),)),
+    ("k9 a concat! path in i02.rs", "(includes)",
+     ((_BI02, _I02_INCLUDE, 'include_bytes!(concat!("../../../contracts/broker-handoff-v1/", "channel.schema.json"))'),)),
+)
+# G-HE5B-5, the token (check_he005b_token): condition 2's forgery forms, each its clause's.
+HE005B_TOKEN_ROWS = (
+    ("g1 a pub field", "(i)", ((_BPEER, _GQ_DEF, _GQ_DEF.replace("    pid: i64,", "    pub pid: i64,")),)),
+    ("g2 a pub(crate) field", "(i)", ((_BPEER, _GQ_DEF, _GQ_DEF.replace("    start_ticks: u64,", "    pub(crate) start_ticks: u64,")),)),
+    ("g3 a unit struct", "(i)", ((_BPEER, _GQ_DEF, "#[derive(Debug)]\n#[must_use]\npub struct GateQualified;"),)),
+    ("g4 a tuple struct", "(i)", ((_BPEER, _GQ_DEF, "#[derive(Debug)]\n#[must_use]\npub struct GateQualified(i64, u64);"),)),
+    ("g5 a Default derive", "(i)", ((_BPEER, _GQ_DEF, _GQ_DEF.replace("derive(Debug)", "derive(Debug, Default)")),)),
+    ("g6 a Clone derive", "(i)", ((_BPEER, _GQ_DEF, _GQ_DEF.replace("derive(Debug)", "derive(Clone, Debug)")),)),
+    ("g7 a Copy derive", "(i)", ((_BPEER, _GQ_DEF, _GQ_DEF.replace("derive(Debug)", "derive(Clone, Copy, Debug)")),)),
+    ("g8 a field of a type outside the closed list", "(i)",
+     ((_BPEER, _GQ_DEF, _GQ_DEF.replace("    start_ticks: u64,", "    start_ticks: core::cell::Cell<u64>,")),)),
+    ("g9 a second literal", "(ii)",
+     ((_BPEER, "", "\nfn forge() -> GateQualified {\n    GateQualified { pid: 1, start_ticks: 1 }\n}\n"),)),
+    ("g10 a Self literal", "(ii)",
+     ((_BPEER, "", "\nimpl PeerCredentials {\n    fn zero() -> Self {\n        Self { pid: 0, uid: 0, gid: 0 }\n    }\n}\n"),)),
+    ("g11 a struct literal in another module", "(ii)",
+     ((_BI02, "", "\nfn forge() -> crate::gate_peer::GateQualified {\n"
+                  "    crate::gate_peer::GateQualified { pid: 1, start_ticks: 1 }\n}\n"),)),
+    ("g12 a minting function generic over a trait", "(iii)",
+     ((_BPEER, _GQ_MINT, _GQ_MINT.replace("qualify_gate(", "qualify_gate<O: Into<GateObservation>>(")),)),
+    ("g13 a From impl", "(iv)",
+     ((_BPEER, "", "\nimpl From<u64> for GateQualified {\n    fn from(_ticks: u64) -> GateQualified {\n        loop {}\n"
+                   "    }\n}\n"),)),
+    ("g14 a Default impl", "(iv)",
+     ((_BPEER, "", "\nimpl Default for GateQualified {\n    fn default() -> GateQualified {\n        loop {}\n    }\n}\n"),)),
+    ("g15 an inherent impl", "(iv)",
+     ((_BPEER, "", "\nimpl GateQualified {\n    fn pid(&self) -> i64 {\n        self.pid\n    }\n}\n"),)),
+    ("g16 pub use .. as G", "(v)", ((_BI02, "", "\npub use crate::gate_peer::GateQualified as G;\n"),)),
+    ("g17 a glob re-export", "(v)", ((_BI03, "", "\npub use crate::gate_peer::*;\n"),)),
+    ("g18 a type alias", "(v)", ((_BI05, "", "\ntype Qualified = crate::gate_peer::GateQualified;\n"),)),
+    ("g19 a re-export in lib.rs", "(v)", ((_BLIB, "", "\npub use gate_peer::GateQualified;\n"),)),
+)
+HE005B_ISOLATION_FUNCTIONS = {"(a)": "isolation_a_names", "(b)": "isolation_b_types", "(c)": "isolation_c_impls",
+                              "(d)": "isolation_d_uses"}
+HE005B_PURE_FUNCTIONS = {"(a)": "pure_a_names", "(b)": "pure_b_decode_order", "(c)": "pure_c_presence",
+                         "(d)": "pure_d_words", "(e)": "pure_e_paths"}
+HE005B_TOKEN_FUNCTIONS = {"(i)": "gate_token_i_definition", "(ii)": "gate_token_ii_literal",
+                          "(iii)": "gate_token_iii_signature", "(iv)": "gate_token_iv_impls", "(v)": "gate_token_v_names"}
+
+# G-HE5B-3, the closure (check_workspace_shape's broker block, gate.py's `if "planeon-broker" in names:`; Q-HE5B-6 (a),
+# the block's proof rows): a workspace fixture whose broker, role-seal and host-common manifests are read for their path
+# dependencies beside WORKSPACE's.
+HE005B_CLOSURE_TREE = {
+    **WORKSPACE_TREE,
+    "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace(
+        '"crates/gate-tls"]', '"crates/gate-tls", "crates/broker", "crates/role-seal", "crates/host-common"]'),
+    "crates/broker/Cargo.toml": ('[package]\nname = "planeon-broker"\nedition.workspace = true\n\n[dependencies]\n'
+                                 'gate-sys = { path = "../gate-sys" }\nrole-seal = { path = "../role-seal" }\n'
+                                 'i05-protocol = { path = "../i05-protocol" }\n'),
+    "crates/role-seal/Cargo.toml": ('[package]\nname = "role-seal"\nedition.workspace = true\n\n[dependencies]\n'
+                                    'gate-sys = { path = "../gate-sys" }\n'),
+    "crates/host-common/Cargo.toml": '[package]\nname = "host-common"\nedition.workspace = true\n',
+}
+_CLOSURE_I05 = 'i05-protocol = { path = "../i05-protocol" }\n'
+
+
+def he005b_closure_tree(changes=()):
+    """HE005B_CLOSURE_TREE with each (file, anchor, replacement) applied once (an empty anchor appends)."""
+    texts = dict(HE005B_CLOSURE_TREE)
+    for rel, old, new in changes:
+        if not old:
+            texts[rel] = texts[rel] + new
+            continue
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+def he005b_closure_check(base):
+    """check_workspace_shape over the fixture, its workspace WORKSPACE's with the three manifests' path dependencies."""
+    workspace = {name: set(dependencies) for name, dependencies in WORKSPACE.items()}
+    for rel in ("crates/broker/Cargo.toml", "crates/role-seal/Cargo.toml", "crates/host-common/Cargo.toml"):
+        table = gate.tomllib.loads((base / rel).read_text(encoding="utf-8"))
+        workspace[table["package"]["name"]] = set(table.get("dependencies", {}))
+    return gate.check_workspace_shape(base, workspace)
+
+
+HE005B_CLOSURE_ROWS = (
+    ("l1 A's three crates (i05-protocol dropped)", "(closure)", (("crates/broker/Cargo.toml", _CLOSURE_I05, ""),)),
+    ("l2 host-common added", "(closure)",
+     (("crates/broker/Cargo.toml", "", 'host-common = { path = "../host-common" }\n'),)),
+    ("l3 effect-gate added", "(closure)",
+     (("crates/broker/Cargo.toml", "", 'effect-gate = { path = "../effect-gate" }\n'),)),
+    ("l4 effect-gate reached through role-seal", "(closure)",
+     (("crates/role-seal/Cargo.toml", "", 'effect-gate = { path = "../effect-gate" }\n'),)),
+    ("l5 role-seal dropped", "(closure)",
+     (("crates/broker/Cargo.toml", 'role-seal = { path = "../role-seal" }\n', ""),)),
+)
+
+# (rule, check, its clauses, rows, the named clause's message, any clause's message, the patches, the tree builder).
+HE005B_PROOF_RULES = (
+    ("G-HE5B-1 isolation", gate.check_broker_isolation, tuple(HE005B_ISOLATION_FUNCTIONS), HE005B_ISOLATION_ROWS,
+     lambda clause: "(HE-005B isolation, G-HE5B-1 %s)" % clause, r"\(HE-005B isolation, G-HE5B-1 \(",
+     named_patches(HE005B_ISOLATION_FUNCTIONS), he005b_tree),
+    ("G-HE5B-2 pure", gate.check_broker_pure, tuple(HE005B_PURE_FUNCTIONS), HE005B_PURE_ROWS,
+     lambda clause: "(HE-005B pure, G-HE5B-2 %s)" % clause, r"\(HE-005B pure, G-HE5B-2 \(",
+     named_patches(HE005B_PURE_FUNCTIONS), he005b_tree),
+    ("G-HE5B-3 closure", he005b_closure_check, ("(closure)",), HE005B_CLOSURE_ROWS, lambda clause: "(workspace shape)",
+     re.escape("(workspace shape)"), named_patches({"(closure)": "check_workspace_shape"}), he005b_closure_tree),
+    ("G-HE5B-4 includes", lambda base: gate.check_broker_includes(base), ("(includes)",), HE005B_INCLUDE_ROWS,
+     lambda clause: "(broker includes)", re.escape("(broker includes)"),
+     named_patches({"(includes)": "check_broker_includes"}), he005b_tree),
+    ("G-HE5B-5 token", gate.check_he005b_token, tuple(HE005B_TOKEN_FUNCTIONS), HE005B_TOKEN_ROWS,
+     lambda clause: "(gate-qualification token, G-HE5B-5 %s)" % clause, r"\(gate-qualification token, G-HE5B-5 \(",
+     named_patches(HE005B_TOKEN_FUNCTIONS), he005b_tree),
+)
+
+
+class He005bRuleTests(Tree):
+    """HE-005B's rules G-HE5B-1, -2, -4 and -5 over copies of the real sources (HE005B_TREE): each accepts today's
+    sources; each row is refused by its rule and, with every other clause of the rule disabled, by its own named
+    clause's message; and comments, literals and strict test blocks pass."""
+
+    TREE = HE005B_TREE
+
+    def plant(self, changes):
+        texts = he005b_tree(changes)
+        for rel in HE005B_TREE:
+            if rel not in texts and (self.base / rel).exists():
+                (self.base / rel).unlink()
+        for rel, text in texts.items():
+            self.write(rel, text)
+
+    def test_the_real_sources_and_the_fixture_pass(self):
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_broker_isolation(base), 28)
+            self.assertEqual(gate.check_broker_pure(base), 4)
+            self.assertEqual(gate.check_broker_includes(base), 3)
+            self.assertEqual(gate.check_he005b_token(base), 5)
+            self.assertEqual(gate.check_broker_no_panic(base), 9)
+        self.assertEqual(gate.HE005B_FILES, ("crates/broker/src/i02.rs", "crates/broker/src/i03.rs",
+                                             "crates/broker/src/i05_client.rs", "crates/broker/src/gate_peer.rs"))
+        self.assertTrue(set(gate.HE005B_FILES) <= set(gate.BROKER_NO_PANIC))
+        self.assertEqual(gate.BROKER_EMBEDS, {gate.BROKER_SEAL_RS: tuple(sorted(gate.BROKER_PROGRAMS.values())),
+                                              gate.BROKER_I02: ("contracts/broker-handoff-v1/channel.schema.json",)})
+
+    def test_the_tables(self):
+        self.assertEqual(tuple(len(rows) for rows in (HE005B_ISOLATION_ROWS, HE005B_PURE_ROWS, HE005B_CLOSURE_ROWS,
+                                                      HE005B_INCLUDE_ROWS, HE005B_TOKEN_ROWS)), (14, 34, 5, 9, 19))
+        self.assertEqual(sum(len(rule[3]) for rule in HE005B_PROOF_RULES), 81)
+        for name, check, clauses, rows, tag, any_tag, patches, tree in HE005B_PROOF_RULES:
+            self.assertTrue(callable(check), name)
+            for row in rows:
+                self.assertIn(row[1], clauses, row[0])
+                tree(row[2])
+        for function in (list(HE005B_ISOLATION_FUNCTIONS.values()) + list(HE005B_PURE_FUNCTIONS.values())
+                         + list(HE005B_TOKEN_FUNCTIONS.values())):
+            self.assertTrue(callable(getattr(gate, function)), function)
+
+    def refuses_each(self, check, rows, tag, any_tag, patches):
+        for label, clause, changes in rows:
+            self.plant(changes)
+            try:
+                with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                    check(self.base)
+                active = patches(enabled=clause)
+                for patch in active:
+                    patch.start()
+                try:
+                    with self.assertRaisesRegex(gate.GateError, re.escape(tag(clause)), msg=label):
+                        check(self.base)
+                finally:
+                    for patch in active:
+                        patch.stop()
+            finally:
+                self.plant(())
+
+    def test_each_rule_refuses_its_rows(self):
+        for name, check, _, rows, tag, any_tag, patches, tree in HE005B_PROOF_RULES:
+            if tree is he005b_tree:
+                self.refuses_each(check, rows, tag, any_tag, patches)
+
+    def test_forms_the_rules_pass(self):
+        # Comments and literals naming the modules, std::fs, the token or vectors.json are not code; a strict test block
+        # in a module may hold an extern block ((a) sets it aside; since round 1, (e) reads every path of the file, as
+        # check_observer_logic does, so a gate_sys path there would refuse); lib.rs's own module comment names them.
+        for changes in (
+                ((_BMAIN, "", "\n// planeon_broker::i02 and Transcript are HE-005B's, unreachable here\n"),),
+                ((_BI02, "", '\n// std::fs::read and unsafe stay out of i02\nconst NOTE: &str = "i03 std::fs GateQualified";\n'),),
+                ((_BPEER, "", "\n#[cfg(test)]\nmod tests {\n    extern \"C\" {\n        fn getpid() -> i32;\n    }\n}\n"),),
+                ((_BLIB, "", "\n// pub use gate_peer::GateQualified as G; include_bytes!(\"vectors.json\")\n"),)):
+            self.plant(changes)
+            try:
+                for check in (gate.check_broker_isolation, gate.check_broker_pure, gate.check_broker_includes,
+                              gate.check_he005b_token):
+                    check(self.base)
+            finally:
+                self.plant(())
+
+
+class He005bClosureTests(Tree):
+    """HE-005B G-HE5B-3 (Q-HE5B-6 (a)): the broker closure block's rows over a workspace fixture whose manifests carry the
+    path dependencies: the exact four-crate closure passes; A's three crates, an added crate and a crate reached through
+    role-seal refuse, with the block switched off passing each."""
+
+    TREE = HE005B_CLOSURE_TREE
+
+    def test_the_closure_rows(self):
+        self.assertEqual(he005b_closure_check(self.base), 8)
+        name, check, clauses, rows, tag, any_tag, patches, tree = HE005B_PROOF_RULES[2]
+        for label, clause, changes in rows:
+            for rel, text in tree(changes).items():
+                self.write(rel, text)
+            try:
+                with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape", msg=label):
+                    check(self.base)
+                active = patches(disabled=(clause,))
+                for patch in active:
+                    patch.start()
+                try:
+                    check(self.base)
+                finally:
+                    for patch in active:
+                        patch.stop()
+            finally:
+                for rel, text in tree(()).items():
+                    self.write(rel, text)
+
+
+class He005bSymbolTests(unittest.TestCase):
+    """HE-005B G-HE5B-6 (check_d2_absent's form): no planeon-broker symbol has a path in one of the four modules, by item
+    path (legacy, v0, an inherent impl) or by its first crate root (a trait impl, a closure); a symbol that only
+    mentions a module's name passes."""
+
+    REFUSED = ("_ZN14planeon_broker3i0215decode_datagram17h0123456789abcdefE",
+               "_RNvNtCs5pXa2Z9YbGW_14planeon_broker3i035start",
+               "_RNvMNtCs5pXa2Z9YbGW_14planeon_broker10i05_clientNtB2_9I05Client4open",
+               "_RNvXs_NtCs5pXa2Z9YbGW_14planeon_broker9gate_peerNtB4_13GateQualifiedNtNtCsifRdLFh1usa_4core3fmt5Debug3fmt",
+               "_RNCNvNtCs5pXa2Z9YbGW_14planeon_broker9gate_peer12qualify_gate0B5_")
+    PASSED = ("_RNvNtCs5pXa2Z9YbGW_14planeon_broker4seal11seal_stage1",
+              "_RINvNtCsifRdLFh1usa_4core3ptr13drop_in_placeNtNtCs5pXa2Z9YbGW_14planeon_broker3i0210TranscriptEB4_",
+              "_ZN4core3ptr52drop_in_place$LT$planeon_broker..i02..Transcript$GT$17h0123456789abcdefE",
+              "_ZN16planeon_observer3i0215decode_datagram17h0123456789abcdefE",
+              "_ZN16planeon_broker_x3i021f17h0123456789abcdefE", "i02", "main")
+
+    def test_he005b_symbols_refuse_and_mentions_pass(self):
+        self.assertEqual(gate.check_he005b_absent(set(self.PASSED)), len(self.PASSED))
+        for name in self.REFUSED:
+            with self.assertRaisesRegex(gate.GateError, "a symbol of the HE-005B module .*G-HE5B-6"):
+                gate.check_he005b_absent(set(self.PASSED) | {name})
+        self.assertEqual(gate.HE005B_MODULES, ("i02", "i03", "i05_client", "gate_peer"))
 
 
 class OutputPrefixTests(unittest.TestCase):

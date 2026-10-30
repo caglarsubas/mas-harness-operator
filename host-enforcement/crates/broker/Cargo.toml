@@ -11,6 +11,12 @@ publish.workspace = true
 # gate-sys's raw calls and the I02 listener is gate-sys's channel module, both by path, so planeon-broker links exactly
 # crates/broker, crates/role-seal and crates/gate-sys. No registry crate (the signed configuration and ring are
 # HE-005C's); Cargo.lock gains only these two path edges.
+# HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; MON-HE005B-PLAN, Q-HE5B-1..6 (a)): the broker's four pure logic
+# modules (I02, I03, the I05 client's frames and the gate's qualification) use i05-protocol's public JSON, SHA-256,
+# base64 and schema items, unchanged and by path (H5D-12), so planeon-broker links exactly crates/broker,
+# crates/role-seal, crates/gate-sys and crates/i05-protocol. No registry crate; Cargo.lock's planeon-broker entry gains
+# only this one dependency name.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
 role-seal = { path = "../role-seal" }
+i05-protocol = { path = "../i05-protocol" }

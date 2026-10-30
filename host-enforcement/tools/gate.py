@@ -215,8 +215,9 @@ observer's seal.rs keeps its include rule: exactly the two OBSERVER programs.
 HE-005A (the broker's seal, programs and I02 listener; DESIGN-HE005 revision 5 section 4, HE-005A, with the scope notes;
 MON-HE005A-PLAN2, MON-HE005A0-PUSH, MON-HE005A-LAUNCH; owner decisions Q-HE5A-1..3 (a)) registers edge record v11's four
 seccomp-v3 BROKER and WORKER programs (67 files; BROKER embedded, WORKER held). crates/broker becomes planeon-broker's
-library and binary: its closure is exactly BROKER_LINKED_CRATES (itself, role-seal and gate-sys); it joins every
-linked-crate scan (SCANNED_CRATES), the gate's post-seal list, CRATE_ROOTS (lib.rs and main.rs forbid unsafe_code) and its
+library and binary: its closure is exactly BROKER_LINKED_CRATES (itself, role-seal and gate-sys, and since HE-005B
+i05-protocol: four crates); it joins every linked-crate scan (SCANNED_CRATES), the gate's post-seal list, CRATE_ROOTS
+(lib.rs and main.rs forbid unsafe_code) and its
 own no-panic list; its main.rs holds the seal-order grammar with BROKER_SEAL_SITE (the observer's form); its linux_listen.rs
 is its one socket file (SOCKET_FILES, SOCKET_CRATE_MODULES), re-exporting nothing; its seal.rs embeds exactly the two
 BROKER programs and no other broker source embeds anything (check_broker_includes); outside seal.rs no const, static or
@@ -231,6 +232,22 @@ per role, aliases followed (R1-5, check_observer_no_send's item form). HE-005A's
 R1-1 closes the stage-call rule's re-export route (no source imports the role_seal crate itself or reaches it through
 another path, and every role_seal::<stage> counts, whatever precedes it); R1-4 folds G-I01-1's never-unlink form over
 crates/broker (check_broker_never_unlinks); R1-5 folds G5's form over the broker's serve (check_broker_serve).
+
+HE-005B (I02's and I03's codec and checks, the I05 client's frames and the gate's qualification; DESIGN-HE005 revision 5
+sections 1, 3.1, 3.3 and 4, HE-005B; MON-HE005B-PLAN, Q-HE5B-1..6 (a) with its two conditions) registers edge record v12's
+two broker handoff rows 80 and 81 (69 files; the channel schema embedded by i02.rs, the vectors read by the tests only),
+and adds four pure logic modules to crates/broker, i02, i03, i05_client and gate_peer (HE005B_MODULES), unreachable from
+main, serve, seal.rs, status.rs and linux_listen.rs. G-HE5B-1 (check_broker_isolation, module_isolation's form with
+resolved_uses): the modules are named only by each other and by lib.rs's four `pub mod` lines, their types by no other
+broker source, with no alias, re-export or glob. G-HE5B-2 (check_broker_pure): they name no I/O, system-call or foreign
+item and join the no-panic list; i02.rs's decode keeps decode_frame's order under I02's limits (condition 1's order
+clause), and tests/i02_differential.rs is present with every named form (its presence clause); PR review round 1
+(R1-3, R1-4) folds in the observer logic-module words and path whitelist (HE005B_LOGIC_PATHS). G-HE5B-3: planeon-broker's
+closure is exactly the four crates (check_workspace_shape; Cargo.lock's one path edge). G-HE5B-4 (check_broker_includes):
+seal.rs embeds exactly the two BROKER programs and i02.rs exactly the channel schema, once each with include_bytes!, and
+no broker source names vectors.json. G-HE5B-5 (check_he005b_token): GateQualified is closed in R240's five clauses, in
+G-D2-8's form with resolved_uses (condition 2). G-HE5B-6 (check_he005b_absent, check_d2_absent's form): no symbol of a
+built planeon-broker has a path in the four modules, A's per-binary rules unchanged.
 
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
@@ -326,7 +343,10 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # v3's rows 41-43 stay held and pinned; none embedded, 63. HE-005A (DESIGN-HE005 revision 5 sections 2 and 4; MON-HE005A-
 # PLAN2): edge record v11's four seccomp-v3 rows for HE-005 (artifacts 17, 18, 29 and 30: harness-onion compiled filter
 # programs, MET-ENFORCE-025, BYTE_IDENTICAL, REGISTERED_BEFORE_USE), the BROKER programs the broker's seal embeds
-# (BROKER_PROGRAMS) and the WORKER programs held for HE-005C, 67.
+# (BROKER_PROGRAMS) and the WORKER programs held for HE-005C, 67. HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B;
+# MON-HE005B-PLAN): edge record v12's two rows 80 and 81 (harness-onion MET-REPAIR-014's broker handoff inputs at
+# providerCommit 8f3cc3a8, BYTE_IDENTICAL, REGISTERED_BEFORE_USE, consumer HE-005B), the I02/I03 channel schema, which
+# crates/broker/src/i02.rs embeds, and its vectors, read by the tests only, 69.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -404,6 +424,9 @@ CONTRACTS = {
     "contracts/seccomp-v3/BROKER.x86_64.bpf": "95221bd0db753aa22ead2eb49eeac8dae3d24c3dad72811de86c9392f4894dcc",
     "contracts/seccomp-v3/WORKER.aarch64.bpf": "cc04a4710495d3794b0d295613a2f2bd330524a328cb6963a819565bac2acb40",
     "contracts/seccomp-v3/WORKER.x86_64.bpf": "5616c9099324e441674f8e589b6c705ae95f6a4a697f10e761565d0735689d45",
+    "contracts/broker-handoff-v1/channel.schema.json":
+        "e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9",
+    "contracts/broker-handoff-v1/vectors.json": "80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4",
 }
 # HE-004-I01B1 DESIGN-I01B rev 3 sections 2 and 6 (G-I01B-2): edge record v10's rows 69-72, each file's row, provider
 # path and sha256 (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004-I01B).
@@ -504,14 +527,17 @@ ROLE_SEAL_LIB = "crates/role-seal/src/lib.rs"
 OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol", OBSERVER_SYS, ROLE_SEAL)
 # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; H5D-12; MON-HE005A-PLAN2): planeon-broker, a library and a binary
 # in the observer's form, links exactly its own crate, role-seal and gate-sys (an exact-set check, check_workspace_shape),
-# and its crate joins every linked-crate scan; its five sources are named here.
+# and its crate joins every linked-crate scan; its five sources are named here. HE-005B (DESIGN-HE005 revision 5
+# section 4, HE-005B; H5D-12; MON-HE005B-PLAN, Q-HE5B-6 (a)): i05-protocol joins the closure, unchanged, for its
+# JSON, SHA-256, base64 and schema items in the broker's pure I02, I03 and I05-client modules (no client codec goes
+# into it), so the set is exactly crates/broker, crates/role-seal, crates/gate-sys and crates/i05-protocol.
 BROKER_CRATE = "crates/broker"
 BROKER_LIB = "crates/broker/src/lib.rs"
 BROKER_MAIN = "crates/broker/src/main.rs"
 BROKER_SEAL_RS = "crates/broker/src/seal.rs"
 BROKER_STATUS = "crates/broker/src/status.rs"
 BROKER_LINUX_LISTEN = "crates/broker/src/linux_listen.rs"
-BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys")
+BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys", "crates/i05-protocol")
 SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS, ROLE_SEAL, BROKER_CRATE)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
@@ -1417,7 +1443,12 @@ ROLE_SEAL_SITES = (OBSERVER_SEAL_RS, BROKER_SEAL_RS)
 ROLE_SEAL_STAGE_PATH = re.compile(r"\brole_seal::(seal_stage1|seal_stage2)\b")
 # HE-005A: the broker's no-panic list (its five sources, each read with its item-level compile-time asserts removed, as
 # observer-sys's are), and the status items whose text the broker's status.rs shares with the observer's (Q-HE5A-2 (a)).
-BROKER_NO_PANIC = (BROKER_LIB, BROKER_MAIN, BROKER_SEAL_RS, BROKER_STATUS, BROKER_LINUX_LISTEN)
+# HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; G-HE5B-2; MON-HE005B-PLAN): the broker's four pure logic modules,
+# I02's codec and checks, I03's START, the I05 client's frames and the gate's qualification, join the no-panic list.
+HE005B_MODULES = ("i02", "i03", "i05_client", "gate_peer")
+HE005B_FILES = tuple("crates/broker/src/%s.rs" % name for name in HE005B_MODULES)
+BROKER_I02 = "crates/broker/src/i02.rs"
+BROKER_NO_PANIC = (BROKER_LIB, BROKER_MAIN, BROKER_SEAL_RS, BROKER_STATUS, BROKER_LINUX_LISTEN) + HE005B_FILES
 BROKER_STATUS_CONSTANTS = ("NOT_LINUX", "NOT_YET_SERVING")
 # HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1; Q-HE5A-3 (a)): the broker's serve in G5's form
 # (check_observer_serve): its body, read as serve_body reads the observer's, names each of these exactly once and in this
@@ -1428,6 +1459,74 @@ BROKER_SERVE_CALLS = tuple((re.compile(pattern), name) for pattern, name in (
     (r"\bLinuxI02\b", "LinuxI02")))
 BROKER_SERVE_BODY = "{ status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }"
 BROKER_SERVE_TOKEN = re.compile(r"[A-Za-z_]\w*|::|\S")
+# HE-005B (the HE-005B plan's gate rules G-HE5B-1..6; MON-HE005B-PLAN; the build brief's conditions 1 and 2):
+# G-HE5B-4, the include rule's two files: seal.rs embeds exactly the two BROKER programs, and i02.rs exactly the vendored
+# I02 channel schema (edge record v12, row 80), once, with include_bytes!; no other broker source embeds anything, and none
+# names a vectors.json path in code or a literal (the vectors are read only under tests/).
+BROKER_I02_SCHEMA = "contracts/broker-handoff-v1/channel.schema.json"
+BROKER_EMBEDS = {BROKER_SEAL_RS: tuple(sorted(BROKER_PROGRAMS.values())), BROKER_I02: (BROKER_I02_SCHEMA,)}
+BROKER_VECTORS_NAME = re.compile(r"vectors\.json")
+# G-HE5B-2's decode-order clause (Q-HE5B-3 (a), condition 1): i02.rs's decode function, read as the token rules read a
+# source, names each step exactly once and in decode_frame's order (frame.rs:64-85, then its check_structure); i02.rs's
+# three limits are these exact constants; and decode runs decode_datagram under the datagram bound, then the kind limit,
+# which compares the canonical length with the 16 KiB bound and refuses F02.
+HE005B_DECODE_FUNCTION = "decode_datagram"
+HE005B_DECODE_STEPS = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\braw\.len\(\)\s*>\s*limit\b", "the size limit"),
+    (r"\bstd::str::from_utf8\(\s*raw\s*\)", "UTF-8"),
+    (r"\bjson::parse\(", "the strict parse"),
+    (r"\bParseError::Constant\s*=>\s*FrameError::F03\b", "a refused constant as F03"),
+    (r"\bParseError::Duplicate\s*=>\s*FrameError::F05\b", "a duplicate key as F05"),
+    (r"\bParseError::Syntax\s*=>\s*FrameError::F06\b", "any other parse error as F06"),
+    (r"\bjson::canonical\(\s*&\s*value\s*\)", "the canonical re-encoding"),
+    (r"\bencoded\s*!=\s*raw\b", "the byte comparison"),
+    (r"\bjson::depth\(\s*&\s*value\s*\)\s*>\s*MAX_DEPTH\b", "depth at most 16"),
+    (r"\bjson::contains_float\(", "no float"),
+    (r"\bjson::contains_control\(", "no control character"),
+    (r"\bschema\.is_valid\(", "the schema")))
+HE005B_LIMITS = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bpub\s+const\s+MAX_DATAGRAM_BYTES\s*:\s*usize\s*=\s*65_?536\s*;", "MAX_DATAGRAM_BYTES = 65,536"),
+    (r"\bpub\s+const\s+MAX_CONTROL_BYTES\s*:\s*usize\s*=\s*16_?384\s*;", "MAX_CONTROL_BYTES = 16,384"),
+    (r"\bpub\s+const\s+MAX_DEPTH\s*:\s*usize\s*=\s*16\s*;", "MAX_DEPTH = 16")))
+HE005B_KIND_LIMIT = (
+    ("decode", ((re.compile(r"\bdecode_datagram\(\s*raw\s*,\s*MAX_DATAGRAM_BYTES\s*,"), "decode_datagram under MAX_DATAGRAM_BYTES"),
+                (re.compile(r"\bcheck_control_size\("), "the kind limit"))),
+    ("check_control_size", ((re.compile(r"\bcanonical_length\s*>\s*MAX_CONTROL_BYTES\b"), "the 16 KiB comparison"),
+                            (re.compile(r"\bFrameError::F02\b"), "F02"))))
+# G-HE5B-2's presence clause: the differential test exists, calls decode_frame and the decode function, and names each
+# form condition 1 lists, as a string literal.
+HE005B_DIFFERENTIAL = "crates/broker/tests/i02_differential.rs"
+HE005B_DIFFERENTIAL_CALLS = (re.compile(r"\bdecode_frame\s*\("), re.compile(r"\bdecode_datagram\s*\("))
+HE005B_FORMS = ("oversize", "truncated", "trailing byte", "not UTF-8", "duplicate key", "float", "control character",
+                "depth 17", "schema miss", "digest mismatch")
+# G-HE5B-2's names clause: what the four modules never name, read without comments and literal contents and outside
+# strict test blocks.
+HE005B_REFUSED_NAMES = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bstd::fs\b", "std::fs"), (r"\bstd::net\b", "std::net"), (r"\bstd::os\b", "std::os"), (r"\bstd::io\b", "std::io"),
+    (r"\bstd::process\b", "std::process"), (r"\bstd::thread\b", "std::thread"), (r"\bgate_sys\b", "gate_sys"),
+    (r"\brole_seal\b", "role_seal"), (r"\bextern\b", "extern (a foreign item)"), (r"\bunsafe\b", "unsafe")))
+# HE-005B PR review round 1, R1-3 and R1-4 (Q-HE5B-R1-2 (a), MON-R10-HE005B-R1): G-HE5B-2 folds the observer
+# logic-module construction the plan cites (check_observer_logic's, by reference, its items unchanged: the first entry of
+# OBSERVER_LOGIC_WORDS, CRATE_PATH_ROOTS, CODE_PATH and allowed_logic_path) over the four modules, with B's own
+# whitelist: crate:: and self:: paths only to the four modules themselves, i05-protocol's items they use (the plan's
+# json, sha256, base64 and schema, the brief's FrameError, and i05_client's decode_frame, i05_v3_schema and Datagram),
+# std's ordered collections and std::str. So std::time, std's hashed collections, super:: paths and the broker's own
+# seal, listener and lib.rs items are refused. OBSERVER_LOGIC_WORDS' include entry stays G-HE5B-4's (i02.rs embeds).
+HE005B_LOGIC_PATHS = (tuple(("crate", name) for name in HE005B_MODULES) + tuple(("self", name) for name in HE005B_MODULES)
+                      + tuple(("i05_protocol", name) for name in ("json", "sha256", "base64", "schema", "FrameError",
+                                                                    "decode_frame", "i05_v3_schema", "Datagram"))
+                      + tuple(("std", "collections", name) for name in ("BTreeMap", "BTreeSet", "VecDeque"))
+                      + (("std", "str"),))
+HE005B_LOGIC_WORDS = OBSERVER_LOGIC_WORDS[:1]
+# G-HE5B-5 (Q-HE5B-5 (a), condition 2): the gate-qualification token, its one file and its one minting function, with
+# that function's exact signature (R240's clauses in G-D2-8's form).
+HE005B_TOKEN = "GateQualified"
+HE005B_TOKEN_HOME = "crates/broker/src/gate_peer.rs"
+HE005B_TOKEN_MINT = "qualify_gate"
+HE005B_TOKEN_SIGNATURE = (
+    re.compile(r"\bpub\s+fn\s+qualify_gate\s*\(\s*observed\s*:\s*&\s*GateObservation\s*,\s*gate_executable_path\s*:\s*&"
+               r"\s*str\s*\)\s*->\s*Result\s*<\s*GateQualified\s*,\s*GateRefusal\s*>\s*\{"),
+    "pub fn qualify_gate(observed: &GateObservation, gate_executable_path: &str) -> Result<GateQualified, GateRefusal>")
 # HE-003B DESIGN section 2.6 (D1-5, D2-1): the TLS deny-list over gate-tls's non-test sources, raw text with comments,
 # each a case-sensitive regular expression tolerant of whitespace around `=`, `(` and `::`. HE-003C DESIGN section 5
 # (D1-8, Q-HE3C-5 (b)): one global list, kept whole and amended with the client hazards (session stores and TLS 1.2
@@ -2973,10 +3072,14 @@ def check_broker_includes(base: Path) -> int:
     """HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A: BROKER_SEAL_RS's include rule): crates/broker/src/seal.rs
     exists, and in crates/broker's sources (read without comments, literals kept) every include_bytes!/include_str! is one
     plain literal (OBSERVER_INCLUDE_FORM); only seal.rs holds any, two include_bytes! naming, relative to it, exactly
-    BROKER_PROGRAMS' two files. The WORKER programs are vendored, not embedded, until HE-005C. The number of embedded
+    BROKER_PROGRAMS' two files. The WORKER programs are vendored, not embedded, until HE-005C. HE-005B (G-HE5B-4;
+    MON-HE005B-PLAN): BROKER_EMBEDS adds crates/broker/src/i02.rs (required too), which embeds exactly the vendored I02
+    channel schema, once, with include_bytes!; no other broker source embeds anything; and no broker source names a
+    vectors.json path in code or a literal, so the I02 vectors are read only under tests/. The number of embedded
     files."""
     rule = "broker includes"
-    require((base / BROKER_SEAL_RS).is_file(), "%s is missing (%s)" % (BROKER_SEAL_RS, rule))
+    for rel in BROKER_EMBEDS:
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
     count = 0
     for path in sorted((base / BROKER_CRATE / "src").rglob("*.rs")):
         rel = path.relative_to(base).as_posix()
@@ -2988,13 +3091,16 @@ def check_broker_includes(base: Path) -> int:
         forms = OBSERVER_INCLUDE_FORM.findall(kept)
         require(len(OBSERVER_INCLUDE.findall(code)) == len(forms) == len(OBSERVER_INCLUDE.findall(kept)),
                 "%s holds an include_bytes! or include_str! that is not one plain path literal (%s)" % (rel, rule))
-        if rel != BROKER_SEAL_RS:
-            require(not forms, "%s embeds a file; only %s embeds, the two BROKER programs (%s)" % (rel, BROKER_SEAL_RS, rule))
+        require(not BROKER_VECTORS_NAME.search(kept), "%s names vectors.json; the I02 vectors are read only under tests/ "
+                "(%s)" % (rel, rule))
+        expected = BROKER_EMBEDS.get(rel)
+        if expected is None:
+            require(not forms, "%s embeds a file; only %s embed, their listed files (%s)"
+                    % (rel, " and ".join(BROKER_EMBEDS), rule))
             continue
         targets = sorted(posixpath.normpath(posixpath.join(posixpath.dirname(rel), literal)) for literal in forms)
-        require(targets == sorted(BROKER_PROGRAMS.values()) and len(re.findall(r"\binclude_bytes\s*!", code)) == 2,
-                "%s embeds %s, not exactly the two BROKER programs %s with include_bytes! (%s)"
-                % (rel, targets, sorted(BROKER_PROGRAMS.values()), rule))
+        require(targets == sorted(expected) and len(re.findall(r"\binclude_bytes\s*!", code)) == len(expected),
+                "%s embeds %s, not exactly %s with include_bytes! (%s)" % (rel, targets, sorted(expected), rule))
         count += len(forms)
     return count
 
@@ -3133,6 +3239,340 @@ def check_broker_serve(base: Path) -> int:
     serve_a_calls_once(body, rule)
     serve_b_body_exact(body, rule)
     return len(BROKER_SERVE_CALLS)
+
+
+# HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; the HE-005B plan's gate rules; MON-HE005B-PLAN): G-HE5B-1, -2 and -5
+# over crates/broker's non-test sources, each clause its own function, so the mutation proof can name it.
+
+def he005b_codes(base: Path, rule: str) -> dict[str, str]:
+    """crates/broker's non-test sources (src/), read without comments, literal contents emptied and the whitespace around
+    `::` removed; each clause sets the strict test blocks aside where it reads."""
+    codes = {}
+    for rel, raw in observer_sources(base, (BROKER_CRATE,)):
+        try:
+            codes[rel] = PATH_SPACE.sub("::", rust_code(raw))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    return codes
+
+
+def he005b_definitions(codes: dict[str, str]) -> list[tuple[str, str]]:
+    """(name, file) of every struct, enum, union, trait and type item the four modules' files define at any depth outside
+    strict test blocks (D2_TYPE_ITEM, module_isolation's type set)."""
+    return [(item.group(1), rel) for rel in HE005B_FILES if rel in codes
+            for item in D2_TYPE_ITEM.finditer(blank_test_blocks(codes[rel]))]
+
+
+def isolation_a_names(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-1 (a), module_isolation's (a): the four modules' files are present, and outside them the module names occur
+    only in lib.rs, each exactly as its line-anchored `pub mod <name>;`, so main.rs (serve included, and its library-root
+    paths), seal.rs, status.rs and linux_listen.rs name none of them."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (a))" % (rel, rule))
+    words = re.compile(r"\b(?:%s)\b" % "|".join(HE005B_MODULES))
+    for rel, code in sorted(codes.items()):
+        if rel in HE005B_FILES:
+            continue
+        rest = code
+        if rel == BROKER_LIB:
+            for name in HE005B_MODULES:
+                declaration = re.compile(r"(?m)^[ \t]*pub\s+mod\s+%s\s*;" % name)
+                require(len(declaration.findall(rest)) == 1, "%s does not declare `pub mod %s;` exactly once, on its own "
+                        "line (%s (a))" % (rel, name, rule))
+                rest = declaration.sub(" ", rest)
+        found = words.search(rest)
+        require(not found, "%s names the HE-005B module %s other than in lib.rs's one `pub mod` line (%s (a))"
+                % (rel, found.group(0) if found else "", rule))
+
+
+def isolation_b_types(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-1 (b), module_isolation's (b): each name of the four modules' type set is defined once among them, and none
+    occurs in another broker source, whatever it is there."""
+    defined: dict[str, str] = {}
+    for name, rel in he005b_definitions(codes):
+        require(name not in defined, "%s defines %s, which %s defines too (%s (b))" % (rel, name, defined.get(name), rule))
+        defined[name] = rel
+    if not defined:
+        return
+    words = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(name) for name in sorted(defined)))
+    for rel, code in sorted(codes.items()):
+        if rel in HE005B_FILES:
+            continue
+        hit = words.search(code)
+        require(not hit, "%s names %s, a type the HE-005B module %s defines (%s (b))"
+                % (rel, hit.group(0) if hit else "", defined.get(hit.group(0)) if hit else "", rule))
+
+
+def isolation_c_impls(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-1 (c), module_isolation's (c): every impl header in the four modules' files is exactly `impl <a name of
+    their type set> {` (no trait, no `for`, no generic parameter)."""
+    defined = {name for name, _ in he005b_definitions(codes)}
+    for rel in HE005B_FILES:
+        if rel not in codes:
+            continue
+        for _, header in impl_headers(rel, codes[rel]):
+            form = re.fullmatch(r"impl ([A-Za-z_]\w*)", header)
+            require(form is not None and form.group(1) in defined, "%s has the impl header `%s`; every impl in an HE-005B "
+                    "module is exactly `impl <a type it defines> {` (%s (c))" % (rel, header, rule))
+
+
+def isolation_d_uses(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-1 (d), no alias, re-export or glob: the four modules' files hold no `pub use`, and no use path of theirs,
+    read with the file's own aliases of crate paths followed (resolved_uses rooted at `crate`), that runs through one of
+    the four modules or names one of their types renames it with `as` or ends in a glob."""
+    defined = {name for name, _ in he005b_definitions(codes)}
+    for rel in HE005B_FILES:
+        if rel not in codes:
+            continue
+        code = blank_test_blocks(codes[rel])
+        require(not PUB_USE.search(code), "%s re-exports with pub use (%s (d))" % (rel, rule))
+        uses = []
+        for declaration in USE_DECLARATION.finditer(code):
+            try:
+                uses.extend(use_paths(declaration.group(1)))
+            except GateError:
+                raise GateError("%s holds a use declaration the isolation rule cannot read (%s (d))" % (rel, rule)) from None
+        for path, rename in resolved_uses(uses, root="crate"):
+            if not set(path) & (set(HE005B_MODULES) | defined):
+                continue
+            require(rename is None, "%s renames %s with `as` (%s (d))" % (rel, "::".join(path), rule))
+            require(path[-1] != "*", "%s imports a glob through %s (%s (d))" % (rel, "::".join(path), rule))
+
+
+def check_broker_isolation(base: Path) -> int:
+    """HE-005B G-HE5B-1 (MON-HE005B-PLAN; G-D2-5's and G-I01B-1's construction, module_isolation's, over crates/broker):
+    the four pure logic modules (HE005B_MODULES) are named only by each other and by lib.rs's four `pub mod` lines, with
+    no alias, re-export or glob, so nothing in main.rs, serve, seal.rs, status.rs or linux_listen.rs reaches them and
+    planeon-broker's behaviour stays HE-005A's: (a) the names, (b) the type set, (c) the impl headers, (d) the uses. The
+    number of type names."""
+    rule = "HE-005B isolation, G-HE5B-1"
+    codes = he005b_codes(base, rule)
+    isolation_a_names(codes, rule)
+    isolation_b_types(codes, rule)
+    isolation_c_impls(codes, rule)
+    isolation_d_uses(codes, rule)
+    return len({name for name, _ in he005b_definitions(codes)})
+
+
+def pure_a_names(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (a): outside strict test blocks, the four modules' files name none of HE005B_REFUSED_NAMES (std::fs,
+    std::net, std::os, std::io, std::process, std::thread, gate_sys, role_seal, extern, unsafe): no I/O, no system call,
+    no foreign item. The linked-source tripwire, the foreign-item check and the unsafe tripwire stand beside it."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (a))" % (rel, rule))
+        code = blank_test_blocks(codes[rel])
+        for pattern, name in HE005B_REFUSED_NAMES:
+            require(not pattern.search(code), "%s names %s (%s (a))" % (rel, name, rule))
+
+
+def ordered_once(body: str, steps: tuple, what: str, rule: str) -> None:
+    """Each of `steps` ((pattern, name)) occurs exactly once in `body`, and in that order (G5's form)."""
+    positions = []
+    for pattern, name in steps:
+        found = list(pattern.finditer(body))
+        require(len(found) == 1, "%s names %s other than exactly once (%s (b))" % (what, name, rule))
+        positions.append(found[0].start())
+    require(positions == sorted(positions), "%s does not name %s in this order (%s (b))"
+            % (what, ", ".join(name for _, name in steps), rule))
+
+
+def pure_b_decode_order(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (b), condition 1's decode-order clause (check_broker_serve's order form): i02.rs's fn decode_datagram
+    names each of HE005B_DECODE_STEPS exactly once, in decode_frame's order (the size limit, UTF-8, the strict parse and
+    its three refusal mappings, the canonical re-encoding, the byte comparison, depth, no float, no control character,
+    the schema); i02.rs defines each of HE005B_LIMITS exactly once (65,536, 16,384, 16); fn decode runs decode_datagram
+    under MAX_DATAGRAM_BYTES, then the kind limit; and fn check_control_size compares the canonical length with
+    MAX_CONTROL_BYTES and refuses F02."""
+    require(BROKER_I02 in codes, "%s is missing (%s (b))" % (BROKER_I02, rule))
+    code = blank_test_blocks(codes[BROKER_I02])
+    for function, steps in ((HE005B_DECODE_FUNCTION, HE005B_DECODE_STEPS),) + HE005B_KIND_LIMIT:
+        span = function_span(code, function)
+        require(span is not None, "%s does not hold exactly one fn %s (%s (b))" % (BROKER_I02, function, rule))
+        ordered_once(code[span[0]:span[1]], steps, "%s's fn %s" % (BROKER_I02, function), rule)
+    for pattern, name in HE005B_LIMITS:
+        require(len(pattern.findall(code)) == 1, "%s does not define %s exactly once (%s (b))" % (BROKER_I02, name, rule))
+
+
+def pure_c_presence(base: Path, rule: str) -> None:
+    """G-HE5B-2 (c), condition 1's presence clause: tests/i02_differential.rs exists, calls decode_frame and
+    decode_datagram (read without comments, literal contents emptied), and names each of HE005B_FORMS as a string
+    literal (read without comments, literals kept)."""
+    rel = HE005B_DIFFERENTIAL
+    require((base / rel).is_file(), "%s is missing (%s (c))" % (rel, rule))
+    raw = (base / rel).read_text(encoding="utf-8")
+    try:
+        code, kept = PATH_SPACE.sub("::", rust_code(raw)), rust_code(raw, literals=True)
+    except GateError as error:
+        raise GateError("%s: %s (%s (c))" % (rel, error, rule)) from None
+    for pattern in HE005B_DIFFERENTIAL_CALLS:
+        require(pattern.search(code), "%s does not call %s (%s (c))" % (rel, pattern.pattern, rule))
+    literals = set(re.findall(r'"((?:[^"\\]|\\.)*)"', kept))
+    for form in HE005B_FORMS:
+        require(form in literals, "%s does not name the form %r (%s (c))" % (rel, form, rule))
+
+
+def pure_d_words(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (d), check_observer_logic's words (HE-005B PR review round 1, R1-3): no module of the four names HashMap,
+    HashSet or RandomState (HE005B_LOGIC_WORDS, OBSERVER_LOGIC_WORDS' first entry: std's default hasher asks getrandom),
+    read as check_observer_logic reads a logic module."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (d))" % (rel, rule))
+        for pattern, name in HE005B_LOGIC_WORDS:
+            require(not pattern.search(codes[rel]), "%s names %s (%s (d))" % (rel, name, rule))
+
+
+def pure_e_paths(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-2 (e), check_observer_logic's path whitelist (HE-005B PR review round 1, R1-3 and R1-4): in each of the four
+    modules, read as check_observer_logic reads a logic module (comments removed, literal contents emptied, the whitespace
+    around `::` removed), every use path has no rename and no glob and every use path and every crate-rooted code path
+    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged)."""
+    for rel in HE005B_FILES:
+        require(rel in codes, "%s is missing (%s (e))" % (rel, rule))
+        code = codes[rel]
+        for declaration in USE_DECLARATION.finditer(code):
+            try:
+                uses = use_paths(declaration.group(1))
+            except GateError:
+                raise GateError("%s holds a use declaration the logic rule cannot read (%s (e))" % (rel, rule)) from None
+            for path, rename in uses:
+                require(rename is None, "%s renames an import (%s (e))" % (rel, rule))
+                require(path[-1] != "*", "%s imports a glob (%s (e))" % (rel, rule))
+                require(allowed_logic_path(path, False, HE005B_LOGIC_PATHS), "%s imports %s, outside the HE-005B logic "
+                        "whitelist (%s (e))" % (rel, "::".join(path), rule))
+        for match in CODE_PATH.finditer(USE_DECLARATION.sub(" ", code)):
+            leading, root, tail = match.groups()
+            path = (root,) + tuple(tail.split("::")[1:])
+            require(allowed_logic_path(path, bool(leading), HE005B_LOGIC_PATHS), "%s names %s%s, outside the HE-005B "
+                    "logic whitelist (%s (e))" % (rel, leading or "", "::".join(path), rule))
+
+
+def check_broker_pure(base: Path) -> int:
+    """HE-005B G-HE5B-2 (MON-HE005B-PLAN; Q-HE5B-3 (a), condition 1): the four pure logic modules join BROKER_NO_PANIC
+    (check_broker_no_panic) and (a) name no I/O, system-call or foreign item; (b) i02.rs's decode keeps decode_frame's
+    order and I02's limits; (c) the differential test is present with every named form. HE-005B PR review round 1, R1-3
+    and R1-4 (Q-HE5B-R1-2 (a)): the observer logic-module construction folded in, (d) its words and (e) its path
+    whitelist with HE005B_LOGIC_PATHS. The number of modules."""
+    rule = "HE-005B pure, G-HE5B-2"
+    codes = he005b_codes(base, rule)
+    pure_a_names(codes, rule)
+    pure_b_decode_order(codes, rule)
+    pure_c_presence(base, rule)
+    pure_d_words(codes, rule)
+    pure_e_paths(codes, rule)
+    return len(HE005B_FILES)
+
+
+def gate_token_i_definition(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-5 (i), R240's (i) in G-D2-8's form: among the broker's non-test sources, struct GateQualified is defined
+    exactly once, in gate_peer.rs; its fields are named, none with a visibility, each of a type in TOKEN_FIELD_TYPES, at
+    least one; its attributes are exactly SEAL_TOKEN_ATTRIBUTES; so it is no unit or tuple struct and derives no Default,
+    Clone, Copy or other trait."""
+    found = [(rel, match) for rel, code in sorted(codes.items())
+             for match in re.finditer(r"\bstruct\s+%s\b" % HE005B_TOKEN, blank_test_blocks(code))]
+    require(len(found) == 1 and found[0][0] == HE005B_TOKEN_HOME, "the broker's sources do not define struct %s exactly "
+            "once, in %s (%s (i))" % (HE005B_TOKEN, HE005B_TOKEN_HOME, rule))
+    code = blank_test_blocks(codes[HE005B_TOKEN_HOME])
+    names = []
+    for field in struct_fields(code, found[0][1].end()):
+        require(not re.match(r"\s*pub\b", field), "%s's %s holds a field with a visibility (%s (i))"
+                % (HE005B_TOKEN_HOME, HE005B_TOKEN, rule))
+        form = re.fullmatch(r"\s*([a-z_]\w*)\s*:\s*(.+?)\s*", field, re.S)
+        require(form, "%s's %s has a field the token rule cannot read: %r (%s (i))"
+                % (HE005B_TOKEN_HOME, HE005B_TOKEN, field.strip(), rule))
+        require(re.sub(r"\s+", "", form.group(2)) in TOKEN_FIELD_TYPES, "%s's %s field %s is of type %s, outside %s (%s (i))"
+                % (HE005B_TOKEN_HOME, HE005B_TOKEN, form.group(1), form.group(2), ", ".join(TOKEN_FIELD_TYPES), rule))
+        names.append(form.group(1))
+    require(names, "%s's %s has no named field (%s (i))" % (HE005B_TOKEN_HOME, HE005B_TOKEN, rule))
+    start = re.search(r"(?:\bpub\s*(?:\([^)]*\)\s*)?)?\bstruct\s+%s\b" % HE005B_TOKEN, code).start()
+    attributes = sorted(re.sub(r"\s+", "", attribute) for attribute in token_attributes(code, start))
+    require(attributes == sorted(SEAL_TOKEN_ATTRIBUTES), "%s's %s carries the attributes %s, not exactly %s (%s (i))"
+            % (HE005B_TOKEN_HOME, HE005B_TOKEN, attributes, " and ".join(SEAL_TOKEN_ATTRIBUTES), rule))
+
+
+def gate_token_ii_literal(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-5 (ii): gate_peer.rs writes no `Self {` or `Self(`, and the token's literal (`GateQualified {` or `(`,
+    empty generics allowed) occurs there exactly once outside its definition, inside fn qualify_gate's body, and in no
+    other broker source."""
+    code = blank_test_blocks(codes[HE005B_TOKEN_HOME])
+    require(not SELF_LITERAL.search(code), "%s writes `Self{` or `Self(`; the token's one literal names its type (%s (ii))"
+            % (HE005B_TOKEN_HOME, rule))
+    literal = re.compile(r"\b%s(?:::\s*<\s*>)?\s*[{(]" % HE005B_TOKEN)
+    excluded = {match.start(1) for match in re.finditer(r"\b(?:struct|impl)\s+(%s)\b" % HE005B_TOKEN, code)}
+    literals = [match.start() for match in literal.finditer(code) if match.start() not in excluded]
+    span = function_span(code, HE005B_TOKEN_MINT)
+    require(len(literals) == 1 and span is not None and span[0] < literals[0] < span[1],
+            "%s writes the %s literal other than once, in fn %s (%s (ii))"
+            % (HE005B_TOKEN_HOME, HE005B_TOKEN, HE005B_TOKEN_MINT, rule))
+    for rel, other in sorted(codes.items()):
+        if rel != HE005B_TOKEN_HOME:
+            require(not literal.search(blank_test_blocks(other)), "%s writes the %s literal; only %s's fn %s does (%s (ii))"
+                    % (rel, HE005B_TOKEN, HE005B_TOKEN_HOME, HE005B_TOKEN_MINT, rule))
+
+
+def gate_token_iii_signature(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-5 (iii): gate_peer.rs holds the minting function's exact signature (HE005B_TOKEN_SIGNATURE) exactly once,
+    concrete (no generic parameter), and names qualify_gate only there."""
+    code = blank_test_blocks(codes[HE005B_TOKEN_HOME])
+    pattern, signature = HE005B_TOKEN_SIGNATURE
+    require(len(pattern.findall(code)) == 1, "%s does not hold `%s` exactly once (%s (iii))"
+            % (HE005B_TOKEN_HOME, signature, rule))
+    require(len(re.findall(r"\b%s\b" % HE005B_TOKEN_MINT, code)) == 1, "%s names %s other than once, at its exact "
+            "signature (%s (iii))" % (HE005B_TOKEN_HOME, HE005B_TOKEN_MINT, rule))
+
+
+def gate_token_iv_impls(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-5 (iv): no impl header (impl_headers) of a broker source names GateQualified: no `impl From<..> for`, no
+    Default or other trait impl and no inherent impl; the per-frame comparison is a free function."""
+    for rel, code in sorted(codes.items()):
+        for _, header in impl_headers(rel, blank_test_blocks(code)):
+            require(HE005B_TOKEN not in header.split(), "%s holds an impl naming %s, `%s` (%s (iv))"
+                    % (rel, HE005B_TOKEN, header, rule))
+
+
+def gate_token_v_names(codes: dict[str, str], rule: str) -> None:
+    """G-HE5B-5 (v), with resolved_uses rooted at `crate`: no broker source renames GateQualified with `as`, names it in a
+    type item, or re-exports it or gate_peer's items (a `pub use` whose path, the file's own aliases of crate paths
+    followed, runs through gate_peer or names the token, a glob included); lib.rs's one `pub mod gate_peer;` is the
+    exception, as it is no use."""
+    for rel, raw_code in sorted(codes.items()):
+        code = blank_test_blocks(raw_code)
+        require(not re.search(r"\b%s\s+as\b|\bas\s+%s\b" % (HE005B_TOKEN, HE005B_TOKEN), code),
+                "%s renames %s (%s (v))" % (rel, HE005B_TOKEN, rule))
+        try:
+            type_items = [item_text(code, found.start(), "type") for found in TYPE_WORD.finditer(code)]
+        except GateError:
+            raise GateError("%s holds a type item the token rule cannot read (%s (v))" % (rel, rule)) from None
+        require(not any(re.search(r"\b%s\b" % HE005B_TOKEN, text) for text in type_items),
+                "%s aliases %s in a type item (%s (v))" % (rel, HE005B_TOKEN, rule))
+        uses = []
+        for declaration in USE_DECLARATION.finditer(code):
+            try:
+                uses.extend(use_paths(declaration.group(1)))
+            except GateError:
+                raise GateError("%s holds a use declaration the token rule cannot read (%s (v))" % (rel, rule)) from None
+        aliases = dict(zip(uses, resolved_uses(uses, root="crate")))
+        for declaration in PUB_USE_DECLARATION.finditer(code):
+            for path in use_paths(declaration.group(1)):
+                resolved = aliases.get(path, path)[0]
+                require(not {"gate_peer", HE005B_TOKEN} & set(resolved), "%s re-exports %s (%s (v))"
+                        % (rel, "::".join(resolved), rule))
+
+
+def check_he005b_token(base: Path) -> int:
+    """HE-005B G-HE5B-5 (MON-HE005B-PLAN, Q-HE5B-5 (a), condition 2): HE-005A R1-1's no-pub forgery-form rule applied to
+    the gate-qualification token: R240's five clauses (check_seal_tokens, with check_i01b_binding's constructions) in
+    G-D2-8's form (the token, its one file and its one minting function), with R242's resolved_uses for use paths, over
+    crates/broker's non-test sources: (i) the definition, (ii) the one literal, (iii) the minting function's exact
+    signature, (iv) no impl, (v) no other name. The number of clauses."""
+    rule = "gate-qualification token, G-HE5B-5"
+    codes = he005b_codes(base, rule)
+    require(HE005B_TOKEN_HOME in codes, "%s is missing (%s)" % (HE005B_TOKEN_HOME, rule))
+    gate_token_i_definition(codes, rule)
+    gate_token_ii_literal(codes, rule)
+    gate_token_iii_signature(codes, rule)
+    gate_token_iv_impls(codes, rule)
+    gate_token_v_names(codes, rule)
+    return 5
 
 
 def check_unsafe(base: Path) -> int:
@@ -3290,7 +3730,9 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
         require(observer == set(OBSERVER_LINKED_CRATES), "planeon-observer links %s, not %s (workspace shape)"
                 % (sorted(str(path) for path in observer), sorted(OBSERVER_LINKED_CRATES)))
     # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; H5D-12; MON-HE005A-PLAN2): planeon-broker, a member, links
-    # exactly BROKER_LINKED_CRATES, its own crate, role-seal and gate-sys (host-common dropped; i05-protocol is HE-005B's).
+    # exactly BROKER_LINKED_CRATES, its own crate, role-seal and gate-sys (host-common dropped). HE-005B (section 4,
+    # HE-005B; G-HE5B-3; MON-HE005B-PLAN, Q-HE5B-6 (a)): and i05-protocol, unchanged, the one path edge it adds; a
+    # missing or any further workspace crate in the closure refuses.
     if "planeon-broker" in names:
         require("planeon-broker" in workspace, "no planeon-broker crate in the workspace (workspace shape)")
         broker = {names.get(name) for name in linked(workspace, "planeon-broker")}
@@ -7831,6 +8273,21 @@ def check_d2_absent(names: set[str]) -> int:
     return len(names)
 
 
+def check_he005b_absent(names: set[str]) -> int:
+    """HE-005B G-HE5B-6 (MON-HE005B-PLAN; check_d2_absent's form, G-D2-7, run in check_broker_binary's per-binary path,
+    whose own rules are unchanged): no symbol of planeon-broker's .symtab has an item path (legacy or v0, `item_path`) or
+    a first-crate-root path (`symbol_path`, which also reads trait impls and closures) beginning `planeon_broker::<one of
+    HE005B_MODULES>`. A symbol that only mentions a module's name (another crate, a generic argument) passes.
+    Build-time corroboration of G-HE5B-1, not its proof: an inlined function leaves no symbol. The number of symbols
+    read."""
+    for name in names:
+        for path in (item_path(name), symbol_path(name)[0]):
+            if path[:1] == ("planeon_broker",) and path[1:2] and path[1] in HE005B_MODULES:
+                raise GateError("planeon-broker's symbol table holds %s, a symbol of the HE-005B module %s (G-HE5B-6)"
+                                % (name, path[1]))
+    return len(names)
+
+
 # HE-004-I01B1's check_i01b1_absent, G-I01B-1's symbol-table corroboration (extended to i01_answer in HE-004-I01B3),
 # retired in HE-004-I01B5 with its gate line (Q-I01B3-8 (a); DESIGN-I01B5 rev 5 section 6.1): I01B5 makes the modules
 # reachable, so their symbols are linked. G-D2-7 (check_d2_absent) stays.
@@ -8403,7 +8860,7 @@ def main() -> int:
                len(vendor_rows) - len(PATCH_CRATES)))
         say("workspace shape: %d members, each crates/<name> and inheriting edition %s; crates is not a symlink; "
             "effect-gate, gate-tls and planeon-gate link exactly %s; planeon-observer links exactly %s; planeon-broker "
-            "links exactly %s (HE-005A)"
+            "links exactly %s (HE-005A; i05-protocol since HE-005B, G-HE5B-3)"
             % (check_workspace_shape(HE, workspace), WORKSPACE_EDITION, ", ".join(LINKED_CRATES),
                ", ".join(OBSERVER_LINKED_CRATES), ", ".join(BROKER_LINKED_CRATES)))
         say("contracts: %d files match the registered harness-onion bytes" % check_contracts(HE))
@@ -8560,8 +9017,9 @@ def main() -> int:
             "path, renames or globs it or imports a stage (a), no role_seal::seal_stage1 or ::seal_stage2 path, whatever "
             "precedes it, lies outside the %d seal.rs files %s (b), and each calls each stage exactly once, inside its own "
             "wrapper (c)" % (check_role_seal_stage_calls(HE), " and ".join(ROLE_SEAL_SITES)))
-        say("broker includes (HE-005A): %d embedded files, both in %s, exactly %s with include_bytes!; no other broker "
-            "source embeds" % (check_broker_includes(HE), BROKER_SEAL_RS, " and ".join(sorted(BROKER_PROGRAMS.values()))))
+        say("broker includes (HE-005A; HE-005B, G-HE5B-4): %d embedded files, each with include_bytes!: %s; no other "
+            "broker source embeds, and none names vectors.json" % (check_broker_includes(HE), "; ".join(
+                "%s embeds exactly %s" % (rel, " and ".join(files)) for rel, files in BROKER_EMBEDS.items())))
         say("broker bytes (HE-005A, R1-2): %d broker sources outside %s hold no const or static whose type names u8 "
             "but a lone u8, no type item naming u8 and no u8 rename" % (check_broker_bytes(HE), BROKER_SEAL_RS))
         say("broker no-panic: %d sources (%s) name no panicking macro or call outside strict #[cfg(test)] blocks, "
@@ -8576,6 +9034,23 @@ def main() -> int:
             "in order (%s) (a), and its body is exactly `%s` (b)" % (BROKER_MAIN, check_broker_serve(HE),
                                                                  ", ".join(name for _, name in BROKER_SERVE_CALLS),
                                                                  BROKER_SERVE_BODY))
+        say("HE-005B isolation (G-HE5B-1): the modules %s, defining %d type names, are named outside their files only by "
+            "%s's one `pub mod` line each (a); no other broker source names one of their types (b); their impls are "
+            "`impl <own type> {` (c); they hold no pub use, and no use path of theirs through them renames or globs (d)"
+            % (", ".join(HE005B_MODULES), check_broker_isolation(HE), BROKER_LIB))
+        say("HE-005B pure (G-HE5B-2): the %d modules name no std::fs, std::net, std::os, std::io, std::process, "
+            "std::thread, gate_sys, role_seal, extern or unsafe and join the no-panic list (a); %s's fn %s names its %d "
+            "steps once each, in decode_frame's order, its limits are %s, and decode runs the kind limit after it (b); "
+            "%s calls decode_frame and %s and names the forms %s (c); PR review round 1: they name no HashMap, HashSet "
+            "or RandomState (d), and every path they import or root starts with one of %d whitelist entries (e)"
+            % (check_broker_pure(HE), BROKER_I02, HE005B_DECODE_FUNCTION, len(HE005B_DECODE_STEPS),
+               ", ".join(name for _, name in HE005B_LIMITS), HE005B_DIFFERENTIAL, HE005B_DECODE_FUNCTION,
+               ", ".join(HE005B_FORMS), len(HE005B_LOGIC_PATHS)))
+        say("gate-qualification token (G-HE5B-5; R240's clauses in G-D2-8's form): %d clauses over the broker's sources: "
+            "%s is defined once, in %s, with private fields of %s and exactly %s (i); its one literal lies inside fn %s, "
+            "and no `Self{` or `Self(` (ii); `%s` once (iii); no impl names it (iv); no rename, alias or re-export (v)"
+            % (check_he005b_token(HE), HE005B_TOKEN, HE005B_TOKEN_HOME, ", ".join(TOKEN_FIELD_TYPES),
+               " and ".join(SEAL_TOKEN_ATTRIBUTES), HE005B_TOKEN_MINT, HE005B_TOKEN_SIGNATURE[1]))
         say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
             "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
             "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "
@@ -8776,6 +9251,8 @@ def main() -> int:
                     say("%s planeon-broker program and symbols (HE-005A): the %d bytes of %s occur exactly once; no "
                         "membarrier or __membarrier, and none of %s (DESIGN-HE005 section 3.5)"
                         % (target, size, BROKER_PROGRAMS[target], ", ".join(BROKER_ABSENT_SYMBOLS)))
+                    say("%s planeon-broker HE-005B symbols (G-HE5B-6): none of its %d symbols has a path in "
+                        "planeon_broker::%s" % (target, check_he005b_absent(symbol_names(raw)), ", ::".join(HE005B_MODULES)))
                 if binary == "planeon-gate":
                     present = check_gate_symbols(symbol_names(raw))
                     say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "

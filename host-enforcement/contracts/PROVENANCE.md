@@ -397,6 +397,35 @@ programs are vendored only, for HE-005C's worker filter.
 - `contracts/seccomp-v3/WORKER.aarch64.bpf` from `architecture/compiled-filter-programs/programs/WORKER.aarch64.bpf`, sha256 `cc04a4710495d3794b0d295613a2f2bd330524a328cb6963a819565bac2acb40`, 1376 bytes (172 instructions)
 - `contracts/seccomp-v3/WORKER.x86_64.bpf` from `architecture/compiled-filter-programs/programs/WORKER.x86_64.bpf`, sha256 `5616c9099324e441674f8e589b6c705ae95f6a4a697f10e761565d0735689d45`, 1496 bytes (187 instructions)
 
+## The broker handoff inputs v1, the broker's I02 and I03 schema and vectors (HE-005B)
+
+HE-005B (DESIGN-HE005 revision 5 sections 1 and 4, HE-005B; MON-HE005B-PLAN, Q-HE5B-1..6 (a)): the two rows edge
+registry record v12 adds, rows 80 and 81 of `architecture/artifact-edges/operator-harness-engineering-v12.json` (sha256
+`3587488b040f1c23f95f847dd3f1e15b97fa6ca705b6dca429d1cc6d64f3a5c7`, 38902 bytes; harness-onion EDGE-V12, slot 271,
+read by exact path at harness-onion main `dd000fef`, that slot's merge), consumer packet HE-005B, status
+REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer paths exactly these. Its `supersedes` binds edge
+record v11 by sha256 (`9188980f…`), and its first 79 rows equal v11's, in order, so the sections above stand as they
+record them.
+
+Both files are MET-REPAIR-014's broker handoff inputs, already on harness-onion main at `providerCommit`
+`8f3cc3a8ef34e808e7c85ba954ccd4da5b2b842e` (each file's last change, so no provider packet). Each was copied with
+`git show dd000fef:<providerPath>`, the commit actually used; the build checked that those bytes equal
+`git show 8f3cc3a8:<providerPath>`'s.
+
+Each row was compared key by key with the HE-005B plan's table (relation, status, mode, consumer packet and path,
+provider path, sha256, provider commit, no provider packet, and no other key) and each size with README-v12's table;
+each file's sha256, length and mode were checked against its row. `crates/broker/src/i02.rs` embeds the schema once,
+with `include_bytes!` (G-HE5B-4); the tests under `crates/broker/tests/` alone read the vectors. The vectors are
+positive only (DATA_CHECK_ONLY): R10 states its own negative cases in those tests and in
+`crates/effect-gate/MODEL_DEFINED.md`'s HE-005B section (Q-HE5-1 (a)). `tools/gate.py` holds both files to these rows
+(69 registered files).
+
+- `contracts/broker-handoff-v1/channel.schema.json` from `architecture/broker-handoff-inputs/channel.schema.json`, sha256 `e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9`, 42572 bytes
+- `contracts/broker-handoff-v1/vectors.json` from `architecture/broker-handoff-inputs/vectors.json`, sha256 `80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4`, 47254 bytes
+
+Not registered and not vendored (`architecture/artifact-edges/README-v12.md` :33-35): the readiness guide
+`docs/alpha-2/BROKER_HANDOFF_READINESS.md`, which is not a consumer artefact.
+
 ## NIST CAVP SHA-256 test vectors
 
 Byte-oriented SHA-256 response files from NIST CAVP `shabytetestvectors.zip` (csrc.nist.gov; CAVS 11.0 for ShortMsg and LongMsg, 11.1 for Monte), archive sha256

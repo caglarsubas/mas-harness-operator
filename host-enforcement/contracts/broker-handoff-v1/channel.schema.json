@@ -1,0 +1,1443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/binding"
+    },
+    {
+      "$ref": "#/$defs/dispatch"
+    },
+    {
+      "$ref": "#/$defs/frame"
+    },
+    {
+      "$ref": "#/$defs/workerStart"
+    }
+  ],
+  "$defs": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "profileDigest",
+        "observationBindingDigest",
+        "brokerManifestDigest",
+        "brokerExecutableDigest",
+        "workerManifestDigest",
+        "workerArtifactDigest",
+        "caseResourceDigests"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "planeon.internal.broker-binding/v1"
+        },
+        "profileDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "observationBindingDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "brokerManifestDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "brokerExecutableDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "workerManifestDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "workerArtifactDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "caseResourceDigests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "HOST_ISOLATION_NEGATIVES",
+            "LINUX_TARGET_BUILD",
+            "FULL_PREDECESSOR_REGRESSION",
+            "CONTROL_CONTAINER_STARTUP",
+            "POSTGRES_MIGRATION_AND_RLS",
+            "DURABLE_RESTART",
+            "ARBITRARY_NON_ROOT_UID",
+            "READ_ONLY_ROOT_FILESYSTEM",
+            "KUBERNETES_SMOKE",
+            "DEFAULT_DENY_NETWORK"
+          ],
+          "properties": {
+            "HOST_ISOLATION_NEGATIVES": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "LINUX_TARGET_BUILD": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "FULL_PREDECESSOR_REGRESSION": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "CONTROL_CONTAINER_STARTUP": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "POSTGRES_MIGRATION_AND_RLS": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "DURABLE_RESTART": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "ARBITRARY_NON_ROOT_UID": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "READ_ONLY_ROOT_FILESYSTEM": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "KUBERNETES_SMOKE": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            },
+            "DEFAULT_DENY_NETWORK": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 71,
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "maxItems": 32,
+              "minItems": 0,
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "operation",
+        "bindingDigest",
+        "reservationDigest",
+        "runNonce",
+        "caseId",
+        "requestDigest",
+        "observationDigest",
+        "generation",
+        "challenge"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "planeon.internal.broker-dispatch/v1"
+        },
+        "operation": {
+          "const": "EXECUTE_FIXED_PROBE"
+        },
+        "bindingDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "reservationDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "runNonce": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+        },
+        "caseId": {
+          "enum": [
+            "HOST_ISOLATION_NEGATIVES",
+            "LINUX_TARGET_BUILD",
+            "FULL_PREDECESSOR_REGRESSION",
+            "CONTROL_CONTAINER_STARTUP",
+            "POSTGRES_MIGRATION_AND_RLS",
+            "DURABLE_RESTART",
+            "ARBITRARY_NON_ROOT_UID",
+            "READ_ONLY_ROOT_FILESYSTEM",
+            "KUBERNETES_SMOKE",
+            "DEFAULT_DENY_NETWORK"
+          ]
+        },
+        "requestDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "observationDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "challenge": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "frame": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "STARTED"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "workerPid",
+                "workerStartTicks"
+              ],
+              "properties": {
+                "workerPid": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 2147483647
+                },
+                "workerStartTicks": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "RESOURCE_ACTION"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "actionId",
+                "verb",
+                "manifestDigest"
+              ],
+              "properties": {
+                "actionId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 256
+                },
+                "verb": {
+                  "enum": [
+                    "CREATE",
+                    "GET",
+                    "DELETE"
+                  ]
+                },
+                "manifestDigest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 71,
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "RESOURCE_RESULT"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "actionId",
+                "outcome",
+                "objectBase64"
+              ],
+              "properties": {
+                "actionId": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 256
+                },
+                "outcome": {
+                  "enum": [
+                    "ABSENT",
+                    "CREATED",
+                    "PRESENT",
+                    "DELETED",
+                    "DENIED",
+                    "AMBIGUOUS"
+                  ]
+                },
+                "objectBase64": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 21848,
+                      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "RECEIPT_CHUNK"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "index",
+                "dataBase64"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 170
+                },
+                "dataBase64": {
+                  "type": "string",
+                  "minLength": 4,
+                  "maxLength": 32768,
+                  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "CLEANUP_RECORDED"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cleanupDigest",
+                "state",
+                "remainingResources"
+              ],
+              "properties": {
+                "cleanupDigest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 71,
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "state": {
+                  "enum": [
+                    "CLEAN",
+                    "CLEANUP_PENDING"
+                  ]
+                },
+                "remainingResources": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "apiVersion",
+                      "kind",
+                      "namespace",
+                      "name",
+                      "uid",
+                      "manifestDigest",
+                      "reasonCode"
+                    ],
+                    "properties": {
+                      "apiVersion": {
+                        "const": "v1"
+                      },
+                      "kind": {
+                        "enum": [
+                          "Pod",
+                          "ConfigMap",
+                          "Service"
+                        ]
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 63,
+                        "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+                      },
+                      "uid": {
+                        "oneOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9-]{1,128}$"
+                          }
+                        ]
+                      },
+                      "manifestDigest": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 71,
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                      },
+                      "reasonCode": {
+                        "enum": [
+                          "DELETE_DENIED",
+                          "UID_CHANGED",
+                          "DEADLINE",
+                          "IO_AMBIGUOUS",
+                          "OBSERVATION_UNAVAILABLE"
+                        ]
+                      }
+                    }
+                  },
+                  "maxItems": 32,
+                  "minItems": 0,
+                  "uniqueItems": true
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "TERMINAL"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "receiptSize",
+                "receiptDigest",
+                "cleanupDigest",
+                "workerReaped"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "COMPLETED",
+                    "FAILED",
+                    "UNAVAILABLE"
+                  ]
+                },
+                "receiptSize": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4194304
+                },
+                "receiptDigest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 71,
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "cleanupDigest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 71,
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "workerReaped": {
+                  "const": true
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "ABORT"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "enum": [
+                    "DEADLINE",
+                    "REVOKED",
+                    "POLICY_LOST",
+                    "PEER_CHANGED",
+                    "IO_AMBIGUOUS",
+                    "INVALID_FRAME"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "bindingDigest",
+            "reservationDigest",
+            "runNonce",
+            "caseId",
+            "requestDigest",
+            "observationDigest",
+            "generation",
+            "challenge",
+            "executionId",
+            "sequence",
+            "previousDigest",
+            "kind",
+            "payload"
+          ],
+          "properties": {
+            "schemaVersion": {
+              "const": "planeon.internal.broker-frame/v1"
+            },
+            "bindingDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "reservationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "runNonce": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63,
+              "pattern": "^[a-z0-9][a-z0-9.-]{0,62}$"
+            },
+            "caseId": {
+              "enum": [
+                "HOST_ISOLATION_NEGATIVES",
+                "LINUX_TARGET_BUILD",
+                "FULL_PREDECESSOR_REGRESSION",
+                "CONTROL_CONTAINER_STARTUP",
+                "POSTGRES_MIGRATION_AND_RLS",
+                "DURABLE_RESTART",
+                "ARBITRARY_NON_ROOT_UID",
+                "READ_ONLY_ROOT_FILESYSTEM",
+                "KUBERNETES_SMOKE",
+                "DEFAULT_DENY_NETWORK"
+              ]
+            },
+            "requestDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "observationDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "generation": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "challenge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "previousDigest": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 71,
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "kind": {
+              "const": "REFUSED"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "enum": [
+                    "UNAVAILABLE",
+                    "REPLAY",
+                    "GENERATION_MISMATCH",
+                    "CAPACITY_HELD",
+                    "INVALID_AUTHORITY"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "workerStart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "operation",
+        "executionId",
+        "bindingDigest",
+        "caseId",
+        "requestDigest",
+        "generation"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "planeon.internal.broker-worker/v1"
+        },
+        "operation": {
+          "const": "START"
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bindingDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "caseId": {
+          "enum": [
+            "HOST_ISOLATION_NEGATIVES",
+            "LINUX_TARGET_BUILD",
+            "FULL_PREDECESSOR_REGRESSION",
+            "CONTROL_CONTAINER_STARTUP",
+            "POSTGRES_MIGRATION_AND_RLS",
+            "DURABLE_RESTART",
+            "ARBITRARY_NON_ROOT_UID",
+            "READ_ONLY_ROOT_FILESYSTEM",
+            "KUBERNETES_SMOKE",
+            "DEFAULT_DENY_NETWORK"
+          ]
+        },
+        "requestDigest": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 71,
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
