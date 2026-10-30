@@ -9284,8 +9284,8 @@ def main() -> int:
             "`pub trait PeerOps {`"
             % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
         say("observer gate_sys crate (HE-GATE-001; HE-005A PR review round 2, R2-1): %d sources; outside %s and %s "
-            "none imports the gate_sys crate itself (i), none holds gate_sys after a use path's head (ii), and every use "
-            "declaration is readable (iii); extern crate is check_linked_sources', globs and socket modules "
+            "none imports the gate_sys crate itself (i), none holds gate_sys after a use path's head (ii), and every "
+            "use declaration is readable (iii); extern crate is check_linked_sources', globs and socket modules "
             "check_socket_modules'"
             % (check_observer_gate_sys_crate(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN))
         say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "

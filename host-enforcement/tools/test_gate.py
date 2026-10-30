@@ -10656,6 +10656,150 @@ class He005bSymbolTests(unittest.TestCase):
         self.assertEqual(gate.HE005B_MODULES, ("i02", "i03", "i05_client", "gate_peer"))
 
 
+# HE-GATE-001 (DESIGN rev 3): Fix A, CODE_PATH's colon form (HE-005B PR review round 2, R2-1 and R2-2), in both of its
+# readers; Fix B, the observer's gate_sys crate check (HE-005A PR review round 2, R2-1). The old pattern, patched into
+# gate.CODE_PATH, shows each Fix A refusal fails with the fix reverted.
+HEGATE_OLD_CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
+_HG_RBAC, _HG_LIB, _HG_TLS = "crates/observer/src/rbac.rs", gate.OBSERVER_LIB, gate.OBSERVER_TLS
+_HG_CONFIG, _HG_CREDENTIALS = "crates/observer/src/config.rs", "crates/observer/src/credentials.rs"
+_HG_NET, _HG_LISTEN = gate.OBSERVER_LINUX_NET, gate.OBSERVER_LINUX_LISTEN
+# Fix A's forms, (text, the path its reader names): a parameter, a let, a field, a bound, a closure parameter, a static
+# and a const, a struct-literal value, and the spaced leading `: ::path` (PATH_SPACE's `:::path`) and `:::path`. The
+# observer forms name paths outside rbac.rs's whitelist; the broker forms name only paths that (e) alone refuses
+# (std::time, std::sync, std::cell, crate::seal, crate::linux_listen), never one of (a)'s HE005B_REFUSED_NAMES.
+HEGATE_OBSERVER_COLON_FORMS = (
+    ("fn hg_parameter(t:std::time::SystemTime) -> bool { true }\n", "std::time::SystemTime"),
+    ("fn hg_let() { let m:std::sync::Mutex<u8> = hg(); }\n", "std::sync::Mutex"),
+    ("struct HgField { l:crate::client::Client }\n", "crate::client::Client"),
+    ("fn hg_bound<T:std::marker::Send>(t: T) -> T { t }\n", "std::marker::Send"),
+    ("fn hg_closure() { let c = |t:std::time::Instant| t; }\n", "std::time::Instant"),
+    ("static HG_STATIC:std::sync::Mutex<u8> = hg();\n", "std::sync::Mutex"),
+    ("const HG_CONST:crate::seal::Plan = hg();\n", "crate::seal::Plan"),
+    ("fn hg_value() -> HgT { HgT { f:std::time::SystemTime::now() } }\n", "std::time::SystemTime::now"),
+    ("fn hg_spaced(t: ::std::time::SystemTime) {}\n", "::std::time::SystemTime"),
+    ("fn hg_colons(t:::std::time::SystemTime) {}\n", "::std::time::SystemTime"),
+)
+HEGATE_BROKER_COLON_FORMS = (
+    ("fn hg_parameter(t:std::time::SystemTime) -> bool { true }\n", "std::time::SystemTime"),
+    ("fn hg_let() { let m:std::sync::Mutex<u8> = hg(); }\n", "std::sync::Mutex"),
+    ("struct HgField { l:crate::linux_listen::LinuxI02 }\n", "crate::linux_listen::LinuxI02"),
+    ("fn hg_bound<T:crate::seal::Sealing>(t: T) -> T { t }\n", "crate::seal::Sealing"),
+    ("fn hg_closure() { let c = |t:std::time::Instant| t; }\n", "std::time::Instant"),
+    ("static HG_STATIC:std::cell::Cell<u8> = hg();\n", "std::cell::Cell"),
+    ("const HG_CONST:crate::seal::Plan = hg();\n", "crate::seal::Plan"),
+    ("fn hg_value() -> HgT { HgT { f:std::time::SystemTime::now() } }\n", "std::time::SystemTime::now"),
+    ("fn hg_spaced(t: ::std::time::SystemTime) {}\n", "::std::time::SystemTime"),
+    ("fn hg_colons(t:::std::time::SystemTime) {}\n", "::std::time::SystemTime"),
+)
+HEGATE_COLON_PASSES = ("fn hg_whitelisted(x:std::collections::BTreeMap<u8, u8>) -> usize { x.len() }\n",
+                       "fn hg_unrooted(x:Foo::Bar) {}\n")
+HEGATE_CODE_PATH_TEXTS = ("a::b::c", "Foo::<T>::bar::baz", "<std::time::Instant>::now()", "::std::time::Instant::now()")
+HEGATE_OBSERVER_SOURCES = 41
+
+
+class HeGateTests(Tree):
+    """HE-GATE-001 over copies of the real sources (HE005B_TREE). Fix A: each colon-adjacent form is refused by
+    check_observer_logic in rbac.rs and by check_broker_pure's (e) in i03.rs, and passes with the old pattern patched into
+    gate.CODE_PATH; whitelisted and unrooted forms pass under both; the old and new patterns match alike elsewhere. Fix B:
+    check_observer_gate_sys_crate's clauses (i), (ii) and (iii) refuse their forms with their own messages, the real
+    files and gate_sys's item imports pass, and its stated bounds stay refused by check_linked_sources."""
+
+    TREE = HE005B_TREE
+
+    def colon_forms_refuse(self, check, rel, forms, tag, count):
+        good = self.TREE[rel]
+        for text, named in forms:
+            self.write(rel, good + "\n" + text)
+            try:
+                with self.assertRaisesRegex(gate.GateError, re.escape("%s names %s, outside the " % (rel, named)) + ".*"
+                                            + re.escape(tag), msg=text):
+                    check(self.base)
+                with mock.patch.object(gate, "CODE_PATH", HEGATE_OLD_CODE_PATH):
+                    self.assertEqual(check(self.base), count, text)
+            finally:
+                self.write(rel, good)
+
+    def test_fix_a_observer_logic_reads_the_colon_forms(self):
+        self.colon_forms_refuse(gate.check_observer_logic, _HG_RBAC, HEGATE_OBSERVER_COLON_FORMS,
+                                "(observer logic rules)", len(gate.LOGIC_MODULES))
+
+    def test_fix_a_broker_pure_reads_the_colon_forms(self):
+        self.colon_forms_refuse(gate.check_broker_pure, _BI03, HEGATE_BROKER_COLON_FORMS,
+                                "(HE-005B pure, G-HE5B-2 (e))", len(gate.HE005B_FILES))
+
+    def test_fix_a_whitelisted_and_unrooted_forms_pass(self):
+        for check, rel, count in ((gate.check_observer_logic, _HG_RBAC, len(gate.LOGIC_MODULES)),
+                                  (gate.check_broker_pure, _BI03, len(gate.HE005B_FILES))):
+            good = self.TREE[rel]
+            for text in HEGATE_COLON_PASSES:
+                self.write(rel, good + "\n" + text)
+                try:
+                    self.assertEqual(check(self.base), count, text)
+                    with mock.patch.object(gate, "CODE_PATH", HEGATE_OLD_CODE_PATH):
+                        self.assertEqual(check(self.base), count, text)
+                finally:
+                    self.write(rel, good)
+
+    def test_fix_a_code_path_matches_alike_elsewhere(self):
+        for text in HEGATE_CODE_PATH_TEXTS:
+            self.assertEqual([(found.span(), found.groups()) for found in gate.CODE_PATH.finditer(text)],
+                             [(found.span(), found.groups()) for found in HEGATE_OLD_CODE_PATH.finditer(text)], text)
+
+    def test_fix_b_the_real_files_pass(self):
+        for base in (self.base, gate.HE):
+            self.assertEqual(gate.check_observer_gate_sys_crate(base), HEGATE_OBSERVER_SOURCES)
+
+    def test_fix_b_i_refuses_the_crate_itself_outside_the_socket_files(self):
+        for rel, text in ((_OCLIENT, "pub(crate) use gate_sys;\n"), (_HG_CONFIG, "use gate_sys::{self};\n"),
+                          (_HG_TLS, "use ::gate_sys as g;\n"), (_HG_CREDENTIALS, "use ::{gate_sys};\n"),
+                          (_HG_CONFIG, "use gate_sys::{Dir, self};\n"), (_OCLIENT, "use gate_sys::{{self}};\n")):
+            self.refused(gate.check_observer_gate_sys_crate, rel, self.TREE[rel] + "\n" + text,
+                         re.escape("%s imports the gate_sys crate itself (observer gate_sys crate, HE-GATE-001 (i))"
+                                   % rel))
+
+    def test_fix_b_i_passes_a_private_import_in_a_socket_file(self):
+        # Not refused by (i), and not a re-export: check_socket_modules refuses every `pub use` in a socket file.
+        self.write(_HG_NET, self.TREE[_HG_NET] + "\nuse gate_sys;\n")
+        self.assertEqual(gate.check_observer_gate_sys_crate(self.base), HEGATE_OBSERVER_SOURCES)
+
+    def test_fix_b_ii_refuses_gate_sys_after_the_head(self):
+        for rel, text, path in ((_OCLIENT, "use crate::wire::gate_sys::Dir;\n", "crate::wire::gate_sys::Dir"),
+                                (_OCLIENT, "pub use self::gate_sys;\n", "self::gate_sys"),
+                                (_OCLIENT, "use super::gate_sys;\n", "super::gate_sys"),
+                                (_HG_LIB, "pub use crate::client::gate_sys;\n", "crate::client::gate_sys"),
+                                (_HG_LISTEN, "use crate::client::gate_sys::channel::{send};\n",
+                                 "crate::client::gate_sys::channel::send")):
+            self.refused(gate.check_observer_gate_sys_crate, rel, self.TREE[rel] + "\n" + text,
+                         re.escape("%s reaches gate_sys through another path, %s (observer gate_sys crate, HE-GATE-001 "
+                                   "(ii))" % (rel, path)))
+
+    def test_fix_b_iii_refuses_an_unreadable_declaration(self):
+        self.refused(gate.check_observer_gate_sys_crate, _HG_CONFIG, self.TREE[_HG_CONFIG] + "\nuse r#gate_sys;\n",
+                     re.escape("%s holds a use declaration the gate_sys crate rule cannot read (observer gate_sys "
+                               "crate, HE-GATE-001 (iii))" % _HG_CONFIG))
+
+    def test_fix_b_forms_that_pass(self):
+        good = self.TREE[_OCLIENT]
+        for text in ("pub(crate) use gate_sys::Dir;\n", "use gate_sys::inet::{self};\n",
+                     'const HEGATE_NOTE: &str = "pub(crate) use gate_sys;";\n', "// pub(crate) use gate_sys;\n"):
+            self.write(_OCLIENT, good + "\n" + text)
+            try:
+                self.assertEqual(gate.check_observer_gate_sys_crate(self.base), HEGATE_OBSERVER_SOURCES, text)
+            finally:
+                self.write(_OCLIENT, good)
+
+    def test_fix_b_bounds_stay_refused(self):
+        # HG-D1-5: extern crate gate_sys, at any visibility, is check_linked_sources' (LINKED_FORMS), over LINKED_TREE.
+        for rel, text in LINKED_TREE.items():
+            self.write("linked/" + rel, text)
+        linked = self.base / "linked"
+        gate.check_linked_sources(linked)
+        self.write("linked/" + gate.OBSERVER_CLIENT, "pub(crate) extern crate gate_sys;\n")
+        with self.assertRaisesRegex(gate.GateError, re.escape("%s declares an extern crate (linked-source tripwire)"
+                                                              % gate.OBSERVER_CLIENT)):
+            gate.check_linked_sources(linked)
+
+
 class OutputPrefixTests(unittest.TestCase):
     def test_every_line_carries_the_prefix(self):
         output = io.StringIO()
