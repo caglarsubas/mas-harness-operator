@@ -4012,14 +4012,29 @@ the owner's pause of HE-005C, not as a design change (R305). Its rules are R246-
 
 The binary statement (MON-I01B3-BIN's four-part form; the plan, with addendum 1's (iv)):
 - (i) G-HE5B-1's source isolation (R296): the four modules are named only by each other and lib.rs's `pub mod` lines.
-- (ii) G-HE5B-6's symbol check, as proof, on both targets: `<pending heavy step>`.
+- (ii) G-HE5B-6's symbol check, as proof, on both targets: no symbol of the four modules among planeon-broker's 951
+  `.symtab` symbols on x86_64 and 1,061 on aarch64 (the gate's per-binary lines at `b638f700`).
 - (iii) planeon-gate, planeon-observer, planeon-containment and planeon-writer byte-identical, sha256 and SBOM, to
-  HE-005A's on both targets (the build kit's `reference-binlines-HE005A.txt`, compared by script): `<pending heavy step>`.
-- (iv) planeon-broker's binary sha256, on both targets, equal to the reference's two broker lines; its SBOM different
-  from A's by exactly the i05-protocol workspace component (removed, `serialNumber` recomputed as `sbom()` does, the
-  canonical bytes' sha256 then equal to the reference line's; `sbom()` emits components only, MON-R10-HE005B-ADD1):
-  `<pending heavy step>`. If the binary sha256 differs, the heavy slot's removal diagnostic removes the four `pub mod`
-  lines and the i05-protocol edge and shows byte identity restored, the residual recorded in I01B3's form.
+  HE-005A's on both targets (the build kit's `reference-binlines-HE005A.txt`, compared by the kit's
+  `binstatement_b.py`): **PASS**: x86_64 `f534bd63…`, `a317a7b5…`, `77886c4b…`, `684149d7…`; aarch64 `2d62ef0a…`,
+  `daa9482a…`, `8fd74ad0…`, `cfb11b59…`.
+- (iv) planeon-broker's binary sha256, on both targets, against the reference's two broker lines (addendum 1's form):
+  **the binary differs**: x86_64 `18589a172ec196477138c341028a4b14804e3ac3d2dfb9701bd36317c1a24f5d` (HE-005A's
+  `b7601d51f7616e0e6cdf23ada16618bee0d2200d764ee30c6cb5fea2d3002078`), aarch64
+  `dbd3293d5d32cf26d224b61393c33110017e9323dbc413acd4781eff2f571747` (HE-005A's
+  `0a5c446aaae15e15a702d465f557da0a28072b50779476a970ab74777537ab05`). So addendum 1's SBOM check does not apply, and
+  the binary-differs path ran: the removal diagnostic (the kit's `removal_diag.zsh`, `5fd2b0e3…`), in a `git archive`
+  export of `b638f700`, removed the four `pub mod` lines, the i05-protocol edge and B's comment lines (`lib.rs`,
+  `crates/broker/Cargo.toml` and `Cargo.lock` then byte-equal to `abde6fc5`'s; `.cargo/config.toml` byte-equal to
+  `b638f700`'s), and the rebuilt planeon-broker is `b7601d51…` on x86_64 and `0a5c446a…` on aarch64: byte identity
+  restored on both targets.
+
+The residual, in I01B3's form (MON-R10-HE005B-DIAG-OK, accepted as written): planeon-broker at `b638f700` differs from
+HE-005A's on both targets, by the digests above; with the four `pub mod` lines and the i05-protocol edge removed, the build
+is byte-identical to HE-005A's on both targets; there is no new reachable source (G-HE5B-1, R296; G-HE5B-6, R301); the
+difference comes from the new edge and the unreachable modules (crate metadata and symbol hashes, and reachable
+functions' machine code may differ through optimiser effects; the run does not say which). Reproducibility: "a second
+clean build of B's broker gives the same two digests" `<pending the sim's heavy slot>`.
 
 ### Superseded and discharged
 
@@ -4046,11 +4061,15 @@ equal to the same files' at `abde6fc5`). The early check (MON-R10-HE005B-EARLY-G
 `cargo check --offline -p planeon-broker --all-targets` rc 0, and `cargo test --offline -p planeon-broker` rc 0, 60
 passed, 0 failed, 0 warnings (i02_codec 22, i02_differential 8, i03_start 3, i05_client 10), the lockfile unchanged.
 
-The heavy evidence, through the build's `heavy.zsh`, on the monitor's word: `cargo test` `<pending heavy step>`; both
-musl release builds `<pending heavy step>`; `he-gate: passed` with its contracts, workspace shape and binary lines
-`<pending heavy step>`; the gate's self-test `<pending heavy step>`; the mutation proof (69 rows) `<pending heavy step>`;
-the binary statement (iii) and (iv) `<pending heavy step>`; `tests/verify` `<pending heavy step>`. The sim and the verify
-are the author's.
+The heavy evidence, through the build's `heavy.zsh`, offline, on the monitor's word (MON-R10-HE005B-HEAVY-GO), at
+`b638f700`: `cargo test` rc 0, 854 passed, 0 failed, 0 ignored, in 129 test binaries (301 s), with warnings only in the
+vendored ring 0.17.14; both musl release builds rc 0 (x86_64 53 s, aarch64 56 s), warnings only in the vendored ring;
+`he-gate: passed` (69 s), with G-HE5B-1's 4 modules and 28 type names, G-HE5B-2, the broker's includes 3, G-HE5B-5's 5
+clauses and G-HE5B-6's per-binary lines (no HE-005B symbol among 951 on x86_64 and 1,061 on aarch64); the gate's
+self-test, 453 tests, OK (62 s); the mutation proof, 69 of 69 rows killed, 65 with a one-clause refusing set and 4 with
+larger sets, 0 failures; `tests/verify`, 13 tests, OK; and the binary statement (iii) PASS and (iv) with its removal
+diagnostic, as the Binaries section states (MON-R10-HE005B-DIAG-OK). The logs are the build's `logs/` files. The sim and
+the verify are the author's.
 
 ### Code and audit
 
