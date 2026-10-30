@@ -4158,3 +4158,96 @@ components only); MON-R10-HE005B-U2-OK (Q-HE5B-U2-1 (a); departures 1-3); MON-R1
 MON-R10-HE005B-EARLY-GO and MON-R10-HE005B-EARLY-OK (U3 accepted, the early check); MON-R10-HE005B-U4-OK
 (Q-HE5B-U4-1 (a), Q-HE5B-U4-2 (a)); and MON-R10-HE005B-U5-OK (departures 1-6, the parity condition met). All are
 2026-10-30 unless dated above. The complete messages are recorded in the operator's `tools/w03/he005/OWNER_DECISIONS.md`.
+
+## HE-GATE-001: the CODE_PATH colon-form fix and the observer's gate_sys crate check (`tools/gate.py`, `tools/test_gate.py`)
+
+HE-GATE-001 is a small R10 gate packet, ruled by the monitor as Q-R10-NEXT (a) under the owner's delegation, built as its
+design revision 3 (sha256 `4a484dbc…`) states it, by the build brief (`05bdf88f…`), on HE-005B's merged base `b732b940`
+(tree `d0d68b60`). It carries out the owner's decision on HE-005B's PR review round 2, "Push, carry R2-1 (Recommended)":
+R2-1 and R2-2 become one fix of CODE_PATH, shared by both of its readers (Fix A). It also folds HE-005A's carried PR
+review round 2 R2-1, the `gate_sys` re-export form (Fix B). It changes only `tools/gate.py`, `tools/test_gate.py`, this
+section and its packet YAML: no Rust source, contract, lock, manifest, vendored package, `ci/` or `.github/` path, and
+no other rule. Its rules are R308-R314.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R308 | **Fix A, CODE_PATH's colon form.** CODE_PATH (`tools/gate.py:1314` at `b732b940`) was `(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)`. Its lookbehind stopped a match after any colon, so in the text both readers scan (after `rust_code`, PATH_SPACE and `USE_DECLARATION.sub`) no crate-rooted path written right after a lone colon was read: a parameter (`t:std::time::SystemTime`), a let, static or const type, a field or a struct-literal value, a closure parameter, a bound or where-clause, and the spaced leading `t: ::std::time::SystemTime`, which PATH_SPACE turns into `t:::std::time::SystemTime`. It is now `(?<!\w)(?<!::)(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)`: a match still never starts inside a path (after a word character or after `::`), and a path after a lone colon is read as any other code path. Its two readers, `check_observer_logic` and `pure_e_paths` (G-HE5B-2 (e)), are unchanged but for one docstring sentence each | HE-005B PR review round 2, R2-1 and R2-2; the owner's "Push, carry R2-1 (Recommended)"; Q-R10-NEXT (a); design §1 (HG-D1-2, HG-D1-6, HG-D2-3) |
+| R309 | **Fix A's reach in today's tree: none.** Design review round 1, over `git archive` copies of `b732b940` with only CODE_PATH replaced: `check_observer_logic` 18, `check_broker_pure` 4 and `check_observer_no_send` 41 under both patterns; the readers' scanned text 1,700 = 1,700 matches; all 225 `crates/**/*.rs` files 15,035 = 15,035, the old matches a subset of the new and none new-only, so no colon-adjacent path exists today. Each colon-adjacent plant outside the whitelist, the `: ::` and `:::` forms included, passes under the old pattern and is refused under the new, in both readers; whitelisted and unrooted forms pass under both | Design review round 1 (`117b71bd…`); design review round 2 (`9a448bb2…`), the monitor's probe (2) |
+| R310 | **The other `(?<![\w:])` lookbehinds, reviewed and unchanged:** gate.py's patterns at `:649-656`, `:4318`, `:5493`, `:5497`, `:7846` and `:8218-8222` (at `b732b940`) carry the same lookbehind. Design review round 1 read each, without probing: most are presence or exact-count patterns, so a missed form fails closed; `:4318` is `own_scope_strip`'s prefix strip; `:7846` (`<alias>::send`) sits behind `:7849`, which refuses any rename of the channel module. They stay unchanged; a further sweep is the monitor's to carry if it wants one | Design §1 (HG-D1-6) |
+| R311 | **Fix B, `check_observer_gate_sys_crate`** (new, beside `check_observer_no_send`, and called once from the gate's main sequence right after it, its count printed). It makes its own `observer_code(base, rule)` reading of crates/observer's non-test sources (comments removed, literal contents emptied, the whitespace around `::` removed, strict test blocks blanked), never `check_observer_no_send`'s literals-kept reading, and reads every use declaration with `use_paths`. Three clause functions, each with its own message tag, in `check_seal_tokens`' named-clause pattern: (i) `observer_gate_sys_bare`: in every observer source except `linux_net.rs` and `linux_listen.rs`, no use path is `gate_sys` or `gate_sys::{self}` (`use gate_sys;`, `use gate_sys::{self};`, `use ::gate_sys;`, `use ::{gate_sys};`, `use gate_sys::{Dir, self};`), renamed or not, at any visibility; (ii) `observer_gate_sys_after_head`: in every observer source, the socket files included, no use path holds `gate_sys` after its head (`crate::wire::gate_sys::Dir`, `self::gate_sys`, `super::gate_sys`, `crate::client::gate_sys::channel::{send}`), which closes the socket-file route through a re-export elsewhere; (iii) `observer_gate_sys_readable`: in every observer source, a use declaration `use_paths` cannot read (`use r#gate_sys;`) refuses. (i) and (ii) read only the declarations `use_paths` can read and leave every other one to (iii). Imports of gate_sys's items and modules stay allowed (`use gate_sys::Dir;`, `use gate_sys::inet::{self};`): the real tree's 41 sources pass | HE-005A PR review round 2, R2-1 (its successor clause: refuse importing gate_sys itself outside the socket files, as R1-1's fix does for role_seal); design §2 (HG-D1-1, HG-D1-4, HG-D2-1) |
+| R312 | **Fix B's stated bounds,** refused by existing rules, not by it: `extern crate gate_sys`, at any visibility, by `check_linked_sources` (LINKED_FORMS) in every observer source; a glob of gate_sys and imports of its socket modules outside the socket files by `check_socket_modules`, which reads `gate_sys` at any path position. Inside a socket file a re-export is already impossible (`check_socket_modules` refuses every `pub use` there, and `check_observer_no_send` refuses any rename of gate_sys), so (i) does not refuse a private, unrenamed `use gate_sys;` there | Design §2 (HG-D1-1, HG-D1-5) |
+| R313 | **`check_observer_no_send` is byte-identical,** its messages unchanged, so `test_g_i01_5_the_alias_forms_refuse` keeps its 36 forms and messages and is itself unchanged: Fix B is a separate check, not a clause inside it | Design §2 (HG-D1-1); Q-HG-CAP (a), the monitor's probe (1) |
+| R314 | **The rows.** Self-tests (`HeGateTests`, over copies of the real sources). Fix A: its nine forms (the static and the const planted apart, so ten plants) in `rbac.rs` through `check_observer_logic`, and in the broker's `i03.rs` through `check_broker_pure`, each broker plant naming a path only (e) refuses (`std::time`, `std::sync`, `std::cell`, `crate::seal`, `crate::linux_listen`); each is refused with the new CODE_PATH and passes with the old pattern patched into `gate.CODE_PATH`, so every Fix A refusal test fails with the fix reverted; a whitelisted and an unrooted colon-adjacent path pass under both patterns in both readers; the two patterns give equal match lists on `a::b::c`, `Foo::<T>::bar::baz`, `<std::time::Instant>::now()` and `::std::time::Instant::now()`. Fix B: (i)'s six forms, (ii)'s five and (iii)'s one, each refused with its own clause's message; the real files, a private `use gate_sys;` in `linux_net.rs`, `pub(crate) use gate_sys::Dir;`, `use gate_sys::inet::{self};`, and a literal and a comment holding `pub(crate) use gate_sys;` pass; and `pub(crate) extern crate gate_sys;` stays refused by `check_linked_sources`. The proof rows (`HEGATE_PROOF_RULES`, in `HE005B_PROOF_RULES`' 8-field shape, read by the build's `mutation_proof.py` after `HE005B_PROOF_RULES`, whose 81 rows keep their results): "HE-GATE-001 Fix A (observer)" and "HE-GATE-001 Fix A (broker)", one clause each, `(colon)`, switched off by `codepath_patches` (the old pattern patched into `gate.CODE_PATH`), and "HE-GATE-001 Fix B", its three clause functions switched off by name. HG1 `fn p(t:std::time::SystemTime) -> bool { true }` in `rbac.rs` and HG2 the same in `i03.rs` (`(colon)`); HG3 `pub(crate) use gate_sys;` in `client.rs` ((i)); HG4 `use crate::wire::gate_sys::Dir;` in `client.rs` ((ii)); HG5 `use r#gate_sys;` in `config.rs` ((iii)). `HeGateTests` also reads the table: each row refused by its rule, by its own clause alone, and passing with its clause off | Design §3 and §4 (HG-D1-2, HG-D1-3, HG-D2-2) |
+
+### Binaries
+
+All ten binary lines must equal HE-005B's (the kit's `reference-binlines-HE005B`): the packet changes no crate source, and
+design review round 1 found gate.py and test_gate.py named by no crate source or workspace file outside comment lines (40
+files, 0 non-comment hits). The statement: filled at the heavy checkpoint.
+
+### Superseded and discharged
+
+- **HE-005B PR review round 2's R2-1 and R2-2** (carried by the owner's "Push, carry R2-1 (Recommended)" to one gate-wide
+  colon-form fix): closed by Fix A (R308).
+- **HE-005A PR review round 2's R2-1** (the bare `pub(crate) use gate_sys;` form in a non-socket observer source, carried
+  in HE-005B's Carried list): closed by Fix B (R311).
+
+### Evidence
+
+At build, light (`python3 -I -B` text checks, no cargo), on `b732b940`'s worktree: the brief's and the design's digests
+(`05bdf88f…`, `4a484dbc…`) and the two review records' (`117b71bd…`, `9a448bb2…`); `check_observer_no_send`,
+`observer_code`, `use_paths`, `source_uses`, `resolved_uses`, `gate_sys_aliases`, `check_socket_modules`,
+`check_linked_sources`, `check_broker_pure` and `check_seal_tokens` source-identical to `b732b940`'s (AST source
+segments), and `check_observer_logic` and `pure_e_paths` identical but for their docstrings; the three targeted unit
+tests, each run alone from `tools/` as `python3 -I -B -m unittest discover -s . -p test_gate.py -q -k <name>` (isolated
+mode leaves the current directory off `sys.path`, so the plain `-m unittest <name>` form cannot import the module):
+`test_gate.HeGateTests` 12 tests OK, `test_gate.I01ListenerRuleTests.test_g_i01_5_the_alias_forms_refuse` 1 test OK,
+`test_gate.He005bRuleTests` 4 tests OK.
+
+The heavy evidence, through the build's `heavy.zsh`, offline, on the monitor's word: the nine inherited argv, `cargo
+test` and both musl release builds: filled at the heavy checkpoint. `he-gate: passed`, with the new check's line and the
+ten binary lines equal to HE-005B's: filled at the heavy checkpoint. The gate's self-test: filled at the heavy
+checkpoint. The mutation proof, `HE005B_PROOF_RULES`' 81 rows and `HEGATE_PROOF_RULES`' 5: filled at the heavy
+checkpoint. The sim and the verify are the author's.
+
+### Code and audit
+
+- `tools/gate.py`: CODE_PATH and its comment (R308); one docstring sentence each in `check_observer_logic` and
+  `pure_e_paths`; `gate_sys_crate_uses`, `observer_gate_sys_bare`, `observer_gate_sys_after_head`,
+  `observer_gate_sys_readable` and `check_observer_gate_sys_crate` (new; R311); one main-sequence line.
+- `tools/test_gate.py`: `HeGateTests`, `HEGATE_PROOF_RULES` and their helpers (new; R314); no existing test changes.
+- This section, and `task-packets/HE-GATE-001.yaml` at the repository root. No other file: every crate source, contract,
+  lock, manifest, `ci/` and `.github/` path and the vendored crates are untouched.
+
+### Stated residuals
+
+- **The textual reading's limits:** CODE_PATH and Fix B read text, not Rust; a form they do not read stays code review's.
+- **Fix B's bounds** (R312) rest on `check_linked_sources` and `check_socket_modules`.
+- **The other lookbehinds** (R310) were read, not probed.
+
+### Carried
+
+- **LINKED-EXCEPTIONS-PROOF:** still open, out of this packet's scope as ruled (HE-005C's, Q-HE5C-5 (a)).
+- **HE-005A PR review round 1's R1-2 and R1-3:** still open, out of this packet's scope as ruled.
+- **MON-HG-BROKER-CARRY, as widened, an HE-005D carry.** Q-HG-1 = no: there is no broker twin of Fix B in this packet,
+  since the ruling scoped it to HE-005A's observer-only R2-1. Design review round 1 found a real broker path: none of the
+  broker rules it ran refuses `use gate_sys::channel::{send};` in the broker's `linux_listen.rs`, whether written
+  directly or reached through a `pub(crate) use gate_sys;` re-export in `status.rs`. The interim stop rule covers the
+  whole broker crate: any packet before HE-005D that adds `channel::send`, `.send(` or any other write path anywhere in
+  the broker crate, `serve_unanswered` (`lib.rs:69`) and `LinuxI02`'s methods included, stops and goes to the monitor;
+  until HE-005D, `check_broker_serve`'s pin that serve closes every connection unanswered stays in force. That pin
+  covers `main.rs`'s `fn serve` body, not `serve_unanswered`'s body or `LinuxI02`'s methods (HG-D2-4). HE-005D's carried
+  no-send rule must refuse `use gate_sys::channel::{send}` in the broker's `linux_listen.rs`, directly and through a
+  `pub(crate) use gate_sys;` re-export, cover the whole crate except its one reviewed send path, and pin
+  `serve_unanswered`'s and `LinuxI02`'s bodies or prove them send-free. It sits on HE-005D's carried list beside
+  SO_PEERSEC, R1-8/R1-9, H5G-4 and R2-3.
+
+### Owner and monitor decisions
+
+Cited by id, all 2026-10-30, by the lane monitor under the owner's delegation of 2026-10-22: Q-R10-NEXT (a) and
+GO-HEGATE-DESIGN; Q-HG-1 = no, the four allowedPaths accepted, and MON-KIT-BASETEMP; MON-HG-DR1-KEEP, Q-HG-CAP (a) and
+MON-HG-BROKER-CARRY; MON-HG-DR2-KEEP, Q-HG-CAP2 (a) (the design closed at revision 3), GO-HEGATE-BUILD, MON-HG-BROKER-CARRY
+widened, and the standing kit rules (MON-KIT-BASETEMP, MON-KIT-YAML-MASK v2, MON-KIT-OPERATOR-TESTS, MON-KIT-RESIDUAL,
+MON-KIT-SIZE-ONLY). The complete messages are recorded in the operator's `tools/w03/hegate/OWNER_DECISIONS.md`.
