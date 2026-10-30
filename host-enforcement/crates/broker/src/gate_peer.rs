@@ -155,7 +155,7 @@ pub fn compare_start_time(qualified: &GateQualified, stat: &[u8], exited: bool) 
 
 /// A delivered label against an expected one written without a NUL: exactly one trailing NUL stripped, then equal
 /// (gate-sys's `label_matches` form); an empty expected label never matches.
-fn label_matches(delivered: &[u8], expected: &[u8]) -> bool {
+pub fn label_matches(delivered: &[u8], expected: &[u8]) -> bool {
     let stripped = match delivered.split_last() {
         Some((0, rest)) => rest,
         _ => delivered,
@@ -165,7 +165,7 @@ fn label_matches(delivered: &[u8], expected: &[u8]) -> bool {
 
 /// A `cgroup` text's set of lines, a final newline ending the last; `None` for an empty text or an empty line
 /// (gate-sys's `line_set` form).
-fn line_set(text: &[u8]) -> Option<BTreeSet<Vec<u8>>> {
+pub fn line_set(text: &[u8]) -> Option<BTreeSet<Vec<u8>>> {
     let body = text.strip_suffix(b"\n").unwrap_or(text);
     if body.is_empty() {
         return None;
@@ -181,30 +181,40 @@ fn line_set(text: &[u8]) -> Option<BTreeSet<Vec<u8>>> {
 }
 
 /// Two cgroup texts name exactly the same lines (gate-sys's `same_lines` form).
-fn same_lines(observed: &[u8], expected: &[u8]) -> bool {
+pub fn same_lines(observed: &[u8], expected: &[u8]) -> bool {
     match (line_set(observed), line_set(expected)) {
         (Some(observed), Some(expected)) => observed == expected,
         _ => false,
     }
 }
 
-/// A `stat` line's pid (field 1, before ` (`) and start time (field 22, clock ticks since boot): the fields after the
-/// last `)` are fields 3 onwards, separated by single spaces, the line ending with at most one newline (gate-sys's
-/// `stat_start_time` form, with the pid). `None` for any other shape.
-fn stat_identity(stat: &[u8]) -> Option<(i64, u64)> {
+/// Field 22 of a `stat` line (the process's start time in clock ticks since boot): the fields after the last `)` are
+/// fields 3 onwards, separated by single spaces, the line ending with at most one newline. `None` for any other shape
+/// (gate-sys's `stat_start_time` form; `tests/gate_peer_parity.rs` compares the two).
+pub fn stat_start_time(stat: &[u8]) -> Option<u64> {
     let open = stat.iter().position(|byte| *byte == b'(')?;
     let close = stat.iter().rposition(|byte| *byte == b')')?;
     if close < open {
         return None;
     }
-    let head = stat.get(..open)?.strip_suffix(b" ")?;
-    let pid = i64::try_from(decimal(head)?).ok()?;
     let rest = stat.get(close.checked_add(1)?..)?;
     let rest = rest.strip_suffix(b"\n").unwrap_or(rest);
     let rest = rest.strip_prefix(b" ")?;
     // Field 3 (the state) is the first after the parenthesis, so field 22 is the twentieth.
-    let start_ticks = decimal(rest.split(|byte| *byte == b' ').nth(19)?)?;
-    Some((pid, start_ticks))
+    let field = rest.split(|byte| *byte == b' ').nth(19)?;
+    if field.is_empty() || !field.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    std::str::from_utf8(field).ok()?.parse().ok()
+}
+
+/// A `stat` line's pid (field 1, the decimal before ` (`) and its start time ([`stat_start_time`]). `None` when either
+/// is unreadable.
+fn stat_identity(stat: &[u8]) -> Option<(i64, u64)> {
+    let open = stat.iter().position(|byte| *byte == b'(')?;
+    let head = stat.get(..open)?.strip_suffix(b" ")?;
+    let pid = i64::try_from(decimal(head)?).ok()?;
+    Some((pid, stat_start_time(stat)?))
 }
 
 /// An unsigned decimal of ASCII digits only.
