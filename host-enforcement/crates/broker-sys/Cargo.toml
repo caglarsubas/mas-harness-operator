@@ -1,0 +1,11 @@
+[package]
+name = "broker-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# HE-005C (DESIGN-HE005 revision 5 section 4.0; the frozen seam note DESIGN-HE005.SEAM-C revision 4, ad6d3a75, MON-SEAM-
+# FREEZE): the capacity broker's raw calls, in observer-sys's form. std only, with no dependency, build script or
+# feature. Written by hand by the Build-R10 session in its main session, with no subagent (owner rulings of 2026-10-30,
+# "Hand-written raw module (Recommended)" and "Build-R10 session writes it (Recommended)").
