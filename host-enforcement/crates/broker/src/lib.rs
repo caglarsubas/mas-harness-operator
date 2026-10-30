@@ -6,22 +6,28 @@
 //!   CAP_SETGID}, the two embedded BROKER programs), the broker's start-state pre-check (the filesystem uid and gid and
 //!   the `Groups:` line, one read of the process's own status, no write) and the two stage wrappers. role-seal's
 //!   engine stays crate-private there, and its Linux stages are the only makers of the `Stage1` and `Sealed` tokens.
-//! - `status`: the exit statuses (the observer's seal table, NOT_LINUX, NOT_YET_SERVING, the pre-check's 36-39 and the
-//!   I02 listener's 24).
+//! - `status`: the exit statuses (the observer's seal table, NOT_LINUX, NOT_YET_SERVING, the pre-check's 36-39, the
+//!   I02 listener's 24 and, since HE-005C, the signed configuration's 11, 12 and 13).
 //! - `linux_listen` (Linux only): the one file that names gate-sys's channel module and the I02 path (DESIGN-HE005
 //!   O12), the I02 listener bound after the seal and never removed.
 //! - The seam below: [`I02Listener`], the listener's four operations, and [`serve_unanswered`], the single-threaded
 //!   loop over them that closes every accepted connection with no frame written and nothing read (Q-HE5A-3 (a)), so a
 //!   host test drives the loop over a fake.
+//! - HE-005C (DESIGN-HE005 section 3.1, moved to HE-005C by the scope notes; Q-HE5C-1 (a) and Q-HE5C-2 (a)):
+//!   `signed_config`, the configuration's read and Ed25519 check in the observer's form, and `config`, the parse of a
+//!   verified document with section 3.1's closed members and bounds. `main` calls both between the seal's two stages
+//!   (delta C3's site form), and hands the checked configuration to `serve`.
 //!
-//! The configuration, the HOLD derivation, the lifecycle and every I02, I03 and I05 frame are later packets' (HE-005B
-//! to HE-005D); nothing that they guard is reachable here. The R10-defined behaviour is listed in
-//! `crates/effect-gate/MODEL_DEFINED.md` (the HE-005A section).
+//! The HOLD derivation, the lifecycle and every I02, I03 and I05 frame are later units' and packets' (HE-005C's
+//! lifecycle, HE-005D); nothing that they guard is reachable here. The R10-defined behaviour is listed in
+//! `crates/effect-gate/MODEL_DEFINED.md` (the HE-005A, HE-005B and HE-005C sections).
 #![forbid(unsafe_code)]
 
+pub mod config;
 #[cfg(target_os = "linux")]
 pub mod linux_listen;
 pub mod seal;
+pub mod signed_config;
 pub mod status;
 
 // HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; MON-HE005B-PLAN): the broker's pure logic modules, named only

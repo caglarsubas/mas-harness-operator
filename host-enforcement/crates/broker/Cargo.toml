@@ -16,7 +16,14 @@ publish.workspace = true
 # base64 and schema items, unchanged and by path (H5D-12), so planeon-broker links exactly crates/broker,
 # crates/role-seal, crates/gate-sys and crates/i05-protocol. No registry crate; Cargo.lock's planeon-broker entry gains
 # only this one dependency name.
+# HE-005C (DESIGN-HE005 revision 5 section 3.1, moved to HE-005C by the scope notes; the HE-005C plan's Q-HE5C-2 (a)):
+# the signed configuration's Ed25519 check links the vendored ring through the broker's own registry lines, each
+# byte-equal to the observer's (tools/gate.py's REGISTRY_LINES): ring, and getrandom, which ring's pinned version
+# depends on, so its features are the observer's in the broker's own build too. No package is added, and Cargo.lock
+# gains only planeon-broker's two edges.
 [dependencies]
 gate-sys = { path = "../gate-sys" }
 role-seal = { path = "../role-seal" }
 i05-protocol = { path = "../i05-protocol" }
+getrandom = { version = "=0.2.17", default-features = false, features = ["linux_disable_fallback"] }
+ring = "=0.17.14"

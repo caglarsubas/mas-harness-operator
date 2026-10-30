@@ -1,7 +1,7 @@
 //! HE-005A (owner decisions Q-HE5A-2 (a) and Q-HE5A-3 (a); MON-HE005A-LAUNCH): the broker binary's exit statuses are
 //! distinct, non-zero and below 200 (systemd reserves 200-243). Every seal step has the observer's status (stage 1 in
 //! 40-59, stage 2 in 60-79), each pre-check refusal its own status outside them (36-39), the I02 listener its one status
-//! (24), and NOT_LINUX and NOT_YET_SERVING are the observer's 2 and 10.
+//! (24), and NOT_LINUX and NOT_YET_SERVING are the observer's 2 and 10. HE-005C: the signed configuration's 11, 12 and 13.
 
 use std::collections::BTreeMap;
 
@@ -67,9 +67,21 @@ fn every_listener_error_is_the_one_listener_status() {
 }
 
 #[test]
+fn the_signed_configuration_has_the_gates_and_the_observers_three_statuses() {
+    // HE-005C (DESIGN-HE005 section 3.1; delta C3, C3-6): the read 11, the key or the signature 12, the parse 13, outside
+    // the seal's ranges and the pre-check's.
+    let codes = [status::CONFIG_READ, status::CONFIG_SIGNATURE, status::CONFIG_CHECK];
+    assert_eq!(codes, [11, 12, 13]);
+    for code in codes {
+        assert!(!(36..=79).contains(&code) && code != status::LISTENER, "{code}");
+    }
+}
+
+#[test]
 fn all_statuses_are_distinct_non_zero_and_below_200() {
     let (one, two) = steps();
-    let mut all: Vec<u8> = vec![status::NOT_LINUX, status::NOT_YET_SERVING, status::LISTENER];
+    let mut all: Vec<u8> = vec![status::NOT_LINUX, status::NOT_YET_SERVING, status::LISTENER, status::CONFIG_READ,
+                                status::CONFIG_SIGNATURE, status::CONFIG_CHECK];
     all.extend(CHECKS.iter().map(|check| status::start(*check)));
     all.extend(one.iter().chain(two.iter()).map(|step| seal_step(*step)));
     let mut sorted = all.clone();
