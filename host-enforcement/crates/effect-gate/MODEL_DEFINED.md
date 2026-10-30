@@ -4081,9 +4081,15 @@ the verify are the author's.
 PR review round 1's fixes (R1-2 to R1-5; MON-R10-HE005B-R1, MON-R10-HE005B-H5G4) change no file under
 `crates/broker/src/` (checked by `git diff`), so planeon-broker's sources are those of the binaries above. At build,
 light: the source-text checks taking only the tree, 72, all passing (check_broker_pure 4 with its clauses (d) and (e),
-check_observer_logic 18, unchanged); the 81 proof rows each built in memory with its anchors found once. The round-1
-heavy slot: `cargo test` `<pending round-1 heavy slot>`; `he-gate: passed` `<pending round-1 heavy slot>`; the gate's
-self-test `<pending round-1 heavy slot>`; the mutation proof, 81 rows, `<pending round-1 heavy slot>`.
+check_observer_logic 18, unchanged); the 81 proof rows each built in memory with its anchors found once.
+
+The round-1 heavy slot (MON-R10-HE005B-R1-HEAVY-GO), through the build's `heavy.zsh`, offline, at `24fb2967`:
+`cargo test` rc 0, 855 passed (the 854 above and `h5g4_exec_failure_after_started`), 0 failed, 0 ignored, in 129 test
+binaries (86 s), with warnings only in the vendored ring; `he-gate: passed` (64 s, 0 FAILED), its ten binary lines,
+sha256 and SBOM, identical to the heavy slot's and the sim's (the kit's `reference-binlines-HE005B`), so the binaries are
+unchanged: no broker source, lock, manifest or `.cargo` change since `b638f700`; the gate's self-test, 453 tests, OK
+(58 s); the mutation proof, 81 of 81 rows killed, 67 with a one-clause refusing set and 14 with larger sets, 0 failures
+(6 s). The logs are the build's `r1-test.log`, `r1-gate.log`, `r1-selftest.log` and `r1-mutation.log`.
 
 ### Code and audit
 
