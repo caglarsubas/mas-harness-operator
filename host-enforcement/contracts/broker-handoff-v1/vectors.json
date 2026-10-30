@@ -1,0 +1,922 @@
+{
+  "evidenceClass": "DATA_CHECK_ONLY",
+  "nativeAcceptance": false,
+  "tenantAcceptance": false,
+  "positive": [
+    {
+      "profile": {
+        "profileId": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V1",
+        "binding": {
+          "tenantId": "unit-tenant",
+          "environmentId": "unit-environment",
+          "runNonce": "unit-nonce",
+          "capacityNonce": "unit-capacity-nonce",
+          "endpointId": "unit-proxy",
+          "namespace": "unit-namespace",
+          "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+          "validFrom": "2026-09-08T00:00:00Z",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "apiEndpointId": null
+        },
+        "capacityEntries": {
+          "kubernetesApiRules": [],
+          "campaignProxyRules": [
+            {
+              "endpointId": "unit-proxy",
+              "namespace": "unit-namespace",
+              "service": "linux-baseline-probes",
+              "port": 9443,
+              "protocol": "HTTPS",
+              "methods": [
+                "POST"
+              ],
+              "paths": [
+                "/v1/linux-baseline/host-isolation-negatives",
+                "/v1/linux-baseline/linux-target-build",
+                "/v1/linux-baseline/full-predecessor-regression",
+                "/v1/linux-baseline/control-container-startup",
+                "/v1/linux-baseline/postgres-migration-and-rls",
+                "/v1/linux-baseline/durable-restart",
+                "/v1/linux-baseline/arbitrary-non-root-uid",
+                "/v1/linux-baseline/read-only-root-filesystem",
+                "/v1/linux-baseline/kubernetes-smoke",
+                "/v1/linux-baseline/default-deny-network"
+              ],
+              "requestMediaType": "application/json",
+              "responseMediaType": "application/json",
+              "requestMaxBytes": 16384,
+              "responseMaxBytes": 4194304,
+              "timeoutSeconds": 900
+            }
+          ],
+          "permittedGvksAndVerbs": [],
+          "preexistingResourceRefs": [
+            {
+              "apiVersion": "v1",
+              "kind": "ResourceQuota",
+              "namespace": "unit-namespace",
+              "name": "unit-quota",
+              "uid": "unit-quota-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "LimitRange",
+              "namespace": "unit-namespace",
+              "name": "unit-limits",
+              "uid": "unit-limit-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "ServiceAccount",
+              "namespace": "unit-namespace",
+              "name": "campaign",
+              "uid": "unit-service-account-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ],
+          "preallocatedStorageRefs": [],
+          "preallocatedAcceleratorRefs": [],
+          "credentialIdentities": [
+            {
+              "endpointId": "unit-proxy",
+              "purpose": "CAMPAIGN_PROXY_CLIENT_MTLS",
+              "subject": "system:serviceaccount:unit-namespace:campaign",
+              "expiresAt": "2026-09-08T00:10:00Z",
+              "certificateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "clientSpkiDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ]
+        },
+        "policy": {
+          "admissionPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceQuotaDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "limitRangeDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "namespaceUid": "unit-namespace-uid",
+          "resourceQuotaUid": "unit-quota-uid",
+          "limitRangeUid": "unit-limit-uid",
+          "serviceAccountUid": "unit-service-account-uid",
+          "rbacDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "networkPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "mutationBrokerDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "maxConcurrentOperations": 1,
+          "serviceAccountDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "quota": {
+          "pods": 0,
+          "configMaps": 1,
+          "services": 0,
+          "cpuMillis": 0,
+          "memoryBytes": 0,
+          "ephemeralStorageBytes": 0
+        },
+        "resources": [],
+        "localImages": []
+      },
+      "observationBinding": {
+        "schemaVersion": "planeon.internal.policy-observation-binding/v1",
+        "profileDigest": "sha256:fc569e17cf8bc82b2d2f4e0244134549e4f3d9e885e8b339c1256eca1a840164",
+        "scope": {
+          "tenantId": "unit-tenant",
+          "environmentId": "unit-environment",
+          "runNonce": "unit-nonce",
+          "capacityNonce": "unit-capacity-nonce",
+          "endpointId": "unit-proxy",
+          "namespace": "unit-namespace",
+          "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+          "validFrom": "2026-09-08T00:00:00Z",
+          "expiresAt": "2026-09-08T00:10:00Z"
+        },
+        "observer": {
+          "executableDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "namespace": {
+          "name": "unit-namespace",
+          "uid": "unit-namespace-uid"
+        },
+        "projections": {
+          "admissionPolicy": {
+            "apiVersion": "admissionregistration.k8s.io/v1",
+            "kind": "ValidatingAdmissionPolicy",
+            "name": "admissionpolicy",
+            "namespace": null,
+            "uid": "unit-admissionpolicy-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "resourceQuota": {
+            "apiVersion": "v1",
+            "kind": "ResourceQuota",
+            "name": "unit-quota",
+            "namespace": "unit-namespace",
+            "uid": "unit-quota-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "limitRange": {
+            "apiVersion": "v1",
+            "kind": "LimitRange",
+            "name": "unit-limits",
+            "namespace": "unit-namespace",
+            "uid": "unit-limit-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "serviceAccount": {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "name": "campaign",
+            "namespace": "unit-namespace",
+            "uid": "unit-service-account-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "rbac": {
+            "apiVersion": "planeon.internal/v1",
+            "kind": "EffectiveRbac",
+            "name": "rbac",
+            "namespace": "unit-namespace",
+            "uid": "unit-rbac-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "networkPolicy": {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "name": "networkpolicy",
+            "namespace": "unit-namespace",
+            "uid": "unit-networkpolicy-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "mutationBroker": {
+            "apiVersion": "planeon.internal/v1",
+            "kind": "MutationBroker",
+            "name": "mutationbroker",
+            "namespace": "unit-namespace",
+            "uid": "unit-mutationbroker-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        "enforcementPins": {
+          "admissionFenceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "rbacClosureDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "networkEnforcementDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "hostPreflightDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "binding": {
+        "schemaVersion": "planeon.internal.broker-binding/v1",
+        "profileDigest": "sha256:ba778a9992aea19c502a754e7c3ee74dcbfe0cacd950c05f79a0ec0b3e5413d8",
+        "observationBindingDigest": "sha256:e10d89fd6bec18db91e3802886429267dd01e5abf15ce387469eec9341640750",
+        "brokerManifestDigest": "sha256:2f6660e76836c4d9f1b90e761062a160f66a353dbef34b64c2f5baf35ca1c22d",
+        "brokerExecutableDigest": "sha256:d227c714bdf154fe6cc1c6a5580a5ec9117bf675288341d718834107c197a524",
+        "workerManifestDigest": "sha256:7640802bc21a61ccfa7e869cc249d64adce084c6d5f193b6ea6007a79747f5d5",
+        "workerArtifactDigest": "sha256:04a6cdae44f1edd300d7694e464d14eeacf1143ca14137b30fefc0ca309d5194",
+        "caseResourceDigests": {
+          "HOST_ISOLATION_NEGATIVES": [],
+          "LINUX_TARGET_BUILD": [],
+          "FULL_PREDECESSOR_REGRESSION": [],
+          "CONTROL_CONTAINER_STARTUP": [],
+          "POSTGRES_MIGRATION_AND_RLS": [],
+          "DURABLE_RESTART": [],
+          "ARBITRARY_NON_ROOT_UID": [],
+          "READ_ONLY_ROOT_FILESYSTEM": [],
+          "KUBERNETES_SMOKE": [],
+          "DEFAULT_DENY_NETWORK": []
+        }
+      },
+      "request": {
+        "schemaVersion": "planeon.internal.broker-dispatch/v1",
+        "operation": "EXECUTE_FIXED_PROBE",
+        "bindingDigest": "sha256:ab348ce41280219126ac3f711d758c5303337467d30f2482f6ce22d958c90e1b",
+        "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+        "runNonce": "unit-nonce",
+        "caseId": "HOST_ISOLATION_NEGATIVES",
+        "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+        "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+        "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "frames": [
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:ab348ce41280219126ac3f711d758c5303337467d30f2482f6ce22d958c90e1b",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 1,
+          "previousDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": "STARTED",
+          "payload": {
+            "workerPid": 1234,
+            "workerStartTicks": 123
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:ab348ce41280219126ac3f711d758c5303337467d30f2482f6ce22d958c90e1b",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 2,
+          "previousDigest": "sha256:c719af4a6a81a12b9c0c55c4a9e6805eb9060bedbee90587fc3bd452458348b4",
+          "kind": "RECEIPT_CHUNK",
+          "payload": {
+            "index": 0,
+            "dataBase64": "eyJjYXNlSWQiOiJIT1NUX0lTT0xBVElPTl9ORUdBVElWRVMiLCJldmlkZW5jZUNsYXNzIjoiREFUQV9DSEVDS19PTkxZIn0="
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:ab348ce41280219126ac3f711d758c5303337467d30f2482f6ce22d958c90e1b",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 3,
+          "previousDigest": "sha256:496290f8d3bfc3abaadc16c4e4234de29e857d97f693f8d412b0d6f9342a19a9",
+          "kind": "CLEANUP_RECORDED",
+          "payload": {
+            "cleanupDigest": "sha256:29ac31ca8dc81cd39a69fc0645ae3022edee05b16d9e7d0ee107eb416f801148",
+            "state": "CLEAN",
+            "remainingResources": []
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:ab348ce41280219126ac3f711d758c5303337467d30f2482f6ce22d958c90e1b",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 4,
+          "previousDigest": "sha256:203acd5b1de83d2d48d20cfa2dbc1c59769afe8341da85cf3f1be66d974af9ff",
+          "kind": "TERMINAL",
+          "payload": {
+            "status": "COMPLETED",
+            "receiptSize": 71,
+            "receiptDigest": "sha256:77f11772e7399345d470312676d41539b995e09f6b50aab651ed535d6b54ec9c",
+            "cleanupDigest": "sha256:29ac31ca8dc81cd39a69fc0645ae3022edee05b16d9e7d0ee107eb416f801148",
+            "workerReaped": true
+          }
+        }
+      ]
+    },
+    {
+      "profile": {
+        "profileId": "CAMPAIGN_PROXY_MTLS_ZERO_COST_V1",
+        "binding": {
+          "tenantId": "unit-tenant",
+          "environmentId": "unit-environment",
+          "runNonce": "unit-nonce",
+          "capacityNonce": "unit-capacity-nonce",
+          "endpointId": "unit-proxy",
+          "namespace": "unit-namespace",
+          "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+          "validFrom": "2026-09-08T00:00:00Z",
+          "expiresAt": "2026-09-08T00:10:00Z",
+          "apiEndpointId": "unit-api-proxy"
+        },
+        "capacityEntries": {
+          "kubernetesApiRules": [
+            {
+              "endpointId": "unit-api-proxy",
+              "verb": "create",
+              "apiGroup": "",
+              "apiVersion": "v1",
+              "resource": "configmaps",
+              "namespace": "unit-namespace",
+              "name": "unit-fixture",
+              "subresource": "",
+              "requestMediaType": "application/json",
+              "responseMediaType": "application/json",
+              "requestMaxBytes": 16384,
+              "responseMaxBytes": 4194304
+            },
+            {
+              "endpointId": "unit-api-proxy",
+              "verb": "get",
+              "apiGroup": "",
+              "apiVersion": "v1",
+              "resource": "configmaps",
+              "namespace": "unit-namespace",
+              "name": "unit-fixture",
+              "subresource": "",
+              "requestMediaType": "application/json",
+              "responseMediaType": "application/json",
+              "requestMaxBytes": 16384,
+              "responseMaxBytes": 4194304
+            },
+            {
+              "endpointId": "unit-api-proxy",
+              "verb": "delete",
+              "apiGroup": "",
+              "apiVersion": "v1",
+              "resource": "configmaps",
+              "namespace": "unit-namespace",
+              "name": "unit-fixture",
+              "subresource": "",
+              "requestMediaType": "application/json",
+              "responseMediaType": "application/json",
+              "requestMaxBytes": 16384,
+              "responseMaxBytes": 4194304
+            }
+          ],
+          "campaignProxyRules": [
+            {
+              "endpointId": "unit-proxy",
+              "namespace": "unit-namespace",
+              "service": "linux-baseline-probes",
+              "port": 9443,
+              "protocol": "HTTPS",
+              "methods": [
+                "POST"
+              ],
+              "paths": [
+                "/v1/linux-baseline/host-isolation-negatives",
+                "/v1/linux-baseline/linux-target-build",
+                "/v1/linux-baseline/full-predecessor-regression",
+                "/v1/linux-baseline/control-container-startup",
+                "/v1/linux-baseline/postgres-migration-and-rls",
+                "/v1/linux-baseline/durable-restart",
+                "/v1/linux-baseline/arbitrary-non-root-uid",
+                "/v1/linux-baseline/read-only-root-filesystem",
+                "/v1/linux-baseline/kubernetes-smoke",
+                "/v1/linux-baseline/default-deny-network"
+              ],
+              "requestMediaType": "application/json",
+              "responseMediaType": "application/json",
+              "requestMaxBytes": 16384,
+              "responseMaxBytes": 4194304,
+              "timeoutSeconds": 900
+            }
+          ],
+          "permittedGvksAndVerbs": [
+            {
+              "apiGroup": "",
+              "apiVersion": "v1",
+              "kind": "ConfigMap",
+              "verbs": [
+                "create",
+                "get",
+                "delete"
+              ],
+              "names": [
+                "unit-fixture"
+              ]
+            }
+          ],
+          "preexistingResourceRefs": [
+            {
+              "apiVersion": "v1",
+              "kind": "ResourceQuota",
+              "namespace": "unit-namespace",
+              "name": "unit-quota",
+              "uid": "unit-quota-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "LimitRange",
+              "namespace": "unit-namespace",
+              "name": "unit-limits",
+              "uid": "unit-limit-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "apiVersion": "v1",
+              "kind": "ServiceAccount",
+              "namespace": "unit-namespace",
+              "name": "campaign",
+              "uid": "unit-service-account-uid",
+              "observedDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            }
+          ],
+          "preallocatedStorageRefs": [],
+          "preallocatedAcceleratorRefs": [],
+          "credentialIdentities": [
+            {
+              "endpointId": "unit-proxy",
+              "purpose": "CAMPAIGN_PROXY_CLIENT_MTLS",
+              "subject": "system:serviceaccount:unit-namespace:campaign",
+              "expiresAt": "2026-09-08T00:10:00Z",
+              "certificateDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "clientSpkiDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            {
+              "endpointId": "unit-api-proxy",
+              "purpose": "KUBERNETES_PROXY_SERVER_MTLS",
+              "subject": "system:serviceaccount:unit-namespace:campaign",
+              "expiresAt": "2026-09-08T00:10:00Z",
+              "certificateDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "clientSpkiDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          ]
+        },
+        "policy": {
+          "admissionPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "resourceQuotaDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "limitRangeDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "namespaceUid": "unit-namespace-uid",
+          "resourceQuotaUid": "unit-quota-uid",
+          "limitRangeUid": "unit-limit-uid",
+          "serviceAccountUid": "unit-service-account-uid",
+          "rbacDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "networkPolicyDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "mutationBrokerDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "maxConcurrentOperations": 1,
+          "serviceAccountDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "quota": {
+          "pods": 0,
+          "configMaps": 1,
+          "services": 0,
+          "cpuMillis": 0,
+          "memoryBytes": 0,
+          "ephemeralStorageBytes": 0
+        },
+        "resources": [
+          {
+            "manifest": {
+              "apiVersion": "v1",
+              "kind": "ConfigMap",
+              "metadata": {
+                "name": "unit-fixture",
+                "namespace": "unit-namespace",
+                "labels": {
+                  "planeon.ai/run-nonce": "unit-nonce",
+                  "planeon.ai/tenant-id": "unit-tenant"
+                }
+              },
+              "immutable": true,
+              "data": {
+                "fixture.json": "{}"
+              }
+            },
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        ],
+        "localImages": []
+      },
+      "observationBinding": {
+        "schemaVersion": "planeon.internal.policy-observation-binding/v1",
+        "profileDigest": "sha256:fc569e17cf8bc82b2d2f4e0244134549e4f3d9e885e8b339c1256eca1a840164",
+        "scope": {
+          "tenantId": "unit-tenant",
+          "environmentId": "unit-environment",
+          "runNonce": "unit-nonce",
+          "capacityNonce": "unit-capacity-nonce",
+          "endpointId": "unit-proxy",
+          "namespace": "unit-namespace",
+          "serviceAccountSubject": "system:serviceaccount:unit-namespace:campaign",
+          "validFrom": "2026-09-08T00:00:00Z",
+          "expiresAt": "2026-09-08T00:10:00Z"
+        },
+        "observer": {
+          "executableDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "manifestDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "namespace": {
+          "name": "unit-namespace",
+          "uid": "unit-namespace-uid"
+        },
+        "projections": {
+          "admissionPolicy": {
+            "apiVersion": "admissionregistration.k8s.io/v1",
+            "kind": "ValidatingAdmissionPolicy",
+            "name": "admissionpolicy",
+            "namespace": null,
+            "uid": "unit-admissionpolicy-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "resourceQuota": {
+            "apiVersion": "v1",
+            "kind": "ResourceQuota",
+            "name": "unit-quota",
+            "namespace": "unit-namespace",
+            "uid": "unit-quota-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "limitRange": {
+            "apiVersion": "v1",
+            "kind": "LimitRange",
+            "name": "unit-limits",
+            "namespace": "unit-namespace",
+            "uid": "unit-limit-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "serviceAccount": {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "name": "campaign",
+            "namespace": "unit-namespace",
+            "uid": "unit-service-account-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "rbac": {
+            "apiVersion": "planeon.internal/v1",
+            "kind": "EffectiveRbac",
+            "name": "rbac",
+            "namespace": "unit-namespace",
+            "uid": "unit-rbac-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "networkPolicy": {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "name": "networkpolicy",
+            "namespace": "unit-namespace",
+            "uid": "unit-networkpolicy-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "mutationBroker": {
+            "apiVersion": "planeon.internal/v1",
+            "kind": "MutationBroker",
+            "name": "mutationbroker",
+            "namespace": "unit-namespace",
+            "uid": "unit-mutationbroker-uid",
+            "projectionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        },
+        "enforcementPins": {
+          "admissionFenceDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "rbacClosureDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "networkEnforcementDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "hostPreflightDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "binding": {
+        "schemaVersion": "planeon.internal.broker-binding/v1",
+        "profileDigest": "sha256:fc569e17cf8bc82b2d2f4e0244134549e4f3d9e885e8b339c1256eca1a840164",
+        "observationBindingDigest": "sha256:e10d89fd6bec18db91e3802886429267dd01e5abf15ce387469eec9341640750",
+        "brokerManifestDigest": "sha256:2f6660e76836c4d9f1b90e761062a160f66a353dbef34b64c2f5baf35ca1c22d",
+        "brokerExecutableDigest": "sha256:d227c714bdf154fe6cc1c6a5580a5ec9117bf675288341d718834107c197a524",
+        "workerManifestDigest": "sha256:7640802bc21a61ccfa7e869cc249d64adce084c6d5f193b6ea6007a79747f5d5",
+        "workerArtifactDigest": "sha256:04a6cdae44f1edd300d7694e464d14eeacf1143ca14137b30fefc0ca309d5194",
+        "caseResourceDigests": {
+          "HOST_ISOLATION_NEGATIVES": [
+            "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          ],
+          "LINUX_TARGET_BUILD": [],
+          "FULL_PREDECESSOR_REGRESSION": [],
+          "CONTROL_CONTAINER_STARTUP": [],
+          "POSTGRES_MIGRATION_AND_RLS": [],
+          "DURABLE_RESTART": [],
+          "ARBITRARY_NON_ROOT_UID": [],
+          "READ_ONLY_ROOT_FILESYSTEM": [],
+          "KUBERNETES_SMOKE": [],
+          "DEFAULT_DENY_NETWORK": []
+        }
+      },
+      "request": {
+        "schemaVersion": "planeon.internal.broker-dispatch/v1",
+        "operation": "EXECUTE_FIXED_PROBE",
+        "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+        "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+        "runNonce": "unit-nonce",
+        "caseId": "HOST_ISOLATION_NEGATIVES",
+        "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+        "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+        "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "frames": [
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 1,
+          "previousDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "kind": "STARTED",
+          "payload": {
+            "workerPid": 1234,
+            "workerStartTicks": 123
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 2,
+          "previousDigest": "sha256:f15342621c0e5ff31d36f0760eca56e0655a6b64082fd00dab804364ee1f991b",
+          "kind": "RESOURCE_ACTION",
+          "payload": {
+            "actionId": 1,
+            "verb": "GET",
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 3,
+          "previousDigest": "sha256:275b3af33af9d09c3fc378e50d850c51904ffdbf1a5bcb2e8d656b90c749b297",
+          "kind": "RESOURCE_RESULT",
+          "payload": {
+            "actionId": 1,
+            "outcome": "ABSENT",
+            "objectBase64": null
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 4,
+          "previousDigest": "sha256:04f143e59d202d8f55a725c783c26213f6d39cbf745c3eabe29c3a2192c882b4",
+          "kind": "RESOURCE_ACTION",
+          "payload": {
+            "actionId": 2,
+            "verb": "CREATE",
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 5,
+          "previousDigest": "sha256:d455efd42ac6339858ad881c40a4ca717cec27dad278b61d4cb15047edeaf0af",
+          "kind": "RESOURCE_RESULT",
+          "payload": {
+            "actionId": 2,
+            "outcome": "CREATED",
+            "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJkYXRhIjp7ImZpeHR1cmUuanNvbiI6Int9In0sImltbXV0YWJsZSI6dHJ1ZSwia2luZCI6IkNvbmZpZ01hcCIsIm1ldGFkYXRhIjp7ImxhYmVscyI6eyJwbGFuZW9uLmFpL3J1bi1ub25jZSI6InVuaXQtbm9uY2UiLCJwbGFuZW9uLmFpL3RlbmFudC1pZCI6InVuaXQtdGVuYW50In0sIm5hbWUiOiJ1bml0LWZpeHR1cmUiLCJuYW1lc3BhY2UiOiJ1bml0LW5hbWVzcGFjZSIsInJlc291cmNlVmVyc2lvbiI6IjEiLCJ1aWQiOiJ1bml0LWNyZWF0ZWQtdWlkIn19"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 6,
+          "previousDigest": "sha256:6a45a4cd2886ba5e7aba20bb42830b3d51f2dbfe64667e945be4aeb045598cb4",
+          "kind": "RESOURCE_ACTION",
+          "payload": {
+            "actionId": 3,
+            "verb": "GET",
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 7,
+          "previousDigest": "sha256:712566605ab7e910d06ca2d31345aeadae1f760ebff6cb9077d3d77272a0cc65",
+          "kind": "RESOURCE_RESULT",
+          "payload": {
+            "actionId": 3,
+            "outcome": "PRESENT",
+            "objectBase64": "eyJhcGlWZXJzaW9uIjoidjEiLCJkYXRhIjp7ImZpeHR1cmUuanNvbiI6Int9In0sImltbXV0YWJsZSI6dHJ1ZSwia2luZCI6IkNvbmZpZ01hcCIsIm1ldGFkYXRhIjp7ImxhYmVscyI6eyJwbGFuZW9uLmFpL3J1bi1ub25jZSI6InVuaXQtbm9uY2UiLCJwbGFuZW9uLmFpL3RlbmFudC1pZCI6InVuaXQtdGVuYW50In0sIm5hbWUiOiJ1bml0LWZpeHR1cmUiLCJuYW1lc3BhY2UiOiJ1bml0LW5hbWVzcGFjZSIsInJlc291cmNlVmVyc2lvbiI6IjEiLCJ1aWQiOiJ1bml0LWNyZWF0ZWQtdWlkIn19"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 8,
+          "previousDigest": "sha256:7e7c2c8ef8f67e1a060858edda2aa8e5e0807ddb0046a6d6cb645c954cab1639",
+          "kind": "RESOURCE_ACTION",
+          "payload": {
+            "actionId": 4,
+            "verb": "DELETE",
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 9,
+          "previousDigest": "sha256:bafaec8e5e27625bdeaee8f2678ad0bf7159270d59f1e4ab8de4ff4b6169df94",
+          "kind": "RESOURCE_RESULT",
+          "payload": {
+            "actionId": 4,
+            "outcome": "DELETED",
+            "objectBase64": null
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 10,
+          "previousDigest": "sha256:5ae9d3de686f0b2241eaf60ceec9e48fd1a0af500041e2bc6719b861b3d1c1a8",
+          "kind": "RESOURCE_ACTION",
+          "payload": {
+            "actionId": 5,
+            "verb": "GET",
+            "manifestDigest": "sha256:e455c4a909dc0e47f79d3df287fee5344bf062aac49e050dc4a3668793b13028"
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 11,
+          "previousDigest": "sha256:5e33540c43d8b49a432ff6061001bfe5604d11eb2670dd4a8aa520ae0c32a03f",
+          "kind": "RESOURCE_RESULT",
+          "payload": {
+            "actionId": 5,
+            "outcome": "ABSENT",
+            "objectBase64": null
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 12,
+          "previousDigest": "sha256:240f6d7a02e380f73a2f0245605a5df165faf9eb0e81a54e028a5160552f3257",
+          "kind": "RECEIPT_CHUNK",
+          "payload": {
+            "index": 0,
+            "dataBase64": "eyJjYXNlSWQiOiJIT1NUX0lTT0xBVElPTl9ORUdBVElWRVMiLCJldmlkZW5jZUNsYXNzIjoiREFUQV9DSEVDS19PTkxZIn0="
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 13,
+          "previousDigest": "sha256:6bc62e1649c95770b7633728cea5cbe5947b67dd28273fe44e1070a46d8bee60",
+          "kind": "CLEANUP_RECORDED",
+          "payload": {
+            "cleanupDigest": "sha256:29ac31ca8dc81cd39a69fc0645ae3022edee05b16d9e7d0ee107eb416f801148",
+            "state": "CLEAN",
+            "remainingResources": []
+          }
+        },
+        {
+          "schemaVersion": "planeon.internal.broker-frame/v1",
+          "bindingDigest": "sha256:416dfe89960927c1a3768b678250feeb11286f7b36110ce963a5479122c12794",
+          "reservationDigest": "sha256:d1eb4535d5242e597dc36f90b271a62b399d046ed0241210f7f91d3b0f373e56",
+          "runNonce": "unit-nonce",
+          "caseId": "HOST_ISOLATION_NEGATIVES",
+          "requestDigest": "sha256:2fd6f2dbc38fea7d46ed069895a90e794781b4eabfb9ab4e4204aff18c3791ed",
+          "observationDigest": "sha256:e65a37b1cdaa8362cd32b16102e14ec6c810b2aa665a3b73881689c8e0bedca2",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "challenge": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "executionId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sequence": 14,
+          "previousDigest": "sha256:f33995f6f83b4179f15cc7ef435385e49b67ee381db92953c1315094f2352030",
+          "kind": "TERMINAL",
+          "payload": {
+            "status": "COMPLETED",
+            "receiptSize": 71,
+            "receiptDigest": "sha256:77f11772e7399345d470312676d41539b995e09f6b50aab651ed535d6b54ec9c",
+            "cleanupDigest": "sha256:29ac31ca8dc81cd39a69fc0645ae3022edee05b16d9e7d0ee107eb416f801148",
+            "workerReaped": true
+          }
+        }
+      ]
+    }
+  ]
+}

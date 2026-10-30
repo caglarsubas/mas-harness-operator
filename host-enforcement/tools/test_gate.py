@@ -1104,10 +1104,17 @@ class ContractTests(unittest.TestCase):
     # HE-004-I01B4 (DESIGN-I01B4 rev 2 sections 1.2 and 5, G-I01B-2): edge record v11's seven rows, the contract v2's three
     # files, admission v4's three and profile v2's vectors, beside the held v1 and admission v3 files (63).
     # HE-005A (DESIGN-HE005 revision 5 sections 2 and 4): edge record v11's four seccomp-v3 BROKER and WORKER programs (67).
+    # HE-005B (DESIGN-HE005 revision 5 section 4, G-HE5B-4): edge record v12's two broker handoff rows 80 and 81 (69).
     def test_the_table_pins_the_effect_gate_programs(self):
         self.patch.stop()
         try:
-            self.assertEqual(len(gate.CONTRACTS), 67)
+            self.assertEqual(len(gate.CONTRACTS), 69)
+            self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
+                              if path.startswith("contracts/broker-handoff-v1/")}, {
+                "contracts/broker-handoff-v1/channel.schema.json":
+                    "e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9",
+                "contracts/broker-handoff-v1/vectors.json":
+                    "80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4"})
             self.assertEqual({path: digest for path, digest in gate.CONTRACTS.items()
                               if path.startswith(("contracts/seccomp-v3/BROKER", "contracts/seccomp-v3/WORKER"))}, {
                 "contracts/seccomp-v3/BROKER.aarch64.bpf": "bc9c5a3797277ca753b5168e8e55132e1878fed2a726de361fd7d80e0fababf8",
@@ -5148,8 +5155,8 @@ class ObserverNativeProfileTests(Tree):
         # HE-004-I01a unit U1: edge record v8's two seccomp-v5 programs make 48; unit U6's two I06 v4 files 50; unit U7's
         # two I01 wire files (HE-004-I01A2, edge record v9) 52; HE-004-I01B1's four (edge record v10, none embedded) 56;
         # HE-004-I01B4's seven (edge record v11, none embedded) 63; HE-005A's four seccomp-v3 programs (edge record v11,
-        # BROKER embedded by the broker's seal) 67.
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # BROKER embedded by the broker's seal) 67; HE-005B's two broker handoff files (edge record v12) 69.
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertEqual(gate.check_native_profile_use(self.base), 4)
         self.assertEqual(gate.check_observer_contracts_module(self.base), 7)
 
@@ -5700,6 +5707,8 @@ I01B_V11_CONTRACTS = ("contracts/i01-digests-v2/definitions.json", "contracts/i0
 # HE-005A: edge record v11's four seccomp-v3 rows for HE-005 (artifacts 17, 18, 29 and 30).
 HE005A_V11_CONTRACTS = ("contracts/seccomp-v3/BROKER.aarch64.bpf", "contracts/seccomp-v3/BROKER.x86_64.bpf",
                         "contracts/seccomp-v3/WORKER.aarch64.bpf", "contracts/seccomp-v3/WORKER.x86_64.bpf")
+# HE-005B (G-HE5B-4): edge record v12's two broker handoff rows 80 and 81.
+HE005B_V12_CONTRACTS = ("contracts/broker-handoff-v1/channel.schema.json", "contracts/broker-handoff-v1/vectors.json")
 
 
 class D2ContractCountTests(unittest.TestCase):
@@ -5728,15 +5737,16 @@ class D2ContractCountTests(unittest.TestCase):
         # (section 10): its two I06 v4 files make 50; unit U7 (HE-004-I01A2, sections 3 and 7): edge record v9's two
         # I01 wire files make 52; HE-004-I01B1 (DESIGN-I01B rev 3 section 2, G-I01B-2): edge record v10's four make 56;
         # HE-004-I01B4 (DESIGN-I01B4 rev 2 section 1.2, G-I01B-2): edge record v11's seven make 63; HE-005A (DESIGN-HE005
-        # revision 5 section 2): its four seccomp-v3 BROKER and WORKER rows make 67.
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # revision 5 section 2): its four seccomp-v3 BROKER and WORKER rows make 67; HE-005B (section 4, G-HE5B-4): edge
+        # record v12's two broker handoff rows make 69.
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertTrue(set(D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS
-                            + I01B_V11_CONTRACTS + HE005A_V11_CONTRACTS) <= set(gate.CONTRACTS))
-        self.assertEqual(gate.check_contracts(self.base), 67)
+                            + I01B_V11_CONTRACTS + HE005A_V11_CONTRACTS + HE005B_V12_CONTRACTS) <= set(gate.CONTRACTS))
+        self.assertEqual(gate.check_contracts(self.base), 69)
 
     def test_a_missing_changed_or_unregistered_file_refuses(self):
         for rel in (D2_V6_CONTRACTS + D2_V7_CONTRACTS + I01_V9_CONTRACTS + I01B_V10_CONTRACTS + I01B_V11_CONTRACTS
-                    + HE005A_V11_CONTRACTS):
+                    + HE005A_V11_CONTRACTS + HE005B_V12_CONTRACTS):
             path = self.base / rel
             data = path.read_bytes()
             path.unlink()
@@ -5757,14 +5767,17 @@ class D2ContractCountTests(unittest.TestCase):
                     # the same place beside the contract v2's own files.
                     "contracts/i01-digests-v2/policy_observation_digests_v2.py",
                     # HE-005A: a third role's program, which no record registers, beside the four.
-                    "contracts/seccomp-v3/WRITER.x86_64.bpf"):
+                    "contracts/seccomp-v3/WRITER.x86_64.bpf",
+                    # HE-005B: the readiness guide, which edge record v12 leaves unregistered (not a consumer
+                    # artefact), beside the two broker handoff files.
+                    "contracts/broker-handoff-v1/BROKER_HANDOFF_READINESS.md"):
             path = self.base / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"{}")
             with self.assertRaisesRegex(gate.GateError, "exactly the registered files"):
                 gate.check_contracts(self.base)
             path.unlink()
-        self.assertEqual(gate.check_contracts(self.base), 67)
+        self.assertEqual(gate.check_contracts(self.base), 69)
 
 
 class D2EmbeddedContractTests(Tree):
@@ -6963,8 +6976,9 @@ class I01bContractFileTests(Tree):
             gate.check_i01b_contracts(self.base)
 
     def test_the_tree_and_the_real_files_pass(self):
-        # HE-005A: edge record v11's four seccomp-v3 rows join the 63 (outside the I01b rows this rule reads).
-        self.assertEqual(len(gate.CONTRACTS), 67)
+        # HE-005A: edge record v11's four seccomp-v3 rows join the 63 (outside the I01b rows this rule reads). HE-005B:
+        # edge record v12's two broker handoff rows make 69 (also outside them).
+        self.assertEqual(len(gate.CONTRACTS), 69)
         self.assertEqual(tuple(gate.I01B_EDGE_V10_ROWS), I01B_V10_CONTRACTS)
         self.assertEqual([row[0] for row in gate.I01B_EDGE_V10_ROWS.values()], [69, 70, 71, 72])
         self.assertEqual([row[1] for row in gate.I01B_EDGE_V10_ROWS.values()],
@@ -10198,25 +10212,30 @@ class BrokerLinkedTests(Tree):
 
 class BrokerClosureTests(Tree):
     """HE-005A (H5D-12): planeon-broker links exactly BROKER_LINKED_CRATES (itself, role-seal and gate-sys): host-common,
-    i05-protocol (HE-005B's) or any other workspace crate in its closure refuses."""
+    i05-protocol (HE-005B's) or any other workspace crate in its closure refuses. HE-005B (G-HE5B-3; Q-HE5B-6 (a)):
+    i05-protocol joins the set, unchanged, so A's three crates (i05-protocol missing) refuse, as does host-common,
+    effect-gate or any other workspace crate, directly or through role-seal."""
 
     TREE = {**WORKSPACE_TREE,
             "Cargo.toml": WORKSPACE_TREE["Cargo.toml"].replace('"crates/gate-tls"]', '"crates/gate-tls", "crates/broker", '
                                                                                    '"crates/role-seal"]'),
             "crates/broker/Cargo.toml": '[package]\nname = "planeon-broker"\nedition.workspace = true\n',
             "crates/role-seal/Cargo.toml": '[package]\nname = "role-seal"\nedition.workspace = true\n'}
-    GOOD = {**WORKSPACE, "planeon-broker": {"gate-sys", "role-seal"}, "role-seal": {"gate-sys"}}
+    GOOD = {**WORKSPACE, "planeon-broker": {"gate-sys", "role-seal", "i05-protocol"}, "role-seal": {"gate-sys"}}
 
     def test_the_closure_is_exact(self):
-        self.assertEqual(gate.BROKER_LINKED_CRATES, ("crates/broker", "crates/role-seal", "crates/gate-sys"))
+        self.assertEqual(gate.BROKER_LINKED_CRATES, ("crates/broker", "crates/role-seal", "crates/gate-sys",
+                                                     "crates/i05-protocol"))
         self.assertEqual(gate.check_workspace_shape(self.base, self.GOOD), 7)
-        self.assertEqual(gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": {"role-seal"}}), 7)
-        for dependencies in (set(), {"gate-sys"}, {"gate-sys", "role-seal", "host-common"},
-                             {"gate-sys", "role-seal", "i05-protocol"}, {"gate-sys", "role-seal", "effect-gate"}):
+        self.assertEqual(gate.check_workspace_shape(self.base, {**self.GOOD,
+                                                                "planeon-broker": {"role-seal", "i05-protocol"}}), 7)
+        for dependencies in (set(), {"gate-sys"}, {"gate-sys", "role-seal"}, {"gate-sys", "i05-protocol"},
+                             {"gate-sys", "role-seal", "i05-protocol", "host-common"},
+                             {"gate-sys", "role-seal", "i05-protocol", "effect-gate"}):
             with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
                 gate.check_workspace_shape(self.base, {**self.GOOD, "planeon-broker": dependencies, "host-common": set()})
         with self.assertRaisesRegex(gate.GateError, "planeon-broker links .*, not .* .workspace shape"):
-            gate.check_workspace_shape(self.base, {**self.GOOD, "role-seal": {"gate-sys", "i05-protocol"}})
+            gate.check_workspace_shape(self.base, {**self.GOOD, "role-seal": {"gate-sys", "effect-gate"}})
         without = {name: dependencies for name, dependencies in self.GOOD.items() if name != "planeon-broker"}
         with self.assertRaisesRegex(gate.GateError, "no planeon-broker crate in the workspace"):
             gate.check_workspace_shape(self.base, without)

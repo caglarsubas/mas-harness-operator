@@ -326,7 +326,10 @@ BUILD_SCRIPTS = {"libc", "ring", "rustls"}
 # v3's rows 41-43 stay held and pinned; none embedded, 63. HE-005A (DESIGN-HE005 revision 5 sections 2 and 4; MON-HE005A-
 # PLAN2): edge record v11's four seccomp-v3 rows for HE-005 (artifacts 17, 18, 29 and 30: harness-onion compiled filter
 # programs, MET-ENFORCE-025, BYTE_IDENTICAL, REGISTERED_BEFORE_USE), the BROKER programs the broker's seal embeds
-# (BROKER_PROGRAMS) and the WORKER programs held for HE-005C, 67.
+# (BROKER_PROGRAMS) and the WORKER programs held for HE-005C, 67. HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B;
+# MON-HE005B-PLAN): edge record v12's two rows 80 and 81 (harness-onion MET-REPAIR-014's broker handoff inputs at
+# providerCommit 8f3cc3a8, BYTE_IDENTICAL, REGISTERED_BEFORE_USE, consumer HE-005B), the I02/I03 channel schema, which
+# crates/broker/src/i02.rs embeds, and its vectors, read by the tests only, 69.
 CONTRACTS = {
     "contracts/i05-v1/README.md": "dc9aa22017b2cdf71f886fb7890aff3f6e7095b9afc25bd37645cb0dee23b498",
     "contracts/i05-v2/README.md": "1cb07cef90b0881c42370d8bbaeea08c6abc48478bed3939286b651601d2cca3",
@@ -404,6 +407,9 @@ CONTRACTS = {
     "contracts/seccomp-v3/BROKER.x86_64.bpf": "95221bd0db753aa22ead2eb49eeac8dae3d24c3dad72811de86c9392f4894dcc",
     "contracts/seccomp-v3/WORKER.aarch64.bpf": "cc04a4710495d3794b0d295613a2f2bd330524a328cb6963a819565bac2acb40",
     "contracts/seccomp-v3/WORKER.x86_64.bpf": "5616c9099324e441674f8e589b6c705ae95f6a4a697f10e761565d0735689d45",
+    "contracts/broker-handoff-v1/channel.schema.json":
+        "e7e9558fb50b7ba804222065734d1d4fb4694327bb2427a34ef8dffc945d56f9",
+    "contracts/broker-handoff-v1/vectors.json": "80d8da953c41ef544ecf0cd4a0f62b98316b018bfbdc39c550c320f68ab603c4",
 }
 # HE-004-I01B1 DESIGN-I01B rev 3 sections 2 and 6 (G-I01B-2): edge record v10's rows 69-72, each file's row, provider
 # path and sha256 (status REGISTERED_BEFORE_USE, relation BYTE_IDENTICAL, mode 100644, consumer packet HE-004-I01B).
@@ -504,14 +510,17 @@ ROLE_SEAL_LIB = "crates/role-seal/src/lib.rs"
 OBSERVER_LINKED_CRATES = (OBSERVER_CRATE, "crates/gate-sys", "crates/i05-protocol", OBSERVER_SYS, ROLE_SEAL)
 # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; H5D-12; MON-HE005A-PLAN2): planeon-broker, a library and a binary
 # in the observer's form, links exactly its own crate, role-seal and gate-sys (an exact-set check, check_workspace_shape),
-# and its crate joins every linked-crate scan; its five sources are named here.
+# and its crate joins every linked-crate scan; its five sources are named here. HE-005B (DESIGN-HE005 revision 5
+# section 4, HE-005B; H5D-12; MON-HE005B-PLAN, Q-HE5B-6 (a)): i05-protocol joins the closure, unchanged, for its
+# JSON, SHA-256, base64 and schema items in the broker's pure I02, I03 and I05-client modules (no client codec goes
+# into it), so the set is exactly crates/broker, crates/role-seal, crates/gate-sys and crates/i05-protocol.
 BROKER_CRATE = "crates/broker"
 BROKER_LIB = "crates/broker/src/lib.rs"
 BROKER_MAIN = "crates/broker/src/main.rs"
 BROKER_SEAL_RS = "crates/broker/src/seal.rs"
 BROKER_STATUS = "crates/broker/src/status.rs"
 BROKER_LINUX_LISTEN = "crates/broker/src/linux_listen.rs"
-BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys")
+BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys", "crates/i05-protocol")
 SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS, ROLE_SEAL, BROKER_CRATE)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
@@ -3290,7 +3299,9 @@ def check_workspace_shape(base: Path, workspace: dict) -> int:
         require(observer == set(OBSERVER_LINKED_CRATES), "planeon-observer links %s, not %s (workspace shape)"
                 % (sorted(str(path) for path in observer), sorted(OBSERVER_LINKED_CRATES)))
     # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; H5D-12; MON-HE005A-PLAN2): planeon-broker, a member, links
-    # exactly BROKER_LINKED_CRATES, its own crate, role-seal and gate-sys (host-common dropped; i05-protocol is HE-005B's).
+    # exactly BROKER_LINKED_CRATES, its own crate, role-seal and gate-sys (host-common dropped). HE-005B (section 4,
+    # HE-005B; G-HE5B-3; MON-HE005B-PLAN, Q-HE5B-6 (a)): and i05-protocol, unchanged, the one path edge it adds; a
+    # missing or any further workspace crate in the closure refuses.
     if "planeon-broker" in names:
         require("planeon-broker" in workspace, "no planeon-broker crate in the workspace (workspace shape)")
         broker = {names.get(name) for name in linked(workspace, "planeon-broker")}
