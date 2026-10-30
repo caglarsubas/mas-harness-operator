@@ -4185,7 +4185,8 @@ no other rule. Its rules are R308-R314.
 
 All ten binary lines must equal HE-005B's (the kit's `reference-binlines-HE005B`): the packet changes no crate source, and
 design review round 1 found gate.py and test_gate.py named by no crate source or workspace file outside comment lines (40
-files, 0 non-comment hits). The statement: filled at the heavy checkpoint.
+files, 0 non-comment hits). The statement, at the heavy slot (3297555d): the ten `he-gate:` binary lines are byte-identical
+to the reference, in the same order (`cmp` equal; both files sha256 e95c12fb).
 
 ### Superseded and discharged
 
@@ -4207,10 +4208,12 @@ mode leaves the current directory off `sys.path`, so the plain `-m unittest <nam
 `test_gate.He005bRuleTests` 4 tests OK.
 
 The heavy evidence, through the build's `heavy.zsh`, offline, on the monitor's word: the nine inherited argv, `cargo
-test` and both musl release builds: filled at the heavy checkpoint. `he-gate: passed`, with the new check's line and the
-ten binary lines equal to HE-005B's: filled at the heavy checkpoint. The gate's self-test: filled at the heavy
-checkpoint. The mutation proof, `HE005B_PROOF_RULES`' 81 rows and `HEGATE_PROOF_RULES`' 5: filled at the heavy
-checkpoint. The sim and the verify are the author's.
+test` and both musl release builds, at 3297555d (2026-10-30): cargo test rc 0, 855 passed, 0 failed, 0 ignored, in 129
+test binaries (298 s); both release builds rc 0 (x86_64 30 s, aarch64 28 s), 0 errors. `he-gate: passed`, rc 0, 0 FAILED
+lines (87 s), with the line "observer gate_sys crate (HE-GATE-001 ...): 41 sources" and the ten binary lines equal to
+HE-005B's. The gate's self-test: 465 tests, OK (83 s). The mutation proof: `HE005B_PROOF_RULES`' 81 rows (67 with a
+one-clause refusing set, 14 with more) and `HEGATE_PROOF_RULES`' 5 rows (5 one-clause), 86 rows, 0 failures. The
+zero-bill scan and `tests/verify` rc 0. The sim and the verify are the author's.
 
 ### Code and audit
 
