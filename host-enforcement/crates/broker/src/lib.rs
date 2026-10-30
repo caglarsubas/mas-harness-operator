@@ -24,6 +24,10 @@ pub mod linux_listen;
 pub mod seal;
 pub mod status;
 
+// HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; MON-HE005B-PLAN): the broker's pure logic modules, named only
+// here and by each other; nothing in main.rs, serve, seal.rs, status.rs or linux_listen.rs names them (G-HE5B-1).
+pub mod i02;
+
 #[cfg(target_os = "linux")]
 pub use seal::{seal_stage1, seal_stage2};
 pub use seal::{SealError, Sealed, Stage1, StartCheck};
