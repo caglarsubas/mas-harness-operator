@@ -10695,14 +10695,81 @@ HEGATE_COLON_PASSES = ("fn hg_whitelisted(x:std::collections::BTreeMap<u8, u8>) 
                        "fn hg_unrooted(x:Foo::Bar) {}\n")
 HEGATE_CODE_PATH_TEXTS = ("a::b::c", "Foo::<T>::bar::baz", "<std::time::Instant>::now()", "::std::time::Instant::now()")
 HEGATE_OBSERVER_SOURCES = 41
+# The proof (DESIGN rev 3 section 4, HG-D2-2): the trees of copies of the real sources each rule reads, in he005b_tree's
+# form; Fix A's one clause, (colon), switched off by patching the old pattern into gate.CODE_PATH; Fix B's three clause
+# functions switched off by name.
+HEGATE_LOGIC_TREE = {rel: HE005B_TREE[rel] for rel, _ in gate.LOGIC_MODULES}
+HEGATE_OBSERVER_TREE = {rel: text for rel, text in HE005B_TREE.items() if rel.startswith(gate.OBSERVER_CRATE + "/src/")}
+HEGATE_FIX_B_FUNCTIONS = {"(i)": "observer_gate_sys_bare", "(ii)": "observer_gate_sys_after_head",
+                          "(iii)": "observer_gate_sys_readable"}
+
+
+def hegate_changed(texts, changes):
+    """`texts` with each (file, anchor, replacement) applied once, in order (an empty anchor appends), and each
+    (file, None, None) removing the file (he005b_tree's form)."""
+    texts = dict(texts)
+    for rel, old, new in changes:
+        if old is None:
+            del texts[rel]
+            continue
+        if not old:
+            texts[rel] = texts[rel] + new
+            continue
+        if texts[rel].count(old) != 1:
+            raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+        texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+def hegate_logic_tree(changes=()):
+    """Copies of LOGIC_MODULES' real sources (check_observer_logic's input) with `changes`."""
+    return hegate_changed(HEGATE_LOGIC_TREE, changes)
+
+
+def hegate_observer_tree(changes=()):
+    """Copies of crates/observer's real sources (check_observer_gate_sys_crate's input) with `changes`."""
+    return hegate_changed(HEGATE_OBSERVER_TREE, changes)
+
+
+def codepath_patches(enabled=None, disabled=()):
+    """Fix A's one clause, (colon), in named_patches' result shape: a list holding mock.patch.object(gate, "CODE_PATH",
+    the old compiled pattern) only when (colon) is disabled (another clause enabled alone, or (colon) in `disabled`)."""
+    off = (enabled is not None and enabled != "(colon)") or "(colon)" in disabled
+    return [mock.patch.object(gate, "CODE_PATH", HEGATE_OLD_CODE_PATH)] if off else []
+
+
+HEGATE_COLON_ROW = "\nfn p(t:std::time::SystemTime) -> bool { true }\n"
+HEGATE_OBSERVER_ROWS = (("HG1 a parameter type after a lone colon in rbac.rs", "(colon)",
+                         ((_HG_RBAC, "", HEGATE_COLON_ROW),)),)
+HEGATE_BROKER_ROWS = (("HG2 a parameter type after a lone colon in i03.rs", "(colon)",
+                       ((_BI03, "", HEGATE_COLON_ROW),)),)
+HEGATE_FIX_B_ROWS = (
+    ("HG3 pub(crate) use gate_sys; in client.rs", "(i)", ((_OCLIENT, "", "\npub(crate) use gate_sys;\n"),)),
+    ("HG4 use crate::wire::gate_sys::Dir; in client.rs", "(ii)",
+     ((_OCLIENT, "", "\nuse crate::wire::gate_sys::Dir;\n"),)),
+    ("HG5 use r#gate_sys; in config.rs", "(iii)", ((_HG_CONFIG, "", "\nuse r#gate_sys;\n"),)),
+)
+# (rule, check, its clauses, rows, the named clause's message, any clause's message, the patches, the tree builder):
+# HE005B_PROOF_RULES' shape; the lane's mutation proof reads this table after that one, with the same row logic.
+HEGATE_PROOF_RULES = (
+    ("HE-GATE-001 Fix A (observer)", gate.check_observer_logic, ("(colon)",), HEGATE_OBSERVER_ROWS,
+     lambda clause: "(observer logic rules)", re.escape("(observer logic rules)"), codepath_patches, hegate_logic_tree),
+    ("HE-GATE-001 Fix A (broker)", gate.check_broker_pure, ("(colon)",), HEGATE_BROKER_ROWS,
+     lambda clause: "(HE-005B pure, G-HE5B-2 (e))", re.escape("(HE-005B pure, G-HE5B-2 (e))"), codepath_patches,
+     he005b_tree),
+    ("HE-GATE-001 Fix B", gate.check_observer_gate_sys_crate, tuple(HEGATE_FIX_B_FUNCTIONS), HEGATE_FIX_B_ROWS,
+     lambda clause: "(observer gate_sys crate, HE-GATE-001 %s)" % clause, r"\(observer gate_sys crate, HE-GATE-001 \(",
+     named_patches(HEGATE_FIX_B_FUNCTIONS), hegate_observer_tree),
+)
 
 
 class HeGateTests(Tree):
     """HE-GATE-001 over copies of the real sources (HE005B_TREE). Fix A: each colon-adjacent form is refused by
-    check_observer_logic in rbac.rs and by check_broker_pure's (e) in i03.rs, and passes with the old pattern patched into
-    gate.CODE_PATH; whitelisted and unrooted forms pass under both; the old and new patterns match alike elsewhere. Fix B:
-    check_observer_gate_sys_crate's clauses (i), (ii) and (iii) refuse their forms with their own messages, the real
-    files and gate_sys's item imports pass, and its stated bounds stay refused by check_linked_sources."""
+    check_observer_logic in rbac.rs and by check_broker_pure's (e) in i03.rs, and passes with the old pattern patched
+    into gate.CODE_PATH; whitelisted and unrooted forms pass under both; the old and new patterns match alike
+    elsewhere. Fix B: check_observer_gate_sys_crate's clauses (i), (ii) and (iii) refuse their forms with their own
+    messages, the real files and gate_sys's item imports pass, and its stated bounds stay refused by
+    check_linked_sources. The proof table's rows HG1-HG5."""
 
     TREE = HE005B_TREE
 
@@ -10798,6 +10865,46 @@ class HeGateTests(Tree):
         with self.assertRaisesRegex(gate.GateError, re.escape("%s declares an extern crate (linked-source tripwire)"
                                                               % gate.OBSERVER_CLIENT)):
             gate.check_linked_sources(linked)
+
+    def test_the_proof_table(self):
+        # DESIGN rev 3 section 4: three rules in HE005B_PROOF_RULES' shape, rows HG1-HG5; each row is refused by its
+        # rule (any clause's message), by its own clause alone (the named clause's message), and passes with its clause
+        # off.
+        self.assertEqual([rule[0] for rule in HEGATE_PROOF_RULES],
+                         ["HE-GATE-001 Fix A (observer)", "HE-GATE-001 Fix A (broker)", "HE-GATE-001 Fix B"])
+        self.assertEqual([row[0][:3] for rule in HEGATE_PROOF_RULES for row in rule[3]],
+                         ["HG1", "HG2", "HG3", "HG4", "HG5"])
+        self.assertEqual((len(HEGATE_LOGIC_TREE), len(HEGATE_OBSERVER_TREE)),
+                         (len(gate.LOGIC_MODULES), HEGATE_OBSERVER_SOURCES))
+        self.assertEqual((codepath_patches(), codepath_patches(enabled="(colon)")), ([], []))
+        self.assertEqual((len(codepath_patches(disabled=("(colon)",))), len(codepath_patches(enabled="(i)"))), (1, 1))
+        for function in HEGATE_FIX_B_FUNCTIONS.values():
+            self.assertTrue(callable(getattr(gate, function)), function)
+        for name, check, clauses, rows, tag, any_tag, patches, tree in HEGATE_PROOF_RULES:
+            self.assertTrue(callable(check), name)
+            for label, clause, changes in rows:
+                self.assertIn(clause, clauses, label)
+                for rel, text in tree(changes).items():
+                    self.write(rel, text)
+                try:
+                    with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                        check(self.base)
+                    for enabled, disabled in ((clause, ()), (None, (clause,))):
+                        active = patches(enabled=enabled, disabled=disabled)
+                        for patch in active:
+                            patch.start()
+                        try:
+                            if disabled:
+                                check(self.base)
+                            else:
+                                with self.assertRaisesRegex(gate.GateError, re.escape(tag(clause)), msg=label):
+                                    check(self.base)
+                        finally:
+                            for patch in active:
+                                patch.stop()
+                finally:
+                    for rel, text in tree(()).items():
+                        self.write(rel, text)
 
 
 class OutputPrefixTests(unittest.TestCase):
