@@ -1311,7 +1311,10 @@ LOGIC_MODULES = (tuple((rel, OBSERVER_LOGIC_PATHS) for rel in OBSERVER_LOGIC) + 
 # G-D2-5: the items whose names make the D2 type set, and a use declaration's `pub` form.
 D2_TYPE_ITEM = re.compile(r"\b(?:struct|enum|union|trait|type)\s+([A-Za-z_]\w*)")
 PUB_USE_DECLARATION = re.compile(r"\bpub\s*(?:\([^)]*\)\s*)?use\b([^;]*);")
-CODE_PATH = re.compile(r"(?<![\w:])(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
+# HE-GATE-001 (HE-005B PR review round 2, R2-1 and R2-2): a match never starts inside a path (after a word character or
+# after `::`), and a path right after a lone colon (`t:std::..`, and `t:::std::..`, PATH_SPACE's form of `t: ::std::..`)
+# is read.
+CODE_PATH = re.compile(r"(?<!\w)(?<!::)(::)?([A-Za-z_]\w*)((?:::[A-Za-z_]\w*)+)")
 OBSERVER_LOGIC_WORDS = ((re.compile(r"\b(?:HashMap|HashSet|RandomState)\b"), "HashMap, HashSet or RandomState (getrandom)"),
                         (re.compile(r"\binclude_(?:bytes|str)\s*!"), "include_bytes! or include_str! (only contracts.rs embeds)"))
 PANICS = tuple((re.compile(pattern), name) for pattern, name in (
@@ -2437,7 +2440,10 @@ def check_observer_logic(base: Path) -> int:
     read with comments removed, literal contents emptied and the whitespace around `::` removed: every use path (no
     rename, no glob) and every crate-rooted code path starts with an OBSERVER_LOGIC_PATHS entry; none of
     OBSERVER_LOGIC_WORDS; and, outside strict #[cfg(test)] mod tests blocks, none of PANICS. HE-004D1 (G-D1-10): D1's
-    three logic modules too, each path starting with a D1_LOGIC_PATHS entry (LOGIC_MODULES). The number of modules."""
+    three logic modules too, each path starting with a D1_LOGIC_PATHS entry (LOGIC_MODULES). HE-GATE-001: a crate-rooted
+    path right after a lone colon (a parameter, let, static, const or field type, a struct-literal value, a closure
+    parameter, a bound, or the spaced leading `: ::path` or `:::path`) is read as any other code path. The number of
+    modules."""
     for rel, _ in LOGIC_MODULES:
         require((base / rel).is_file(), "%s is missing (observer logic rules)" % rel)
     for rel, prefixes in LOGIC_MODULES:
@@ -3425,7 +3431,9 @@ def pure_e_paths(codes: dict[str, str], rule: str) -> None:
     """G-HE5B-2 (e), check_observer_logic's path whitelist (HE-005B PR review round 1, R1-3 and R1-4): in each of the four
     modules, read as check_observer_logic reads a logic module (comments removed, literal contents emptied, the whitespace
     around `::` removed), every use path has no rename and no glob and every use path and every crate-rooted code path
-    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged)."""
+    starts with an HE005B_LOGIC_PATHS entry (allowed_logic_path with CRATE_PATH_ROOTS, unchanged). HE-GATE-001: a
+    crate-rooted path right after a lone colon (a parameter, let, static, const or field type, a struct-literal value, a
+    closure parameter, a bound, or the spaced leading `: ::path` or `:::path`) is read as any other code path."""
     for rel in HE005B_FILES:
         require(rel in codes, "%s is missing (%s (e))" % (rel, rule))
         code = codes[rel]
@@ -7868,6 +7876,73 @@ def check_observer_no_send(base: Path) -> int:
     return len(codes)
 
 
+# HE-GATE-001 Fix B (HE-005A PR review round 2, R2-1): the observer's gate_sys crate import, each clause its own
+# function (check_seal_tokens' named-clause pattern), over observer_code's literals-emptied reading.
+
+def gate_sys_crate_uses(code: str) -> tuple[list[tuple[tuple[str, ...], str | None]], int]:
+    """HE-GATE-001 (HG-D2-1): a source's use paths, every use declaration read with use_paths, and the number of
+    declarations use_paths cannot read, which (i) and (ii) set aside for (iii)."""
+    uses, unreadable = [], 0
+    for declaration in USE_DECLARATION.finditer(code):
+        try:
+            uses.extend(use_paths(declaration.group(1)))
+        except GateError:
+            unreadable += 1
+    return uses, unreadable
+
+
+def observer_gate_sys_bare(codes: dict[str, str], rule: str) -> None:
+    """HE-GATE-001 (i): in every crates/observer source except OBSERVER_LINUX_NET and OBSERVER_LINUX_LISTEN, no use path
+    is `gate_sys` or `gate_sys::{self}` (`use gate_sys;`, `use gate_sys::{self};`, `use ::gate_sys;`,
+    `use ::{gate_sys};`, `use gate_sys::{Dir, self};`), renamed or not, at any visibility, so no such source imports or
+    re-exports the gate_sys crate itself. Only the declarations use_paths can read; the rest are (iii)'s."""
+    for rel, code in sorted(codes.items()):
+        if rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
+            continue
+        uses, _ = gate_sys_crate_uses(code)
+        for path, _ in uses:
+            require(path not in (("gate_sys",), ("gate_sys", "self")),
+                    "%s imports the gate_sys crate itself (%s (i))" % (rel, rule))
+
+
+def observer_gate_sys_after_head(codes: dict[str, str], rule: str) -> None:
+    """HE-GATE-001 (ii): in every crates/observer source, the socket files included, no use path holds gate_sys after
+    its head (`crate::wire::gate_sys::Dir`, `self::gate_sys`, `super::gate_sys`,
+    `crate::client::gate_sys::channel::{send}`), so no path reaches gate_sys through another module, a re-export
+    elsewhere included. Only the declarations use_paths can read; the rest are (iii)'s."""
+    for rel, code in sorted(codes.items()):
+        uses, _ = gate_sys_crate_uses(code)
+        for path, _ in uses:
+            require("gate_sys" not in path[1:], "%s reaches gate_sys through another path, %s (%s (ii))"
+                    % (rel, "::".join(path), rule))
+
+
+def observer_gate_sys_readable(codes: dict[str, str], rule: str) -> None:
+    """HE-GATE-001 (iii): in every crates/observer source, a use declaration that use_paths cannot read (for example
+    `use r#gate_sys;`) refuses."""
+    for rel, code in sorted(codes.items()):
+        _, unreadable = gate_sys_crate_uses(code)
+        require(not unreadable, "%s holds a use declaration the gate_sys crate rule cannot read (%s (iii))"
+                % (rel, rule))
+
+
+def check_observer_gate_sys_crate(base: Path) -> int:
+    """HE-GATE-001 (HE-005A PR review round 2, R2-1; R1-1's form for role_seal): outside the two socket files, no
+    crates/observer source imports the gate_sys crate itself (i); in every observer source, no use path holds gate_sys
+    after its head (ii), and an unreadable use declaration refuses (iii). Imports of gate_sys's items stay allowed.
+    extern crate gate_sys is refused by check_linked_sources, and globs and socket-module imports outside the socket
+    files by check_socket_modules. Read with its own observer_code call (comments removed, literal contents emptied, the
+    whitespace around `::` removed, strict test blocks blanked), every use declaration with use_paths; (i) and (ii) read
+    only the declarations use_paths can read, and leave every other declaration to (iii) (HG-D2-1). The number of
+    sources."""
+    rule = "observer gate_sys crate, HE-GATE-001"
+    codes = observer_code(base, rule)
+    observer_gate_sys_bare(codes, rule)
+    observer_gate_sys_after_head(codes, rule)
+    observer_gate_sys_readable(codes, rule)
+    return len(codes)
+
+
 def check_observer_i01_socket(base: Path) -> int:
     """HE-004-I01a G-I01-6 (DESIGN-I01A sections 0, 4 and 12; review r3 I3-1, r4 I4-6): read without comments and with
     the whitespace around `::` removed, I01Socket is named only in linux_listen.rs (its definition and impls) and
@@ -9208,6 +9283,11 @@ def main() -> int:
             "i01_ sources are exactly %s, naming none of Wire, connect, ConnId and Client; PeerOps is declared once, as "
             "`pub trait PeerOps {`"
             % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
+        say("observer gate_sys crate (HE-GATE-001; HE-005A PR review round 2, R2-1): %d sources; outside %s and %s "
+            "none imports the gate_sys crate itself (i), none holds gate_sys after a use path's head (ii), and every "
+            "use declaration is readable (iii); extern crate is check_linked_sources', globs and socket modules "
+            "check_socket_modules'"
+            % (check_observer_gate_sys_crate(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN))
         say("observer I01 socket (HE-004-I01a, G-I01-6): %d sources; I01Socket is named only in %s and %s, renamed and "
             "aliased nowhere, and I01Socket::open is called once, inside LinuxWire::new, its qualified forms counted"
             % (check_observer_i01_socket(HE), OBSERVER_LINUX_LISTEN, OBSERVER_LINUX_NET))
