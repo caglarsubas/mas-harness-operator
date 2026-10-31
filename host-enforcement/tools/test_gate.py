@@ -3175,10 +3175,11 @@ class ObserverLinkedCrateTests(Tree):
         self.assertEqual(gate.OBSERVER_LINKED_CRATES, ("crates/observer", "crates/gate-sys", "crates/i05-protocol",
                                                        "crates/observer-sys", "crates/role-seal"))
         # 13 sources of the gate's linked crates, 6 of the observer's (HE-004C: its socket module; HE-004-I01a: its I01
-        # listener file), 2 of observer-sys's (HE-004D1), role-seal's 1 (HE-005A0) and the broker's 3 (HE-005A).
+        # listener file), 2 of observer-sys's (HE-004D1), role-seal's 1 (HE-005A0), the broker's 3 (HE-005A) and
+        # broker-sys's 2 (HE-005C).
         for check in (gate.check_linked_sources, gate.check_foreign_items, gate.check_debug_derives, gate.check_socket_modules,
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
-            self.assertEqual(check(self.base), 25, check.__name__)
+            self.assertEqual(check(self.base), 27, check.__name__)
         # HE-004B1: the observer's (5 with HE-004C's socket module, 6 with HE-004-I01a's listener file) and i05-protocol's
         # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1. The gate's list: its 13 and, from HE-005A, the broker's 3;
         # HE-005C (Q-U4-1 (a)): broker-sys's 2.
