@@ -249,6 +249,25 @@ no broker source names vectors.json. G-HE5B-5 (check_he005b_token): GateQualifie
 G-D2-8's form with resolved_uses (condition 2). G-HE5B-6 (check_he005b_absent, check_d2_absent's form): no symbol of a
 built planeon-broker has a path in the four modules, A's per-binary rules unchanged.
 
+HE-005C (the broker's lifecycle W1-W6, the child path, HOLD and NP-9, the signed configuration and the startup run over
+the frozen seam's stand-ins; DESIGN-HE005 sections 3.2-3.5; the frozen seam note DESIGN-HE005.SEAM-C rev 4 with errata
+MON-SEAM-E1..E3; delta C3) adds crates/broker-sys (the raw side, written by hand: one audited module, raw.rs, the only
+`#[allow(unsafe_code)]`) and the broker's signed configuration and lifecycle modules. The seam note's lint exceptions:
+raw.rs joins UNSAFE_FILES, FD_FILES and FOREIGN_ITEMS ({syscall}); STARTUP_EXCEPTIONS gains three per-file expressions
+(proc.rs's process directory, raw.rs's descriptor directory, leaf.rs's LEAF_PATH root constant); broker-sys joins
+SCANNED_CRATES, BROKER_LINKED_CRATES, CRATE_ROOTS and the no-panic list; check_role_seal (e) excepts proc.rs's one
+PEER_DIR expression (MON-SEAM-E2), and G-HE5B-1 (b) the seam's path-qualified ChannelEnd and Step::Bind forms
+(MON-SEAM-E3). The rules, each stating its reading scope: G-HE5C-1..3 (check_child_span: the span pinned by hash, its
+signal order, its calls and operations); G-HE5C-4 (check_measured_exec: one clone3 and one execveat site, the measured
+script is the exec's, across the seam); G-HE5C-5 (check_w4_thaw: W4's thaw only after W3's pass and BIND's ticket);
+G-HE5C-6 (check_control_opener: the O_WRONLY opener and the two control-file names in raw.rs only); G-HE5C-7
+(check_he005c_lists, check_broker_sys_calls: the list memberships and G-D1-3's form per Q-RAW-R1-3); G-HE5C-8
+(check_broker_includes with the WORKER programs in the one spawn file, check_signer_key for the broker's key, and
+R1-3's pin, check_role_programs); G-HE5C-9 (check_he005c_markers, and per built planeon-broker check_broker_worker and
+check_broker_markers); G-HE5C-10 (check_he005c_seams: the stand-ins); G-HE5C-11 (check_broker_serve (a)-(c)); G-HE5C-12
+(check_broker_load: the key through black_box and the observer's parity); G-HE5C-13 (check_seal_order's configured site,
+configured_site_tail). check_broker_bytes admits the named byte items of BROKER_BYTES_ALLOWED only.
+
 The owner-operated verifier runs it as `python3 -I -B host-enforcement/tools/gate.py` from the repository root, after
 the two musl release builds. Stdlib only. Every line it prints starts with "he-gate: ", so no line starts with one of the
 verifier's evidence prefixes. It fails closed on the first violation (exit 1).
@@ -294,7 +313,11 @@ GATE_TLS_REGISTRY_LINES = {
 # vendored crates through its own entry, each of its four lines equal to gate-tls's (no package is added; Cargo.lock
 # gains only planeon-observer's edges). Its gate-tls dev-dependency is a path edge, outside REGISTRY_LINES and outside
 # the closure, which reads [dependencies] only.
-REGISTRY_LINES = {"crates/gate-tls": GATE_TLS_REGISTRY_LINES, "crates/observer": dict(GATE_TLS_REGISTRY_LINES)}
+# HE-005C (DESIGN-HE005 section 3.1, moved by the scope notes; the HE-005C plan's Q-HE5C-2 (a)): the broker's signed
+# configuration links ring through its own entry, and getrandom, which ring's pinned version depends on, each line equal
+# to gate-tls's and the observer's (no package is added; Cargo.lock gains only planeon-broker's edges).
+REGISTRY_LINES = {"crates/gate-tls": GATE_TLS_REGISTRY_LINES, "crates/observer": dict(GATE_TLS_REGISTRY_LINES),
+                  "crates/broker": {name: GATE_TLS_REGISTRY_LINES[name] for name in ("getrandom", "ring")}}
 # HE-003D DESIGN sections 2 and 5 (phase 1): the workspace manifest's only [patch] table maps exactly these 11 LINKED
 # vendored crates to their vendor/ directories (path packages inside the workspace root, so rustc receives
 # workspace-relative paths and planeon-gate carries no build-host path); in Cargo.lock they are path packages (no
@@ -537,8 +560,32 @@ BROKER_MAIN = "crates/broker/src/main.rs"
 BROKER_SEAL_RS = "crates/broker/src/seal.rs"
 BROKER_STATUS = "crates/broker/src/status.rs"
 BROKER_LINUX_LISTEN = "crates/broker/src/linux_listen.rs"
-BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys", "crates/i05-protocol")
-SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS, ROLE_SEAL, BROKER_CRATE)
+# HE-005C (DESIGN-HE005 revision 5 section 4, HE-005C; the frozen seam note DESIGN-HE005.SEAM-C revision 4 section 1,
+# with its errata MON-SEAM-E1..E3; the HE-005C plan's G-HE5C-7): broker-sys, the hand-written raw module (std only, one
+# audited file raw.rs, one foreign item), joins planeon-broker's closure and every linked-crate scan; the broker's
+# signed configuration (config.rs, signed_config.rs, the key file) and its lifecycle files are named here.
+BROKER_SYS_CRATE = "crates/broker-sys"
+BROKER_SYS_LIB = "crates/broker-sys/src/lib.rs"
+BROKER_SYS_RAW = "crates/broker-sys/src/raw.rs"
+BROKER_CONFIG = "crates/broker/src/config.rs"
+BROKER_SIGNED_CONFIG = "crates/broker/src/signed_config.rs"
+BROKER_SIGNER_KEY = "crates/broker/config-signer.pub"
+BROKER_LIFECYCLE = "crates/broker/src/lifecycle"
+BROKER_OPS = "crates/broker/src/lifecycle/ops.rs"
+BROKER_OUTCOME = "crates/broker/src/lifecycle/outcome.rs"
+BROKER_SEAMS = "crates/broker/src/lifecycle/seams.rs"
+BROKER_RUN = "crates/broker/src/lifecycle/run.rs"
+BROKER_LEAF = "crates/broker/src/lifecycle/leaf.rs"
+BROKER_PROC = "crates/broker/src/lifecycle/proc.rs"
+BROKER_SPAWN = "crates/broker/src/lifecycle/spawn.rs"
+BROKER_CLOCK = "crates/broker/src/lifecycle/clock.rs"
+BROKER_W6 = "crates/broker/src/lifecycle/w6.rs"
+BROKER_NP9 = "crates/broker/src/lifecycle/np9.rs"
+BROKER_LIFECYCLE_NAMES = ("mod", "outcome", "ops", "seams", "text", "wait", "hold", "w6", "np9", "run", "leaf", "proc",
+                          "spawn", "clock")
+BROKER_LIFECYCLE_FILES = tuple("%s/%s.rs" % (BROKER_LIFECYCLE, name) for name in BROKER_LIFECYCLE_NAMES)
+BROKER_LINKED_CRATES = (BROKER_CRATE, ROLE_SEAL, "crates/gate-sys", "crates/i05-protocol", BROKER_SYS_CRATE)
+SCANNED_CRATES = LINKED_CRATES + (OBSERVER_CRATE, OBSERVER_SYS, ROLE_SEAL, BROKER_CRATE, BROKER_SYS_CRATE)
 OBSERVER_MAIN = "crates/observer/src/main.rs"
 OBSERVER_LIB = "crates/observer/src/lib.rs"
 GATE_MAIN = "crates/gate/src/main.rs"
@@ -621,7 +668,7 @@ OBSERVER_MAIN_USES = tuple(sorted(
     # HE-004-I01B2 (DESIGN-I01B2 rev 3 section 5): serve's import of the closed binding.
     + [(("planeon_observer", "i01_request", "I01Binding"), None)]))
 GATE_SEAL_SITE = {"main": GATE_MAIN, "before": (GATE_CONFIG, SIGNED_CONFIG), "calls": SEAL_CALLS, "uses": MAIN_USES,
-                  "functions": MAIN_FUNCTIONS, "adjacent": False}
+                  "functions": MAIN_FUNCTIONS, "adjacent": False, "dir_file": SIGNED_CONFIG}
 OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": OBSERVER_MAIN_USES,
                       "functions": ["main", "main", "serve"], "adjacent": True}
 # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A: "a BROKER seal-order site (D2-3 form)"; Q-HE5A-1 (a)): the broker's
@@ -629,12 +676,39 @@ OBSERVER_SEAL_SITE = {"main": OBSERVER_MAIN, "before": (), "calls": OBSERVER_SEA
 # statement, then exactly `ExitCode::from(serve(&<the stage-2 binding>))`, which closes main; no configuration file read
 # before the seal; its pinned imports, serve's two in-body ones included (the Linux listener and the unanswered loop);
 # two fn main and fn serve. Both stages of the broker's seal.rs return its one SealError, so status::seal maps either.
+# HE-005C (delta C3's G-HE5C-13, C3-3; Q-HE5C-1 (a)): a third site form beside the gate's and HE-005A's adjacent one.
+# Stage 1's statement is exact; between the stages only the broker's configuration calls (BROKER_SEAL_CALLS), as exactly
+# two statements, `let <d> = match signed_config::load() { Ok(<x>) => <x>, Err(LoadError::Read) => return
+# ExitCode::from(status::CONFIG_READ), Err(LoadError::Signature(_)) => return ExitCode::from(status::CONFIG_SIGNATURE), };`
+# and `let <c> = match BrokerConfig::parse(&<d>) { Ok(<y>) => <y>, Err(_) => return ExitCode::from(status::CONFIG_CHECK),
+# };`, and nothing else; stage 2's statement is exact; then exactly `drop(<d>); ExitCode::from(serve(&<stage-2
+# binding>, <c>))`, which closes main (the configured form). The broker's config.rs and signed_config.rs are its
+# before-files, the latter with the site's one `use gate_sys::Dir;`. The imports gain the configuration's and serve's
+# lifecycle ones.
+BROKER_SEAL_CALLS = ("signed_config::load", "BrokerConfig::parse", "ExitCode::from", "status::seal", "Ok", "Err")
 BROKER_MAIN_USES = tuple(sorted(
     [(("std", "process", "ExitCode"), None), (("planeon_broker", "status"), None)]
     + [(("planeon_broker", name), None) for name in ("seal_stage1", "seal_stage2", "Sealed", "serve_unanswered")]
-    + [(("planeon_broker", "linux_listen", "LinuxI02"), None)]))
-BROKER_SEAL_SITE = {"main": BROKER_MAIN, "before": (), "calls": OBSERVER_SEAL_CALLS, "uses": BROKER_MAIN_USES,
-                    "functions": ["main", "main", "serve"], "adjacent": True}
+    + [(("planeon_broker", "linux_listen", "LinuxI02"), None)]
+    + [(("planeon_broker", "config", "BrokerConfig"), None), (("planeon_broker", "signed_config", "self"), None),
+       (("planeon_broker", "signed_config", "LoadError"), None)]
+    + [(("planeon_broker", "lifecycle", "leaf", "open_leaf"), None),
+       (("planeon_broker", "lifecycle", "run", "derive_hold"), None),
+       (("planeon_broker", "lifecycle", "run", "startup_run"), None),
+       (("planeon_broker", "lifecycle", "seams", "BinderStandIn"), None),
+       (("planeon_broker", "lifecycle", "seams", "QualifierStandIn"), None)]))
+BROKER_SEAL_SITE = {"main": BROKER_MAIN, "before": (BROKER_CONFIG, BROKER_SIGNED_CONFIG), "calls": BROKER_SEAL_CALLS,
+                    "uses": BROKER_MAIN_USES, "functions": ["main", "main", "serve"], "adjacent": False,
+                    "configured": True, "dir_file": BROKER_SIGNED_CONFIG}
+CONFIG_LOAD_STATEMENT = re.compile(
+    r"\s*let\s+([A-Za-z_]\w*)\s*=\s*match\s+signed_config::load\s*\(\s*\)\s*\{\s*Ok\s*\(\s*([A-Za-z_]\w*)\s*\)\s*=>\s*"
+    r"([A-Za-z_]\w*)\s*,\s*Err\s*\(\s*LoadError::Read\s*\)\s*=>\s*return\s+ExitCode::from\s*\(\s*status::CONFIG_READ\s*\)"
+    r"\s*,\s*Err\s*\(\s*LoadError::Signature\s*\(\s*_\s*\)\s*\)\s*=>\s*return\s+ExitCode::from\s*\(\s*"
+    r"status::CONFIG_SIGNATURE\s*\)\s*,?\s*\}\s*;")
+CONFIG_PARSE_STATEMENT = (r"\s*let\s+([A-Za-z_]\w*)\s*=\s*match\s+BrokerConfig::parse\s*\(\s*&\s*%s\s*\)\s*\{\s*Ok\s*\(\s*"
+                          r"([A-Za-z_]\w*)\s*\)\s*=>\s*([A-Za-z_]\w*)\s*,\s*Err\s*\(\s*_\s*\)\s*=>\s*return\s+"
+                          r"ExitCode::from\s*\(\s*status::CONFIG_CHECK\s*\)\s*,?\s*\}\s*;")
+CONFIGURED_TAIL = r"\s*drop\s*\(\s*%s\s*\)\s*;\s*ExitCode::from\s*\(\s*serve\s*\(\s*&\s*%s\s*,\s*%s\s*\)\s*\)\s*\}"
 # G5's wiring rule (D1-1): in serve, read without comments and use declarations, the whitespace around `::` removed, each
 # of these calls appears exactly once, in this order. HE-004D1 DESIGN-D1 section 17.3 (G-D1-8): twelve calls, the v2
 # parse with the record's reference in place of the v1 parse, the capture schema, the record's read, the enrolled record
@@ -779,7 +853,8 @@ SIGNER_KEY = "crates/gate-tls/config-signer.pub"
 # HE-004C DESIGN-C sections 11 and 15 (G6, Q-HE4C-3 (i)): the observer's own compiled-in key, empty until HE-008, under
 # the same rule; the gate run reads both.
 OBSERVER_SIGNER_KEY = "crates/observer/config-signer.pub"
-SIGNER_KEYS = (SIGNER_KEY, OBSERVER_SIGNER_KEY)
+# HE-005C (G-HE5C-8; D-U2-1 (a)): the broker's own compiled-in key, empty until HE-008, under the same rule.
+SIGNER_KEYS = (SIGNER_KEY, OBSERVER_SIGNER_KEY, BROKER_SIGNER_KEY)
 # HE-003D DESIGN section 5 (O3, C8): planeon-gate's symbol inventory. MEMBARRIER must be absent (musl's membarrier.lo
 # defines both; its __membarrier_init is WEAK in pthread_create.lo and harmless). KILLED_WRAPPERS are the musl 1.2.5
 # wrappers whose system call the pinned EFFECT_GATE programs kill unconditionally on at least one target: each name's
@@ -849,6 +924,11 @@ BROKER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/BROKER.x86
                    "aarch64-unknown-linux-musl": "contracts/seccomp-v3/BROKER.aarch64.bpf"}
 BROKER_ABSENT_SYMBOLS = ("__synccall", "setresuid", "setresgid", "setuid", "setgid", "pthread_create", "fork",
                          "posix_spawn")
+# HE-005C (DESIGN-HE005 O1 and O7; the HE-005C plan's G-HE5C-8 and G-HE5C-9; delta C3): the two vendored WORKER programs
+# (edge record v11), embedded once each in lifecycle/spawn.rs, the one spawn file; each built planeon-broker holds its
+# architecture's WORKER program bytes exactly once (check_broker_worker).
+BROKER_WORKER_PROGRAMS = {"x86_64-unknown-linux-musl": "contracts/seccomp-v3/WORKER.x86_64.bpf",
+                          "aarch64-unknown-linux-musl": "contracts/seccomp-v3/WORKER.aarch64.bpf"}
 # HE-004C DESIGN-C section 15 (G9, D1-6, D2-8; owner decision Q-HE4C-12 (a)): symbols only the path after the
 # configuration keeps, so the shipped planeon-observer holds the composed client while its key is empty (the compiled
 # key passes core::hint::black_box). A symbol counts by its own path: the mangled name (legacy `_ZN` or v0 `_R`) is read
@@ -871,10 +951,12 @@ TCP = "crates/gate-sys/src/tcp.rs"
 GATE_TLS = "crates/gate-tls"
 # The workspace sources where the word unsafe may appear (HE-002C DESIGN section 3, HE-002S DESIGN section 6, HE-003A
 # DESIGN section 8, HE-003B DESIGN section 3; HE-004D1 DESIGN-D1 section 4.4, G-D1-2: observer-sys's kernel.rs).
-UNSAFE_FILES = (OPENAT, SEAL, CHANNEL, TCP, OBSERVER_SYS_KERNEL)
+# HE-005C (the frozen seam note section 1; G-HE5C-7): broker-sys's one audited module, raw.rs.
+UNSAFE_FILES = (OPENAT, SEAL, CHANNEL, TCP, OBSERVER_SYS_KERNEL, BROKER_SYS_RAW)
 # The linked sources that may name std::os::fd items (HE-003A DESIGN section 8): effect-gate holds gate-sys's opaque
-# types and names no descriptor. HE-004D1 (G-D1-2): observer-sys's kernel.rs.
-FD_FILES = (OPENAT, CHANNEL, TCP, OBSERVER_SYS_KERNEL)
+# types and names no descriptor. HE-004D1 (G-D1-2): observer-sys's kernel.rs. HE-005C (seam note section 1): raw.rs,
+# whose opaque descriptors keep their OwnedFd private; crates/broker names no fd item.
+FD_FILES = (OPENAT, CHANNEL, TCP, OBSERVER_SYS_KERNEL, BROKER_SYS_RAW)
 # HE-002S DESIGN section 6 (owner decision Q-HE2S-5 (a), D3; PR review round 1, R1-5) and HE-003A DESIGN section 8:
 # the start-up lint's exceptions, a per-file list of exact expressions (whitespace between their tokens ignored), each
 # removed once before the scan: in gate-sys's seal module the expression that opens the process's own status file, in
@@ -883,6 +965,10 @@ FD_FILES = (OPENAT, CHANNEL, TCP, OBSERVER_SYS_KERNEL)
 STATUS_READ = 'Dir::at("/proc/self")?.file_ro("status")'
 SOCKCREATE_DIR = 'Dir::at("/proc/thread-self/attr")'
 PEER_DIR = 'Dir::at(&format!("/proc/{}", pid))'
+PEER_DIR_CALL = re.compile(r'\bDir\s*::\s*at\s*\(\s*&\s*format\s*!\s*\(\s*"/proc/\{\}"\s*,\s*pid\s*\)\s*\)')
+# HE-005C (the frozen seam note section 1, SM-R2-12): broker-sys's descriptor-directory path, its one start-up exception.
+FD_DIR_FORMAT = 'format!("/proc/{}/fd", pid)'
+FD_DIR_FORMAT_CALL = re.compile(r'\bformat\s*!\s*\(\s*"/proc/\{\}/fd"\s*,\s*pid\s*\)')
 # HE-003A3 (DESIGN sections 5 and 6, D2-5): the observation's two root opens, each exactly once in linux_os.rs (the
 # observation rules pin both inside KernelRoots::open_after_seal).
 LINUX_OS = "crates/effect-gate/src/linux_os.rs"
@@ -915,7 +1001,11 @@ OBSERVER_RECORD_CHECK = "crates/observer/src/record_check.rs"
 D2_ROOT_CONSTANTS = {
     OBSERVER_RECORD_CHECK: (root_constant("CGROUP_ROOT", "/sys/fs/cgroup"), root_constant("PIN_ROOT", "/sys/fs/bpf/planeon")),
 }
-ROOT_CONSTANTS = {**D1_ROOT_CONSTANTS, **D2_ROOT_CONSTANTS}
+# HE-005C (the frozen seam note section 1, Q-SEAM-1 (a); G-HE5C-7): lifecycle/leaf.rs's one private root constant, the
+# probe-worker leaf, under the same anchored pattern.
+LEAF_PATH = "/sys/fs/cgroup/planeon.slice/planeon-capacity-broker.service/probe-worker"
+HE5C_ROOT_CONSTANTS = {BROKER_LEAF: (root_constant("LEAF_PATH", LEAF_PATH),)}
+ROOT_CONSTANTS = {**D1_ROOT_CONSTANTS, **D2_ROOT_CONSTANTS, **HE5C_ROOT_CONSTANTS}
 # HE-004D2 DESIGN-D2 sections 5.4 and 9 (G-D2-6): the one /opt/planeon/ text of crates/observer's sources.
 INTERPRETER_TREE = root_constant("INTERPRETER_TREE", "/opt/planeon/python/")
 STARTUP_EXCEPTIONS = {
@@ -923,7 +1013,12 @@ STARTUP_EXCEPTIONS = {
     SEAL: ((STATUS_READ,
             re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/self"\s*\)\s*\?\s*\.\s*file_ro\s*\(\s*"status"\s*\)')),),
     CHANNEL: ((SOCKCREATE_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*"/proc/thread-self/attr"\s*\)')),
-              (PEER_DIR, re.compile(r'\bDir\s*::\s*at\s*\(\s*&\s*format\s*!\s*\(\s*"/proc/\{\}"\s*,\s*pid\s*\)\s*\)'))),
+              (PEER_DIR, PEER_DIR_CALL)),
+    # HE-005C (the frozen seam note section 1, SM-R2-12): three per-file exact expressions, each in its own file, in
+    # PEER_DIR's form: the lifecycle's process-directory open, broker-sys's descriptor-directory path, and (through
+    # ROOT_CONSTANTS, merged last) leaf.rs's root constant.
+    BROKER_PROC: ((PEER_DIR, PEER_DIR_CALL),),
+    BROKER_SYS_RAW: ((FD_DIR_FORMAT, FD_DIR_FORMAT_CALL),),
     **ROOT_CONSTANTS,
 }
 # HE-004D1 DESIGN-D1 section 19 (G-D1-5, R3-1): the linked-source scan refuses the word fs in the raw text of every
@@ -947,7 +1042,9 @@ FOREIGN_ITEMS = {OPENAT: {"openat", "readlinkat"},
                  TCP: {"socket", "setsockopt", "bind", "listen", "connect", "getsockopt", "recv", "send", "shutdown",
                        "syscall"},
                  # HE-004D1 DESIGN-D1 section 4.1 (G-D1-2; owner decision Q-HE4D1-5 (a)): observer-sys's one item.
-                 OBSERVER_SYS_KERNEL: {"syscall"}}
+                 OBSERVER_SYS_KERNEL: {"syscall"},
+                 # HE-005C (the frozen seam note section 1; G-HE5C-7): broker-sys's one item, in G-D1-3's form.
+                 BROKER_SYS_RAW: {"syscall"}}
 # HE-004D1 DESIGN-D1 sections 4.1 and 19 (G-D1-3, D1-6): kernel.rs's calls of its one foreign item. Read without comments
 # and with literals kept: the word syscall is its extern declaration `fn syscall(` once and otherwise only a plain call
 # `syscall(` (not after `::` or `.`); every call has exactly seven arguments, the first one of the six SYS_ constants;
@@ -1204,8 +1301,9 @@ LIFETIME = re.compile(r"'(?:r#)?[^\W\d]\w*")
 # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; MON-HE005A-PLAN2): the broker's crate joins the list, so its code,
 # which runs after the BROKER filter, names none of these std APIs either (a list, not a proof of the BROKER row: T04's
 # trace stays the proof).
+# HE-005C, Q-U4-1 (a) (2026-10-31): broker-sys joins too, since its code runs after the seal, under the broker's filter.
 POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate",
-                    BROKER_CRATE)
+                    BROKER_CRATE, BROKER_SYS_CRATE)
 POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)"),
                        (r"\bread_dir\b", "read_dir (getdents64)"),
                        (r"\bcurrent_exe\b", "current_exe (readlink, readlinkat)"),
@@ -1372,7 +1470,9 @@ CRATE_ROOTS = {"crates/i05-protocol/src/lib.rs": "#![forbid(unsafe_code)]",
                ROLE_SEAL_LIB: "#![forbid(unsafe_code)]",
                # HE-005A (DESIGN-HE005 section 4, HE-005A): the broker's library and binary roots forbid it.
                BROKER_LIB: "#![forbid(unsafe_code)]",
-               BROKER_MAIN: "#![forbid(unsafe_code)]"}
+               BROKER_MAIN: "#![forbid(unsafe_code)]",
+               # HE-005C (the frozen seam note section 1): broker-sys's root denies unsafe_code; raw.rs alone allows it.
+               BROKER_SYS_LIB: "#![deny(unsafe_code)]"}
 # HE-005A0 (DESIGN-HE005 section 4, A0: effect-gate's D6; MON-HE005A-PLAN; MON-HE005A0-U1, exception 4): role-seal's
 # rule (check_role_seal), each clause its own function. (a) Its src/ holds only lib.rs. (b) Read without comments and
 # literal contents, outside the strict #[cfg(test)] mod tests block, its public items are exactly ROLE_SEAL_PUBLIC
@@ -1451,23 +1551,52 @@ ROLE_SEAL_STAGE_PATH = re.compile(r"\brole_seal::(seal_stage1|seal_stage2)\b")
 HE005B_MODULES = ("i02", "i03", "i05_client", "gate_peer")
 HE005B_FILES = tuple("crates/broker/src/%s.rs" % name for name in HE005B_MODULES)
 BROKER_I02 = "crates/broker/src/i02.rs"
-BROKER_NO_PANIC = (BROKER_LIB, BROKER_MAIN, BROKER_SEAL_RS, BROKER_STATUS, BROKER_LINUX_LISTEN) + HE005B_FILES
+# HE-005C (the HE-005C plan; the frozen seam note section 1): the signed configuration's two files, the lifecycle's files
+# and broker-sys's two join the list (raw.rs's item-level compile-time asserts removed first, as seal.rs's are).
+BROKER_NO_PANIC = ((BROKER_LIB, BROKER_MAIN, BROKER_SEAL_RS, BROKER_STATUS, BROKER_LINUX_LISTEN) + HE005B_FILES
+                   + (BROKER_CONFIG, BROKER_SIGNED_CONFIG) + BROKER_LIFECYCLE_FILES + (BROKER_SYS_LIB, BROKER_SYS_RAW))
 BROKER_STATUS_CONSTANTS = ("NOT_LINUX", "NOT_YET_SERVING")
 # HE-005A PR review round 1, R1-5 (folded under MON-HE005A-R1; Q-HE5A-3 (a)): the broker's serve in G5's form
 # (check_observer_serve): its body, read as serve_body reads the observer's, names each of these exactly once and in this
 # order (a), and is token for token BROKER_SERVE_BODY (b), so serve reaches the listener seam once and returns only the
-# listener's status.
+# listener's status. HE-005C (delta C3's G-HE5C-11, C3-5; the frozen seam note SM-R2-2, SM-R3-6): the order begins with
+# lifecycle/leaf.rs's opening function, then the HOLD derivation and the one startup run, then the listener's three
+# names; the body constructs C's two stand-ins as exact expressions; the run's outcome is never returned, so serve still
+# returns only the listener's status (24).
 BROKER_SERVE_CALLS = tuple((re.compile(pattern), name) for pattern, name in (
+    (r"\bopen_leaf\b", "open_leaf"), (r"\bderive_hold\b", "derive_hold"), (r"\bstartup_run\b", "startup_run"),
     (r"\bstatus::listener\b", "status::listener"), (r"\bserve_unanswered\b", "serve_unanswered"),
     (r"\bLinuxI02\b", "LinuxI02")))
-BROKER_SERVE_BODY = "{ status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }"
+BROKER_SERVE_BODY = ("{ let leaf = open_leaf(); let mut standing = derive_hold(&leaf); "
+                     "startup_run(&leaf, &config, &mut standing, QualifierStandIn, BinderStandIn); "
+                     "status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }")
+# HE-005C PR review round 1, R1-1 (Q-HE5C-R1-1 (a), folded before the push): G-HE5C-11 (b) pins, in the same form, the
+# bodies of the two run entries serve reaches in lifecycle/run.rs, so neither can run a W-step before the startup run's
+# one call of `startup` with serve's two seams: startup_run's (a failed leaf open holds; the clock's origin; the one call)
+# and derive_hold's (the derivation over the opened leaf, a failed open counting as HoldRead, with no write).
+STARTUP_RUN_BODY = ("{ let Ok(handles) = opened else { standing.hold(Step::HoldRead); return "
+                    "Outcome::CapacityHeld(Step::HoldRead); }; let clock = MonotonicClock::start(); let mut spawn = "
+                    "LinuxSpawn::new(handles.leaf_dir(), config.worker_script_path()); startup(&mut handles.leaf_ops(), "
+                    "&mut spawn, &clock, qualifier, binder, config, standing) }")
+DERIVE_HOLD_BODY = ("{ let mut standing = Standing::new(); let found = match opened { Ok(handles) => "
+                    "hold::derive(&mut handles.leaf_ops(), false), Err(_) => Some(Step::HoldRead), }; if let Some(step) = "
+                    "found { standing.hold(step); } standing }")
+RUN_ENTRY_BODIES = {"startup_run": STARTUP_RUN_BODY, "derive_hold": DERIVE_HOLD_BODY}
+# PR review round 2, R2-2 (Q-HE5C-R2 (a)): startup's body from its { through step 2's statement, as a token prefix.
+STARTUP_BODY_PREFIX = ("{ let start_ms = clock.now_ms(); if let Some(step) = standing.held() { return "
+                       "Outcome::CapacityHeld(step); } let gate = match qualifier.qualify() { "
+                       "GateAnswer::Qualified(ticket) => ticket, GateAnswer::Unavailable => return Outcome::Unavailable, };")
 BROKER_SERVE_TOKEN = re.compile(r"[A-Za-z_]\w*|::|\S")
 # HE-005B (the HE-005B plan's gate rules G-HE5B-1..6; MON-HE005B-PLAN; the build brief's conditions 1 and 2):
 # G-HE5B-4, the include rule's two files: seal.rs embeds exactly the two BROKER programs, and i02.rs exactly the vendored
 # I02 channel schema (edge record v12, row 80), once, with include_bytes!; no other broker source embeds anything, and none
 # names a vectors.json path in code or a literal (the vectors are read only under tests/).
 BROKER_I02_SCHEMA = "contracts/broker-handoff-v1/channel.schema.json"
-BROKER_EMBEDS = {BROKER_SEAL_RS: tuple(sorted(BROKER_PROGRAMS.values())), BROKER_I02: (BROKER_I02_SCHEMA,)}
+# HE-005C (G-HE5C-8; addendum 1's D-U2-1 (a)): lifecycle/spawn.rs embeds exactly the two WORKER programs, and
+# signed_config.rs exactly the broker's key file (`include_bytes!("../config-signer.pub")`, the observer's include
+# form), once each; no other broker source embeds anything.
+BROKER_EMBEDS = {BROKER_SEAL_RS: tuple(sorted(BROKER_PROGRAMS.values())), BROKER_I02: (BROKER_I02_SCHEMA,),
+                 BROKER_SPAWN: tuple(sorted(BROKER_WORKER_PROGRAMS.values())), BROKER_SIGNED_CONFIG: (BROKER_SIGNER_KEY,)}
 BROKER_VECTORS_NAME = re.compile(r"vectors\.json")
 # G-HE5B-2's decode-order clause (Q-HE5B-3 (a), condition 1): i02.rs's decode function, read as the token rules read a
 # source, names each step exactly once and in decode_frame's order (frame.rs:64-85, then its check_structure); i02.rs's
@@ -2778,6 +2907,11 @@ def role_seal_formatting(base: Path) -> int:
                                        for path in (base / BROKER_CRATE / "src").rglob("*.rs"))
     for rel in sources:
         raw = (base / rel).read_text(encoding="utf-8")
+        if rel == BROKER_PROC:
+            # HE-005C, MON-SEAM-E2 (the owner's "Exact one-file exception (Recommended)"): the seam note's one
+            # process-directory open, matched by PEER_DIR's own regex, is blanked once before this clause reads proc.rs;
+            # nothing else in that file and no other file is excepted.
+            raw = PEER_DIR_CALL.sub(" ", raw, count=1)
         try:
             code, kept = rust_code(raw), rust_code(raw, literals=True)
         except GateError as error:
@@ -3115,8 +3249,9 @@ def check_broker_bytes(base: Path) -> int:
     """HE-005A, R1-2's broker form (MON-HE005A0-PUSH; the HE-005A plan's obligation 3): outside seal.rs, crates/broker's
     non-test sources, read without comments, with literal contents emptied and strict test blocks blanked, hold no const
     or static whose type names u8 other than a lone `u8` (an exit status), no type item naming u8 and no use path
-    renaming u8 (bytes_aliases), so the broker's program bytes live in seal.rs alone, under its include rule. The number
-    of sources read."""
+    renaming u8 (bytes_aliases), so the broker's program bytes live in seal.rs alone, under its include rule. HE-005C:
+    besides, each file holds exactly its BROKER_BYTES_ALLOWED items (name and type head), once each: the WORKER programs
+    in the one spawn file and the signed configuration's key and small-order table. The number of sources read."""
     rule = "broker bytes, R1-2"
     count = 0
     for path in sorted((base / BROKER_CRATE / "src").rglob("*.rs")):
@@ -3127,10 +3262,17 @@ def check_broker_bytes(base: Path) -> int:
             code = blank_test_blocks(PATH_SPACE.sub("::", rust_code(path.read_text(encoding="utf-8"))))
         except GateError as error:
             raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+        allowed = BROKER_BYTES_ALLOWED.get(rel, {})
+        seen = []
         for match in ROLE_SEAL_BYTES_ITEM.finditer(code):
             typed = " ".join(match.group(2).split())
+            if allowed.get(match.group(1)) == typed:
+                seen.append(match.group(1))
+                continue
             require(typed == "u8" or not U8_WORD.search(typed), "%s holds bytes outside %s: %s's type `%s` names u8 (%s)"
                     % (rel, BROKER_SEAL_RS, match.group(1), typed, rule))
+        require(sorted(seen) == sorted(allowed), "%s holds its named byte items %s, not exactly %s once each (%s)"
+                % (rel, sorted(seen), sorted(allowed), rule))
         bytes_aliases(rel, code, rule)
         count += 1
     return count
@@ -3226,12 +3368,31 @@ def serve_a_calls_once(body: str, rule: str) -> None:
             % (", ".join(name for _, name in BROKER_SERVE_CALLS), rule))
 
 
-def serve_b_body_exact(body: str, rule: str) -> None:
+def serve_b_body_exact(body: str, rule: str, base: Path | None = None) -> None:
     """R1-5 (b): the broker's serve body is token for token (BROKER_SERVE_TOKEN) BROKER_SERVE_BODY, so serve runs the
     listener seam once and returns only its status: no statement before or after it, no loop, branch or closure around
-    it, and no other value returned."""
+    it, and no other value returned. HE-005C PR review round 1, R1-1: with `base`, lifecycle/run.rs's startup_run and
+    derive_hold bodies (code, comments removed, literal contents emptied, the whitespace around `::` removed, non-test)
+    are token for token RUN_ENTRY_BODIES' too."""
     require(BROKER_SERVE_TOKEN.findall(body) == BROKER_SERVE_TOKEN.findall(BROKER_SERVE_BODY),
             "the broker's serve body is not exactly `%s` (%s (b))" % (BROKER_SERVE_BODY, rule))
+    if base is None:
+        return
+    require((base / BROKER_RUN).is_file(), "%s is missing (%s (b))" % (BROKER_RUN, rule))
+    try:
+        run = blank_test_blocks(PATH_SPACE.sub("::", rust_code((base / BROKER_RUN).read_text(encoding="utf-8"))))
+    except GateError as error:
+        raise GateError("%s: %s (%s (b))" % (BROKER_RUN, error, rule)) from None
+    for name, pinned in RUN_ENTRY_BODIES.items():
+        spans = [span for span in function_bodies(run) if span[0] == name]
+        require(len(spans) == 1 and BROKER_SERVE_TOKEN.findall(run[spans[0][2]:spans[0][3]])
+                == BROKER_SERVE_TOKEN.findall(pinned), "%s's %s body is not exactly `%s` (%s (b))"
+                % (BROKER_RUN, name, pinned, rule))
+    # PR review round 2, R2-2: startup's body begins with exactly STARTUP_BODY_PREFIX's tokens.
+    prefix = BROKER_SERVE_TOKEN.findall(STARTUP_BODY_PREFIX)
+    spans = [span for span in function_bodies(run) if span[0] == "startup"]
+    require(len(spans) == 1 and BROKER_SERVE_TOKEN.findall(run[spans[0][2]:spans[0][3]])[:len(prefix)] == prefix,
+            "%s's startup body does not begin with exactly `%s` (%s (b))" % (BROKER_RUN, STARTUP_BODY_PREFIX, rule))
 
 
 def check_broker_serve(base: Path) -> int:
@@ -3239,12 +3400,1189 @@ def check_broker_serve(base: Path) -> int:
     serve, read as serve_body reads the observer's (comments removed, literal contents emptied, the whitespace around
     `::` removed, use declarations dropped), and each clause is its own function: (a) its body names status::listener,
     serve_unanswered and LinuxI02 exactly once each, in that order (G5's form); (b) its body is exactly BROKER_SERVE_BODY.
-    Its imports are BROKER_SEAL_SITE's pinned set and main calls it once, as the tail. The number of named calls."""
+    Its imports are BROKER_SEAL_SITE's pinned set and main calls it once, as the tail. HE-005C (G-HE5C-11): (a)'s order
+    begins with the opening function, the HOLD derivation and the startup run, (b)'s body is serve's new one, and (c)
+    holds the lifecycle reachable only through serve (serve_c_isolation). PR review round 1, R1-1: (b) also pins
+    startup_run's and derive_hold's bodies (RUN_ENTRY_BODIES). The number of named calls."""
     rule = "broker serve, R1-5"
     body = serve_body(base, rule, BROKER_MAIN)
     serve_a_calls_once(body, rule)
-    serve_b_body_exact(body, rule)
+    serve_b_body_exact(body, rule, base)
+    serve_c_isolation(base, rule)
     return len(BROKER_SERVE_CALLS)
+
+
+SERVE_ENTRIES = ("open_leaf", "derive_hold", "startup_run")
+LIFECYCLE_DECLARATION = re.compile(r"(?m)^[ \t]*pub\s+mod\s+lifecycle\s*;")
+
+
+def serve_c_isolation(base: Path, rule: str) -> None:
+    """HE-005C, G-HE5C-11's isolation (delta C3, C3-5; module_isolation's construction, G-I01B-1): over crates/broker's
+    non-test sources (comments removed, literal contents emptied, the whitespace around `::` removed, strict test blocks
+    aside), outside the lifecycle's files the word lifecycle occurs only as lib.rs's one line-anchored `pub mod
+    lifecycle;` and in main.rs's imports (BROKER_SEAL_SITE's pinned set); main.rs, its imports aside, names each of
+    SERVE_ENTRIES (the opening function, the HOLD derivation, the run's entry) exactly once, in serve; and inside the
+    lifecycle's files each is named only by its own `fn`. So no other route reaches the run or a W-step."""
+    codes = he005b_codes(base, rule)
+    for rel, code in sorted(codes.items()):
+        if rel in BROKER_LIFECYCLE_FILES:
+            continue
+        rest = blank_test_blocks(code)
+        if rel == BROKER_LIB:
+            require(len(LIFECYCLE_DECLARATION.findall(rest)) == 1, "%s does not declare `pub mod lifecycle;` exactly once, "
+                    "on its own line (%s (c))" % (rel, rule))
+            rest = LIFECYCLE_DECLARATION.sub(" ", rest)
+        if rel == BROKER_MAIN:
+            rest = USE_DECLARATION.sub(" ", rest)
+        require(not re.search(r"\blifecycle\b", rest), "%s names the lifecycle module other than lib.rs's `pub mod "
+                "lifecycle;` and main.rs's pinned imports (%s (c))" % (rel, rule))
+    require(BROKER_MAIN in codes, "%s is missing (%s (c))" % (BROKER_MAIN, rule))
+    main = USE_DECLARATION.sub(" ", blank_test_blocks(codes[BROKER_MAIN]))
+    inside = " ".join(blank_test_blocks(codes[rel]) for rel in BROKER_LIFECYCLE_FILES if rel in codes)
+    for name in SERVE_ENTRIES:
+        require(len(re.findall(r"\b%s\b" % name, main)) == 1, "main.rs names %s other than exactly once, in serve "
+                "(%s (c))" % (name, rule))
+        require(len(re.findall(r"\b%s\b" % name, inside)) == 1 and re.search(r"\bfn\s+%s\b" % name, inside),
+                "the lifecycle names %s other than by its own fn (%s (c))" % (name, rule))
+
+
+# HE-005C (the plan's G-HE5C-8; delta C3's G-HE5C-9, "WORKER's static named only in the child path's parent-side
+# preparation (check_broker_bytes' form)"; Q-HE5C-2 (a)): outside seal.rs, the broker's only named byte items, each in
+# its one file with its exact type head (ROLE_SEAL_BYTES_ITEM's text up to `=` or `;`) and each once: the two WORKER
+# programs in the one spawn file (their lines pinned by check_he005c_markers), and the signed configuration's compiled
+# key and small-order table, the observer's items token for token (check_broker_load (b)).
+BROKER_BYTES_ALLOWED = {BROKER_SPAWN: {"WORKER_X86_64": "&[u8", "WORKER_AARCH64": "&[u8"},
+                        BROKER_SIGNED_CONFIG: {"COMPILED_KEY": "&[u8]", "SMALL_ORDER_Y": "[[u8"}}
+# HE-005C, MON-SEAM-E3 (2026-10-31; the owner's "Exact qualified-form exception (Recommended)" for Q-U3-1): the seam's
+# ChannelEnd (seam sections 2 and 3) and the outcome's Step::Bind (seam section 6) are spelled like two of HE-005B's type
+# names, which G-HE5B-1 (b) refuses as words in every other broker source. (b) excepts only these path-qualified forms,
+# each in its named file, blanked before it reads: in lifecycle/ops.rs `type ChannelEnd;` and `Self::ChannelEnd`; in
+# lifecycle/run.rs `S::ChannelEnd`; in lifecycle/spawn.rs `type ChannelEnd = broker_sys::ChannelEnd;` and
+# `broker_sys::ChannelEnd`; in lifecycle/outcome.rs the one `enum Step`'s unit variant `Bind`; elsewhere, read as the
+# lifecycle's other files, `Step::Bind`. No qualified form follows another `::`. A bare name, any other form, or a listed
+# form in another file is still refused; (a), (c) and (d) are unchanged.
+SEAM_QUALIFIED_FORMS = {
+    BROKER_OPS: (re.compile(r"\btype\s+ChannelEnd\s*;"), re.compile(r"(?<!::)\bSelf::ChannelEnd\b")),
+    BROKER_RUN: (re.compile(r"(?<!::)\bS::ChannelEnd\b"),),
+    BROKER_SPAWN: (re.compile(r"\btype\s+ChannelEnd\s*=\s*broker_sys::ChannelEnd\s*;"),
+                   re.compile(r"(?<!::)\bbroker_sys::ChannelEnd\b")),
+}
+STEP_ENUM = re.compile(r"\benum\s+Step\s*\{")
+STEP_BIND_VARIANT = re.compile(r"(?<=[{,])\s*Bind(?=\s*[,}])")
+STEP_BIND_PATH = re.compile(r"(?<!::)\bStep::Bind\b")
+
+
+def seam_qualified_blanked(rel: str, code: str) -> str:
+    """MON-SEAM-E3: `code` (a broker source read as he005b_codes reads it) with exactly the qualified forms its own file
+    may hold replaced by spaces of their length: SEAM_QUALIFIED_FORMS, outcome.rs's one `enum Step`'s one unit variant
+    `Bind`, and `Step::Bind` in the lifecycle's files. Anything else stays for G-HE5B-1 (b) to read."""
+    def blank(match: re.Match) -> str:
+        return " " * len(match.group(0))
+    for pattern in SEAM_QUALIFIED_FORMS.get(rel, ()):
+        code = pattern.sub(blank, code)
+    if rel == BROKER_OUTCOME:
+        enums = list(STEP_ENUM.finditer(code))
+        if len(enums) == 1:
+            opening = enums[0].end() - 1
+            end = block_end(code, opening)
+            variants = list(STEP_BIND_VARIANT.finditer(code, opening, end))
+            if len(variants) == 1:
+                code = code[:variants[0].start()] + blank(variants[0]) + code[variants[0].end():]
+    if rel in BROKER_LIFECYCLE_FILES:
+        code = STEP_BIND_PATH.sub(blank, code)
+    return code
+
+
+def configured_site_tail(code: str, body: int, statement: re.Match, rel: str) -> int:
+    """HE-005C, G-HE5C-13 (delta C3, C3-3; Q-HE5C-1 (a)), the configured site form of check_seal_order: from main's body
+    at `body` (main.rs read without comments, literal contents emptied), the stage-1 statement exactly; then exactly the
+    two configuration statements, CONFIG_LOAD_STATEMENT (binding the document) and CONFIG_PARSE_STATEMENT over that
+    document (binding the configuration); nothing else before the stage-2 `statement`; four distinct bindings; then
+    exactly CONFIGURED_TAIL, `drop(<document>); ExitCode::from(serve(&<stage-2 binding>, <configuration>))`, closing
+    main. Returns the index after main's closing brace."""
+    first = STAGE1_STATEMENT.match(code, body)
+    require(first and first.group(2) == first.group(3) and first.group(4) == first.group(5),
+            "the first stage is not exactly `let <name> = match seal_stage1() { Ok(<x>) => <x>, Err(<e>) => return "
+            "ExitCode::from(status::seal(&<e>)), };` (seal-order grammar)")
+    load = CONFIG_LOAD_STATEMENT.match(code, first.end())
+    require(load and load.group(2) == load.group(3),
+            "after the first stage %s does not load the signed configuration with exactly `let <d> = match "
+            "signed_config::load() { Ok(<x>) => <x>, Err(LoadError::Read) => return ExitCode::from(status::CONFIG_READ), "
+            "Err(LoadError::Signature(_)) => return ExitCode::from(status::CONFIG_SIGNATURE), };` (seal-order grammar)"
+            % rel)
+    document = load.group(1)
+    parse = re.compile(CONFIG_PARSE_STATEMENT % re.escape(document)).match(code, load.end())
+    require(parse and parse.group(2) == parse.group(3),
+            "after the load %s does not parse the document with exactly `let <c> = match BrokerConfig::parse(&<d>) { "
+            "Ok(<y>) => <y>, Err(_) => return ExitCode::from(status::CONFIG_CHECK), };` (seal-order grammar)" % rel)
+    config = parse.group(1)
+    require(statement.start() >= parse.end() and not code[parse.end():statement.start()].strip(),
+            "%s runs something between the configuration's parse and the second stage (seal-order grammar)" % rel)
+    require(len({first.group(1), document, config, statement.group(1)}) == 4,
+            "the configured site's four bindings (the two stages, the document, the configuration) are not distinct "
+            "names (seal-order grammar)")
+    tail = re.compile(CONFIGURED_TAIL % (re.escape(document), re.escape(statement.group(1)), re.escape(config))).match(
+        code, statement.end())
+    require(tail, "after the second stage %s does not end main with exactly `drop(<the document>); ExitCode::from(serve("
+            "&<the stage-2 binding>, <the configuration>))` (seal-order grammar)" % rel)
+    return tail.end()
+
+
+# HE-005C (the frozen seam note sections 1-3 and 3.5; the HE-005C plan's G-HE5C-1..8; delta C3's G-HE5C-9..13; the build
+# brief's addenda 1 and 2): the rules over broker-sys's audited module and the broker's lifecycle, each clause its own
+# function, so the mutation proof can name it. Each rule states its reading scope (RAW-R1-4, RAW-R2-3): code (comments
+# removed, the whitespace around `::` removed, literal contents emptied unless it says literals kept) or raw text; strict
+# test blocks blanked (non-test) or kept (tests included).
+
+def he005c_raw(base: Path, rule: str) -> tuple[str, str, str, str]:
+    """raw.rs as (raw text, code with tests, code without tests, code with literals kept and tests): comments removed,
+    the whitespace around `::` removed, literal contents emptied in the two middle forms."""
+    rel = BROKER_SYS_RAW
+    require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    raw = (base / rel).read_text(encoding="utf-8")
+    try:
+        code_all = PATH_SPACE.sub("::", rust_code(raw))
+        return raw, code_all, blank_test_blocks(code_all), PATH_SPACE.sub("::", rust_code(raw, literals=True))
+    except GateError as error:
+        raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+
+
+def he005c_codes(base: Path, crates: tuple[str, ...], rule: str, literals: bool = False,
+                 tests: bool = False) -> dict[str, str]:
+    """The src/ sources of `crates` (observer_sources), comments removed and the whitespace around `::` removed: literal
+    contents emptied (kept with `literals`), strict test blocks blanked (kept with `tests`)."""
+    codes = {}
+    for rel, raw in observer_sources(base, crates):
+        try:
+            code = PATH_SPACE.sub("::", rust_code(raw, literals=literals))
+            codes[rel] = code if tests else blank_test_blocks(code)
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (rel, error, rule)) from None
+    return codes
+
+
+def he005c_tokens(code: str, start: int, end: int) -> str:
+    """pinned_text's form: `code` from where the item before `start` ends (the previous `}`, `;` or `{`) to `end`, as
+    LINK_TOKEN tokens joined by single spaces, so the item's attributes count and whitespace does not."""
+    prefix = max(code.rfind("}", 0, start), code.rfind(";", 0, start), code.rfind("{", 0, start)) + 1
+    return " ".join(LINK_TOKEN.findall(code[prefix:end]))
+
+
+def he005c_fn(code: str, rel: str, name: str, rule: str) -> tuple[int, int, int]:
+    """(the start of `fn`, its body's `{`, the index after its `}`) of the one fn `name` in `code`; none or several
+    refuse."""
+    spans = [span for span in function_bodies(code) if span[0] == name]
+    require(len(spans) == 1, "%s does not define exactly one fn %s (%s)" % (rel, name, rule))
+    return spans[0][1], spans[0][2], spans[0][3]
+
+
+def he005c_fn_text(code: str, rel: str, name: str, rule: str) -> str:
+    """The one fn `name` of `code`, attributes and signature included, as he005c_tokens reads it."""
+    start, _, end = he005c_fn(code, rel, name, rule)
+    return he005c_tokens(code, start, end)
+
+
+def he005c_item_text(code: str, rel: str, pattern: re.Pattern, rule: str, what: str) -> str:
+    """The one item `pattern` finds in `code` (a struct, enum, trait or impl), from its attributes to its closing `}` or
+    `;`, as he005c_tokens reads it; none or several refuse."""
+    found = list(pattern.finditer(code))
+    require(len(found) == 1, "%s does not hold exactly one %s (%s)" % (rel, what, rule))
+    start = found[0].start()
+    brace, semi = code.find("{", found[0].end() - 1), code.find(";", found[0].end() - 1)
+    require(brace >= 0 or semi >= 0, "%s's %s does not end (%s)" % (rel, what, rule))
+    end = semi + 1 if semi >= 0 and (brace < 0 or semi < brace) else block_end(code, brace)
+    return he005c_tokens(code, start, end)
+
+
+# The plan's G-HE5C-1 (H5E-16, H5G-3): the span, clone_span (the parent's block-all, clone3, the child path on its
+# return-0 branch, the restore) and child_path (the child's path to its last call), each pinned by the sha256 of its
+# text from its attributes to its closing brace, read without comments and with literals kept, as LINK_TOKEN tokens
+# joined by single spaces (G-D1-7's form, hashed); any edit refuses and needs a new pin. G-HE5C-2 (H5E-3) restates the
+# order the pins hold, and G-HE5C-3 the calls and operations they may hold, so each refusal names its reason.
+SPAN_PINS = {"clone_span": "f3487c636d0ac7b133617e9d2f6491ce8a71bf575ba5f75aa184ff3bc9091570",
+             "child_path": "0a9684c3eb62eb4770692265882f11ae137521c83158ee108025b792a6209f0c"}
+SPAN_CALLS = {
+    "clone_span": (
+        ("SYS_RT_SIGPROCMASK", ("SIG_SETMASK", "values.all_signals", "values.saved_mask", "SIGSET_BYTES", "0", "0")),
+        ("SYS_CLONE3", ("values.clone_args", "CLONE_ARGS_BYTES", "0", "0", "0", "0")),
+        ("SYS_RT_SIGPROCMASK", ("SIG_SETMASK", "values.saved_mask", "0", "SIGSET_BYTES", "0", "0"))),
+    "child_path": (
+        ("SYS_RT_SIGPROCMASK", ("SIG_SETMASK", "values.all_signals", "0", "SIGSET_BYTES", "0", "0")),
+        ("SYS_RT_SIGACTION", ("signal", "values.default_action", "0", "SIGSET_BYTES", "0", "0")),
+        ("SYS_DUP3", ("values.channel", "WORKER_CHANNEL_FD", "0", "0", "0", "0")),
+        ("SYS_DUP3", ("values.script", "WORKER_SCRIPT_FD", "0", "0", "0", "0")),
+        ("SYS_CLOSE_RANGE", ("FIRST_FREE_FD", "CLOSE_RANGE_LAST", "0", "0", "0", "0")),
+        ("SYS_RT_SIGPROCMASK", ("SIG_SETMASK", "values.no_signals", "0", "SIGSET_BYTES", "0", "0")),
+        ("SYS_SETRESGID", ("values.worker_id", "values.worker_id", "values.worker_id", "0", "0", "0")),
+        ("SYS_SETRESUID", ("values.worker_id", "values.worker_id", "values.worker_id", "0", "0", "0")),
+        ("SYS_CAPSET", ("values.cap_header", "values.cap_data", "0", "0", "0", "0")),
+        ("SYS_PRCTL", ("PR_SET_NO_NEW_PRIVS", "1", "0", "0", "0", "0")),
+        ("SYS_SECCOMP", ("SECCOMP_SET_MODE_FILTER", "0", "values.worker_program", "0", "0", "0")),
+        ("SYS_EXECVEAT", ("WORKER_SCRIPT_FD", "values.empty_path", "values.argv", "values.envp", "AT_EMPTY_PATH", "0")),
+        ("SYS_EXIT_GROUP", ("EXIT_STATUS", "0", "0", "0", "0", "0"))),
+}
+SPAN_CONSTANTS = {"SIG_SETMASK": 2, "SIGSET_BYTES": 8, "CLONE_ARGS_BYTES": 88, "WORKER_CHANNEL_FD": 3,
+                  "WORKER_SCRIPT_FD": 4, "FIRST_FREE_FD": 5, "CLOSE_RANGE_LAST": 0xFFFF_FFFF, "PR_SET_NO_NEW_PRIVS": 38,
+                  "SECCOMP_SET_MODE_FILTER": 1, "AT_EMPTY_PATH": 0x1000, "EXIT_STATUS": 127}
+SPAN_CALLEES = ("call", "child_path")
+SPAN_FORBIDDEN = re.compile(r"[-+*/%^|&?!]|\.\.|\b(?:as|unsafe|Box|Vec|String)\b")
+RAW_CALL = re.compile(r"(?<![\w.])raw\.call\s*\(")
+RESET_SIGNALS_ITEM = re.compile(r"\bconst\s+RESET_SIGNALS\s*:\s*\[\s*c_long\s*;\s*62\s*\]\s*=\s*\[([^\]]*)\]\s*;")
+RESET_LOOP = re.compile(r"\bfor\s+signal\s+in\s+RESET_SIGNALS\s*\{")
+UNBLOCK_BEFORE_SETRESGID = re.compile(
+    r"\bif\s+raw\.call\s*\(\s*SYS_RT_SIGPROCMASK\s*,\s*\[\s*SIG_SETMASK\s*,\s*values\.no_signals\s*,[^\]]*\]\s*\)\s*<\s*0\s*"
+    r"\{\s*break\s+'steps\s*;\s*\}\s*if\s+raw\.call\s*\(\s*SYS_SETRESGID\s*,")
+CLONE3_BINDING = re.compile(r"\blet\s+pid\s*=\s*raw\.call\s*\(\s*SYS_CLONE3\s*,")
+CHILD_PATH_BRANCH = re.compile(r"\bif\s+pid\s*==\s*0\s*\{\s*child_path\s*\(\s*raw\s*,\s*values\s*\)\s*;\s*\}")
+
+
+def span_calls(body: str) -> list[tuple[str, tuple[str, ...]]]:
+    """Each `raw.call(<number>, [<six>])` of a span body (literal contents emptied), as (the number, the array's
+    arguments); a call of another shape gives an empty tuple."""
+    calls = []
+    for match in RAW_CALL.finditer(body):
+        arguments = call_arguments(body, match.end() - 1)
+        array = arguments[1] if len(arguments) == 2 else ""
+        calls.append((arguments[0] if arguments else "", tuple(call_arguments(array, 0)) if array.startswith("[") else ()))
+    return calls
+
+
+def check_child_span(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-1..3 (H5E-3, H5E-16, H5G-3; the frozen seam note section 3.5): broker-sys's span, each
+    clause its own function: (1) span_1_pinned, (2) span_2_order, (3) span_3_calls. Reading scope: raw.rs's code; (1)
+    with literals kept over the whole file, (2) and (3) with literal contents emptied and strict test blocks blanked.
+    The number of raw calls in the span."""
+    rule = "child-path span, G-HE5C-1..3"
+    _, _, code, kept = he005c_raw(base, rule)
+    span_1_pinned(kept, rule)
+    span_2_order(code, rule)
+    return span_3_calls(code, rule)
+
+
+def span_1_pinned(kept: str, rule: str) -> None:
+    """G-HE5C-1: clone_span and child_path, each read from its attributes to its closing brace (he005c_fn_text), start
+    `#[inline(never)] fn <name><` (G-HE5C-9's marker form) and hash to SPAN_PINS."""
+    for name, digest in SPAN_PINS.items():
+        text = he005c_fn_text(kept, BROKER_SYS_RAW, name, rule)
+        require(text.startswith("# [ inline ( never ) ] fn %s <" % name), "%s's %s is not directly `#[inline(never)] "
+                "fn %s<` (%s (1))" % (BROKER_SYS_RAW, name, name, rule))
+        require(sha256(text.encode()) == digest, "%s's %s differs from its pinned text (sha256 %s) (%s (1))"
+                % (BROKER_SYS_RAW, name, digest, rule))
+
+
+def span_2_order(code: str, rule: str) -> None:
+    """G-HE5C-2 (H5E-3): each span function's raw calls are exactly SPAN_CALLS, in order (the parent's block-all, clone3
+    and restore; the child's block-all, the reset of every disposition but SIGKILL's and SIGSTOP's, the two dup3s,
+    close_range, the unblock, setresgid, setresuid, capset, no_new_privs, the WORKER filter, execveat of fd 4 and
+    exit_group); the reset is the one call inside the one `for signal in RESET_SIGNALS {`, and RESET_SIGNALS, defined
+    once, is 1..64 without 9 and 19; the unblock's statement directly precedes setresgid's; clone3's result is `pid`,
+    and `if pid == 0 { child_path(raw, values); }` lies between clone3 and the restore; SPAN_CONSTANTS are each defined
+    once with their pinned values."""
+    rel = BROKER_SYS_RAW
+    bodies = {}
+    for name, expected in SPAN_CALLS.items():
+        _, opening, end = he005c_fn(code, rel, name, rule)
+        bodies[name] = code[opening:end]
+        found = span_calls(bodies[name])
+        require(found == list(expected), "%s's %s makes the raw calls %s, not exactly %s with their pinned arguments, in "
+                "this order (%s (2))" % (rel, name, [number for number, _ in found], [number for number, _ in expected],
+                                         rule))
+    child = bodies["child_path"]
+    loops = list(RESET_LOOP.finditer(child))
+    require(len(loops) == 1, "%s's child_path does not hold exactly one `for signal in RESET_SIGNALS {` (%s (2))"
+            % (rel, rule))
+    inside = child[loops[0].end() - 1:block_end(child, loops[0].end() - 1)]
+    require([number for number, _ in span_calls(inside)] == ["SYS_RT_SIGACTION"],
+            "%s's reset loop does not hold exactly the one rt_sigaction call (%s (2))" % (rel, rule))
+    signals = RESET_SIGNALS_ITEM.findall(code)
+    require(defined_once(code, "RESET_SIGNALS") and len(signals) == 1
+            and [value.strip() for value in signals[0].split(",") if value.strip()]
+            == [str(signal) for signal in range(1, 65) if signal not in (9, 19)],
+            "%s's RESET_SIGNALS is not defined once as exactly 1..64 without 9 and 19 (%s (2))" % (rel, rule))
+    require(len(UNBLOCK_BEFORE_SETRESGID.findall(child)) == 1,
+            "%s's unblock is not the statement directly before setresgid (%s (2))" % (rel, rule))
+    clone = bodies["clone_span"]
+    binding, branch = list(CLONE3_BINDING.finditer(clone)), list(CHILD_PATH_BRANCH.finditer(clone))
+    restores = [match.start() for match in re.finditer(r"\braw\.call\s*\(\s*SYS_RT_SIGPROCMASK\b", clone)]
+    require(len(binding) == 1 and len(branch) == 1 and len(restores) == 2
+            and binding[0].start() < branch[0].start() < restores[1],
+            "%s's clone_span does not bind clone3's result as `pid` and run `if pid == 0 { child_path(raw, values); }` "
+            "between clone3 and the restore (%s (2))" % (rel, rule))
+    for name, value in SPAN_CONSTANTS.items():
+        require(defined_once(code, name, value), "%s does not define %s once as %#x (%s (2))" % (rel, name, value, rule))
+
+
+def span_3_calls(code: str, rule: str) -> int:
+    """G-HE5C-3 (H5E-16): in each span body every call is `raw.call(<n>, [<six>])` with <n> one of the call numbers
+    pinned for both targets (BROKER_SYS_NUMBERS) or clone_span's one `child_path(raw, values)`; every `[` is a raw call's
+    argument array (no index or slice); and it holds no `+ - * / % ^ | & ? !`, `..`, `as`, `unsafe`, Box, Vec or String
+    (no arithmetic, conversion, macro or other operation that can panic or allocate). The number of raw calls."""
+    rel = BROKER_SYS_RAW
+    numbers = set(BROKER_SYS_NUMBERS["x86_64"]) & set(BROKER_SYS_NUMBERS["aarch64"])
+    total, children = 0, 0
+    for name in SPAN_CALLS:
+        _, opening, end = he005c_fn(code, rel, name, rule)
+        body = code[opening:end]
+        callees = re.findall(r"([A-Za-z_]\w*)\s*\(", body)
+        require(set(callees) <= set(SPAN_CALLEES), "%s's %s calls %s; the span calls only raw.call and the child path "
+                "(%s (3))" % (rel, name, ", ".join(sorted(set(callees) - set(SPAN_CALLEES))), rule))
+        raw_calls = len(RAW_CALL.findall(body))
+        require(raw_calls == callees.count("call"), "%s's %s calls `call` other than as raw.call (%s (3))"
+                % (rel, name, rule))
+        for number, arguments in span_calls(body):
+            require(number in numbers and len(arguments) == 6, "%s's %s makes a raw call with %r and %d array "
+                    "arguments, not a pinned call number and six (%s (3))" % (rel, name, number[:40], len(arguments), rule))
+        require(body.count("[") == raw_calls and body.count("]") == raw_calls, "%s's %s holds a `[` other than a raw "
+                "call's argument array (an index or a slice) (%s (3))" % (rel, name, rule))
+        found = SPAN_FORBIDDEN.search(body)
+        require(not found, "%s's %s holds `%s`, which the span may not hold (%s (3))"
+                % (rel, name, found.group(0) if found else "", rule))
+        children += callees.count("child_path")
+        total += raw_calls
+    require(children == 1, "the span calls child_path other than once (%s (3))" % rule)
+    return total
+
+
+# The plan's G-HE5C-4 (DESIGN-HE005 section 3.2; SM-R1-22: it spans the seam; RAW-R1-4): clone3 and execveat are each
+# called at exactly one site of raw.rs's non-test code, in the span (call sites, not names in the numbers modules, the
+# tests or comments). The raw half: the exec's descriptor is the script the plan carries (EXEC_RAW_FORMS once each,
+# ChildValues' shorthand field `script,`, `values.script` only as the dup3 to WORKER_SCRIPT_FD, execveat of
+# WORKER_SCRIPT_FD by SPAN_CALLS). The agent half: the script W5 opens is the one it measures and the one W2's plan
+# takes, bound once and never rebound (EXEC_AGENT_FORMS once each in their functions, which name `script` exactly
+# EXEC_SCRIPT_WORDS times; spawn.measure, spawn.open_script and spawn.plan once each in run.rs).
+EXEC_ONCE = {"SYS_CLONE3": "clone_span", "SYS_EXECVEAT": "child_path"}
+NUMBERS_MODULE_CODE = re.compile(r'#\s*\[\s*cfg\s*\(\s*target_arch\s*=\s*""\s*\)\s*\]\s*mod\s+numbers\s*\{')
+EXEC_RAW_FORMS = (
+    re.compile(r"\blet\s+script\s*=\s*plan\.script\.fd\.as_raw_fd\s*\(\s*\)\s+as\s+c_long\s*;"),
+    re.compile(r"\bChildValues\s*\{[^{}]*\bscript\s*,"),
+    re.compile(r"\blet\s+values\s*=\s*ChildValues::of\s*\(\s*&\s*mut\s+plan\s*\)\s*;"),
+    re.compile(r"\bclone_span\s*\(\s*&\s*mut\s+Kernel\s*,\s*&\s*values\s*\)"),
+)
+EXEC_AGENT_FORMS = (
+    (BROKER_RUN, "w5", re.compile(r"\blet\s+script\s*=\s*spawn\.open_script\s*\(\s*\)\s*\.map_err\s*\(\s*\|\s*_\s*\|\s*"
+                                  r"Step::W5Open\s*\)\s*\?\s*;")),
+    (BROKER_RUN, "w5", re.compile(r"\blet\s*\(\s*algorithm\s*,\s*digest\s*\)\s*=\s*spawn\.measure\s*\(\s*&\s*script\s*\)\s*"
+                                  r"\.map_err\s*\(\s*\|\s*_\s*\|\s*Step::W5Measure\s*\)\s*\?\s*;")),
+    (BROKER_RUN, "w5", re.compile(r"\bOk\s*\(\s*\(\s*script\s*,\s*pair\s*\)\s*\)")),
+    (BROKER_RUN, "startup", re.compile(r"\blet\s*\(\s*script\s*,\s*\(\s*_parent_end\s*,\s*child_end\s*\)\s*\)\s*=\s*match\s+"
+                                       r"w5\s*\(\s*spawn\s*,\s*config\s*\)\s*\{")),
+    (BROKER_RUN, "startup", re.compile(r"\bw2\s*\(\s*spawn\s*,\s*config\.worker_uid\s*\(\s*\)\s*,\s*child_end\s*,\s*script\s*"
+                                       r"\)")),
+    (BROKER_RUN, "w2", re.compile(r"\bspawn\.plan\s*\(\s*worker_uid\s*,\s*child_end\s*,\s*script\s*\)")),
+    (BROKER_SPAWN, "measure", re.compile(r"^\{\s*broker_sys::measure_verity\s*\(\s*script\s*\)\s*\}$")),
+    (BROKER_SPAWN, "plan", re.compile(r"\bChildPlan::new\s*\(\s*worker_uid\s*,\s*match\s+RUNNING_ARCH\s*\{[^{}]*\}\s*,\s*"
+                                      r"child_end\s*,\s*script\s*,?\s*\)")),
+)
+EXEC_SCRIPT_WORDS = {(BROKER_RUN, "w5"): 3, (BROKER_RUN, "startup"): 2, (BROKER_RUN, "w2"): 1, (BROKER_SPAWN, "measure"): 1,
+                     (BROKER_SPAWN, "plan"): 1}
+EXEC_RUN_METHODS = ("open_script", "measure", "plan")
+
+
+def numbers_blanked(code: str) -> str:
+    """`code` (literal contents emptied) with each numbers module's body (NUMBERS_MODULE_CODE) blanked."""
+    for module in reversed(list(NUMBERS_MODULE_CODE.finditer(code))):
+        end = block_end(code, module.end() - 1)
+        code = code[:module.end()] + " " * (end - 1 - module.end()) + code[end - 1:]
+    return code
+
+
+def check_measured_exec(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-4, each clause its own function: (a) exec_a_once, (b) exec_b_raw, (c) exec_c_agent.
+    Reading scope: code, literal contents emptied, non-test (raw.rs for (a) and (b); crates/broker's src for (c)). The
+    number of pinned forms."""
+    rule = "measured exec, G-HE5C-4"
+    _, _, code, _ = he005c_raw(base, rule)
+    exec_a_once(code, rule)
+    exec_b_raw(code, rule)
+    exec_c_agent(he005c_codes(base, (BROKER_CRATE,), rule), rule)
+    return len(EXEC_ONCE) + len(EXEC_RAW_FORMS) + len(EXEC_AGENT_FORMS)
+
+
+def exec_a_once(code: str, rule: str) -> None:
+    """G-HE5C-4 (a) (RAW-R1-4): outside the numbers modules, each of clone3's and execveat's numbers is named once, as the
+    first argument of the one raw.call or sys call that names it, and that call lies in its span function."""
+    rel = BROKER_SYS_RAW
+    outside = numbers_blanked(code)
+    for number, function in EXEC_ONCE.items():
+        sites = list(re.finditer(r"(?:(?<![\w.])raw\.call|(?<![\w.:])sys)\s*\(\s*%s\s*," % number, outside))
+        require(len(sites) == 1 and len(re.findall(r"\b%s\b" % number, outside)) == 1,
+                "%s's non-test code calls %s other than at exactly one site (%s (a))" % (rel, number, rule))
+        _, opening, end = he005c_fn(code, rel, function, rule)
+        require(opening < sites[0].start() < end, "%s's one %s call is not in %s (%s (a))" % (rel, number, function, rule))
+
+
+def exec_b_raw(code: str, rule: str) -> None:
+    """G-HE5C-4 (b), the raw half: EXEC_RAW_FORMS once each (ChildValues::of's script from the plan, its shorthand
+    field, spawn's one ChildValues and one clone_span), and `values.script` once (span_2_order pins it as the dup3 to
+    WORKER_SCRIPT_FD, and execveat of WORKER_SCRIPT_FD)."""
+    rel = BROKER_SYS_RAW
+    for pattern in EXEC_RAW_FORMS:
+        require(len(pattern.findall(code)) == 1, "%s does not hold exactly one `%s` (%s (b))"
+                % (rel, pattern.pattern[:60], rule))
+    require(len(re.findall(r"\bvalues\.script\b", code)) == 1,
+            "%s names values.script other than once, as the dup3 to WORKER_SCRIPT_FD (%s (b))" % (rel, rule))
+
+
+def exec_c_agent(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-4 (c), the agent half: each of EXEC_AGENT_FORMS once in its function's body, which names `script` exactly
+    EXEC_SCRIPT_WORDS times; spawn.open_script, spawn.measure and spawn.plan once each in run.rs."""
+    for rel, _, _ in EXEC_AGENT_FORMS:
+        require(rel in codes, "%s is missing (%s (c))" % (rel, rule))
+    for rel, function, pattern in EXEC_AGENT_FORMS:
+        _, opening, end = he005c_fn(codes[rel], rel, function, rule)
+        body = codes[rel][opening:end]
+        require(len(pattern.findall(body.strip() if pattern.pattern.startswith("^") else body)) == 1,
+                "%s's %s does not hold exactly one `%s` (%s (c))" % (rel, function, pattern.pattern[:60], rule))
+    for (rel, function), count in EXEC_SCRIPT_WORDS.items():
+        _, opening, end = he005c_fn(codes[rel], rel, function, rule)
+        require(len(re.findall(r"\bscript\b", codes[rel][opening:end])) == count,
+                "%s's %s names script other than its %d pinned times (a rebinding or another use) (%s (c))"
+                % (rel, function, count, rule))
+    for method in EXEC_RUN_METHODS:
+        require(len(re.findall(r"\bspawn\.%s\s*\(" % method, codes[BROKER_RUN])) == 1,
+                "%s calls spawn.%s other than once (%s (c))" % (BROKER_RUN, method, rule))
+
+
+# The plan's G-HE5C-5 (H5D-10), a rule over the state machine (and the startup tests): (a) W4's thaw is exactly
+# W4_THAW_TEXT, taking W3's pass and the accepted BIND's ticket; (b) W3Passed is closed (W3_PASSED_TEXT: private, no
+# derive), named only by W3_PASSED_FORMS in run.rs, made only by w3's one literal, and no broker source but seams.rs's
+# definition writes a BindTicket literal, so the ticket comes from the binder; (c) w4_thaw is called once, in startup,
+# after W3's pass and BIND's ticket are bound and before NP-9's bracket, and the leaf's thaw (LeafWrite::Thaw) is written
+# only in THAW_SITES: w4_thaw, W1's failure-thaw of the empty leaf, W6's release of the empty leaf and NP-9's bracket.
+W4_THAW_TEXT = ("# [ inline ( never ) ] fn w4_thaw < L : LeafOps > ( leaf : & mut L , _passed : & W3Passed , _bound : & "
+                "BindTicket ) - > io : : Result < ( ) > { leaf . write ( LeafWrite : : Thaw ) }")
+W3_PASSED_TEXT = "struct W3Passed { start_ticks : u64 , }"
+W3_PASSED_FORMS = (re.compile(r"\bstruct\s+W3Passed\s*\{"), re.compile(r"->\s*Result\s*<\s*W3Passed\s*,\s*Step\s*>"),
+                   re.compile(r"\bOk\s*\(\s*W3Passed\s*\{\s*start_ticks\s*\}\s*\)"),
+                   re.compile(r"\b_passed\s*:\s*&\s*W3Passed\b"))
+THAW_SITES = {(BROKER_RUN, "w1_failure"): 1, (BROKER_RUN, "w4_thaw"): 1, (BROKER_W6, "sequence"): 1,
+              (BROKER_NP9, "bracket"): 2}
+# HE-005C PR review round 1, R1-1 (Q-HE5C-R1-1 (a)): (c)'s call-site construction for the run's other steps. Each name,
+# counted over the broker's sources (comments removed, literal contents emptied, non-test), is its fn in run.rs plus
+# exactly its calls there, each inside its one pinned enclosing fn, as the code at 48cd924f has them: W5, W1, W2 and W3
+# once each and W6's entry (after_w6) eight times, all in startup, and startup once, in startup_run. So no other fn
+# runs a W-step before the run's step 2, or around it. (b)'s literal rule covers both seam tickets (SEAM_TICKETS).
+RUN_CALL_SITES = {"w5": ("startup", 1), "w1": ("startup", 1), "w2": ("startup", 1), "w3": ("startup", 1),
+                  "after_w6": ("startup", 8), "startup": ("startup_run", 1)}
+SEAM_TICKETS = ("BindTicket", "GateTicket")
+W4_CALL = re.compile(r"\bw4_thaw\s*\(\s*leaf\s*,\s*&\s*passed\s*,\s*&\s*bound\s*\)")
+W3_BINDING = re.compile(r"\blet\s+passed\s*=\s*match\s+w3\s*\(")
+BIND_BINDING = re.compile(r"\blet\s+bound\s*=\s*match\s+binder\.bind\s*\(\s*&\s*gate\s*,\s*pid\s*,\s*passed\.start_ticks\s*\)"
+                          r"\s*\{")
+NP9_CALL = re.compile(r"\bnp9::bracket\s*\(")
+
+
+def check_w4_thaw(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-5, each clause its own function: (a) thaw_a_exact, (b) thaw_b_pass, (c) thaw_c_order.
+    Reading scope: crates/broker's src, code, non-test; literals kept for (a), literal contents emptied for (b) and (c).
+    The number of thaw sites."""
+    rule = "W4 thaw, G-HE5C-5"
+    codes = he005c_codes(base, (BROKER_CRATE,), rule)
+    require(BROKER_RUN in codes, "%s is missing (%s)" % (BROKER_RUN, rule))
+    thaw_a_exact(he005c_codes(base, (BROKER_CRATE,), rule, literals=True)[BROKER_RUN], rule)
+    thaw_b_pass(codes, rule)
+    thaw_c_order(codes, rule)
+    return sum(THAW_SITES.values())
+
+
+def thaw_a_exact(kept: str, rule: str) -> None:
+    """G-HE5C-5 (a): run.rs's w4_thaw, attributes to closing brace, is exactly W4_THAW_TEXT."""
+    require(he005c_fn_text(kept, BROKER_RUN, "w4_thaw", rule) == W4_THAW_TEXT,
+            "%s's w4_thaw is not exactly `#[inline(never)] fn w4_thaw<L: LeafOps>(leaf: &mut L, _passed: &W3Passed, "
+            "_bound: &BindTicket) -> io::Result<()> { leaf.write(LeafWrite::Thaw) }` (%s (a))" % (BROKER_RUN, rule))
+
+
+def thaw_b_pass(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-5 (b): W3Passed is exactly W3_PASSED_TEXT, named in run.rs only by W3_PASSED_FORMS (once each; its one
+    literal inside w3) and in no other broker source; the only `BindTicket {` is seams.rs's definition. PR review round
+    1, R1-1: likewise the only `GateTicket {` (SEAM_TICKETS), so step 2's ticket comes from the qualifier's answer."""
+    run = codes[BROKER_RUN]
+    require(he005c_item_text(run, BROKER_RUN, re.compile(r"\bstruct\s+W3Passed\b"), rule, "struct W3Passed")
+            == W3_PASSED_TEXT, "%s's W3Passed is not exactly `struct W3Passed { start_ticks: u64, }` (%s (b))"
+            % (BROKER_RUN, rule))
+    require(all(len(pattern.findall(run)) == 1 for pattern in W3_PASSED_FORMS)
+            and len(re.findall(r"\bW3Passed\b", run)) == len(W3_PASSED_FORMS),
+            "%s names W3Passed other than its definition, w3's return type, w3's one literal and w4_thaw's parameter "
+            "(%s (b))" % (BROKER_RUN, rule))
+    _, opening, end = he005c_fn(run, BROKER_RUN, "w3", rule)
+    require(W3_PASSED_FORMS[2].search(run[opening:end]), "W3Passed's one literal is not in %s's w3 (%s (b))"
+            % (BROKER_RUN, rule))
+    for rel, code in sorted(codes.items()):
+        require(rel == BROKER_RUN or not re.search(r"\bW3Passed\b", code), "%s names W3Passed (%s (b))" % (rel, rule))
+        for ticket in SEAM_TICKETS:
+            literals = len(re.findall(r"\b%s\s*\{" % ticket, code))
+            require(literals == (1 if rel == BROKER_SEAMS else 0)
+                    and (rel != BROKER_SEAMS or re.search(r"\bstruct\s+%s\s*\{" % ticket, code)),
+                    "%s writes a %s literal; only its seam's answer carries one (%s (b))" % (rel, ticket, rule))
+
+
+def thaw_c_order(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-5 (c): w4_thaw is named only in run.rs, as its fn and one W4_CALL in startup, after startup's one
+    W3_BINDING and one BIND_BINDING and before its one NP9_CALL; LeafWrite::Thaw is written exactly at THAW_SITES (by
+    enclosing fn), and the word Thaw occurs nowhere else. PR review round 1, R1-1: each of RUN_CALL_SITES is named only
+    in run.rs, as its one fn and exactly its pinned number of calls, each inside its pinned enclosing fn."""
+    run = codes[BROKER_RUN]
+    for rel, code in sorted(codes.items()):
+        require(len(re.findall(r"\bw4_thaw\b", code)) == (2 if rel == BROKER_RUN else 0),
+                "%s names w4_thaw other than run.rs's fn and its one call (%s (c))" % (rel, rule))
+    spans = function_bodies(run)
+    for name, (owner, count) in RUN_CALL_SITES.items():
+        calls = [match for match in re.finditer(r"\b%s\s*\(" % name, run)
+                 if not re.search(r"\bfn\s+$", run[:match.start()])]
+        owners = [([span[0] for span in spans if span[2] < match.start() < span[3]] or [""])[-1] for match in calls]
+        total = sum(len(re.findall(r"\b%s\b" % name, code)) for code in codes.values())
+        require(len([span for span in spans if span[0] == name]) == 1 and len(calls) == count
+                and owners == [owner] * count and total == 1 + count,
+                "the broker names %s other than as run.rs's fn and exactly %d call%s in %s (%s (c))"
+                % (name, count, "" if count == 1 else "s", owner, rule))
+    _, opening, end = he005c_fn(run, BROKER_RUN, "startup", rule)
+    body = run[opening:end]
+    found = [list(pattern.finditer(body)) for pattern in (W3_BINDING, BIND_BINDING, W4_CALL, NP9_CALL)]
+    require(all(len(matches) == 1 for matches in found) and len(W4_CALL.findall(run)) == 1
+            and found[0][0].start() < found[1][0].start() < found[2][0].start() < found[3][0].start(),
+            "%s's startup does not call `w4_thaw(leaf, &passed, &bound)` once, after `let passed = match w3(` and `let "
+            "bound = match binder.bind(&gate, pid, passed.start_ticks) {` and before np9::bracket (%s (c))"
+            % (BROKER_RUN, rule))
+    sites: dict[tuple[str, str], int] = {}
+    for rel, code in sorted(codes.items()):
+        spans = function_bodies(code)
+        for match in re.finditer(r"\bLeafWrite::Thaw\b", code):
+            owners = [name for name, _, opening, end in spans if opening < match.start() < end]
+            key = (rel, owners[-1] if owners else "")
+            sites[key] = sites.get(key, 0) + 1
+        if rel not in {site for site, _ in THAW_SITES}:
+            require(not re.search(r"\bThaw\b", code), "%s names Thaw (%s (c))" % (rel, rule))
+    require(sites == THAW_SITES and sum(len(re.findall(r"\bThaw\b", codes.get(rel, ""))) for rel in
+                                        {site for site, _ in THAW_SITES}) == sum(THAW_SITES.values()),
+            "the broker writes LeafWrite::Thaw at %s, not exactly %s, or names Thaw otherwise (%s (c))"
+            % (sorted(sites.items()), sorted(THAW_SITES.items()), rule))
+
+
+# The plan's G-HE5C-6 (H5E-2; RAW-R2-3): the O_WRONLY opener lives in broker-sys's audited module only. (a) raw.rs's raw
+# text (comments and tests included) names `cgroup.freeze` and `cgroup.kill` once each, on their pinned const lines;
+# (b) raw.rs's non-test code holds CONTROL_FLAGS exactly (O_WRONLY|O_CLOEXEC|O_NOFOLLOW, with its compile-time assert),
+# one opener call with it, inside the function whose match maps Freeze, Thaw and Kill to the two names and their bytes
+# exactly, names each item only there, and names no O_CREAT, O_TRUNC, O_RDWR or O_TMPFILE; (c) no other broker or
+# broker-sys file, src and tests, raw text, names either file.
+CONTROL_FILE_LINES = {"cgroup.freeze": 'const CGROUP_FREEZE: &[u8] = b"cgroup.freeze\\0";',
+                      "cgroup.kill": 'const CGROUP_KILL: &[u8] = b"cgroup.kill\\0";'}
+CONTROL_FLAGS_LINE = re.compile(r"\bconst\s+CONTROL_FLAGS\s*:\s*c_long\s*=\s*O_WRONLY\s*\|\s*O_CLOEXEC\s*\|\s*O_NOFOLLOW\s*;")
+CONTROL_ASSERT = re.compile(r"\bconst\s+_\s*:\s*\(\s*\)\s*=\s*assert!\s*\(\s*CONTROL_FLAGS\s*&\s*CREATE_MASK\s*==\s*0\s*&&\s*"
+                            r"CONTROL_FLAGS\s*&\s*WRITE_AND_CREATE_MASK\s*!=\s*0\s*\)\s*;")
+CONTROL_OPEN = re.compile(r"\blet\s+control\s*=\s*owned\s*\(\s*sys\s*\(\s*SYS_OPENAT\s*,\s*\[\s*leaf\s*,\s*name\.as_ptr\s*\(\s*\)"
+                          r"\s+as\s+c_long\s*,\s*CONTROL_FLAGS\s*,\s*0\s*,\s*0\s*,\s*0\s*\]\s*\)\s*\?\s*\)\s*;")
+CONTROL_MATCH = (r"\blet\s*\(\s*name\s*,\s*byte\s*\)\s*:\s*\(\s*&\s*\[\s*u8\s*\]\s*,\s*&\s*\[\s*u8\s*;\s*1\s*\]\s*\)\s*=\s*match\s+"
+                 r"what\s*\{\s*LeafWrite::Freeze\s*=>\s*\(\s*CGROUP_FREEZE\s*,\s*%s\s*\)\s*,\s*LeafWrite::Thaw\s*=>\s*\(\s*"
+                 r"CGROUP_FREEZE\s*,\s*%s\s*\)\s*,\s*LeafWrite::Kill\s*=>\s*\(\s*CGROUP_KILL\s*,\s*%s\s*\)\s*,?\s*\}\s*;")
+CONTROL_COUNTS = {"CONTROL_FLAGS": 4, "CGROUP_FREEZE": 3, "CGROUP_KILL": 2, "O_WRONLY": 2}
+OPEN_WRITE_FLAGS = re.compile(r"\bO_(?:CREAT|TRUNC|RDWR|TMPFILE)\b")
+
+
+def check_control_opener(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-6, each clause its own function: (a) opener_a_names, (b) opener_b_site, (c)
+    opener_c_elsewhere. Reading scope: (a) raw.rs's raw text, tests included; (b) raw.rs's code, non-test, literal
+    contents emptied (the match's bytes read with literals kept); (c) the raw text of every other .rs file under
+    crates/broker and crates/broker-sys, src and tests. The number of files (c) reads."""
+    rule = "control opener, G-HE5C-6"
+    raw, _, code, kept = he005c_raw(base, rule)
+    opener_a_names(raw, rule)
+    opener_b_site(code, kept, rule)
+    return opener_c_elsewhere(base, rule)
+
+
+def opener_a_names(raw: str, rule: str) -> None:
+    """G-HE5C-6 (a): each control file name occurs once in raw.rs's raw text, on its pinned line (CONTROL_FILE_LINES)."""
+    lines = [line.strip() for line in raw.splitlines()]
+    for name, line in CONTROL_FILE_LINES.items():
+        require(raw.count(name) == 1 and lines.count(line) == 1, "%s names %s other than once, as exactly `%s` (%s (a))"
+                % (BROKER_SYS_RAW, name, line, rule))
+
+
+def opener_b_site(code: str, kept: str, rule: str) -> None:
+    """G-HE5C-6 (b): CONTROL_FLAGS_LINE, CONTROL_ASSERT and CONTROL_OPEN once each in raw.rs's non-test code, the opener
+    inside the one function that also holds CONTROL_MATCH (its bytes `b"1"`, `b"0"` and `b"1"` read with literals kept);
+    O_WRONLY defined once as 1; CONTROL_COUNTS' names occur exactly so often; no O_CREAT, O_TRUNC, O_RDWR or O_TMPFILE."""
+    rel = BROKER_SYS_RAW
+    for pattern, what in ((CONTROL_FLAGS_LINE, "const CONTROL_FLAGS: c_long = O_WRONLY | O_CLOEXEC | O_NOFOLLOW;"),
+                          (CONTROL_ASSERT, "CONTROL_FLAGS' compile-time assert"), (CONTROL_OPEN, "control-file open")):
+        require(len(pattern.findall(code)) == 1, "%s does not hold exactly one %s (%s (b))" % (rel, what, rule))
+    require(len(re.findall(CONTROL_MATCH % ('b"1"', 'b"0"', 'b"1"'), kept)) == 1,
+            "%s does not map Freeze, Thaw and Kill to exactly (CGROUP_FREEZE, b\"1\"), (CGROUP_FREEZE, b\"0\") and "
+            "(CGROUP_KILL, b\"1\") once (%s (b))" % (rel, rule))
+    opener = CONTROL_OPEN.search(code).start()
+    owners = [(opening, end) for _, _, opening, end in function_bodies(code) if opening < opener < end]
+    require(owners and re.search(CONTROL_MATCH % ('b""', 'b""', 'b""'), code[owners[-1][0]:owners[-1][1]]),
+            "%s's control-file open is not in the function that maps the leaf writes to the two names (%s (b))"
+            % (rel, rule))
+    require(defined_once(code, "O_WRONLY", 1), "%s does not define O_WRONLY once as 1 (%s (b))" % (rel, rule))
+    for name, count in CONTROL_COUNTS.items():
+        require(len(re.findall(r"\b%s\b" % name, code)) == count, "%s names %s other than its %d pinned times (%s (b))"
+                % (rel, name, count, rule))
+    found = OPEN_WRITE_FLAGS.search(code)
+    require(not found, "%s names %s (%s (b))" % (rel, found.group(0) if found else "", rule))
+
+
+def opener_c_elsewhere(base: Path, rule: str) -> int:
+    """G-HE5C-6 (c) (RAW-R2-3): no .rs file under crates/broker or crates/broker-sys but raw.rs, src and tests, names
+    either control file in its raw text. The number of files read."""
+    count = 0
+    for crate in (BROKER_CRATE, BROKER_SYS_CRATE):
+        for path in sorted((base / crate).rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
+            if rel == BROKER_SYS_RAW:
+                continue
+            text = path.read_text(encoding="utf-8")
+            for name in CONTROL_FILE_LINES:
+                require(name not in text, "%s names %s; only %s opens the leaf's control files (%s (c))"
+                        % (rel, name, BROKER_SYS_RAW, rule))
+            count += 1
+    return count
+
+
+# The plan's G-HE5C-7 and the frozen seam note section 1 (SM-R1-10, SM-R2-12, SM-R1-20): broker-sys's list memberships
+# (check_he005c_lists), and its one foreign item in G-D1-3's form as Q-RAW-R1-3 states it (check_broker_sys_calls): the
+# one `syscall(` call passes the raw-call trait's `number` (the H5F-5 single wrapper), so the pinned SYS_ names
+# (BROKER_SYS_NUMBERS, with the two open flags of BROKER_SYS_FLAGS, per target) appear only in the two numbers modules,
+# as the first argument of `raw.call(` and `sys(`, and in raw.rs's tests; a SYS_ name or a number anywhere else refuses.
+BROKER_SYS_NUMBERS = {
+    "x86_64": {"SYS_WRITE": 1, "SYS_RT_SIGACTION": 13, "SYS_RT_SIGPROCMASK": 14, "SYS_IOCTL": 16, "SYS_SOCKETPAIR": 53,
+               "SYS_FCNTL": 72, "SYS_SETRESUID": 117, "SYS_SETRESGID": 119, "SYS_CAPSET": 126, "SYS_PRCTL": 157,
+               "SYS_GETDENTS64": 217, "SYS_CLOCK_NANOSLEEP": 230, "SYS_EXIT_GROUP": 231, "SYS_WAITID": 247,
+               "SYS_OPENAT": 257, "SYS_NEWFSTATAT": 262, "SYS_DUP3": 292, "SYS_SECCOMP": 317, "SYS_EXECVEAT": 322,
+               "SYS_CLONE3": 435, "SYS_CLOSE_RANGE": 436},
+    "aarch64": {"SYS_DUP3": 24, "SYS_FCNTL": 25, "SYS_IOCTL": 29, "SYS_OPENAT": 56, "SYS_GETDENTS64": 61, "SYS_WRITE": 64,
+                "SYS_NEWFSTATAT": 79, "SYS_CAPSET": 91, "SYS_EXIT_GROUP": 94, "SYS_WAITID": 95, "SYS_CLOCK_NANOSLEEP": 115,
+                "SYS_RT_SIGACTION": 134, "SYS_RT_SIGPROCMASK": 135, "SYS_SETRESUID": 147, "SYS_SETRESGID": 149,
+                "SYS_PRCTL": 167, "SYS_SOCKETPAIR": 199, "SYS_SECCOMP": 277, "SYS_EXECVEAT": 281, "SYS_CLONE3": 435,
+                "SYS_CLOSE_RANGE": 436}}
+BROKER_SYS_FLAGS = {"x86_64": {"O_DIRECTORY": 0o200000, "O_NOFOLLOW": 0o400000},
+                    "aarch64": {"O_DIRECTORY": 0o40000, "O_NOFOLLOW": 0o100000}}
+SYSCALL_FORWARD = ["number", "first", "second", "third", "fourth", "fifth", "sixth"]
+CALL_SPLIT = re.compile(r"\blet\s*\[\s*first\s*,\s*second\s*,\s*third\s*,\s*fourth\s*,\s*fifth\s*,\s*sixth\s*\]\s*=\s*args\s*;")
+KERNEL_FORWARD = re.compile(r"\bKernel\.call\s*\(\s*number\s*,\s*args\s*\)")
+NUMBERS_GLOB = re.compile(r"(?m)^[ \t]*use\s+numbers::\*\s*;")
+NUMBERS_FALLBACK = re.compile(r'#\s*\[\s*cfg\s*\(\s*not\s*\(\s*any\s*\(\s*target_arch\s*=\s*""\s*,\s*target_arch\s*=\s*""\s*\)\s*'
+                              r'\)\s*\)\s*\]\s*compile_error!\s*\(\s*""\s*\)\s*;')
+NUMBERS_ITEM = re.compile(r"\bpub\s+const\s+((?:SYS|O)_[A-Z0-9_]+)\s*:\s*c_long\s*=\s*(0[oO][0-7_]+|0[xX][0-9A-Fa-f_]+|[0-9_]+)\s*;")
+SYS_CALL_SITE = re.compile(r"(?:(?<![\w.])raw\.call|(?<![\w.:])sys)\s*\(")
+HE005C_LIST_MEMBERS = (("SCANNED_CRATES", BROKER_SYS_CRATE), ("BROKER_LINKED_CRATES", BROKER_SYS_CRATE),
+                       ("UNSAFE_FILES", BROKER_SYS_RAW), ("FD_FILES", BROKER_SYS_RAW),
+                       # Q-U4-1 (a) (2026-10-31): the post-seal list too.
+                       ("POST_SEAL_CRATES", BROKER_SYS_CRATE))
+
+
+def check_he005c_lists(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-7 and the frozen seam note section 1: broker-sys is in SCANNED_CRATES and
+    BROKER_LINKED_CRATES (so the linked, start-up, thread and macro scans read it) and, Q-U4-1 (a), POST_SEAL_CRATES,
+    raw.rs in UNSAFE_FILES and FD_FILES,
+    FOREIGN_ITEMS gives raw.rs exactly {syscall}, CRATE_ROOTS gives lib.rs `#![deny(unsafe_code)]`, and BROKER_NO_PANIC
+    holds both broker-sys sources, the configuration's two and the lifecycle's; STARTUP_EXCEPTIONS holds, among broker
+    and broker-sys files, exactly the three per-file expressions (proc.rs's PEER_DIR, raw.rs's FD_DIR_FORMAT, leaf.rs's
+    root constant through ROOT_CONSTANTS), each file present; and SM-R1-20: LEAF_PATH is PROBE_WORKER_LEAF's leaf under
+    /sys/fs/cgroup. Reading scope: the gate's own lists and the files' presence. The number of memberships checked."""
+    rule = "broker-sys lists, G-HE5C-7"
+    lists = globals()
+    for name, member in HE005C_LIST_MEMBERS:
+        require(member in lists[name], "%s does not hold %s (%s)" % (name, member, rule))
+    require(FOREIGN_ITEMS.get(BROKER_SYS_RAW) == {"syscall"}, "FOREIGN_ITEMS does not give %s exactly {syscall} (%s)"
+            % (BROKER_SYS_RAW, rule))
+    require(CRATE_ROOTS.get(BROKER_SYS_LIB) == "#![deny(unsafe_code)]", "CRATE_ROOTS does not give %s "
+            "`#![deny(unsafe_code)]` (%s)" % (BROKER_SYS_LIB, rule))
+    wanted = {BROKER_SYS_LIB, BROKER_SYS_RAW, BROKER_CONFIG, BROKER_SIGNED_CONFIG} | set(BROKER_LIFECYCLE_FILES)
+    require(wanted <= set(BROKER_NO_PANIC), "BROKER_NO_PANIC lacks %s (%s)" % (sorted(wanted - set(BROKER_NO_PANIC)), rule))
+    expected = {BROKER_PROC: [(PEER_DIR, PEER_DIR_CALL.pattern)], BROKER_SYS_RAW: [(FD_DIR_FORMAT, FD_DIR_FORMAT_CALL.pattern)],
+                BROKER_LEAF: [(text, pattern.pattern) for text, pattern in (root_constant("LEAF_PATH", LEAF_PATH),)]}
+    found = {rel: [(text, pattern.pattern) for text, pattern in entries] for rel, entries in STARTUP_EXCEPTIONS.items()
+             if rel.startswith((BROKER_CRATE + "/", BROKER_SYS_CRATE + "/"))}
+    require(found == expected, "STARTUP_EXCEPTIONS holds %s among broker and broker-sys files, not exactly the three "
+            "per-file expressions %s (%s)" % (sorted(found), sorted(expected), rule))
+    for rel in sorted(set(expected) | {BROKER_SYS_LIB}):
+        require((base / rel).is_file(), "%s is missing (%s)" % (rel, rule))
+    require(LEAF_PATH + "/cgroup.procs" == "/sys/fs/cgroup/" + PROBE_WORKER_LEAF,
+            "LEAF_PATH %s is not PROBE_WORKER_LEAF's leaf under /sys/fs/cgroup (SM-R1-20) (%s)" % (LEAF_PATH, rule))
+    return len(HE005C_LIST_MEMBERS) + 3 + len(expected)
+
+
+def check_broker_sys_calls(base: Path) -> int:
+    """HE-005C, the plan's G-HE5C-7 in G-D1-3's form (Q-RAW-R1-3, MON-RAW-R1-KEEP), each clause its own function: (a)
+    broker_sys_syscall, (b) broker_sys_numbers, (c) broker_sys_positions, (d) broker_sys_elsewhere. Reading scope:
+    code; (a) raw.rs with tests, (b) raw.rs with literals kept, (c) raw.rs non-test, (d) every other .rs file under
+    crates/broker and crates/broker-sys, src and tests. The number of raw-call and sys call sites."""
+    rule = "broker-sys calls, G-HE5C-7 (G-D1-3's form, Q-RAW-R1-3)"
+    _, code_all, code, kept = he005c_raw(base, rule)
+    broker_sys_syscall(code_all, code, rule)
+    broker_sys_numbers(kept, code, rule)
+    sites = broker_sys_positions(code, rule)
+    broker_sys_elsewhere(base, rule)
+    return sites
+
+
+def broker_sys_syscall(code_all: str, code: str, rule: str) -> None:
+    """(a): the word syscall is its extern declaration `fn syscall(` once, inside an extern block, and otherwise exactly
+    one plain call (not after `::`, `.`, `as` or `use`) whose arguments are exactly `number, first, ..., sixth`, after
+    the non-test code's one `let [first, second, third, fourth, fifth, sixth] = args;`; sys forwards through exactly one
+    `Kernel.call(number, args)`."""
+    rel = BROKER_SYS_RAW
+    blocks = [(block.end() - 1, block_end(code_all, block.end() - 1)) for block in EXTERN_BLOCK.finditer(code_all)]
+    declarations, calls = 0, []
+    for word in SYSCALL_WORD.finditer(code_all):
+        before, after = code_all[:word.start()], code_all[word.end():]
+        if re.match(r"\s*\(", after) and re.search(r"\bfn\s+$", before):
+            require(any(start < word.start() < end for start, end in blocks),
+                    "%s defines fn syscall( outside its extern block (%s (a))" % (rel, rule))
+            declarations += 1
+            continue
+        require(re.match(r"\s*\(", after) and not re.search(r"(?:::|\.|\bas|\buse)\s*$", before),
+                "%s names syscall other than as its extern declaration and plain calls (%s (a))" % (rel, rule))
+        calls.append(call_arguments(code_all, code_all.index("(", word.end())))
+    require(declarations == 1, "%s does not declare fn syscall( exactly once (%s (a))" % (rel, rule))
+    require(calls == [SYSCALL_FORWARD], "%s calls syscall other than exactly once as `syscall(%s)`, the trait's number "
+            "and its six arguments (%s (a))" % (rel, ", ".join(SYSCALL_FORWARD), rule))
+    require(len(CALL_SPLIT.findall(code)) == 1 and len(KERNEL_FORWARD.findall(code)) == 1,
+            "%s does not split the six arguments once and forward sys through one `Kernel.call(number, args)` (%s (a))"
+            % (rel, rule))
+
+
+def broker_sys_numbers(kept: str, code: str, rule: str) -> None:
+    """(b): one numbers module per target (NUMBERS_MODULE, literals kept), each holding exactly its BROKER_SYS_NUMBERS
+    and BROKER_SYS_FLAGS as `pub const <name>: c_long = <value>;`, once each, besides its one `use std::ffi::c_long;`
+    and nothing else; one `use numbers::*;`; and the compile_error! for any other architecture."""
+    rel = BROKER_SYS_RAW
+    found = {}
+    for module in NUMBERS_MODULE.finditer(kept):
+        arch = module.group(1)
+        require(arch not in found, "%s holds two numbers modules for %s (%s (b))" % (rel, arch, rule))
+        body = kept[module.end():block_end(kept, module.end() - 1) - 1]
+        items = NUMBERS_ITEM.findall(body)
+        numbers = {}
+        for name, value in items:
+            try:
+                numbers[name] = int(value.replace("_", ""), 0)
+            except ValueError:
+                numbers[name] = None
+        rest = re.sub(r"\buse\s+std::ffi::c_long\s*;", " ", NUMBERS_ITEM.sub(" ", body), count=1)
+        require(len(items) == len(numbers) and numbers == {**BROKER_SYS_NUMBERS[arch], **BROKER_SYS_FLAGS[arch]}
+                and not rest.strip(), "%s's %s numbers module is not exactly its pinned call numbers and open flags, "
+                "once each (%s (b))" % (rel, arch, rule))
+        found[arch] = numbers
+    require(set(found) == set(BROKER_SYS_NUMBERS), "%s does not define the numbers in one module per target (%s (b))"
+            % (rel, rule))
+    require(len(NUMBERS_GLOB.findall(code)) == 1 and len(NUMBERS_FALLBACK.findall(code)) == 1,
+            "%s does not hold one `use numbers::*;` and the compile_error! for other architectures (%s (b))" % (rel, rule))
+
+
+def broker_sys_positions(code: str, rule: str) -> int:
+    """(c): outside the numbers modules, every `raw.call(` and `sys(` call (fn sys's definition aside) passes one of the
+    pinned SYS_ names as its first argument (not a number or any other expression), every SYS_ name is such a first
+    argument, no SYS_ name is bound, and `.call(` occurs otherwise only as KERNEL_FORWARD. The number of call sites."""
+    rel = BROKER_SYS_RAW
+    names = set(BROKER_SYS_NUMBERS["x86_64"]) | set(BROKER_SYS_NUMBERS["aarch64"])
+    outside = numbers_blanked(code)
+    sites = 0
+    for match in SYS_CALL_SITE.finditer(outside):
+        if re.search(r"\bfn\s+$", outside[:match.start()]):
+            continue
+        arguments = call_arguments(outside, match.end() - 1)
+        require(arguments and arguments[0] in names, "%s calls %s with %r first, not a pinned SYS_ name (%s (c))"
+                % (rel, match.group(0).rstrip("( "), (arguments or [""])[0][:40], rule))
+        sites += 1
+    require(len(SYS_NAME.findall(outside)) == sites, "%s names a SYS_ constant other than in its numbers modules and as "
+            "a raw.call or sys call's first argument (%s (c))" % (rel, rule))
+    require(not re.search(r"\b(?:let|static|const)\s+(?:mut\s+)?SYS_", outside),
+            "%s binds a SYS_ name outside its numbers modules (%s (c))" % (rel, rule))
+    require(len(re.findall(r"\.\s*call\s*\(", outside)) == len(RAW_CALL.findall(outside)) + 1,
+            "%s calls `.call(` other than as raw.call and sys's one Kernel.call (%s (c))" % (rel, rule))
+    return sites
+
+
+def broker_sys_elsewhere(base: Path, rule: str) -> None:
+    """(d): no other .rs file under crates/broker or crates/broker-sys, src and tests, names syscall or a SYS_ name in
+    its code."""
+    for crate in (BROKER_CRATE, BROKER_SYS_CRATE):
+        for path in sorted((base / crate).rglob("*.rs")):
+            rel = path.relative_to(base).as_posix()
+            if rel == BROKER_SYS_RAW:
+                continue
+            try:
+                code = rust_code(path.read_text(encoding="utf-8"))
+            except GateError as error:
+                raise GateError("%s: %s (%s (d))" % (rel, error, rule)) from None
+            require(not SYSCALL_WORD.search(code) and not SYS_NAME.search(code),
+                    "%s names syscall or a SYS_ constant; only %s calls the foreign item (%s (d))"
+                    % (rel, BROKER_SYS_RAW, rule))
+
+
+# HE-005A PR review round 1, R1-3, carried to C (the plan's Q-HE5C-5 (a)): each role spec's program is its included
+# static. In the observer's and the broker's seal.rs (non-test code; the fn read with literals kept), fn program is
+# exactly ROLE_PROGRAM_TEXT, its two statics are named only at their definitions and in its arms (and in no other source
+# of the crate), the one RoleSpec literal (a return type aside) has its program field exactly the site's call, and the
+# argument-free `.program()` occurs once in the crate's sources.
+ROLE_PROGRAM_TEXT = ("pub fn program ( self ) - > & 'static [ u8 ] { match self { Arch : : X86_64 = > PROGRAM_X86_64 . "
+                     "as_slice ( ) , Arch : : Aarch64 = > PROGRAM_AARCH64 . as_slice ( ) , } }")
+ROLE_PROGRAM_SITES = ((BROKER_SEAL_RS, BROKER_CRATE, "arch.program()"),
+                      (OBSERVER_SEAL_RS, OBSERVER_CRATE, "RUNNING_ARCH.program()"))
+ROLE_PROGRAM_STATICS = ("PROGRAM_X86_64", "PROGRAM_AARCH64")
+
+
+def check_role_programs(base: Path) -> int:
+    """HE-005C, R1-3's pin (ROLE_PROGRAM_SITES). Reading scope: each crate's src, code, non-test; fn program with literals
+    kept, the rest with literal contents emptied. The number of sites."""
+    rule = "role programs, R1-3"
+    for seal, crate, value in ROLE_PROGRAM_SITES:
+        codes = he005c_codes(base, (crate,), rule)
+        require(seal in codes, "%s is missing (%s)" % (seal, rule))
+        try:
+            kept = blank_test_blocks(PATH_SPACE.sub("::", rust_code((base / seal).read_text(encoding="utf-8"),
+                                                                    literals=True)))
+        except GateError as error:
+            raise GateError("%s: %s (%s)" % (seal, error, rule)) from None
+        require(he005c_fn_text(kept, seal, "program", rule) == ROLE_PROGRAM_TEXT,
+                "%s's fn program is not exactly `pub fn program(self) -> &'static [u8] { match self { Arch::X86_64 => "
+                "PROGRAM_X86_64.as_slice(), Arch::Aarch64 => PROGRAM_AARCH64.as_slice(), } }` (%s)" % (seal, rule))
+        for name in ROLE_PROGRAM_STATICS:
+            for rel, code in sorted(codes.items()):
+                require(len(re.findall(r"\b%s\b" % name, code)) == (2 if rel == seal else 0),
+                        "%s names %s other than %s's definition and program arm (%s)" % (rel, name, seal, rule))
+        specs = [match for match in ROLE_SEAL_SPEC_LITERAL.finditer(codes[seal])
+                 if not re.search(r"->\s*(?:[A-Za-z_]\w*::)*$", codes[seal][:match.start()])]
+        require(len(specs) == 1, "%s does not hold exactly one RoleSpec literal (a return type aside) (%s)" % (seal, rule))
+        literal = codes[seal][specs[0].end() - 1:block_end(codes[seal], specs[0].end() - 1)]
+        fields = re.findall(r"\bprogram\s*:\s*([^,}]+)", literal)
+        require(len(fields) == 1 and re.sub(r"\s+", "", fields[0]) == value,
+                "%s's RoleSpec program is not exactly `%s` (%s)" % (seal, value, rule))
+        require(sum(len(re.findall(r"\.\s*program\s*\(\s*\)", code)) for code in codes.values()) == 1,
+                "%s's sources call .program() other than once, in the RoleSpec (%s)" % (crate, rule))
+    return len(ROLE_PROGRAM_SITES)
+
+
+# Delta C3's G-HE5C-9 (C3-1), the text half: each marker fn (G-D1-14's form) is `#[inline(never)]` and defined once in its
+# file, named in no use declaration but MARKER_USES, and otherwise called exactly once, from its arm's file (past step 2:
+# the span's entry, the child path and W5's measure; past step 7: W4's thaw and NP-9's bracket); the WORKER statics are
+# exactly WORKER_STATIC_LINES and named only there and in ChildPlan::new's argument, exactly WORKER_ARM, in the one
+# spawn file (after step 2). The binary half: check_broker_markers and check_broker_worker, per built planeon-broker.
+HE005C_MARKERS = ((BROKER_SYS_RAW, "clone_span", BROKER_SYS_RAW), (BROKER_SYS_RAW, "child_path", BROKER_SYS_RAW),
+                  (BROKER_SYS_RAW, "measure_verity", BROKER_SPAWN), (BROKER_RUN, "w4_thaw", BROKER_RUN),
+                  (BROKER_NP9, "bracket", BROKER_RUN))
+MARKER_USES = {(BROKER_SYS_LIB, "measure_verity"): "useraw::measure_verity;"}
+WORKER_STATIC_LINES = {
+    "WORKER_X86_64": 'static WORKER_X86_64: &[u8; 1496] = include_bytes!("../../../../contracts/seccomp-v3/WORKER.x86_64.bpf");',
+    "WORKER_AARCH64": 'static WORKER_AARCH64: &[u8; 1376] = include_bytes!("../../../../contracts/seccomp-v3/WORKER.aarch64.bpf");'}
+WORKER_ARM = "match RUNNING_ARCH { Arch::X86_64 => WORKER_X86_64.as_slice(), Arch::Aarch64 => WORKER_AARCH64.as_slice(), }"
+BROKER_MARKER_SYMBOLS = (("broker_sys", "raw", "clone_span"), ("broker_sys", "raw", "child_path"),
+                         ("broker_sys", "raw", "measure_verity"), ("planeon_broker", "lifecycle", "run", "w4_thaw"),
+                         ("planeon_broker", "lifecycle", "np9", "bracket"))
+BROKER_CONFIG_MODULES = (("planeon_broker", "signed_config"), ("planeon_broker", "config"))
+
+
+def check_he005c_markers(base: Path) -> int:
+    """HE-005C, delta C3's G-HE5C-9 text half, each clause its own function: (a) markers_a_defined, (b) markers_b_once,
+    (c) markers_c_worker. Reading scope: crates/broker's and crates/broker-sys's src, code, non-test, literal contents
+    emptied; (c)'s static lines in spawn.rs's raw text. The number of markers."""
+    rule = "broker markers, G-HE5C-9"
+    codes = he005c_codes(base, (BROKER_CRATE, BROKER_SYS_CRATE), rule)
+    markers_a_defined(codes, rule)
+    markers_b_once(codes, rule)
+    markers_c_worker(base, codes, rule)
+    return len(HE005C_MARKERS)
+
+
+def markers_a_defined(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-9 (a): each marker is defined once in its file, `#[inline(never)]` among its attributes."""
+    for rel, name, _ in HE005C_MARKERS:
+        require(rel in codes, "%s is missing (%s (a))" % (rel, rule))
+        text = he005c_fn_text(codes[rel], rel, name, rule)
+        head = re.match(r"(.*?)\bfn %s\b" % name, text)
+        require(head and "# [ inline ( never ) ]" in head.group(1), "%s's fn %s is not #[inline(never)] (%s (a))"
+                % (rel, name, rule))
+
+
+def markers_b_once(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-9 (b): a use declaration names a marker only as MARKER_USES; outside use declarations each marker's name
+    occurs exactly twice among the sources, its fn and one call in its caller's file."""
+    for rel, code in sorted(codes.items()):
+        for use in USE_DECLARATION.finditer(code):
+            for _, name, _ in HE005C_MARKERS:
+                if re.search(r"\b%s\b" % name, use.group(0)):
+                    require(MARKER_USES.get((rel, name)) == re.sub(r"\s+", "", use.group(0)),
+                            "%s's use declaration names the marker %s other than as `pub use raw::measure_verity;` in %s "
+                            "(%s (b))" % (rel, name, BROKER_SYS_LIB, rule))
+    plain = {rel: USE_DECLARATION.sub(" ", code) for rel, code in codes.items()}
+    for home, name, caller in HE005C_MARKERS:
+        total = sum(len(re.findall(r"\b%s\b" % name, code)) for code in plain.values())
+        calls = [match for match in re.finditer(r"\b%s\s*\(" % name, plain.get(caller, ""))
+                 if not re.search(r"\bfn\s+$", plain[caller][:match.start()])]
+        require(total == 2 and len(calls) == 1 and re.search(r"\bfn\s+%s\b" % name, plain[home]),
+                "the marker %s is named other than as its fn in %s and one call in %s (%s (b))" % (name, home, caller, rule))
+
+
+def markers_c_worker(base: Path, codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-9 (c): spawn.rs's raw text holds each of WORKER_STATIC_LINES once; each WORKER static is named twice in its
+    code, at its definition and in the second argument of the one `ChildPlan::new(`, which is exactly WORKER_ARM; no
+    other source names either."""
+    require((base / BROKER_SPAWN).is_file(), "%s is missing (%s (c))" % (BROKER_SPAWN, rule))
+    lines = [line.strip() for line in (base / BROKER_SPAWN).read_text(encoding="utf-8").splitlines()]
+    for name, line in WORKER_STATIC_LINES.items():
+        require(lines.count(line) == 1, "%s does not hold exactly `%s` once (%s (c))" % (BROKER_SPAWN, line, rule))
+        for rel, code in sorted(codes.items()):
+            require(len(re.findall(r"\b%s\b" % name, code)) == (2 if rel == BROKER_SPAWN else 0),
+                    "%s names %s other than its definition and ChildPlan::new's argument (%s (c))" % (rel, name, rule))
+    spawn = codes.get(BROKER_SPAWN, "")
+    news = list(re.finditer(r"\bChildPlan::new\s*\(", spawn))
+    require(len(news) == 1, "%s does not call ChildPlan::new exactly once (%s (c))" % (BROKER_SPAWN, rule))
+    arguments = call_arguments(spawn, news[0].end() - 1)
+    require(len(arguments) == 4 and BROKER_SERVE_TOKEN.findall(arguments[1]) == BROKER_SERVE_TOKEN.findall(WORKER_ARM),
+            "%s's ChildPlan::new does not take exactly `%s` as its program (%s (c))" % (BROKER_SPAWN, WORKER_ARM, rule))
+
+
+def marker_path(name: str) -> tuple[str, ...]:
+    """item_path's reading of a symbol, and for a v0 generic instance (`_RI<path><arguments>E`) its generic function's
+    own path (v0_path over the name without the `I`; the arguments are not read, and a misread backref gives a path
+    that matches no marker)."""
+    path = item_path(name)
+    if path or not name.startswith("_RI"):
+        return path
+    return v0_path("_R" + name[3:])
+
+
+def check_broker_markers(names: set[str]) -> list[str]:
+    """HE-005C, delta C3's G-HE5C-9 (C3-1), the binary half in G-D1-14's form: planeon-broker's .symtab holds, each by
+    its whole item path (marker_path), a symbol of every BROKER_MARKER_SYMBOLS function, so the arms past each stand-in
+    are linked as built; a ring_core_0_17_14_ symbol (CRATE_SYMBOLS' ring pattern); and a symbol whose own path lies in
+    the broker's signed_config or config module, so the configuration path is linked. A closure inside a marker, or a
+    name that only mentions it, does not count. The symbols found, one per item."""
+    found = []
+    for wanted in BROKER_MARKER_SYMBOLS:
+        matches = sorted(name for name in names if marker_path(name) == wanted)
+        require(matches, "planeon-broker's symbol table holds no %s symbol: that arm is not linked as built (broker "
+                "markers, G-HE5C-9)" % "::".join(wanted))
+        found.append(matches[0])
+    ring = sorted(name for name in names if dict(CRATE_SYMBOLS)["ring"].search(name))
+    require(ring, "planeon-broker's symbol table holds no ring_core_0_17_14_ symbol: the configuration's verification is "
+            "not linked (broker markers, G-HE5C-9)")
+    config = sorted(name for name in names if len(marker_path(name)) > 2 and marker_path(name)[:2] in BROKER_CONFIG_MODULES)
+    require(config, "planeon-broker's symbol table holds no symbol in planeon_broker::signed_config or ::config: the "
+            "configuration path is not linked (broker markers, G-HE5C-9)")
+    return found + [ring[0], config[0]]
+
+
+def check_broker_worker(raw: bytes, program: bytes) -> int:
+    """HE-005C, delta C3's G-HE5C-9 and the plan's G-HE5C-8: planeon-broker (`raw`) holds its architecture's WORKER
+    program bytes exactly once. The program's size."""
+    require(program, "an empty WORKER program (program-bytes check, G-HE5C-9)")
+    count = raw.count(program)
+    require(count == 1, "planeon-broker holds its WORKER program %d times, not exactly once (program-bytes check, "
+            "G-HE5C-9)" % count)
+    return len(program)
+
+
+# Delta C3's G-HE5C-10 (C3-2): the stand-ins. Over seams.rs (non-test, literals kept): the two traits exactly (one method,
+# an exact signature, no default body, no other item), the success payloads and answers exactly (concrete, non-zero-sized,
+# inhabited, exact fields), the stand-ins and their impls exactly (each body `core::hint::black_box(<the Unavailable
+# value's full path>)`); over every crates/broker src source, main.rs included (non-test): the stand-ins' impls are the
+# only impls naming either trait or either stand-in, no `as` rename, glob or type alias of a trait, a stand-in, Outcome
+# or its variants, no `dyn` of either trait; and w6.rs pins `const W6_BOUND_MS: u64 = 10_000;` by text.
+SEAM_TEXTS = (
+    ("i", r"\btrait\s+GateQualifier\b", "pub trait GateQualifier { fn qualify ( & mut self ) - > GateAnswer ; }"),
+    ("i", r"\btrait\s+Binder\b",
+     "pub trait Binder { fn bind ( & mut self , gate : & GateTicket , pid : i32 , start_ticks : u64 ) - > BindAnswer ; }"),
+    ("ii", r"\bstruct\s+GateTicket\b",
+     "# [ derive ( Clone , Copy , Debug , PartialEq , Eq ) ] pub struct GateTicket { pub generation : u64 , }"),
+    ("ii", r"\benum\s+GateAnswer\b",
+     "# [ derive ( Clone , Copy , Debug , PartialEq , Eq ) ] pub enum GateAnswer { Qualified ( GateTicket ) , Unavailable , }"),
+    ("ii", r"\bstruct\s+BindTicket\b",
+     "# [ derive ( Clone , Copy , Debug , PartialEq , Eq ) ] pub struct BindTicket { pub pid : i32 , pub start_ticks : u64 , }"),
+    ("ii", r"\benum\s+BindAnswer\b",
+     "# [ derive ( Clone , Copy , Debug , PartialEq , Eq ) ] pub enum BindAnswer { Bound ( BindTicket ) , Unavailable , }"),
+    ("iii", r"\bstruct\s+QualifierStandIn\b", "pub struct QualifierStandIn ;"),
+    ("iii", r"\bstruct\s+BinderStandIn\b", "pub struct BinderStandIn ;"),
+    ("iii", r"\bimpl\s+GateQualifier\s+for\b",
+     "impl GateQualifier for QualifierStandIn { fn qualify ( & mut self ) - > GateAnswer { core : : hint : : black_box ( "
+     "crate : : lifecycle : : seams : : GateAnswer : : Unavailable ) } }"),
+    ("iii", r"\bimpl\s+Binder\s+for\b",
+     "impl Binder for BinderStandIn { fn bind ( & mut self , _gate : & GateTicket , _pid : i32 , _start_ticks : u64 ) - > "
+     "BindAnswer { core : : hint : : black_box ( crate : : lifecycle : : seams : : BindAnswer : : Unavailable ) } }"),
+)
+SEAM_TRAITS = ("GateQualifier", "Binder")
+SEAM_IMPL_HEADERS = ("impl GateQualifier for QualifierStandIn", "impl Binder for BinderStandIn")
+SEAM_IMPL_WORDS = re.compile(r"\b(?:GateQualifier|Binder|QualifierStandIn|BinderStandIn)\b")
+SEAM_DYN = re.compile(r"\bdyn\s+(?:GateQualifier|Binder)\b")
+W6_BOUND_LINE = "const W6_BOUND_MS: u64 = 10_000;"
+TYPE_ALIAS = re.compile(r"\btype\s+[A-Za-z_]\w*\s*(?:<[^=;]*>)?\s*=\s*([^;]*);")
+
+
+def check_he005c_seams(base: Path) -> int:
+    """HE-005C, delta C3's G-HE5C-10, each clause its own function: (i) seams_i_traits, (ii) seams_ii_payloads, (iii)
+    seams_iii_standins, (iv) seams_iv_impls, (v) seams_v_aliases, (vi) seams_vi_dyn, (vii) seams_vii_bound. Reading
+    scope: code, non-test; (i)-(iii) seams.rs with literals kept; (iv)-(vi) every crates/broker src source with literal
+    contents emptied; (vii) w6.rs's raw text and code. The number of clauses."""
+    rule = "seam stand-ins, G-HE5C-10"
+    codes = he005c_codes(base, (BROKER_CRATE,), rule)
+    require(BROKER_SEAMS in codes and BROKER_OUTCOME in codes and BROKER_W6 in codes,
+            "%s, %s or %s is missing (%s)" % (BROKER_SEAMS, BROKER_OUTCOME, BROKER_W6, rule))
+    kept = he005c_codes(base, (BROKER_CRATE,), rule, literals=True)[BROKER_SEAMS]
+    seams_i_traits(kept, codes, rule)
+    seams_ii_payloads(kept, rule)
+    seams_iii_standins(kept, rule)
+    seams_iv_impls(codes, rule)
+    seams_v_aliases(codes, rule)
+    seams_vi_dyn(codes, rule)
+    seams_vii_bound(base, codes, rule)
+    return 7
+
+
+def seam_texts(kept: str, clause: str, rule: str) -> None:
+    """The SEAM_TEXTS items of `clause`, each read from seams.rs as he005c_item_text reads it, equal their pins."""
+    for which, pattern, text in SEAM_TEXTS:
+        if which == clause:
+            found = he005c_item_text(kept, BROKER_SEAMS, re.compile(pattern), rule, pattern.replace("\\b", "").replace(
+                "\\s+", " "))
+            require(found == text, "%s's %s is not exactly its pinned text `%s` (%s (%s))"
+                    % (BROKER_SEAMS, pattern.replace("\\b", "").replace("\\s+", " "), text, rule, clause))
+
+
+def seams_i_traits(kept: str, codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-10 (i): the two traits exactly, each defined once among the broker's sources."""
+    seam_texts(kept, "i", rule)
+    for name in SEAM_TRAITS:
+        require(sum(len(re.findall(r"\btrait\s+%s\b" % name, code)) for code in codes.values()) == 1,
+                "the broker defines trait %s other than once (%s (i))" % (name, rule))
+
+
+def seams_ii_payloads(kept: str, rule: str) -> None:
+    """G-HE5C-10 (ii): GateTicket, GateAnswer, BindTicket and BindAnswer exactly."""
+    seam_texts(kept, "ii", rule)
+
+
+def seams_iii_standins(kept: str, rule: str) -> None:
+    """G-HE5C-10 (iii): the two stand-ins and their two impls exactly."""
+    seam_texts(kept, "iii", rule)
+
+
+def seams_iv_impls(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-10 (iv): every impl header naming a trait or a stand-in is one of SEAM_IMPL_HEADERS, each once."""
+    seen = []
+    for rel, code in sorted(codes.items()):
+        for _, header in impl_headers(rel, code):
+            # PR review round 2, R2-1: no impl header names a seam ticket (their derives are attributes).
+            require(not re.search(r"\b(?:%s)\b" % "|".join(SEAM_TICKETS), header), "%s has the impl header `%s`, "
+                    "which names a seam ticket (%s (iv))" % (rel, header, rule))
+            if SEAM_IMPL_WORDS.search(header):
+                require(header in SEAM_IMPL_HEADERS, "%s has the impl header `%s`; only the stand-ins implement the two "
+                        "traits, by exactly `%s` (%s (iv))" % (rel, header, "` and `".join(SEAM_IMPL_HEADERS), rule))
+                seen.append(header)
+    require(sorted(seen) == sorted(SEAM_IMPL_HEADERS), "the broker holds the stand-ins' impls %s, not exactly once each "
+            "(%s (iv))" % (sorted(seen), rule))
+
+
+def outcome_variants(code: str) -> tuple[str, ...]:
+    """The variant names of outcome.rs's one `enum Outcome` (none if it is not there once)."""
+    found = list(re.finditer(r"\benum\s+Outcome\s*\{", code))
+    if len(found) != 1:
+        return ()
+    body = code[found[0].end():block_end(code, found[0].end() - 1) - 1]
+    while re.search(r"\([^()]*\)|\{[^{}]*\}", body):
+        body = re.sub(r"\([^()]*\)|\{[^{}]*\}", " ", body)
+    return tuple(re.findall(r"(?:^|,)\s*([A-Za-z_]\w*)", body))
+
+
+def seams_v_aliases(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-10 (v): no use declaration renames (`as`) or globs (`*`) a trait, a stand-in, Outcome or one of its
+    variants, or globs the seams or outcome module; no type alias names one."""
+    names = (SEAM_TRAITS + ("QualifierStandIn", "BinderStandIn", "Outcome") + outcome_variants(codes[BROKER_OUTCOME])
+             + SEAM_TICKETS)  # PR review round 2, R2-1
+    words = re.compile(r"\b(?:%s)\b" % "|".join(names))
+    for rel, code in sorted(codes.items()):
+        for use in USE_DECLARATION.finditer(code):
+            text = use.group(0)
+            require(not ((words.search(text) or re.search(r"\b(?:seams|outcome)\b", text))
+                         and (re.search(r"\bas\b", text) or "*" in text)),
+                    "%s's `%s` renames or globs a seam trait, a stand-in or the outcome (%s (v))"
+                    % (rel, " ".join(text.split()), rule))
+        for alias in TYPE_ALIAS.finditer(code):
+            require(not words.search(alias.group(1)), "%s aliases %s with a type item (%s (v))"
+                    % (rel, " ".join(alias.group(1).split()), rule))
+
+
+def seams_vi_dyn(codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-10 (vi): no `dyn` of either trait."""
+    for rel, code in sorted(codes.items()):
+        require(not SEAM_DYN.search(code), "%s names dyn of a seam trait; the run is statically dispatched (%s (vi))"
+                % (rel, rule))
+
+
+def seams_vii_bound(base: Path, codes: dict[str, str], rule: str) -> None:
+    """G-HE5C-10 (vii): w6.rs's raw text holds W6_BOUND_LINE once, and its code binds W6_BOUND_MS once, as that const."""
+    lines = [line.strip() for line in (base / BROKER_W6).read_text(encoding="utf-8").splitlines()]
+    require(lines.count(W6_BOUND_LINE) == 1 and len(re.findall(r"\b(?:const|static|let)\s+(?:mut\s+)?W6_BOUND_MS\b",
+                                                               codes[BROKER_W6])) == 1
+            and all(not re.search(r"\b(?:const|static|let)\s+(?:mut\s+)?W6_BOUND_MS\b", code)
+                    for rel, code in codes.items() if rel != BROKER_W6),
+            "%s does not pin exactly `%s` once (%s (vii))" % (BROKER_W6, W6_BOUND_LINE, rule))
+
+
+# Delta C3's G-HE5C-12 (C3-4): the key through black_box. (a) signed_config.rs's load is exactly LOAD_TEXT, its key line
+# exactly KEY_LINE, COMPILED_KEY named only there and in load, and black_box only in load and the two stand-ins
+# (BLACK_BOX_SITES); (b) Q-HE5C-2 (a)'s parity: the file's non-test code with literals kept equals the observer's token for
+# token, PRODUCTION_DIR's value aside (the broker's is BROKER_PRODUCTION_DIR).
+LOAD_TEXT = ("pub fn load ( ) - > Result < Vec < u8 > , LoadError > { load_from ( PRODUCTION_DIR , core : : hint : : "
+             "black_box ( COMPILED_KEY ) ) }")
+KEY_LINE = 'pub const COMPILED_KEY: &[u8] = include_bytes!("../config-signer.pub");'
+BLACK_BOX_SITES = {BROKER_SIGNED_CONFIG: 1, BROKER_SEAMS: 2}
+BROKER_PRODUCTION_DIR = "/etc/planeon/capacity-broker"
+PRODUCTION_DIR_VALUE = re.compile(r'(\bconst\s+PRODUCTION_DIR\s*:\s*&\s*str\s*=\s*)"((?:[^"\\]|\\.)*)"')
+
+
+def check_broker_load(base: Path) -> int:
+    """HE-005C, delta C3's G-HE5C-12, each clause its own function: (a) load_a_exact, (b) load_b_parity. Reading scope:
+    code, non-test; (a) signed_config.rs's load with literals kept, its key line in raw text, the names over every
+    crates/broker src source with literal contents emptied; (b) both signed_config.rs files with literals kept. The
+    number of tokens compared."""
+    rule = "broker key through black_box, G-HE5C-12"
+    load_a_exact(base, rule)
+    return load_b_parity(base, rule)
+
+
+def load_a_exact(base: Path, rule: str) -> None:
+    """G-HE5C-12 (a): load exactly, the key line exactly, COMPILED_KEY twice in signed_config.rs and nowhere else, and
+    black_box exactly at BLACK_BOX_SITES."""
+    rel = BROKER_SIGNED_CONFIG
+    codes = he005c_codes(base, (BROKER_CRATE,), rule)
+    require(rel in codes, "%s is missing (%s (a))" % (rel, rule))
+    kept = he005c_codes(base, (BROKER_CRATE,), rule, literals=True)[rel]
+    require(he005c_fn_text(kept, rel, "load", rule) == LOAD_TEXT, "%s's load is not exactly `pub fn load() -> "
+            "Result<Vec<u8>, LoadError> { load_from(PRODUCTION_DIR, core::hint::black_box(COMPILED_KEY)) }` (%s (a))"
+            % (rel, rule))
+    lines = [line.strip() for line in (base / rel).read_text(encoding="utf-8").splitlines()]
+    require(lines.count(KEY_LINE) == 1, "%s does not hold exactly `%s` once (%s (a))" % (rel, KEY_LINE, rule))
+    for other, code in sorted(codes.items()):
+        require(len(re.findall(r"\bCOMPILED_KEY\b", code)) == (2 if other == rel else 0),
+                "%s names COMPILED_KEY other than its definition and load's black_box (a renamed key or an alias) "
+                "(%s (a))" % (other, rule))
+        require(len(re.findall(r"\bblack_box\b", code)) == BLACK_BOX_SITES.get(other, 0),
+                "%s names black_box other than load's one and the two stand-ins' (%s (a))" % (other, rule))
+
+
+def load_b_parity(base: Path, rule: str) -> int:
+    """G-HE5C-12 (b), Q-HE5C-2 (a): the broker's signed_config.rs and the observer's, read without comments, with
+    literals kept and strict test blocks blanked, are LINK_TOKEN-equal once each PRODUCTION_DIR's one value is emptied,
+    and the broker's value is BROKER_PRODUCTION_DIR. The number of tokens."""
+    tokens = []
+    for rel in (BROKER_SIGNED_CONFIG, OBSERVER_SIGNED_CONFIG):
+        require((base / rel).is_file(), "%s is missing (%s (b))" % (rel, rule))
+        try:
+            kept = blank_test_blocks(PATH_SPACE.sub("::", rust_code((base / rel).read_text(encoding="utf-8"),
+                                                                    literals=True)))
+        except GateError as error:
+            raise GateError("%s: %s (%s (b))" % (rel, error, rule)) from None
+        values = PRODUCTION_DIR_VALUE.findall(kept)
+        require(len(values) == 1, "%s does not define PRODUCTION_DIR once (%s (b))" % (rel, rule))
+        if rel == BROKER_SIGNED_CONFIG:
+            require(values[0][1] == BROKER_PRODUCTION_DIR, "%s's PRODUCTION_DIR is not %s (%s (b))"
+                    % (rel, BROKER_PRODUCTION_DIR, rule))
+        tokens.append(LINK_TOKEN.findall(PRODUCTION_DIR_VALUE.sub(r'\1""', kept)))
+    require(tokens[0] == tokens[1], "%s differs from %s beyond PRODUCTION_DIR's value (%s (b))"
+            % (BROKER_SIGNED_CONFIG, OBSERVER_SIGNED_CONFIG, rule))
+    return len(tokens[0])
 
 
 # HE-005B (DESIGN-HE005 revision 5 section 4, HE-005B; the HE-005B plan's gate rules; MON-HE005B-PLAN): G-HE5B-1, -2 and -5
@@ -3293,7 +4631,8 @@ def isolation_a_names(codes: dict[str, str], rule: str) -> None:
 
 def isolation_b_types(codes: dict[str, str], rule: str) -> None:
     """G-HE5B-1 (b), module_isolation's (b): each name of the four modules' type set is defined once among them, and none
-    occurs in another broker source, whatever it is there."""
+    occurs in another broker source, whatever it is there. HE-005C, MON-SEAM-E3: each source is read with only its own
+    file's path-qualified seam forms blanked (seam_qualified_blanked)."""
     defined: dict[str, str] = {}
     for name, rel in he005b_definitions(codes):
         require(name not in defined, "%s defines %s, which %s defines too (%s (b))" % (rel, name, defined.get(name), rule))
@@ -3304,6 +4643,7 @@ def isolation_b_types(codes: dict[str, str], rule: str) -> None:
     for rel, code in sorted(codes.items()):
         if rel in HE005B_FILES:
             continue
+        code = seam_qualified_blanked(rel, code)
         hit = words.search(code)
         require(not hit, "%s names %s, a type the HE-005B module %s defines (%s (b))"
                 % (rel, hit.group(0) if hit else "", defined.get(hit.group(0)) if hit else "", rule))
@@ -3981,6 +5321,9 @@ def check_seal_order(base: Path, site: dict = GATE_SEAL_SITE) -> str:
             "the second stage's argument or arms are not the stage-1 binding and the bound names (seal-order grammar)")
     check_main_shape(raw, written, code, linux[0], site)
     end = statement.end()
+    closes = site["adjacent"] or bool(site.get("configured"))
+    if site.get("configured"):
+        end = configured_site_tail(code, body, statement, main_rel)
     if site["adjacent"]:
         first = STAGE1_STATEMENT.match(code, body)
         require(first and first.group(2) == first.group(3) and first.group(4) == first.group(5),
@@ -3995,9 +5338,9 @@ def check_seal_order(base: Path, site: dict = GATE_SEAL_SITE) -> str:
     depth = 1
     for index in range(body, end):
         depth += {"{": 1, "}": -1}.get(code[index], 0)
-        require(depth > 0 or index == end - 1 and site["adjacent"], "seal_stage2 is not called inside main (seal-order "
+        require(depth > 0 or index == end - 1 and closes, "seal_stage2 is not called inside main (seal-order "
                 "grammar)")
-    require(not site["adjacent"] or depth == 0, "the pinned tail does not close main (seal-order grammar)")
+    require(not closes or depth == 0, "the pinned tail does not close main (seal-order grammar)")
     segment = code[re.search(r"\bseal_stage1\s*\(", code).end():statement.start()]
     tokens, index = [], 0
     while segment[index:].strip():
@@ -4040,7 +5383,9 @@ def check_seal_order(base: Path, site: dict = GATE_SEAL_SITE) -> str:
             except GateError as error:
                 raise GateError("%s: %s (seal-order grammar)" % (rel, error)) from None
         text = PATH_SPACE.sub("::", text)
-        if rel == SIGNED_CONFIG:
+        if rel == site.get("dir_file"):
+            # HE-005C (G-HE5C-13; C3-3): the one `use gate_sys::Dir;` exception is the site's own: gate-tls's
+            # signed_config.rs for the gate, the broker's for the broker, none for the observer.
             text = SIGNED_CONFIG_DIR.sub("", text, count=1)
         for pattern in BEFORE_SEAL_REFUSED:
             require(not re.search(pattern, text), "%s names %s before the seal (seal-order grammar)"
@@ -9095,8 +10440,10 @@ def main() -> int:
         say("broker includes (HE-005A; HE-005B, G-HE5B-4): %d embedded files, each with include_bytes!: %s; no other "
             "broker source embeds, and none names vectors.json" % (check_broker_includes(HE), "; ".join(
                 "%s embeds exactly %s" % (rel, " and ".join(files)) for rel, files in BROKER_EMBEDS.items())))
-        say("broker bytes (HE-005A, R1-2): %d broker sources outside %s hold no const or static whose type names u8 "
-            "but a lone u8, no type item naming u8 and no u8 rename" % (check_broker_bytes(HE), BROKER_SEAL_RS))
+        say("broker bytes (HE-005A, R1-2; HE-005C): %d broker sources outside %s hold no const or static whose type names "
+            "u8 but a lone u8 and the named items %s, once each, no type item naming u8 and no u8 rename"
+            % (check_broker_bytes(HE), BROKER_SEAL_RS, "; ".join("%s in %s" % (", ".join(sorted(items)), rel)
+                                                                 for rel, items in BROKER_BYTES_ALLOWED.items())))
         say("broker no-panic: %d sources (%s) name no panicking macro or call outside strict #[cfg(test)] blocks, "
             "seal.rs's item-level compile-time asserts removed first (HE-005A)"
             % (check_broker_no_panic(HE), ", ".join(BROKER_NO_PANIC)))
@@ -9105,8 +10452,10 @@ def main() -> int:
         say("broker never unlinks (HE-005A, PR review round 1, R1-4; G-I01-1's form): %d broker sources name none of "
             "unlink, remove_file, remove_dir, remove_dir_all, rename or hard_link outside strict test blocks"
             % check_broker_never_unlinks(HE))
-        say("broker serve (HE-005A, PR review round 1, R1-5; G5's form): %s's fn serve names %d calls exactly once each, "
-            "in order (%s) (a), and its body is exactly `%s` (b)" % (BROKER_MAIN, check_broker_serve(HE),
+        say("broker serve (HE-005A, PR review round 1, R1-5; G5's form; HE-005C, G-HE5C-11): %s's fn serve names %d "
+            "calls exactly once each, in order (%s) (a), its body is exactly `%s` and startup_run's and derive_hold's "
+            "bodies are pinned (b; PR review round 1, R1-1), and the lifecycle is reached only through serve's three "
+            "entries (c)" % (BROKER_MAIN, check_broker_serve(HE),
                                                                  ", ".join(name for _, name in BROKER_SERVE_CALLS),
                                                                  BROKER_SERVE_BODY))
         say("HE-005B isolation (G-HE5B-1): the modules %s, defining %d type names, are named outside their files only by "
@@ -9126,6 +10475,49 @@ def main() -> int:
             "and no `Self{` or `Self(` (ii); `%s` once (iii); no impl names it (iv); no rename, alias or re-export (v)"
             % (check_he005b_token(HE), HE005B_TOKEN, HE005B_TOKEN_HOME, ", ".join(TOKEN_FIELD_TYPES),
                " and ".join(SEAL_TOKEN_ATTRIBUTES), HE005B_TOKEN_MINT, HE005B_TOKEN_SIGNATURE[1]))
+        say("HE-005C child-path span (G-HE5C-1..3): %s's %s hash to their pinned texts and start #[inline(never)] (1); "
+            "their raw calls are the pinned sequence, the reset loops over 1..64 without 9 and 19, the unblock directly "
+            "precedes setresgid, and the child path runs on clone3's return-0 branch (2); %d raw calls, each with a "
+            "pinned number and six arguments, no index, slice, arithmetic or other operation (3); reading raw.rs's code, "
+            "non-test" % (BROKER_SYS_RAW, " and ".join(SPAN_PINS), check_child_span(HE)))
+        say("HE-005C measured exec (G-HE5C-4, across the seam): %d pinned forms: clone3 and execveat at one non-test call "
+            "site each, in the span (a); the exec's descriptor is the plan's script (b); W5's opened script is the one "
+            "it measures and W2's plan takes, never rebound (c); reading code, non-test" % check_measured_exec(HE))
+        say("HE-005C W4 thaw (G-HE5C-5): w4_thaw is exactly its pinned text, taking W3's pass and BIND's ticket (a); "
+            "W3Passed is closed and made only by w3, and no broker source writes a BindTicket or GateTicket literal (b); "
+            "w4_thaw is "
+            "called once, after W3 and BIND and before NP-9's bracket, LeafWrite::Thaw is written at exactly %d sites "
+            "%s, and W5, W1, W2, W3 and W6's entry are called only in startup and startup only in startup_run (c; PR "
+            "review round 1, R1-1); reading crates/broker's code, non-test" % (check_w4_thaw(HE), ", ".join(
+                "%s %s" % site for site in THAW_SITES)))
+        say("HE-005C control opener (G-HE5C-6): %s's raw text names %s once each, on their pinned lines (a); its "
+            "non-test code holds CONTROL_FLAGS (O_WRONLY|O_CLOEXEC|O_NOFOLLOW) and one opener in the function that maps "
+            "the leaf writes, and no O_CREAT, O_TRUNC, O_RDWR or O_TMPFILE (b); %d other broker and broker-sys files, "
+            "src and tests, raw text, name neither (c)" % (BROKER_SYS_RAW, " and ".join(CONTROL_FILE_LINES),
+                                                            check_control_opener(HE)))
+        say("HE-005C broker-sys lists (G-HE5C-7; the seam note section 1): %d memberships: broker-sys in SCANNED_CRATES, "
+            "BROKER_LINKED_CRATES and POST_SEAL_CRATES (Q-U4-1 (a)), raw.rs in UNSAFE_FILES and FD_FILES with "
+            "FOREIGN_ITEMS {syscall}, lib.rs's crate "
+            "root #![deny(unsafe_code)], the no-panic list, exactly the three per-file start-up exceptions, and LEAF_PATH "
+            "under PROBE_WORKER_LEAF (SM-R1-20)" % check_he005c_lists(HE))
+        say("HE-005C broker-sys calls (G-HE5C-7 in G-D1-3's form; Q-RAW-R1-3): %s declares syscall once and calls it once "
+            "with the trait's number and six arguments (a); its numbers modules hold exactly the %d pinned call numbers "
+            "and two open flags per target (b); %d raw.call and sys sites, each passing a pinned SYS_ name first, and no "
+            "SYS_ name elsewhere in non-test code (c); no other broker or broker-sys file names syscall or a SYS_ name (d)"
+            % (BROKER_SYS_RAW, len(BROKER_SYS_NUMBERS["x86_64"]), check_broker_sys_calls(HE)))
+        say("role programs (HE-005A PR review round 1, R1-3, carried to HE-005C): in %d seal.rs files (%s) fn program is "
+            "exactly its pinned text, its statics are named only there, and the RoleSpec's program is the arch's "
+            "program()" % (check_role_programs(HE), " and ".join(seal for seal, _, _ in ROLE_PROGRAM_SITES)))
+        say("HE-005C markers, text half (G-HE5C-9): %d #[inline(never)] markers (%s), each defined once and called once, "
+            "from its arm's file (a, b); the WORKER statics exactly pinned and named only in ChildPlan::new's argument "
+            "in %s (c); reading code, non-test" % (check_he005c_markers(HE), ", ".join(
+                name for _, name, _ in HE005C_MARKERS), BROKER_SPAWN))
+        say("HE-005C stand-ins (G-HE5C-10): %d clauses: the two traits, the payloads and answers, the stand-ins and their "
+            "black_box bodies exactly (i-iii); the stand-ins are the only impls (iv); no rename, glob or alias (v); no "
+            "dyn (vi); `%s` pinned by text (vii)" % (check_he005c_seams(HE), W6_BOUND_LINE))
+        say("HE-005C key through black_box (G-HE5C-12): %s's load is exactly `load_from(PRODUCTION_DIR, "
+            "core::hint::black_box(COMPILED_KEY))`, the key line exact, no alias (a); its %d tokens equal %s's, "
+            "PRODUCTION_DIR's value aside (b)" % (BROKER_SIGNED_CONFIG, check_broker_load(HE), OBSERVER_SIGNED_CONFIG))
         say("observer-sys calls: %s declares the one foreign item syscall and calls it %d times, each with seven "
             "arguments, the first one of the six numbers %s (pinned per target), openat's flags, ioctl's request and "
             "bpf's command single named constants (%s; %s), no other route to syscall and no SYS_ name elsewhere "
@@ -9333,6 +10725,11 @@ def main() -> int:
                         % (target, size, BROKER_PROGRAMS[target], ", ".join(BROKER_ABSENT_SYMBOLS)))
                     say("%s planeon-broker HE-005B symbols (G-HE5B-6): none of its %d symbols has a path in "
                         "planeon_broker::%s" % (target, check_he005b_absent(symbol_names(raw)), ", ::".join(HE005B_MODULES)))
+                    worker = check_broker_worker(raw, (HE / BROKER_WORKER_PROGRAMS[target]).read_bytes())
+                    say("%s planeon-broker WORKER program (HE-005C, G-HE5C-8 and G-HE5C-9): the %d bytes of %s occur "
+                        "exactly once" % (target, worker, BROKER_WORKER_PROGRAMS[target]))
+                    say("%s planeon-broker markers (HE-005C, G-HE5C-9; G-D1-14's form): %s"
+                        % (target, ", ".join(check_broker_markers(symbol_names(raw)))))
                 if binary == "planeon-gate":
                     present = check_gate_symbols(symbol_names(raw))
                     say("%s planeon-gate symbols: gate-tls, rustls and ring present (the composed gate); no membarrier "

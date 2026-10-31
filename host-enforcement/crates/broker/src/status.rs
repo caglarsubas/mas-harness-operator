@@ -9,6 +9,10 @@
 //! - The broker's pre-check of the start state, before role-seal's stage 1 (MON-HE005A-LAUNCH): 36 for the status read,
 //!   37 for the filesystem uid, 38 for the filesystem gid and 39 for the supplementary groups, outside 40-79.
 //! - The I02 listener's one status, 24 (Q-HE5A-3 (a)): `serve_unanswered` returns only on a listener error.
+//! - HE-005C (DESIGN-HE005 section 3.1; delta C3 revision 2, C3-6): the signed configuration's three statuses, the
+//!   gate's and the observer's 11, 12 and 13, which `main` returns between the seal's two stages: the read, the key or
+//!   the signature, and the parse's canonical form, schema or bounds. While the compiled-in key is empty (until HE-008),
+//!   `main` exits 11 or 12 there, before stage 2.
 //!
 //! There is no normal end and no status 0. No status here is held in a byte array (the R1-2 rule over the broker's
 //! sources outside seal.rs).
@@ -21,6 +25,14 @@ pub const NOT_LINUX: u8 = 2;
 /// Both stages of the seal succeeded and the BROKER program is installed, with nothing served; kept from the observer's
 /// table, which `main` does not reach (it runs `serve` instead).
 pub const NOT_YET_SERVING: u8 = 10;
+
+/// `signed_config::load`: a file could not be read as specified (missing, not a regular file, a size out of bounds, a
+/// short or long read, an I/O error).
+pub const CONFIG_READ: u8 = 11;
+/// `signed_config::load`: the compiled-in key is not set or is refused, or the signature does not verify.
+pub const CONFIG_SIGNATURE: u8 = 12;
+/// `BrokerConfig::parse`: the canonical form, the closed schema or a bound of DESIGN-HE005 section 3.1.
+pub const CONFIG_CHECK: u8 = 13;
 
 /// The status of a seal error: the pre-check's own, or its step's.
 pub fn seal(error: &SealError) -> u8 {
