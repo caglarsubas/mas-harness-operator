@@ -4486,7 +4486,9 @@ vendored package, `ci/` or `.github/` path, and no other rule. Its rules are R34
 
 All ten binary lines must equal HE-005C's (`980d42d6`): the packet changes only the gate's tools, this file and its packet
 YAML, HE-GATE-001's file set, whose Binaries section measured all ten lines equal (design review G2-9). The statement at
-the heavy slot: `<pending heavy step>`.
+the heavy slot (e07902fb, 2026-10-31): the ten `he-gate:` binary lines are byte-identical to HE-005C's, in the same order
+(`cmp` equal to the kit's `hegate/hg2-tools/reference-binlines-HE005C.txt`, `d6e8f505…`, HE-005C's final sim lines),
+and the sim at e07902fb reproduced them.
 
 ### Superseded and discharged
 
@@ -4500,9 +4502,19 @@ At build, light (no cargo, no gate run, no mutation proof), on the worktree of `
 changed rules, run from `tools/` as `python3 -I -B -m unittest discover -s . -p test_gate.py -k <name>` (MON-MECH-TARGETED):
 `HeGate2Tests` 6 tests, `HeGateTests` 12, `RoleSealRuleTests` 5 and `He005aObligationTests` 9, 32 tests OK; the R10
 zero-bill scan, light: passed; the privacy scan over the unit's added lines: names, the legacy term, absolute paths and
-e-mails all 0. The
-heavy evidence (the gate, the self-test, the mutation proof over every table with `HEGATE2_PROOF_RULES`, the binary
-statement, the sim): `<pending heavy step>`.
+e-mails all 0.
+
+The heavy evidence, through the build's `heavy.zsh` (the kit's `hegate/hg2-tools`, the author's run), offline, on the
+monitor's word (GO-HG2-HEAVY, with Q-HG2-BUILD (a)), at e07902fb: the gate's self-test, 481 tests, OK (88 s); the
+mutation proof over every proof table (`mutation_proof_all.py`, one table per step), `HEGATE2_PROOF_RULES`' 8 rows (8
+with a one-clause refusing set), `HE005C_PROOF_RULES`' 145 (131, 14), `HEGATE_PROOF_RULES`' 5 (5, 0),
+`HE005B_PROOF_RULES`' 81 (67, 14), `HE005A_PROOF_RULES`' 116 (103, 13) and `I01B5_PROOF_RULES`' 115 (99, 16): 470 rows,
+0 failures; both musl release builds rc 0 (x86_64 23 s, aarch64 21 s), 0 errors; `he-gate: passed`, rc 0, 0 FAILED
+lines (96 s), contracts 69, with both folded checks' printed lines; the zero-bill scan and `tests/verify` rc 0; the
+binary statement as above. The sim at e07902fb (the packet YAML's commit): the nine argv, rc 0 (294 s), `he-gate:
+passed`, 135 test suites passing, tracked files unchanged, planeon-broker's two digests reproduced and the ten binary
+lines equal to HE-005C's; it reruns at the head that carries this record before the PR review. The verify is the
+owner-operated verifier's.
 
 ### Code and audit
 
