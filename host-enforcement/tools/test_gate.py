@@ -11028,6 +11028,18 @@ HE005C_EXEC_ROWS = (
     ("x8 the plan given another script", "(c)",
      ((_CSPAWN, "            child_end,\n            script,\n", "            child_end,\n            self.open_script()?,\n"),)),
 )
+# PR review round 1, R1-1's two planted forms (Q-HE5C-R1-1 (a)): (i) startup_run first calls a new private fn that runs
+# W5, W1 and W2 before its call of startup with the stand-ins; (ii) step 2's Unavailable arm forges a GateTicket.
+_CSTARTUP_CALL = "    startup(&mut handles.leaf_ops(), &mut spawn, &clock, qualifier, binder, config, standing)\n"
+_CFORM_I = ((_CRUN, _CSTARTUP_CALL, "    early(&mut handles.leaf_ops(), &mut spawn, &clock, config, standing);\n"
+                                    + _CSTARTUP_CALL),
+            (_CRUN, "", "\nfn early<L: LeafOps, S: SpawnOps, K: Clock>(leaf: &mut L, spawn: &mut S, clock: &K, "
+                        "config: &BrokerConfig, standing: &mut Standing<S::Child>) {\n"
+                        "    if let Ok((script, (_parent_end, child_end))) = w5(spawn, config) {\n"
+                        "        let _ = w1(leaf, clock, standing);\n"
+                        "        let _ = w2(spawn, config.worker_uid(), child_end, script);\n    }\n}\n"))
+_CFORM_II = ((_CRUN, "        GateAnswer::Unavailable => return Outcome::Unavailable,\n",
+              "        GateAnswer::Unavailable => GateTicket { generation: 0 },\n"),)
 # G-HE5C-5, W4's thaw (check_w4_thaw): exact (a), the pass and the ticket (b), the order and the thaw sites (c).
 HE005C_THAW_ROWS = (
     ("t1 W4's thaw without BIND's ticket", "(a)",
@@ -11046,6 +11058,11 @@ HE005C_THAW_ROWS = (
        "    let _ = w4_thaw(leaf, &passed, &early_ticket());\n    let pid = spawn.child_pid(&child);\n"),)),
     ("t7 a thaw written in hold.rs", "(c)",
      ((_CHOLD, "", "\nfn thaw_early<L: LeafOps>(leaf: &mut L) -> io::Result<()> {\n    leaf.write(LeafWrite::Thaw)\n}\n"),)),
+    ("t8 R1-1 (ii): step 2's Unavailable arm forges a GateTicket", "(b)", _CFORM_II),
+    ("t9 R1-1 (i): startup_run runs W5, W1 and W2 before startup", "(c)", _CFORM_I),
+    ("t10 a thaw written in startup (R1-2)", "(c)",
+     ((_CRUN, "    let pid = spawn.child_pid(&child);\n",
+       "    let _ = leaf.write(LeafWrite::Thaw);\n    let pid = spawn.child_pid(&child);\n"),)),
 )
 # G-HE5C-6, the control opener (check_control_opener): raw.rs's names (a), its site (b), every other file (c).
 HE005C_OPENER_ROWS = (
@@ -11063,6 +11080,7 @@ HE005C_OPENER_ROWS = (
     ("o6 a lifecycle comment names cgroup.freeze", "(c)", ((_CLEAF, "", "\n// thaws by writing 0 to cgroup.freeze\n"),)),
     ("o7 a broker test names cgroup.kill", "(c)", ((_CTESTS, "", "\n// kills through cgroup.kill\n"),)),
     ("o8 broker-sys's lib.rs names cgroup.kill", "(c)", ((_CSYSLIB, "", '\npub const KILL: &str = "cgroup.kill";\n'),)),
+    ("o9 an O_RDWR const in raw.rs (R1-2)", "(b)", ((_CRAW, "", "\nconst O_RDWR: c_long = 2;\n"),)),
 )
 # G-HE5C-7 and the seam note section 1: the lists (check_he005c_lists), and the existing lints over broker-sys and the
 # lifecycle (the start-up lint, the unsafe tripwire, the foreign items, the linked sources and threads, the socket
@@ -11078,6 +11096,8 @@ HE005C_STARTUP_ROWS = (
     ("k3 the descriptor-directory path in leaf.rs", "(sources)",
      ((_CLEAF, "", '\nfn fds(pid: i32) -> String {\n    format!("/proc/{}/fd", pid)\n}\n'),)),
     ("k4 a second /sys path in leaf.rs", "(sources)", ((_CLEAF, "", '\nconst OTHER: &str = "/sys/fs/cgroup/other";\n'),)),
+    ("k14 raw.rs's descriptor-directory path changed (R1-2)", "(sources)",
+     ((_CRAW, 'format!("/proc/{}/fd", pid)', 'format!("/proc/{}/fdinfo", pid)'),)),
 )
 HE005C_UNSAFE_ROWS = (
     ("k5 unsafe in broker-sys's lib.rs", "(unsafe)", ((_CSYSLIB, "", "\nfn f() {\n    unsafe {}\n}\n"),)),
@@ -11120,6 +11140,8 @@ HE005C_CALLS_ROWS = (
      ((_CRAW, "", "\nfn other() -> c_long {\n    Kernel.call(SYS_GETDENTS64, [0; 6])\n}\n"),)),
     ("c8 a SYS_ name in the lifecycle", "(d)", ((_CLEAF, "", "\nconst SYS_OPENAT: i64 = 257;\n"),)),
     ("c9 syscall named in broker-sys's lib.rs", "(d)", ((_CSYSLIB, "", "\nfn syscall() {}\n"),)),
+    ("c10 an expression for sys's call number (R1-2)", "(c)",
+     ((_CRAW, "sys(SYS_WRITE, [control.as_raw_fd()", "sys(SYS_WRITE + 0, [control.as_raw_fd()"),)),
 )
 # G-HE5C-7, the closure (G-HE5B-3's block over HE005B_CLOSURE_TREE).
 HE005C_CLOSURE_ROWS = (
@@ -11154,6 +11176,9 @@ HE005C_PROGRAM_ROWS = (
      ((_OSEAL, "program: RUNNING_ARCH.program(),", "program: PROGRAM_AARCH64.as_slice(),"),)),
     ("r4 a program static named in lib.rs", "(programs)",
      ((_BLIB, "", "\npub fn program_bytes() -> &'static [u8] {\n    crate::seal::PROGRAM_X86_64\n}\n"),)),
+    ("r5 the broker's program arms fully swapped (R1-2)", "(programs)",
+     ((_BSEAL, "            Arch::X86_64 => PROGRAM_X86_64.as_slice(),\n            Arch::Aarch64 => PROGRAM_AARCH64.as_slice(),",
+       "            Arch::X86_64 => PROGRAM_AARCH64.as_slice(),\n            Arch::Aarch64 => PROGRAM_X86_64.as_slice(),"),)),
 )
 # G-HE5C-9, the markers' text half (check_he005c_markers): defined (a), called once (b), the WORKER statics (c).
 HE005C_MARKER_ROWS = (
@@ -11209,6 +11234,9 @@ HE005C_SERVE_ROWS = (
      ((_CHOLD, "", "\nfn again() {\n    let _ = super::run::startup_run;\n}\n"),)),
     ("v6 seal.rs names the lifecycle", "(c)",
      ((_BSEAL, "", "\nfn leaf_path() -> &'static [u8] {\n    crate::lifecycle::leaf::membership()\n}\n"),)),
+    ("v7 R1-1 (i): startup_run's body runs W5, W1 and W2 first", "(b)", _CFORM_I),
+    ("v8 derive_hold no longer holds a failed open", "(b)",
+     ((_CRUN, "        Err(_) => Some(Step::HoldRead),\n", "        Err(_) => None,\n"),)),
 )
 # G-HE5C-12, the key through black_box (check_broker_load): exact (a), the observer's parity (b).
 _CLOAD = "load_from(PRODUCTION_DIR, core::hint::black_box(COMPILED_KEY))"
@@ -11220,6 +11248,8 @@ HE005C_LOAD_ROWS = (
     ("y4 the document limit changed", "(b)",
      ((_CSIGNED, "pub const DOCUMENT_LIMIT: usize = 1 << 20;", "pub const DOCUMENT_LIMIT: usize = 1 << 21;"),)),
     ("y5 the observer's directory", "(b)", ((_CSIGNED, '"/etc/planeon/capacity-broker"', '"/etc/planeon/policy-observer"'),)),
+    ("y6 a black_box in run.rs (R1-2)", "(a)",
+     ((_CRUN, "", "\nfn opaque(value: u64) -> u64 {\n    core::hint::black_box(value)\n}\n"),)),
 )
 # G-HE5C-13, the configured seal site (check_seal_order with BROKER_SEAL_SITE).
 HE005C_SITE_ROWS = (
@@ -11236,6 +11266,8 @@ HE005C_SITE_ROWS = (
        "    let _again = signed_config::load();\n    let config = match BrokerConfig::parse(&document) {"),)),
     ("n6 a Dir import in config.rs before the seal", "(site)", ((_CCONFIG, "", "\nuse gate_sys::Dir;\n"),)),
     ("n7 the parse reading another document", "(site)", ((_BMAIN, "BrokerConfig::parse(&document)", "BrokerConfig::parse(&stage1)"),)),
+    ("n8 a statement between the parse and stage 2 (R1-2)", "(site)",
+     ((_BMAIN, "    let sealed = match seal_stage2(stage1) {", "    let _x = 1;\n    let sealed = match seal_stage2(stage1) {"),)),
 )
 # MON-SEAM-E2, check_role_seal (e)'s one-file exception: a second format! in proc.rs, another format string there, and the
 # expression in another broker file still refuse.
@@ -11246,6 +11278,8 @@ HE005C_E2_ROWS = (
      ((_CPROC, 'Dir::at(&format!("/proc/{}", pid))', 'Dir::at(&format!("/proc/{}/", pid))'),)),
     ("p3 the process-directory open in leaf.rs", "(e)",
      ((_CLEAF, "", '\nfn peer(pid: i32) -> io::Result<Dir> {\n    Dir::at(&format!("/proc/{}", pid))\n}\n'),)),
+    ("p4 a second identical process-directory open in proc.rs (R1-2)", "(e)",
+     ((_CPROC, "", '\nfn again(pid: i32) -> io::Result<Dir> {\n    Dir::at(&format!("/proc/{}", pid))\n}\n'),)),
 )
 # MON-SEAM-E3, G-HE5B-1 (b)'s qualified-form exception: a bare name, any other form, or a listed form in another file
 # still refuses.
@@ -11259,6 +11293,7 @@ HE005C_E3_ROWS = (
     ("q5 Step::Bind outside the lifecycle", "(b)", ((_BLIB, "", "\npub fn bind_step() -> u8 {\n    let _ = Step::Bind;\n    0\n}\n"),)),
     ("q6 Bind given a payload", "(b)", ((_COUT, "W3Descriptors, Bind, W4Thaw", "W3Descriptors, Bind(u8), W4Thaw"),)),
     ("q7 ops.rs's form in spawn.rs", "(b)", ((_CSPAWN, "", "\nfn end(_end: Self::ChannelEnd) {}\n"),)),
+    ("q8 run.rs's form after another :: (R1-2)", "(b)", ((_CRUN, "", "\ntype Other = crate::x::S::ChannelEnd;\n"),)),
 )
 # LINKED-EXCEPTIONS-PROOF (the plan's Q-HE5C-5 (a)): each main's one exit import is the only std::process path the linked
 # scan removes; another std::process import beside it refuses (He005cLinkedExceptionTests shows a loosened allowance
@@ -11382,8 +11417,10 @@ class He005cRuleTests(Tree):
 
     def test_the_tables(self):
         self.assertEqual(tuple(len(rule[3]) for rule in HE005C_PROOF_RULES),
-                         (12, 8, 7, 8, 2, 4, 2, 2, 2, 3, 9, 2, 3, 3, 4, 8, 12, 6, 5, 7, 3, 7, 6))
-        self.assertEqual(sum(len(rule[3]) for rule in HE005C_PROOF_RULES), 125)
+                         (12, 8, 10, 9, 2, 5, 2, 2, 2, 3, 10, 2, 3, 3, 5, 8, 12, 8, 6, 8, 4, 8, 6))
+        # PR review round 1 (Q-HE5C-R1-1 (a)): R1-1's four rows (its two planted forms, derive_hold's pin) and
+        # R1-2's nine, 125 -> 138.
+        self.assertEqual(sum(len(rule[3]) for rule in HE005C_PROOF_RULES), 138)
         for name, check, clauses, rows, tag, any_tag, patches, tree in HE005C_PROOF_RULES:
             self.assertTrue(callable(check), name)
             for row in rows:

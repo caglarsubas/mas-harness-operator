@@ -1570,6 +1570,18 @@ BROKER_SERVE_CALLS = tuple((re.compile(pattern), name) for pattern, name in (
 BROKER_SERVE_BODY = ("{ let leaf = open_leaf(); let mut standing = derive_hold(&leaf); "
                      "startup_run(&leaf, &config, &mut standing, QualifierStandIn, BinderStandIn); "
                      "status::listener(&serve_unanswered(&mut LinuxI02::new(sealed))) }")
+# HE-005C PR review round 1, R1-1 (Q-HE5C-R1-1 (a), folded before the push): G-HE5C-11 (b) pins, in the same form, the
+# bodies of the two run entries serve reaches in lifecycle/run.rs, so neither can run a W-step before the startup run's
+# one call of `startup` with serve's two seams: startup_run's (a failed leaf open holds; the clock's origin; the one call)
+# and derive_hold's (the derivation over the opened leaf, a failed open counting as HoldRead, with no write).
+STARTUP_RUN_BODY = ("{ let Ok(handles) = opened else { standing.hold(Step::HoldRead); return "
+                    "Outcome::CapacityHeld(Step::HoldRead); }; let clock = MonotonicClock::start(); let mut spawn = "
+                    "LinuxSpawn::new(handles.leaf_dir(), config.worker_script_path()); startup(&mut handles.leaf_ops(), "
+                    "&mut spawn, &clock, qualifier, binder, config, standing) }")
+DERIVE_HOLD_BODY = ("{ let mut standing = Standing::new(); let found = match opened { Ok(handles) => "
+                    "hold::derive(&mut handles.leaf_ops(), false), Err(_) => Some(Step::HoldRead), }; if let Some(step) = "
+                    "found { standing.hold(step); } standing }")
+RUN_ENTRY_BODIES = {"startup_run": STARTUP_RUN_BODY, "derive_hold": DERIVE_HOLD_BODY}
 BROKER_SERVE_TOKEN = re.compile(r"[A-Za-z_]\w*|::|\S")
 # HE-005B (the HE-005B plan's gate rules G-HE5B-1..6; MON-HE005B-PLAN; the build brief's conditions 1 and 2):
 # G-HE5B-4, the include rule's two files: seal.rs embeds exactly the two BROKER programs, and i02.rs exactly the vendored
@@ -3352,12 +3364,26 @@ def serve_a_calls_once(body: str, rule: str) -> None:
             % (", ".join(name for _, name in BROKER_SERVE_CALLS), rule))
 
 
-def serve_b_body_exact(body: str, rule: str) -> None:
+def serve_b_body_exact(body: str, rule: str, base: Path | None = None) -> None:
     """R1-5 (b): the broker's serve body is token for token (BROKER_SERVE_TOKEN) BROKER_SERVE_BODY, so serve runs the
     listener seam once and returns only its status: no statement before or after it, no loop, branch or closure around
-    it, and no other value returned."""
+    it, and no other value returned. HE-005C PR review round 1, R1-1: with `base`, lifecycle/run.rs's startup_run and
+    derive_hold bodies (code, comments removed, literal contents emptied, the whitespace around `::` removed, non-test)
+    are token for token RUN_ENTRY_BODIES' too."""
     require(BROKER_SERVE_TOKEN.findall(body) == BROKER_SERVE_TOKEN.findall(BROKER_SERVE_BODY),
             "the broker's serve body is not exactly `%s` (%s (b))" % (BROKER_SERVE_BODY, rule))
+    if base is None:
+        return
+    require((base / BROKER_RUN).is_file(), "%s is missing (%s (b))" % (BROKER_RUN, rule))
+    try:
+        run = blank_test_blocks(PATH_SPACE.sub("::", rust_code((base / BROKER_RUN).read_text(encoding="utf-8"))))
+    except GateError as error:
+        raise GateError("%s: %s (%s (b))" % (BROKER_RUN, error, rule)) from None
+    for name, pinned in RUN_ENTRY_BODIES.items():
+        spans = [span for span in function_bodies(run) if span[0] == name]
+        require(len(spans) == 1 and BROKER_SERVE_TOKEN.findall(run[spans[0][2]:spans[0][3]])
+                == BROKER_SERVE_TOKEN.findall(pinned), "%s's %s body is not exactly `%s` (%s (b))"
+                % (BROKER_RUN, name, pinned, rule))
 
 
 def check_broker_serve(base: Path) -> int:
@@ -3367,11 +3393,12 @@ def check_broker_serve(base: Path) -> int:
     serve_unanswered and LinuxI02 exactly once each, in that order (G5's form); (b) its body is exactly BROKER_SERVE_BODY.
     Its imports are BROKER_SEAL_SITE's pinned set and main calls it once, as the tail. HE-005C (G-HE5C-11): (a)'s order
     begins with the opening function, the HOLD derivation and the startup run, (b)'s body is serve's new one, and (c)
-    holds the lifecycle reachable only through serve (serve_c_isolation). The number of named calls."""
+    holds the lifecycle reachable only through serve (serve_c_isolation). PR review round 1, R1-1: (b) also pins
+    startup_run's and derive_hold's bodies (RUN_ENTRY_BODIES). The number of named calls."""
     rule = "broker serve, R1-5"
     body = serve_body(base, rule, BROKER_MAIN)
     serve_a_calls_once(body, rule)
-    serve_b_body_exact(body, rule)
+    serve_b_body_exact(body, rule, base)
     serve_c_isolation(base, rule)
     return len(BROKER_SERVE_CALLS)
 
@@ -3821,6 +3848,14 @@ W3_PASSED_FORMS = (re.compile(r"\bstruct\s+W3Passed\s*\{"), re.compile(r"->\s*Re
                    re.compile(r"\b_passed\s*:\s*&\s*W3Passed\b"))
 THAW_SITES = {(BROKER_RUN, "w1_failure"): 1, (BROKER_RUN, "w4_thaw"): 1, (BROKER_W6, "sequence"): 1,
               (BROKER_NP9, "bracket"): 2}
+# HE-005C PR review round 1, R1-1 (Q-HE5C-R1-1 (a)): (c)'s call-site construction for the run's other steps. Each name,
+# counted over the broker's sources (comments removed, literal contents emptied, non-test), is its fn in run.rs plus
+# exactly its calls there, each inside its one pinned enclosing fn, as the code at 48cd924f has them: W5, W1, W2 and W3
+# once each and W6's entry (after_w6) eight times, all in startup, and startup once, in startup_run. So no other fn
+# runs a W-step before the run's step 2, or around it. (b)'s literal rule covers both seam tickets (SEAM_TICKETS).
+RUN_CALL_SITES = {"w5": ("startup", 1), "w1": ("startup", 1), "w2": ("startup", 1), "w3": ("startup", 1),
+                  "after_w6": ("startup", 8), "startup": ("startup_run", 1)}
+SEAM_TICKETS = ("BindTicket", "GateTicket")
 W4_CALL = re.compile(r"\bw4_thaw\s*\(\s*leaf\s*,\s*&\s*passed\s*,\s*&\s*bound\s*\)")
 W3_BINDING = re.compile(r"\blet\s+passed\s*=\s*match\s+w3\s*\(")
 BIND_BINDING = re.compile(r"\blet\s+bound\s*=\s*match\s+binder\.bind\s*\(\s*&\s*gate\s*,\s*pid\s*,\s*passed\.start_ticks\s*\)"
@@ -3850,7 +3885,8 @@ def thaw_a_exact(kept: str, rule: str) -> None:
 
 def thaw_b_pass(codes: dict[str, str], rule: str) -> None:
     """G-HE5C-5 (b): W3Passed is exactly W3_PASSED_TEXT, named in run.rs only by W3_PASSED_FORMS (once each; its one
-    literal inside w3) and in no other broker source; the only `BindTicket {` is seams.rs's definition."""
+    literal inside w3) and in no other broker source; the only `BindTicket {` is seams.rs's definition. PR review round
+    1, R1-1: likewise the only `GateTicket {` (SEAM_TICKETS), so step 2's ticket comes from the qualifier's answer."""
     run = codes[BROKER_RUN]
     require(he005c_item_text(run, BROKER_RUN, re.compile(r"\bstruct\s+W3Passed\b"), rule, "struct W3Passed")
             == W3_PASSED_TEXT, "%s's W3Passed is not exactly `struct W3Passed { start_ticks: u64, }` (%s (b))"
@@ -3864,20 +3900,32 @@ def thaw_b_pass(codes: dict[str, str], rule: str) -> None:
             % (BROKER_RUN, rule))
     for rel, code in sorted(codes.items()):
         require(rel == BROKER_RUN or not re.search(r"\bW3Passed\b", code), "%s names W3Passed (%s (b))" % (rel, rule))
-        literals = len(re.findall(r"\bBindTicket\s*\{", code))
-        require(literals == (1 if rel == BROKER_SEAMS else 0)
-                and (rel != BROKER_SEAMS or re.search(r"\bstruct\s+BindTicket\s*\{", code)),
-                "%s writes a BindTicket literal; only the binder's answer carries one (%s (b))" % (rel, rule))
+        for ticket in SEAM_TICKETS:
+            literals = len(re.findall(r"\b%s\s*\{" % ticket, code))
+            require(literals == (1 if rel == BROKER_SEAMS else 0)
+                    and (rel != BROKER_SEAMS or re.search(r"\bstruct\s+%s\s*\{" % ticket, code)),
+                    "%s writes a %s literal; only its seam's answer carries one (%s (b))" % (rel, ticket, rule))
 
 
 def thaw_c_order(codes: dict[str, str], rule: str) -> None:
     """G-HE5C-5 (c): w4_thaw is named only in run.rs, as its fn and one W4_CALL in startup, after startup's one
     W3_BINDING and one BIND_BINDING and before its one NP9_CALL; LeafWrite::Thaw is written exactly at THAW_SITES (by
-    enclosing fn), and the word Thaw occurs nowhere else."""
+    enclosing fn), and the word Thaw occurs nowhere else. PR review round 1, R1-1: each of RUN_CALL_SITES is named only
+    in run.rs, as its one fn and exactly its pinned number of calls, each inside its pinned enclosing fn."""
     run = codes[BROKER_RUN]
     for rel, code in sorted(codes.items()):
         require(len(re.findall(r"\bw4_thaw\b", code)) == (2 if rel == BROKER_RUN else 0),
                 "%s names w4_thaw other than run.rs's fn and its one call (%s (c))" % (rel, rule))
+    spans = function_bodies(run)
+    for name, (owner, count) in RUN_CALL_SITES.items():
+        calls = [match for match in re.finditer(r"\b%s\s*\(" % name, run)
+                 if not re.search(r"\bfn\s+$", run[:match.start()])]
+        owners = [([span[0] for span in spans if span[2] < match.start() < span[3]] or [""])[-1] for match in calls]
+        total = sum(len(re.findall(r"\b%s\b" % name, code)) for code in codes.values())
+        require(len([span for span in spans if span[0] == name]) == 1 and len(calls) == count
+                and owners == [owner] * count and total == 1 + count,
+                "the broker names %s other than as run.rs's fn and exactly %d call%s in %s (%s (c))"
+                % (name, count, "" if count == 1 else "s", owner, rule))
     _, opening, end = he005c_fn(run, BROKER_RUN, "startup", rule)
     body = run[opening:end]
     found = [list(pattern.finditer(body)) for pattern in (W3_BINDING, BIND_BINDING, W4_CALL, NP9_CALL)]
@@ -10392,8 +10440,9 @@ def main() -> int:
             "unlink, remove_file, remove_dir, remove_dir_all, rename or hard_link outside strict test blocks"
             % check_broker_never_unlinks(HE))
         say("broker serve (HE-005A, PR review round 1, R1-5; G5's form; HE-005C, G-HE5C-11): %s's fn serve names %d "
-            "calls exactly once each, in order (%s) (a), its body is exactly `%s` (b), and the lifecycle is reached only "
-            "through serve's three entries (c)" % (BROKER_MAIN, check_broker_serve(HE),
+            "calls exactly once each, in order (%s) (a), its body is exactly `%s` and startup_run's and derive_hold's "
+            "bodies are pinned (b; PR review round 1, R1-1), and the lifecycle is reached only through serve's three "
+            "entries (c)" % (BROKER_MAIN, check_broker_serve(HE),
                                                                  ", ".join(name for _, name in BROKER_SERVE_CALLS),
                                                                  BROKER_SERVE_BODY))
         say("HE-005B isolation (G-HE5B-1): the modules %s, defining %d type names, are named outside their files only by "
@@ -10423,8 +10472,9 @@ def main() -> int:
             "it measures and W2's plan takes, never rebound (c); reading code, non-test" % check_measured_exec(HE))
         say("HE-005C W4 thaw (G-HE5C-5): w4_thaw is exactly its pinned text, taking W3's pass and BIND's ticket (a); "
             "W3Passed is closed and made only by w3, and no broker source writes a BindTicket literal (b); w4_thaw is "
-            "called once, after W3 and BIND and before NP-9's bracket, and LeafWrite::Thaw is written at exactly %d "
-            "sites %s (c); reading crates/broker's code, non-test" % (check_w4_thaw(HE), ", ".join(
+            "called once, after W3 and BIND and before NP-9's bracket, LeafWrite::Thaw is written at exactly %d sites "
+            "%s, and W5, W1, W2, W3 and W6's entry are called only in startup and startup only in startup_run (c; PR "
+            "review round 1, R1-1); reading crates/broker's code, non-test" % (check_w4_thaw(HE), ", ".join(
                 "%s %s" % site for site in THAW_SITES)))
         say("HE-005C control opener (G-HE5C-6): %s's raw text names %s once each, on their pinned lines (a); its "
             "non-test code holds CONTROL_FLAGS (O_WRONLY|O_CLOEXEC|O_NOFOLLOW) and one opener in the function that maps "
