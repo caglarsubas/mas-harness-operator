@@ -4328,8 +4328,16 @@ seal's stages. Its rules are R315-R345.
 
 The binary statement (the plan): planeon-broker's bytes change; planeon-gate, planeon-observer, planeon-containment and
 planeon-writer, with their SBOMs, stay byte-identical to the base's (`dc9cbd3e`; HE-GATE-001 changed no binary input).
-The statement at the heavy slot: `<pending heavy step>`. The per-binary lines for planeon-broker (A's rules, the WORKER
-bytes once, the markers, G-HE5B-6): `<pending heavy step>`.
+The statement at the heavy slot (92f235a8, 2026-10-31; the kit's `c-tools/binstatement_c.py` over the gate log, rc 0):
+planeon-gate, planeon-observer, planeon-containment and planeon-writer are byte-identical, sha256 and SBOM, to
+HE-GATE-001's lines on both targets (the kit's `reference-binlines-HE005B`, which HE-GATE-001's lines equal).
+planeon-broker changes: x86_64 static-pie, sha256 `eef71595a0d0595e8361ff619bcd25b05740467a56700eaf8dfafe06d26a07c5`,
+SBOM `90eefb12…`; aarch64 static, sha256 `06e7547152952bf7534dd23e70dadb817a0fa36f771062fa2417949102eaf3fe`, SBOM
+`64d90c5b…`; its SBOM holds 36 components, with the workspace crates broker-sys (new), gate-sys, i05-protocol,
+planeon-broker and role-seal. The per-binary lines for planeon-broker, on both targets: the BROKER program exactly once
+(2608 bytes on x86_64, 2488 on aarch64) and none of A's refused symbols; the WORKER program exactly once (1496 and 1376
+bytes; G-HE5C-8 and G-HE5C-9); the five markers present (G-HE5C-9); none of its symbols (1144 and 1298) has a path in
+HE-005B's four modules (G-HE5B-6).
 
 ### Superseded and discharged
 
@@ -4345,9 +4353,26 @@ bytes once, the markers, G-HE5B-6): `<pending heavy step>`.
 At build, light (`python3 -I -B` text checks, no cargo): the brief's, addenda 1-3's, the errata file's, the plan's, the
 design's, delta C3's and the seam note's digests; every source-text check taking only the tree, run over the worktree by
 importing `tools/gate.py` read-only, each passing; each proof row of the three tables built in memory with its anchors
-found once; the privacy scan over each unit's added lines. Their counts: `<pending heavy step>`. U1's cargo results are
-R316's. The heavy evidence (`cargo test`, both musl release builds, `he-gate`, the gate's self-test, the
-mutation proof, `tests/verify`, the binary statement, the sim): `<pending heavy step>`.
+found once; the privacy scan over each unit's added lines. Their counts: 109 check calls, each passing (84 single-tree
+checks, the workspace check and its shape, the three seal sites, the signer keys and the HE-005C rules), with the
+author's own re-run of the 84 single-tree checks passing at U4 and at U5; the proof rows of HE-005A's (116), HE-005B's
+(81) and HE-005C's (125) tables with 0 anchor failures; every unit's privacy scan 0 for names, the legacy term, absolute
+paths and e-mails. U1's cargo results are R316's.
+
+The heavy evidence, through the build's `heavy.zsh` (the author's run), offline, on the monitor's word (GO-HE5C-HEAVY,
+2026-10-31), at 92f235a8: cargo test rc 0, 909 passed, 0 failed, 0 ignored, in 135 test binaries (167 s), among them
+broker-sys's 15 and the broker's new `broker_config` 5, `broker_signed_config` 8, `broker_status` 5, `lifecycle` 16 and
+`lifecycle_text` 9; both musl release builds rc 0 (x86_64 23 s, aarch64 21 s), 0 errors, every warning the vendored
+ring's. `he-gate: passed`, rc 0, 0 FAILED lines (90 s), contracts 69, with the HE-005C lines. The gate's self-test: 475
+tests, OK (83 s), after U5-F1's count-only fix (Q-U5-1 (a)). The mutation proof over every proof table (the author's
+`mutation_proof_all.py`, one table per step through `heavy.zsh mutationall`, the lane's row logic for each table's
+shape): `HE005C_PROOF_RULES`' 125 rows (111 with a one-clause refusing set, 14 with more), `HEGATE_PROOF_RULES`' 5 (5,
+0), `HE005B_PROOF_RULES`' 81 (67, 14), `HE005A_PROOF_RULES`' 116 (103, 13) and `I01B5_PROOF_RULES`' 115 (99, 16, each
+stated set equal to its actual set): 442 rows, 0 failures. The zero-bill scan and `tests/verify` (13 tests) rc 0. The
+binary statement as above. The sim at 414ea76f (the packet YAML's commit): the nine argv, rc 0 (292 s), `he-gate:
+passed`, tracked files unchanged, planeon-broker's two digests reproduced and the ten binary lines equal to the heavy
+slot's; it reruns at the head that carries this record before the PR review. The verify is the owner-operated
+verifier's.
 
 ### Code and audit
 
