@@ -4363,18 +4363,15 @@ The heavy evidence, through the build's `heavy.zsh` (the author's run), offline,
 2026-10-31), at 92f235a8: cargo test rc 0, 909 passed, 0 failed, 0 ignored, in 135 test binaries (167 s), among them
 broker-sys's 15 and the broker's new `broker_config` 5, `broker_signed_config` 8, `broker_status` 5, `lifecycle` 16 and
 `lifecycle_text` 9; both musl release builds rc 0 (x86_64 23 s, aarch64 21 s), 0 errors, every warning the vendored
-ring's. `he-gate: passed`, rc 0, 0 FAILED lines (90 s), contracts 69, with the HE-005C lines (after PR review round 1's
-fold: `<pending heavy re-run>`). The gate's self-test: 475 tests, OK (83 s), after U5-F1's count-only fix (Q-U5-1
-(a)) (after the fold: `<pending heavy re-run>`). The mutation proof over every proof table (the author's
+ring's. `he-gate: passed`, rc 0, 0 FAILED lines (90 s), contracts 69, with the HE-005C lines (after PR review round 1's fold, at 7fcd358d on the monitor's word, GO-HE5C-HEAVY2: rc 0, 0 FAILED lines (120 s), the ten binary lines unchanged). The gate's self-test: 475 tests, OK (83 s), after U5-F1's count-only fix (Q-U5-1
+(a)) (after the fold: 475 tests, OK (125 s)). The mutation proof over every proof table (the author's
 `mutation_proof_all.py`, one table per step through `heavy.zsh mutationall`, the lane's row logic for each table's
-shape): `HE005C_PROOF_RULES`' 125 rows (111 with a one-clause refusing set, 14 with more; 138 rows after the fold:
-`<pending heavy re-run>`), `HEGATE_PROOF_RULES`' 5 (5,
+shape): `HE005C_PROOF_RULES`' 125 rows (111 with a one-clause refusing set, 14 with more; 138 rows after the fold: 124 and 14, 0 failures, each of the 125 earlier rows' refusing sets unchanged), `HEGATE_PROOF_RULES`' 5 (5,
 0), `HE005B_PROOF_RULES`' 81 (67, 14), `HE005A_PROOF_RULES`' 116 (103, 13) and `I01B5_PROOF_RULES`' 115 (99, 16, each
-stated set equal to its actual set): 442 rows, 0 failures (455 rows after the fold: `<pending heavy re-run>`). The zero-bill scan and `tests/verify` (13 tests) rc 0. The
+stated set equal to its actual set): 442 rows, 0 failures (455 rows after the fold, 0 failures). The zero-bill scan and `tests/verify` (13 tests) rc 0. The
 binary statement as above. The sim at 414ea76f (the packet YAML's commit): the nine argv, rc 0 (292 s), `he-gate:
 passed`, tracked files unchanged, planeon-broker's two digests reproduced and the ten binary lines equal to the heavy
-slot's; it reruns at the head that carries this record before the PR review (after the fold: `<pending heavy
-re-run>`). The verify is the owner-operated
+slot's; the sim at 48cd924f (round 1's head): rc 0 (322 s), the same; after the fold it reruns at the head that carries this record before round 2. The verify is the owner-operated
 verifier's.
 
 ### Code and audit
