@@ -10941,6 +10941,145 @@ class HeGateTests(Tree):
                         self.write(rel, text)
 
 
+# --- HE-GATE-002 (HE-GATE-001 PR review round 1, HG-R1-1, with HE-005A PR review round 1's R1-1 role_seal twin; plan
+# rev 1; Q-HG2-1..4 (a)): use_path_self_folded in HE-GATE-001's (i) and R1-5 (a). Its rows form HEGATE2_PROOF_RULES, in
+# HE005B_PROOF_RULES' 8-field shape (design review G2-5), so HEGATE_PROOF_RULES' and HE005A_PROOF_RULES' pins stay.
+HEGATE2_FIX_B_ROWS = (
+    ("HG2-1 use gate_sys::{self::{self}}; in client.rs", "(i)", ((_OCLIENT, "", "\nuse gate_sys::{self::{self}};\n"),)),
+    ("HG2-2 use gate_sys::{self::{self as g}}; in config.rs", "(i)",
+     ((_HG_CONFIG, "", "\nuse gate_sys::{self::{self as g}};\n"),)),
+    ("HG2-3 use gate_sys::{self::{self::{self}}}; in client.rs", "(i)",
+     ((_OCLIENT, "", "\nuse gate_sys::{self::{self::{self}}};\n"),)),
+)
+HEGATE2_STAGE_ROWS = (
+    ("HG2-4 use role_seal::{self::{self}}; in the broker's lib.rs", "(a)",
+     ((_BLIB, "", "\nuse role_seal::{self::{self}};\n"),)),
+    ("HG2-5 use role_seal::{self::{self}}; in an observer module", "(a)",
+     ((_OCLIENT, "", "\nuse role_seal::{self::{self}};\n"),)),
+    ("HG2-6 use role_seal::{self::{self as r}}; in the broker's lib.rs", "(a)",
+     ((_BLIB, "", "\nuse role_seal::{self::{self as r}};\n"),)),
+    ("HG2-7 use role_seal::{self::{self::{self}}}; in an observer module", "(a)",
+     ((_OCLIENT, "", "\nuse role_seal::{self::{self::{self}}};\n"),)),
+    ("HG2-8 use role_seal::self::seal_stage1; in an observer module", "(a)",
+     ((_OCLIENT, "", "\nuse role_seal::self::seal_stage1;\n"),)),
+)
+# The rows the fold itself refuses (G2-4's fold-revert self-test): each passes with use_path_self_folded patched to the
+# identity. HG2-8 is the interior-self stage import, which the merged stage check refuses with or without the fold.
+HEGATE2_FOLD_ROWS = ("HG2-1", "HG2-2", "HG2-3", "HG2-4", "HG2-5", "HG2-6", "HG2-7")
+HEGATE2_PROOF_RULES = (
+    ("HE-GATE-002 (i), interior self", gate.check_observer_gate_sys_crate, tuple(HEGATE_FIX_B_FUNCTIONS),
+     HEGATE2_FIX_B_ROWS, lambda clause: "(observer gate_sys crate, HE-GATE-001 %s)" % clause,
+     r"\(observer gate_sys crate, HE-GATE-001 \(", named_patches(HEGATE_FIX_B_FUNCTIONS), hegate_observer_tree),
+    ("HE-GATE-002 R1-5 (a), interior self", gate.check_role_seal_stage_calls, tuple(STAGE_CALL_FUNCTIONS),
+     HEGATE2_STAGE_ROWS, lambda clause: "(role-seal stage calls, R1-5 %s)" % clause, r"\(role-seal stage calls, R1-5 \(",
+     named_patches(STAGE_CALL_FUNCTIONS), he005b_tree),
+)
+
+
+class HeGate2Tests(Tree):
+    """HE-GATE-002 over copies of the real sources (HE005B_TREE, which holds HE005A_TREE): use_path_self_folded drops
+    every `self` after a path's head and keeps a trailing one; HE-GATE-001's (i) and R1-5 (a) refuse the interior-self
+    forms of the crate itself, renamed and deeper (HG2-1..HG2-7), and still refuse the interior-self stage import
+    (HG2-8); valid imports, interior-self item imports among them, pass; each fold row passes with the fold patched to the
+    identity; the proof table HEGATE2_PROOF_RULES."""
+
+    TREE = HE005B_TREE
+
+    def planted(self, changes, tree):
+        for rel, text in tree(changes).items():
+            self.write(rel, text)
+
+    def test_the_fold(self):
+        for path, folded in ((("gate_sys", "self", "self"), ("gate_sys", "self")),
+                             (("gate_sys", "self", "self", "self"), ("gate_sys", "self")),
+                             (("gate_sys", "self", "channel", "Poller"), ("gate_sys", "channel", "Poller")),
+                             (("role_seal", "self", "seal_stage1"), ("role_seal", "seal_stage1")),
+                             (("gate_sys", "inet", "self"), ("gate_sys", "inet", "self")),
+                             (("gate_sys", "self"), ("gate_sys", "self")), (("gate_sys",), ("gate_sys",)),
+                             (("self", "gate_sys"), ("self", "gate_sys")), (("self",), ("self",)), ((), ()),
+                             (("gate_sys", "self", "*"), ("gate_sys", "*"))):
+            self.assertEqual(gate.use_path_self_folded(path), folded, path)
+
+    def test_fix_b_i_refuses_the_interior_self_forms(self):
+        for label, _, changes in HEGATE2_FIX_B_ROWS:
+            ((rel, _, text),) = changes
+            self.refused(gate.check_observer_gate_sys_crate, rel, self.TREE[rel] + text,
+                         re.escape("%s imports the gate_sys crate itself (observer gate_sys crate, HE-GATE-001 (i))"
+                                   % rel))
+
+    def test_stage_calls_a_refuses_the_interior_self_forms(self):
+        for label, _, changes in HEGATE2_STAGE_ROWS:
+            ((rel, _, text),) = changes
+            message = ("%s imports role-seal's seal_stage1" % rel if "seal_stage1" in text
+                       else "%s imports the role_seal crate itself" % rel)
+            self.refused(gate.check_role_seal_stage_calls, rel, self.TREE[rel] + text,
+                         re.escape("%s (role-seal stage calls, R1-5 (a))" % message))
+
+    def test_valid_imports_pass(self):
+        for check, count, rel, text in (
+                (gate.check_observer_gate_sys_crate, HEGATE_OBSERVER_SOURCES, _HG_CONFIG,
+                 "use gate_sys::self::channel::Poller;\n"),
+                (gate.check_observer_gate_sys_crate, HEGATE_OBSERVER_SOURCES, _OCLIENT, "use gate_sys::channel::Poller;\n"),
+                (gate.check_observer_gate_sys_crate, HEGATE_OBSERVER_SOURCES, _OCLIENT, "use gate_sys::inet::{self};\n"),
+                (gate.check_observer_gate_sys_crate, HEGATE_OBSERVER_SOURCES, _HG_NET, "use gate_sys::{self};\n"),
+                (gate.check_role_seal_stage_calls, None, _OCLIENT, "use role_seal::self::RoleSpec;\n"),
+                (gate.check_role_seal_stage_calls, None, _BLIB, "use role_seal::RoleSpec;\n")):
+            good = self.TREE[rel]
+            self.write(rel, good + "\n" + text)
+            try:
+                found = check(self.base)
+                if count is not None:
+                    self.assertEqual(found, count, text)
+            finally:
+                self.write(rel, good)
+
+    def test_each_fold_row_passes_with_the_fold_reverted(self):
+        # Design review G2-4: the fold, not only the clause, refuses each fold row.
+        rows = [(rule, row) for rule in HEGATE2_PROOF_RULES for row in rule[3] if row[0][:5] in HEGATE2_FOLD_ROWS]
+        self.assertEqual([row[0][:5] for _, row in rows], list(HEGATE2_FOLD_ROWS))
+        for (name, check, _, _, _, any_tag, _, tree), (label, _, changes) in rows:
+            self.planted(changes, tree)
+            try:
+                with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                    check(self.base)
+                with mock.patch.object(gate, "use_path_self_folded", lambda path: path):
+                    check(self.base)
+            finally:
+                self.planted((), tree)
+
+    def test_the_proof_table(self):
+        # Each row is refused by its rule (any clause's message), by its own clause alone (the named clause's message),
+        # and passes with its clause off; HEGATE_PROOF_RULES and HE005A_PROOF_RULES keep their rows.
+        self.assertEqual([rule[0] for rule in HEGATE2_PROOF_RULES],
+                         ["HE-GATE-002 (i), interior self", "HE-GATE-002 R1-5 (a), interior self"])
+        self.assertEqual([row[0][:5] for rule in HEGATE2_PROOF_RULES for row in rule[3]],
+                         ["HG2-1", "HG2-2", "HG2-3", "HG2-4", "HG2-5", "HG2-6", "HG2-7", "HG2-8"])
+        self.assertEqual(len([row for rule in HEGATE_PROOF_RULES for row in rule[3]]), 5)
+        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 116)
+        for name, check, clauses, rows, tag, any_tag, patches, tree in HEGATE2_PROOF_RULES:
+            for label, clause, changes in rows:
+                self.assertIn(clause, clauses, label)
+                self.planted(changes, tree)
+                try:
+                    with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                        check(self.base)
+                    for enabled, disabled in ((clause, ()), (None, (clause,))):
+                        active = patches(enabled=enabled, disabled=disabled)
+                        for patch in active:
+                            patch.start()
+                        try:
+                            if disabled:
+                                check(self.base)
+                            else:
+                                with self.assertRaisesRegex(gate.GateError, re.escape(tag(clause)), msg=label):
+                                    check(self.base)
+                        finally:
+                            for patch in active:
+                                patch.stop()
+                finally:
+                    self.planted((), tree)
+
+
 # --- HE-005C (the broker's lifecycle; the frozen seam note DESIGN-HE005.SEAM-C rev 4 with MON-SEAM-E1..E3; the plan's
 # G-HE5C-1..8 and delta C3's G-HE5C-9..13; the build brief U2-U5 and its addenda 1 and 2) ------------------------------
 # The real sources the HE-005C rules read: every scanned crate's src (broker-sys's raw.rs included), the broker's tests,

@@ -2355,6 +2355,18 @@ def resolved_uses(uses: list[tuple[tuple[str, ...], str | None]],
     return paths
 
 
+def use_path_self_folded(path: tuple[str, ...]) -> tuple[str, ...]:
+    """HE-GATE-002 (HE-GATE-001 PR review round 1, HG-R1-1, with HE-005A PR review round 1's R1-1 role_seal twin;
+    Q-HG2-1 (a)): a use path with every `self` segment after its head removed, and one trailing `self` kept where the
+    path ended in `self`, so `gate_sys::{self::{self}}` reads as `gate_sys::{self}` and `gate_sys::self::channel::Poller`
+    as `gate_sys::channel::Poller`. A path of one segment or none is returned unchanged (design review G2-7). Applied
+    only where a clause compares a crate-itself path: HE-GATE-001's (i) and R1-5 (a)'s role_seal checks."""
+    if len(path) <= 1:
+        return path
+    kept = (path[0],) + tuple(segment for segment in path[1:] if segment != "self")
+    return kept + ("self",) if path[-1] == "self" else kept
+
+
 def gate_sys_aliases(uses: list[tuple[tuple[str, ...], str | None]]) -> set[str]:
     """HE-004-I01A2 (R1-3): the names resolved use paths (resolved_uses) bind to gate_sys itself."""
     return {rename for path, rename in uses if rename is not None and path in (("gate_sys",), ("gate_sys", "self"))}
@@ -3137,7 +3149,9 @@ def stage_calls_a_uses(codes: dict[str, str], rule: str) -> None:
     (c) count. HE-005A PR review round 1, R1-1 (MON-HE005A-R1): and none imports the role_seal crate itself (`role_seal`,
     `role_seal::{self}` or `::role_seal`; renamed or not; pub, pub(crate) or private), so no source re-exports it, and
     none holds role_seal as a segment after its head (`crate::seal::role_seal`, `self::role_seal`, `super::..`), so no
-    path reaches role-seal through another module. Imports of role-seal's items stay allowed, but for the stages."""
+    path reaches role-seal through another module. Imports of role-seal's items stay allowed, but for the stages.
+    HE-GATE-002 (R1-1's twin of HG-R1-1): the crate-itself and rename checks compare each path folded
+    (use_path_self_folded), so `use role_seal::{self::{self}};` and its renamed and deeper forms refuse too."""
     for rel, code in sorted(codes.items()):
         if rel == ROLE_SEAL_LIB:
             continue
@@ -3150,12 +3164,13 @@ def stage_calls_a_uses(codes: dict[str, str], rule: str) -> None:
         for path, _ in uses:
             require("role_seal" not in path[1:], "%s reaches role_seal through another path, `%s` (%s (a))"
                     % (rel, "::".join(path), rule))
-            require(path not in (("role_seal",), ("role_seal", "self")),
+            require(use_path_self_folded(path) not in (("role_seal",), ("role_seal", "self")),
                     "%s imports the role_seal crate itself (%s (a))" % (rel, rule))
         for path, rename in resolved_uses(uses, root="role_seal"):
             if path[:1] != ("role_seal",):
                 continue
-            require(rename is None or path[1:] not in ((), ("self",)), "%s renames role_seal (%s (a))" % (rel, rule))
+            require(rename is None or use_path_self_folded(path)[1:] not in ((), ("self",)),
+                    "%s renames role_seal (%s (a))" % (rel, rule))
             require(path[-1] != "*", "%s imports a glob of role_seal (%s (a))" % (rel, rule))
             stages = sorted(set(path[1:]) & set(ROLE_SEAL_STAGES))
             require(not stages, "%s imports role-seal's %s (%s (a))" % (rel, " and ".join(stages), rule))
@@ -9240,13 +9255,15 @@ def observer_gate_sys_bare(codes: dict[str, str], rule: str) -> None:
     """HE-GATE-001 (i): in every crates/observer source except OBSERVER_LINUX_NET and OBSERVER_LINUX_LISTEN, no use path
     is `gate_sys` or `gate_sys::{self}` (`use gate_sys;`, `use gate_sys::{self};`, `use ::gate_sys;`,
     `use ::{gate_sys};`, `use gate_sys::{Dir, self};`), renamed or not, at any visibility, so no such source imports or
-    re-exports the gate_sys crate itself. Only the declarations use_paths can read; the rest are (iii)'s."""
+    re-exports the gate_sys crate itself. Only the declarations use_paths can read; the rest are (iii)'s. HE-GATE-002
+    (HG-R1-1): each path is compared folded (use_path_self_folded), so `use gate_sys::{self::{self}};` and its renamed
+    and deeper forms refuse too; (i) stays rename-blind."""
     for rel, code in sorted(codes.items()):
         if rel in (OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN):
             continue
         uses, _ = gate_sys_crate_uses(code)
         for path, _ in uses:
-            require(path not in (("gate_sys",), ("gate_sys", "self")),
+            require(use_path_self_folded(path) not in (("gate_sys",), ("gate_sys", "self")),
                     "%s imports the gate_sys crate itself (%s (i))" % (rel, rule))
 
 
@@ -10432,7 +10449,8 @@ def main() -> int:
             "signatures, the stages named once each (iii); no impl names either token (iv); neither is renamed or aliased (v)"
             % (check_seal_tokens(HE), ROLE_SEAL_LIB, " and ".join(fields[0] for fields, _ in SEAL_TOKENS.values()),
                " and ".join(SEAL_TOKEN_ATTRIBUTES), " and ".join(signature for _, signature in SEAL_STAGE_SIGNATURES)))
-        say("role-seal stage calls (HE-005A, R1-5; PR review round 1, R1-1): over the observer's and the broker's sources, "
+        say("role-seal stage calls (HE-005A, R1-5; PR review round 1, R1-1; HE-GATE-002, interior self folded): over the "
+            "observer's and the broker's sources, "
             "no use path (role_seal's aliases followed) imports the role_seal crate itself, reaches it through another "
             "path, renames or globs it or imports a stage (a), no role_seal::seal_stage1 or ::seal_stage2 path, whatever "
             "precedes it, lies outside the %d seal.rs files %s (b), and each calls each stage exactly once, inside its own "
@@ -10675,7 +10693,8 @@ def main() -> int:
             "i01_ sources are exactly %s, naming none of Wire, connect, ConnId and Client; PeerOps is declared once, as "
             "`pub trait PeerOps {`"
             % (check_observer_no_send(HE), OBSERVER_LINUX_NET, OBSERVER_LINUX_LISTEN, ", ".join(I01_FILES_BUILT) or "none yet"))
-        say("observer gate_sys crate (HE-GATE-001; HE-005A PR review round 2, R2-1): %d sources; outside %s and %s "
+        say("observer gate_sys crate (HE-GATE-001; HE-005A PR review round 2, R2-1; HE-GATE-002, interior self folded in "
+            "(i)): %d sources; outside %s and %s "
             "none imports the gate_sys crate itself (i), none holds gate_sys after a use path's head (ii), and every "
             "use declaration is readable (iii); extern crate is check_linked_sources', globs and socket modules "
             "check_socket_modules'"

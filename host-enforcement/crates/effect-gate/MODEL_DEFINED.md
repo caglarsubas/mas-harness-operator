@@ -4461,3 +4461,77 @@ not ask" (2026-10-29); MON-R10-HE005B-U1 (the HE5 carried note); GO-HE5C-SEAM, G
 MON-SEAM-FREEZE and GO-HE5C-RAW-TEXT (2026-10-30); MON-RAW-R1-KEEP, its round-1 dispositions and GO-HE5C-U1-CARGO-2;
 MON-RAW-R2-KEEP, Q-HE5C-T04-1 (a) and Q-HE5C-T04-2 (a); MON-HE5C-U2-KEEP, MON-HE5C-U3-KEEP, MON-HE5C-U4-KEEP and MON-HE5C-U6-KEEP
 (2026-10-31). The complete messages are recorded in the operator's `tools/w03/he005/OWNER_DECISIONS.md`.
+
+## HE-GATE-002: the interior-self fold in HE-GATE-001's (i) and R1-5 (a) (`tools/gate.py`, `tools/test_gate.py`)
+
+HE-GATE-002 is a small R10 gate packet, R10's next after HE-005C's merge (`980d42d6`), ruled by the monitor under the
+owner's delegation (Q-R10-INTERIM (b); Q-HG2-1..4 (a)) and built as its plan revision 1 (`hegate/HE-GATE-002_PLAN.md`,
+sha256 `5c8d9df1…`) states it, after a paper design review (`hegate/reviews/design-review-HG2-round1.json`, `3fbe0c89…`,
+PASS_FOR_BUILD). It closes HE-GATE-001's carried HG-R1-1, carried by the owner's "Push, carry HG-R1-1 (Recommended)",
+with HE-005A PR review round 1's R1-1 role_seal twin, and folds HE-GATE-001's NOTEs HG-R1-3 and HG-R1-6. It changes
+only `tools/gate.py`, `tools/test_gate.py`, this section and its packet YAML: no Rust source, contract, lock, manifest,
+vendored package, `ci/` or `.github/` path, and no other rule. Its rules are R346-R350.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R346 | **The fold, `use_path_self_folded`** (new, beside `gate_sys_aliases`): a use path with every `self` segment after its head removed, and one trailing `self` kept where the path ended in `self`; a path of one segment or none returned unchanged. So `("gate_sys", "self", "self")` folds to `("gate_sys", "self")`, `("gate_sys", "self", "channel", "Poller")` to the item import `("gate_sys", "channel", "Poller")`, and `("gate_sys", "inet", "self")` stays as it is. `use_paths` and `resolved_uses` are unchanged | HG-R1-1's required change ("drop every 'self' segment after the head, here and in R1-1's role_seal clause"); Q-HG2-1 (a): two clauses only; design review G2-7 (short paths) |
+| R347 | **HE-GATE-001's (i) compares the folded path:** outside the two socket files, `use gate_sys::{self::{self}};`, its renamed form `{self::{self as g}}` and its deeper forms import the gate_sys crate itself and refuse. (i) stays rename-blind (it compares every path, renamed or not); (ii) and (iii) are unchanged | HG-R1-1; design review G2-3 (no rename check in (i)) |
+| R348 | **R1-5 (a)'s role_seal checks compare the folded path:** the crate-itself check (raw paths) and the rename check (role_seal's aliases followed) refuse `use role_seal::{self::{self}};`, `{self::{self as r}}` and their deeper forms in every observer and broker source. The glob, after-head and stage checks are unchanged, so `use role_seal::self::seal_stage1;` stays refused by the stage check, and `use role_seal::self::RoleSpec;` stays allowed | HE-005A PR review round 1's R1-1 twin, named in MON-HG-RUSTC-PROBE |
+| R349 | **The rows.** `HEGATE2_PROOF_RULES`, a new table in `HE005B_PROOF_RULES`' 8-field shape, so `HEGATE_PROOF_RULES`' HG1-HG5 and `HE005A_PROOF_RULES`' 116-row pins do not move: (i)'s HG2-1..HG2-3 (the plain, renamed and depth-3 gate_sys forms) and R1-5 (a)'s HG2-4..HG2-8 (the plain form in the broker and in the observer, renamed, depth 3, and the interior-self stage import), 8 rows, each refused by its rule and by its own clause alone and passing with its clause off. Self-tests (`HeGate2Tests`, over copies of the real sources): the fold's cases; each row's message; the valid imports passing (`use gate_sys::self::channel::Poller;` and `use gate_sys::channel::Poller;` through `check_observer_gate_sys_crate` alone, `use gate_sys::inet::{self};`, `use gate_sys::{self};` in a socket file, and `use role_seal::self::RoleSpec;`); and the fold-revert self-test: each of HG2-1..HG2-7 passes with `use_path_self_folded` patched to the identity, so the fold refuses those rows, not only the clause | Design review G2-4 (rows), G2-5 (the table, approved), G2-6 (the Poller row's wording) |
+| R350 | **The records folds of HE-GATE-001's NOTEs,** stated here, its own section unchanged (Q-HG2-3 (a)). HG-R1-3: R312's stated bounds also include `check_included_code`, which refuses a path-attribute module (`#[path = …] mod gate_sys;`), and `check_socket_modules`' bound does not read an interior `self` (carried, G2-2 below). HG-R1-6: HE-GATE-001's decisions also include MON-HG-BUILD-KEEP, GO-HEGATE-HEAVY, GO-HEGATE-EVIDENCE and GO-HEGATE-SIM | MON-HG-PR-R1-KEEP: "HG-R1-3 and HG-R1-6's citations fold into the next records edit" |
+
+### Binaries
+
+All ten binary lines must equal HE-005C's (`980d42d6`): the packet changes only the gate's tools, this file and its packet
+YAML, HE-GATE-001's file set, whose Binaries section measured all ten lines equal (design review G2-9). The statement at
+the heavy slot: `<pending heavy step>`.
+
+### Superseded and discharged
+
+- **HE-GATE-001's HG-R1-1** (carried by the owner's "Push, carry HG-R1-1 (Recommended)"): closed by R346-R347.
+- **HE-005A PR review round 1's R1-1 role_seal twin** (MON-HG-RUSTC-PROBE): closed by R348.
+- **HE-GATE-001's HG-R1-3 and HG-R1-6** (MON-HG-PR-R1-KEEP): folded by R350.
+
+### Evidence
+
+At build, light (no cargo, no gate run, no mutation proof), on the worktree of `980d42d6`: the targeted unit tests for the
+changed rules, run from `tools/` as `python3 -I -B -m unittest discover -s . -p test_gate.py -k <name>` (MON-MECH-TARGETED):
+`HeGate2Tests` 6 tests, `HeGateTests` 12, `RoleSealRuleTests` 5 and `He005aObligationTests` 9, 32 tests OK; the R10
+zero-bill scan, light: passed; the privacy scan over the unit's added lines: names, the legacy term, absolute paths and
+e-mails all 0. The
+heavy evidence (the gate, the self-test, the mutation proof over every table with `HEGATE2_PROOF_RULES`, the binary
+statement, the sim): `<pending heavy step>`.
+
+### Code and audit
+
+- `tools/gate.py`: `use_path_self_folded` (new; R346); `observer_gate_sys_bare`'s comparison and docstring (R347);
+  `stage_calls_a_uses`' crate-itself and rename comparisons and docstring (R348); the two checks' printed lines.
+- `tools/test_gate.py`: `HEGATE2_FIX_B_ROWS`, `HEGATE2_STAGE_ROWS`, `HEGATE2_FOLD_ROWS`, `HEGATE2_PROOF_RULES` and
+  `HeGate2Tests` (new; R349); no existing test changes.
+- This section, and `task-packets/HE-GATE-002.yaml` at the repository root. No other file.
+
+### Stated residuals
+
+- **The textual reading's limits:** the two clauses read text, not Rust; a form they do not read stays code review's.
+- **The fold's reach:** two clauses only (Q-HG2-1 (a)). `super` or `crate` in a non-start position is not normalised
+  (design review G2-8); like the interior-self forms, rustc 1.99.0 rejects such paths.
+
+### Carried
+
+- **G2-1, to HE-GATE-003 (observer/socket-module fold), unscheduled** (Q-HG2-4 (a)): in the two socket files, which (i)
+  skips, `use gate_sys::{self::{self as g}};` passes `check_observer_no_send`'s `gate_sys_aliases` (which refuses its
+  folded meaning `{self as g}`), `check_socket_items`, `send_d`'s channel rename and `resolved_uses`' binding. A
+  rustc-rejected form.
+- **G2-2, to HE-GATE-003 (observer/socket-module fold), unscheduled** (Q-HG2-4 (a)): R312's bound `check_socket_modules`
+  reads the segment right after gate_sys, so `gate_sys::self::*` and `gate_sys::self::channel::Poller` pass it. A
+  rustc-rejected form.
+
+### Owner and monitor decisions
+
+Cited by id, all 2026-10-31, by the lane monitor under the owner's delegation of 2026-10-22: Q-R10-INTERIM (b); the
+HE-GATE-002 name confirmed with Q-HG2-1 (a), Q-HG2-2 (a) and Q-HG2-3 (a), and GO-HG2-DESIGN-R1; the design review's KEEP
+with Q-HG2-4 (a), G2-5 approved and GO-HG2-PLAN-R1; GO-HG2-LIGHT-UNIT. The owner's "Push, carry HG-R1-1 (Recommended)" and
+MON-HG-RUSTC-PROBE (2026-10-30) carried the work here. The complete messages are recorded in the operator's
+`tools/w03/hegate/OWNER_DECISIONS.md`.
