@@ -11,7 +11,7 @@
 
 use std::io;
 
-use broker_sys::{ChannelEnd, Child, ChildPlan, FdEntry, LeafDir, Reaped, Script, W3Expect};
+use broker_sys::{Child, ChildPlan, FdEntry, LeafDir, Reaped, Script, W3Expect};
 use gate_sys::Dir;
 
 use crate::lifecycle::ops::{ProcFile, SpawnOps};
@@ -36,7 +36,7 @@ impl<'a> LinuxSpawn<'a> {
 
 impl SpawnOps for LinuxSpawn<'_> {
     type Script = Script;
-    type ChannelEnd = ChannelEnd;
+    type ChannelEnd = broker_sys::ChannelEnd;
     type Plan = ChildPlan;
     type Child = Child;
 
@@ -52,11 +52,12 @@ impl SpawnOps for LinuxSpawn<'_> {
         broker_sys::measure_verity(script)
     }
 
-    fn channel_pair(&mut self) -> io::Result<(ChannelEnd, ChannelEnd)> {
+    fn channel_pair(&mut self) -> io::Result<(broker_sys::ChannelEnd, broker_sys::ChannelEnd)> {
         broker_sys::seqpacket_pair()
     }
 
-    fn plan(&mut self, worker_uid: u32, child_end: ChannelEnd, script: Script) -> io::Result<(ChildPlan, W3Expect)> {
+    fn plan(&mut self, worker_uid: u32, child_end: broker_sys::ChannelEnd, script: Script)
+        -> io::Result<(ChildPlan, W3Expect)> {
         ChildPlan::new(
             worker_uid,
             match RUNNING_ARCH {
