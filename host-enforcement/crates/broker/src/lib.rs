@@ -18,12 +18,18 @@
 //!   verified document with section 3.1's closed members and bounds. `main` calls both between the seal's two stages
 //!   (delta C3's site form), and hands the checked configuration to `serve`.
 //!
-//! The HOLD derivation, the lifecycle and every I02, I03 and I05 frame are later units' and packets' (HE-005C's
-//! lifecycle, HE-005D); nothing that they guard is reachable here. The R10-defined behaviour is listed in
-//! `crates/effect-gate/MODEL_DEFINED.md` (the HE-005A, HE-005B and HE-005C sections).
+//! - HE-005C (DESIGN-HE005 sections 3.2-3.6; the frozen seam note DESIGN-HE005.SEAM-C revision 4 with MON-SEAM-E1 and
+//!   MON-SEAM-E2; delta C3 revision 2): `lifecycle`, the lifecycle W1-W6 over the seam's traits, HOLD, NP-9 and the
+//!   startup run, over broker-sys's safe API and gate-sys's `Dir`. `serve` opens the leaf, derives HOLD, runs the one
+//!   startup run with C's two stand-ins, then serves the I02 listener unchanged; the run's outcome is never its return.
+//!
+//! Every I02, I03 and I05 frame is HE-005D's; until then the startup run's gate qualification is C's stand-in, which
+//! answers `Unavailable`, and the I02 listener closes every connection unanswered. The R10-defined behaviour is listed
+//! in `crates/effect-gate/MODEL_DEFINED.md` (the HE-005A, HE-005B and HE-005C sections).
 #![forbid(unsafe_code)]
 
 pub mod config;
+pub mod lifecycle;
 #[cfg(target_os = "linux")]
 pub mod linux_listen;
 pub mod seal;

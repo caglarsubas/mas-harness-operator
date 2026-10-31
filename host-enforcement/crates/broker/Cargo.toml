@@ -21,7 +21,10 @@ publish.workspace = true
 # byte-equal to the observer's (tools/gate.py's REGISTRY_LINES): ring, and getrandom, which ring's pinned version
 # depends on, so its features are the observer's in the broker's own build too. No package is added, and Cargo.lock
 # gains only planeon-broker's two edges.
+# HE-005C (the frozen seam note DESIGN-HE005.SEAM-C revision 4, sections 2 and 3): the lifecycle's production
+# implementations drive broker-sys's safe API, by path; Cargo.lock's planeon-broker entry gains only this edge.
 [dependencies]
+broker-sys = { path = "../broker-sys" }
 gate-sys = { path = "../gate-sys" }
 role-seal = { path = "../role-seal" }
 i05-protocol = { path = "../i05-protocol" }

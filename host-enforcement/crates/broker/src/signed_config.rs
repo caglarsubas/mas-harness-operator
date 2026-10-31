@@ -8,8 +8,9 @@
 //! - Files (fixed, no argv): `/etc/planeon/capacity-broker/config.json` (1 byte to 1 MiB) and `config.json.sig`
 //!   (exactly 64 raw bytes), each opened through gate-sys's read-only `Dir`, sized by `fstat` and read into one buffer of
 //!   size + 1 with a plain `read` loop, so a document that grew or shrank is refused (the EOF probe, R69's method).
-//! - The key is compiled in, empty until HE-008: every document is then refused (status 12). A key of small order is
-//!   refused by libsodium's method (the 14 encodings, R69).
+//! - The key is compiled in from `crates/broker/config-signer.pub` (0 or 32 bytes, a gate rule), empty until HE-008:
+//!   every document is then refused (status 12). A key of small order is refused by libsodium's method (the 14
+//!   encodings, R69).
 //! - The payload is `UTF8("planeon.capacity-broker-config/v1") || 0x00 || document`, verified with ring's
 //!   `UnparsedPublicKey::new(&ED25519, key).verify`. The domain differs from the gate's and the observer's, so neither
 //!   role's signature verifies as a broker document. Verification comes first: an unsigned or invalid document is never
@@ -36,10 +37,10 @@ pub const SIGNATURE_BYTES: usize = 64;
 /// An Ed25519 public key's length.
 pub const KEY_BYTES: usize = 32;
 
-/// The broker's signer key, compiled in; empty until HE-008 generates the key and an R10 packet sets it (DESIGN-HE005
-/// section 3.1). An empty literal: the observer's form holds the key in a file beside the crate's manifest, outside
-/// this build's paths, so the form is the monitor's to rule (HE-005C U2, departure D-U2-1).
-pub const COMPILED_KEY: &[u8] = &[];
+/// The broker's signer key, compiled in from `crates/broker/config-signer.pub` (D-U2-1 (a)); empty until HE-008
+/// generates the key and an R10 packet sets it. HE-008 decides whether it holds the same value as the gate's or the
+/// observer's key.
+pub const COMPILED_KEY: &[u8] = include_bytes!("../config-signer.pub");
 
 /// libsodium's small-order y values (little-endian, sign bit clear): 0, 1, the two order-8 points' y, p - 1, p and
 /// p + 1, where p = 2^255 - 19 (copied from the observer's, itself gate-tls's).

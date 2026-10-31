@@ -12,9 +12,10 @@
 //! 3. seal stage 2 (60-79);
 //! 4. `drop(document);`, then exactly `ExitCode::from(serve(&sealed, config))`, which closes main.
 //!
-//! `serve` builds the I02 listener from `&Sealed` and runs `serve_unanswered`, which binds it, closes every connection
-//! unanswered and returns only on a listener error (24, Q-HE5A-3 (a)). It takes the checked configuration, which
-//! HE-005C's lifecycle unit hands to the startup run. On other targets a stub exits with status 2.
+//! `serve` opens the probe-worker leaf, derives HOLD from it, runs the one startup run with the checked configuration
+//! and C's two stand-ins (delta C3), then builds the I02 listener from `&Sealed` and runs `serve_unanswered`, which
+//! binds it, closes every connection unanswered and returns only on a listener error (24, Q-HE5A-3 (a)). On other
+//! targets a stub exits with status 2.
 #![forbid(unsafe_code)]
 
 use std::process::ExitCode;
@@ -55,13 +56,23 @@ fn main() -> ExitCode {
     ExitCode::from(status::NOT_LINUX)
 }
 
-/// Everything after the seal: the I02 listener, whose only constructor takes `&Sealed`, served unanswered; the exit
-/// status, which is the listener's (24), since nothing else ends it. The checked configuration is the startup run's,
-/// which HE-005C's lifecycle unit wires in with serve's new exact body; until then serve's body is HE-005A's.
+/// Everything after the seal (delta C3, "serve, on an accepted configuration"; the frozen seam note, sections 3 and 6),
+/// each step named once, in this order: the leaf's two handles, opened back to back by `lifecycle/leaf.rs`'s one
+/// opening function and owned here; the HOLD derivation at start, with no write (a read or open failure counts as HOLD
+/// and is never a return, C3-5); the one startup run, with C's two stand-ins, whose outcome is never returned (a HOLD at
+/// start ends it at section 3.3 step 1); then the I02 listener, whose only constructor takes `&Sealed`, served
+/// unanswered. The exit status is the listener's (24), since nothing else ends serve. The handles and the standing
+/// state, with any child a `Held` run kept, live until serve returns.
 #[cfg(target_os = "linux")]
-fn serve(sealed: &Sealed, _config: BrokerConfig) -> u8 {
+fn serve(sealed: &Sealed, config: BrokerConfig) -> u8 {
+    use planeon_broker::lifecycle::leaf::open_leaf;
+    use planeon_broker::lifecycle::run::{derive_hold, startup_run};
+    use planeon_broker::lifecycle::seams::{BinderStandIn, QualifierStandIn};
     use planeon_broker::linux_listen::LinuxI02;
     use planeon_broker::serve_unanswered;
 
+    let leaf = open_leaf();
+    let mut standing = derive_hold(&leaf);
+    startup_run(&leaf, &config, &mut standing, QualifierStandIn, BinderStandIn);
     status::listener(&serve_unanswered(&mut LinuxI02::new(sealed)))
 }
