@@ -1582,6 +1582,10 @@ DERIVE_HOLD_BODY = ("{ let mut standing = Standing::new(); let found = match ope
                     "hold::derive(&mut handles.leaf_ops(), false), Err(_) => Some(Step::HoldRead), }; if let Some(step) = "
                     "found { standing.hold(step); } standing }")
 RUN_ENTRY_BODIES = {"startup_run": STARTUP_RUN_BODY, "derive_hold": DERIVE_HOLD_BODY}
+# PR review round 2, R2-2 (Q-HE5C-R2 (a)): startup's body from its { through step 2's statement, as a token prefix.
+STARTUP_BODY_PREFIX = ("{ let start_ms = clock.now_ms(); if let Some(step) = standing.held() { return "
+                       "Outcome::CapacityHeld(step); } let gate = match qualifier.qualify() { "
+                       "GateAnswer::Qualified(ticket) => ticket, GateAnswer::Unavailable => return Outcome::Unavailable, };")
 BROKER_SERVE_TOKEN = re.compile(r"[A-Za-z_]\w*|::|\S")
 # HE-005B (the HE-005B plan's gate rules G-HE5B-1..6; MON-HE005B-PLAN; the build brief's conditions 1 and 2):
 # G-HE5B-4, the include rule's two files: seal.rs embeds exactly the two BROKER programs, and i02.rs exactly the vendored
@@ -3384,6 +3388,11 @@ def serve_b_body_exact(body: str, rule: str, base: Path | None = None) -> None:
         require(len(spans) == 1 and BROKER_SERVE_TOKEN.findall(run[spans[0][2]:spans[0][3]])
                 == BROKER_SERVE_TOKEN.findall(pinned), "%s's %s body is not exactly `%s` (%s (b))"
                 % (BROKER_RUN, name, pinned, rule))
+    # PR review round 2, R2-2: startup's body begins with exactly STARTUP_BODY_PREFIX's tokens.
+    prefix = BROKER_SERVE_TOKEN.findall(STARTUP_BODY_PREFIX)
+    spans = [span for span in function_bodies(run) if span[0] == "startup"]
+    require(len(spans) == 1 and BROKER_SERVE_TOKEN.findall(run[spans[0][2]:spans[0][3]])[:len(prefix)] == prefix,
+            "%s's startup body does not begin with exactly `%s` (%s (b))" % (BROKER_RUN, STARTUP_BODY_PREFIX, rule))
 
 
 def check_broker_serve(base: Path) -> int:
@@ -4454,6 +4463,9 @@ def seams_iv_impls(codes: dict[str, str], rule: str) -> None:
     seen = []
     for rel, code in sorted(codes.items()):
         for _, header in impl_headers(rel, code):
+            # PR review round 2, R2-1: no impl header names a seam ticket (their derives are attributes).
+            require(not re.search(r"\b(?:%s)\b" % "|".join(SEAM_TICKETS), header), "%s has the impl header `%s`, "
+                    "which names a seam ticket (%s (iv))" % (rel, header, rule))
             if SEAM_IMPL_WORDS.search(header):
                 require(header in SEAM_IMPL_HEADERS, "%s has the impl header `%s`; only the stand-ins implement the two "
                         "traits, by exactly `%s` (%s (iv))" % (rel, header, "` and `".join(SEAM_IMPL_HEADERS), rule))
@@ -4476,7 +4488,8 @@ def outcome_variants(code: str) -> tuple[str, ...]:
 def seams_v_aliases(codes: dict[str, str], rule: str) -> None:
     """G-HE5C-10 (v): no use declaration renames (`as`) or globs (`*`) a trait, a stand-in, Outcome or one of its
     variants, or globs the seams or outcome module; no type alias names one."""
-    names = SEAM_TRAITS + ("QualifierStandIn", "BinderStandIn", "Outcome") + outcome_variants(codes[BROKER_OUTCOME])
+    names = (SEAM_TRAITS + ("QualifierStandIn", "BinderStandIn", "Outcome") + outcome_variants(codes[BROKER_OUTCOME])
+             + SEAM_TICKETS)  # PR review round 2, R2-1
     words = re.compile(r"\b(?:%s)\b" % "|".join(names))
     for rel, code in sorted(codes.items()):
         for use in USE_DECLARATION.finditer(code):
@@ -10471,7 +10484,8 @@ def main() -> int:
             "site each, in the span (a); the exec's descriptor is the plan's script (b); W5's opened script is the one "
             "it measures and W2's plan takes, never rebound (c); reading code, non-test" % check_measured_exec(HE))
         say("HE-005C W4 thaw (G-HE5C-5): w4_thaw is exactly its pinned text, taking W3's pass and BIND's ticket (a); "
-            "W3Passed is closed and made only by w3, and no broker source writes a BindTicket literal (b); w4_thaw is "
+            "W3Passed is closed and made only by w3, and no broker source writes a BindTicket or GateTicket literal (b); "
+            "w4_thaw is "
             "called once, after W3 and BIND and before NP-9's bracket, LeafWrite::Thaw is written at exactly %d sites "
             "%s, and W5, W1, W2, W3 and W6's entry are called only in startup and startup only in startup_run (c; PR "
             "review round 1, R1-1); reading crates/broker's code, non-test" % (check_w4_thaw(HE), ", ".join(

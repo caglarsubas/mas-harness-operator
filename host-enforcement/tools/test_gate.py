@@ -11220,9 +11220,34 @@ HE005C_SEAM_ROWS = (
     ("e10 the outcome aliased", "(v)", ((_CRUN, "", "\ntype Ended = Outcome;\n"),)),
     ("e11 a dyn qualifier", "(vi)", ((_CRUN, "", "\nfn erased(_qualifier: &mut dyn GateQualifier) {}\n"),)),
     ("e12 W6's bound changed", "(vii)", ((_CW6, "const W6_BOUND_MS: u64 = 10_000;", "const W6_BOUND_MS: u64 = 60_000;"),)),
+    ("e13 O6c: impl Default for GateTicket with a where clause, used in step 2's arm (R2-1)", "(iv)",
+     ((_CSEAMS, "", "\nimpl Default for GateTicket where u64: Copy {\n    fn default() -> Self {\n"
+                    "        Self { generation: 0 }\n    }\n}\n"),
+      (_CRUN, "        GateAnswer::Unavailable => return Outcome::Unavailable,\n",
+       "        GateAnswer::Unavailable => GateTicket::default(),\n"))),
+    ("e14 O7b: a GateTicket literal through a type alias, in step 2's arm (R2-1)", "(v)",
+     ((_CRUN, "", "\ntype Ticket = crate::lifecycle::seams::GateTicket;\n"),
+      (_CRUN, "        GateAnswer::Unavailable => return Outcome::Unavailable,\n",
+       "        GateAnswer::Unavailable => Ticket { generation: 0 },\n"))),
+    ("e15 O8b: impl GateTicket with a where clause (R2-1)", "(iv)",
+     ((_CSEAMS, "", "\nimpl GateTicket where u64: Copy {\n    pub const fn zero() -> GateTicket {\n"
+                    "        Self { generation: 0 }\n    }\n}\n"),)),
+    ("e16 O7d: a BindTicket literal through a type alias (R2-1)", "(v)",
+     ((_CRUN, "", "\ntype Bound = BindTicket;\n\nfn forged(pid: i32) -> Bound {\n    Bound { pid, start_ticks: 0 }\n}\n"),)),
 )
 # G-HE5C-11, serve (check_broker_serve): the order (a), the exact body (b), the lifecycle only through serve (c).
 _CSTARTUP = "    startup_run(&leaf, &config, &mut standing, QualifierStandIn, BinderStandIn);\n"
+# PR review round 2, R2-2's rows: step 2's statement, and the block from W5 through W2 that O10 moves before it.
+_CSTEP2 = "    let gate = match qualifier.qualify() {\n"
+_CO10_BLOCK = ("    let (script, (_parent_end, child_end)) = match w5(spawn, config) {\n        Ok(found) => found,\n"
+               "        Err(step) => return Outcome::NotSpawned(step),\n    };\n"
+               "    if let Some(step) = hold::derive(leaf, standing.held().is_some()) {\n        standing.hold(step);\n"
+               "        return Outcome::CapacityHeld(step);\n    }\n"
+               "    if let Err(outcome) = w1(leaf, clock, standing) {\n        return outcome;\n    }\n"
+               "    let (child, expect) = match w2(spawn, config.worker_uid(), child_end, script) {\n"
+               "        Ok(found) => found,\n"
+               "        Err((step, child)) => return after_w6(leaf, spawn, clock, standing, child, None, "
+               "Entry::Failed(step)),\n    };\n")
 HE005C_SERVE_ROWS = (
     ("v1 the startup run dropped", "(a)", ((_BMAIN, _CSTARTUP, ""),)),
     ("v2 the leaf opened twice", "(a)",
@@ -11237,6 +11262,18 @@ HE005C_SERVE_ROWS = (
     ("v7 R1-1 (i): startup_run's body runs W5, W1 and W2 first", "(b)", _CFORM_I),
     ("v8 derive_hold no longer holds a failed open", "(b)",
      ((_CRUN, "        Err(_) => Some(Step::HoldRead),\n", "        Err(_) => None,\n"),)),
+    ("v9 O10: W5, the HOLD derivation, W1 and W2 moved before step 2 (R2-2)", "(b)",
+     ((_CRUN, _CO10_BLOCK, ""), (_CRUN, _CSTEP2, _CO10_BLOCK + _CSTEP2))),
+    ("v10 O11: after_w6 in step 2's Unavailable arm, two Bracket arms merged (R2-2)", "(b)",
+     ((_CRUN, "        GateAnswer::Unavailable => return Outcome::Unavailable,\n",
+       "        GateAnswer::Unavailable => return after_w6(leaf, spawn, clock, standing, None, None, Entry::Unavailable),\n"),
+      (_CRUN, "        Bracket::Failed(step) => return after_w6(leaf, spawn, clock, standing, Some(child), None, "
+              "Entry::Failed(step)),\n        Bracket::Expired => return after_w6(leaf, spawn, clock, standing, Some(child), "
+              "None, Entry::Deadline),\n",
+       "        Bracket::Failed(_) | Bracket::Expired => return after_w6(leaf, spawn, clock, standing, Some(child), None, "
+       "Entry::Deadline),\n"))),
+    ("v11 O18: w6::sequence called in startup before step 2 (R2-2)", "(b)",
+     ((_CRUN, _CSTEP2, "    let _ = w6::sequence(leaf, spawn, clock, None, None);\n" + _CSTEP2),)),
 )
 # G-HE5C-12, the key through black_box (check_broker_load): exact (a), the observer's parity (b).
 _CLOAD = "load_from(PRODUCTION_DIR, core::hint::black_box(COMPILED_KEY))"
@@ -11417,10 +11454,10 @@ class He005cRuleTests(Tree):
 
     def test_the_tables(self):
         self.assertEqual(tuple(len(rule[3]) for rule in HE005C_PROOF_RULES),
-                         (12, 8, 10, 9, 2, 5, 2, 2, 2, 3, 10, 2, 3, 3, 5, 8, 12, 8, 6, 8, 4, 8, 6))
+                         (12, 8, 10, 9, 2, 5, 2, 2, 2, 3, 10, 2, 3, 3, 5, 8, 16, 11, 6, 8, 4, 8, 6))
         # PR review round 1 (Q-HE5C-R1-1 (a)): R1-1's four rows (its two planted forms, derive_hold's pin) and
-        # R1-2's nine, 125 -> 138.
-        self.assertEqual(sum(len(rule[3]) for rule in HE005C_PROOF_RULES), 138)
+        # R1-2's nine, 125 -> 138; PR review round 2 (Q-HE5C-R2 (a)): R2-1's four and R2-2's three, 138 -> 145.
+        self.assertEqual(sum(len(rule[3]) for rule in HE005C_PROOF_RULES), 145)
         for name, check, clauses, rows, tag, any_tag, patches, tree in HE005C_PROOF_RULES:
             self.assertTrue(callable(check), name)
             for row in rows:
