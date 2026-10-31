@@ -582,8 +582,8 @@ class LinkedSourceTests(unittest.TestCase):
     # HE-002S DESIGN section 5 (D7): std APIs that reach a call the EFFECT_GATE filter kills, in effect-gate, gate-sys
     # and (PR review round 1, R1-2) i05-protocol, whose code runs after the seal too; is_terminal joins the list.
     def test_post_seal_std_apis(self):
-        # HE-005A: the broker's three sources join the gate's eight.
-        self.assertEqual(gate.check_post_seal_sources(self.base), 11)
+        # HE-005A: the broker's three sources join the gate's eight; HE-005C (Q-U4-1 (a)): broker-sys's root, twelve.
+        self.assertEqual(gate.check_post_seal_sources(self.base), 12)
         for text, name in (("let _ = stream.set_nonblocking(true);", "set_nonblocking"),
                            ("for entry in std::fs::read_dir(x) {}", "read_dir"), ("let _ = current_exe();", "current_exe"),
                            ("let _ = uname(x);", "uname"), ("membarrier(0, 0);", "membarrier"),
@@ -602,7 +602,7 @@ class LinkedSourceTests(unittest.TestCase):
         self.write(UNLINKED_MAIN, "fn main() { let _ = std::io::stdin().is_terminal(); }\n")
         self.write("crates/effect-gate/src/file_store.rs", LINKED_TREE["crates/effect-gate/src/file_store.rs"]
                    + "fn g(f: &File) { let _ = f.try_clone(); let _ = copy_from_slice; let _ = terminal; }\n")
-        self.assertEqual(gate.check_post_seal_sources(self.base), 11)
+        self.assertEqual(gate.check_post_seal_sources(self.base), 12)
         # HE-005A: the broker's code runs after its seal, so the list refuses there too.
         self.refused("crates/broker/src/linux_listen.rs", LINKED_TREE["crates/broker/src/linux_listen.rs"]
                      + "fn f(s: &S) { let _ = s.set_nonblocking(true); }\n", r"set_nonblocking .*\(post-seal check\)",
@@ -3180,9 +3180,10 @@ class ObserverLinkedCrateTests(Tree):
                       gate.check_macros, gate.check_pre_main, gate.check_prints):
             self.assertEqual(check(self.base), 25, check.__name__)
         # HE-004B1: the observer's (5 with HE-004C's socket module, 6 with HE-004-I01a's listener file) and i05-protocol's
-        # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1. The gate's list: its 13 and, from HE-005A, the broker's 3.
+        # 2; HE-004D1: observer-sys's 2; HE-005A0: role-seal's 1. The gate's list: its 13 and, from HE-005A, the broker's 3;
+        # HE-005C (Q-U4-1 (a)): broker-sys's 2.
         self.assertEqual(gate.check_observer_post_seal(self.base), 11)
-        self.assertEqual(gate.check_post_seal_sources(self.base), 16, "the gate's post-seal crates do not include the observer")
+        self.assertEqual(gate.check_post_seal_sources(self.base), 18, "the gate's post-seal crates do not include the observer")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_LIB], "#![forbid(unsafe_code)]")
         self.assertEqual(gate.CRATE_ROOTS[gate.OBSERVER_MAIN], "#![forbid(unsafe_code)]")
 
@@ -11360,7 +11361,7 @@ class He005cRuleTests(Tree):
             self.assertEqual(gate.check_measured_exec(base), 14)
             self.assertEqual(gate.check_w4_thaw(base), 5)
             self.assertEqual(gate.check_control_opener(base), 39)
-            self.assertEqual(gate.check_he005c_lists(base), 10)
+            self.assertEqual(gate.check_he005c_lists(base), 11)  # Q-U4-1 (a): and POST_SEAL_CRATES
             self.assertEqual(gate.check_broker_sys_calls(base), 28)
             self.assertEqual(gate.check_role_programs(base), 2)
             self.assertEqual(gate.check_he005c_markers(base), 5)
@@ -11435,6 +11436,7 @@ class He005cRuleTests(Tree):
         for name, value in (
                 ("SCANNED_CRATES", tuple(crate for crate in gate.SCANNED_CRATES if crate != gate.BROKER_SYS_CRATE)),
                 ("BROKER_LINKED_CRATES", gate.BROKER_LINKED_CRATES[:-1]),
+                ("POST_SEAL_CRATES", tuple(crate for crate in gate.POST_SEAL_CRATES if crate != gate.BROKER_SYS_CRATE)),
                 ("UNSAFE_FILES", tuple(rel for rel in gate.UNSAFE_FILES if rel != gate.BROKER_SYS_RAW)),
                 ("FD_FILES", tuple(rel for rel in gate.FD_FILES if rel != gate.BROKER_SYS_RAW)),
                 ("FOREIGN_ITEMS", {**gate.FOREIGN_ITEMS, gate.BROKER_SYS_RAW: {"syscall", "getpid"}}),

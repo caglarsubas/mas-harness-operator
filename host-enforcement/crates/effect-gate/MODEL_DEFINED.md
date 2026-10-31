@@ -4254,3 +4254,176 @@ GO-HEGATE-DESIGN; Q-HG-1 = no, the four allowedPaths accepted, and MON-KIT-BASET
 MON-HG-BROKER-CARRY; MON-HG-DR2-KEEP, Q-HG-CAP2 (a) (the design closed at revision 3), GO-HEGATE-BUILD, MON-HG-BROKER-CARRY
 widened, and the standing kit rules (MON-KIT-BASETEMP, MON-KIT-YAML-MASK v2, MON-KIT-OPERATOR-TESTS, MON-KIT-RESIDUAL,
 MON-KIT-SIZE-ONLY). The complete messages are recorded in the operator's `tools/w03/hegate/OWNER_DECISIONS.md`.
+
+## HE-005C: the broker's lifecycle W1-W6, the child path, HOLD and NP-9, the signed configuration and the startup run (`crates/broker-sys`; `crates/broker/src/config.rs`, `signed_config.rs`, `lifecycle/`, `main.rs`, `status.rs`, `lib.rs`; `crates/broker/config-signer.pub`; `tools/gate.py`, `tools/test_gate.py`)
+
+HE-005C is DESIGN-HE005 revision 5 §1 (O1, O3-O9, O11, O15, O19, O20, O22), §3.1-§3.6 and §4 HE-005C (sha256
+`0335ce2d…`), built as the HE-005C plan (`6cf3bcc7…`) states it under MON-HE005C-PLAN (Q-HE5C-1..5 (a)), with delta C3
+revision 2 (`f7a14996…`, reachability), over the frozen seam note DESIGN-HE005.SEAM-C revision 4 (`ad6d3a75…`) and its
+errata file (`eb2b44de…`: MON-SEAM-E1, -E2 and -E3), on HE-GATE-001's merged base `dc9cbd3e`. It adds `crates/broker-sys`,
+the raw side, written by hand by the Build-R10 session (R315), and on the agent side the broker's signed configuration
+(R319-R321), the lifecycle over the seam (R322-R326) and delta C3's startup run (R327), with the gate rules G-HE5C-1..13
+and their rows (R328-R345). In C the run is reachable to the compiler but never runs: the gate's qualification is a
+stand-in answering `Unavailable`, and while the key is empty (until HE-008) every configuration is refused between the
+seal's stages. Its rules are R315-R345.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R315 | **broker-sys, the raw side, written by hand.** The Build-R10 session wrote every byte of `crates/broker-sys`, its tests included, in its main session, from the frozen seam note; no agent and no subagent wrote any of it, and there is no classifier wrapper of any kind. Its crate root is `#![deny(unsafe_code)]`; its one audited module, `src/raw.rs`, is the only `#![allow(unsafe_code)]`; it is std only, with one foreign item, `syscall`, in observer-sys's G-D1-3 form, issuing every call by number through one wrapper; it holds the H5F-5 raw-call trait, its production implementation, the recording fake and broker-sys's own host tests, and gives the agent side seam §2's safe API only. Its commits are `89cd8235` (U1) and `2f470d6e` (the round-1 fix), the session's own; no agent unit changed a byte under `crates/broker-sys` (the handover script's guard) | The owner (2026-10-30): "Hand-written raw module (Recommended)" (Q-HE5D-UNBLOCK) and "Build-R10 session writes it (Recommended)"; seam note §1, §2, §8 |
+| R316 | **The two review records and U1's cargo results.** Round 1 (`raw-review-round1.json`, `3abf8e4b…`): CHANGES_REQUIRED, every disposition (a) (MON-RAW-R1-KEEP), the fixes written by hand in `2f470d6e`, with the host tests over the fake that fail each of the 72 checked calls in turn. Round 2 (`raw-review-round2.json`, `d15bdaa9…`): PASS_FOR_T04 (MON-RAW-R2-KEEP), its NOTEs RAW-R2-1..4 (a). U1's cargo (GO-HE5C-U1-CARGO-2, through the build's `heavy.zsh`): check rc 0 on both musl targets, host tests 11, then 15 after the fix, 0 warnings | MON-RAW-R1-KEEP, MON-RAW-R2-KEEP (2026-10-31) |
+| R317 | **Every syscall against the BROKER row** (seam §5; allowlists v5 at harness-onion `dd000fef`, `879909a8…`, `roles.BROKER`, on both targets with each target's open flags). Raw side: `openat` for the leaf directory (O_RDONLY\|O_DIRECTORY\|O_CLOEXEC\|O_NOFOLLOW), the descriptor directory and the control-file opener (O_WRONLY\|O_CLOEXEC\|O_NOFOLLOW, duty 17 only), `write` (one control byte), `close`, `ioctl` (FS_IOC_MEASURE_VERITY 0xC0046686), `socketpair` (AF_UNIX, SOCK_SEQPACKET\|SOCK_CLOEXEC), `fcntl` (F_DUPFD_CLOEXEC, 5), `newfstatat`, `getdents64`, `rt_sigprocmask`, `rt_sigaction`, `clone3` (CLONE_PIDFD\|CLONE_INTO_CGROUP, no namespace flag), `dup3`, `close_range`, `setresgid`, `setresuid`, `capset`, `prctl` (PR_SET_NO_NEW_PRIVS), `seccomp` (SECCOMP_SET_MODE_FILTER, flags 0), `execveat` (4, "", AT_EMPTY_PATH), `exit_group` (127), `waitid` (P_PIDFD, WEXITED\|WNOHANG) and `clock_nanosleep` (CLOCK_MONOTONIC, relative). gate-sys and std: `openat` (`Dir::at`, `file_ro`, `sub`), `read`, `fstat`/`statx`, `clock_gettime` and the allocator's calls. Each is admitted with its masks; no call or argument form outside the row. The WORKER row's admission of `execveat` and `exit_group` after step 7 is T04's and W02d's | Seam note §5; the stop rule carried from A (every syscall stays in the BROKER row); MON-HE005C-LAUNCH |
+| R318 | **The child path** (§3.5; seam §2): the parent's block of every signal, `clone3` into the leaf, the child path on its return-0 branch and the restore directly after (`clone_span`); the child's block, the reset of every disposition but SIGKILL's and SIGSTOP's (`RESET_SIGNALS`, 1..64 without 9 and 19), `dup3` of the channel to 3 and of the script to 4, `close_range` from 5, the unblock as the statement directly before `setresgid`, `setresgid` and `setresuid` to the signed uid, `capset` to empty sets, no_new_privs, the WORKER filter (no TSYNC), `execveat` of fd 4, and `exit_group(127)` on any failure (`child_path`, `-> !`). Raw calls only, no allocation, lock, unwind or index; generic over the H5F-5 trait, so the host tests run the same text over the recording fake | DESIGN-HE005 §3.5, H5E-3, H5E-16, H5G-3; TR-SETXID (O6) |
+| R319 | **The signed configuration** (§3.1). `signed_config.rs` is the observer's file token for token, `PRODUCTION_DIR` (`/etc/planeon/capacity-broker`) aside; `load()` is exactly `load_from(PRODUCTION_DIR, core::hint::black_box(COMPILED_KEY))`; ring and getrandom by their registry lines, equal to gate-tls's. `config.rs`: format `planeon.capacity-broker-config/v1`, a closed object of 13 members (`MEMBERS`), the worker uid in 10,000..=2,147,483,647, the bracket period 140..=3,600 s, the operation deadline 1..=900 s, paths of at most 255 bytes, digests `sha256:` and 64 hex, verity algorithm 1 (SHA-256). It is read between the seal's stages; a read, signature or check refusal exits with `CONFIG_READ` 11, `CONFIG_SIGNATURE` 12 or `CONFIG_CHECK` 13, as the gate's and the observer's do, and the document is dropped before `serve` | Q-HE5C-1 (a), Q-HE5C-2 (a) (MON-HE005C-PLAN); delta C3's run, step 1 (C3-6) |
+| R320 | **The BrokerConfig shape** (no gate rule): its fields are private and read through its accessors; its one maker is `BrokerConfig::parse(document: &[u8]) -> Result<BrokerConfig, ConfigError>` in `config.rs`, whose body holds the type's one literal; that maker is called once, in `main.rs`, between the seal's stages (`let config = match BrokerConfig::parse(&document) {`), and the value moves into `serve` | Addendum 1 §4, the construction pin = (b): "No new rule; MODEL_DEFINED records the shape." |
+| R321 | **The broker's key file** `crates/broker/config-signer.pub`: created empty (0 bytes) and kept empty until HE-008; `COMPILED_KEY` is the observer's line byte for byte, `include_bytes!("../config-signer.pub")`; the key file joins `SIGNER_KEYS` (0 or 32 bytes) and `BROKER_EMBEDS` (R336) | D-U2-1 (a) (addendum 1 §2) |
+| R322 | **The lifecycle over the seam** (`lifecycle/`, seam §3 exactly): `LeafOps`, `SpawnOps` and `Clock`, with the Linux implementations over broker-sys's safe API, gate-sys's `Dir` and std, statically dispatched (no `dyn`, C3-1). The run: step 1 the standing HOLD; step 2 the gate's qualification (a stand-in in C); W5 (open, measure, compare with `workerScriptVerityDigest`, the socketpair: a failure spawns nothing and leaves the leaf untouched); the HOLD derivation; W1 (`domain`, `populated 0`, no procs, the bounded wait for `frozen 1`, the failure-thaw only after re-reading `populated 0`); W2 (the plan with the signed uid and WORKER for `RUNNING_ARCH`, `spawn`, the mask restored); W3 (membership, Uid and Gid 0, `Groups:` empty, the label, the start ticks, the sorted descriptor table against `W3Expect` and S_IFSOCK); step 7 BIND (a stand-in in C); W4's thaw; NP-9; the worker's end or the deadline; W6. Each outcome is seam §6's `Outcome`, each failure its `Step` | DESIGN-HE005 §3.3; seam note §3, §4, §6 |
+| R323 | **HOLD** (§3.4): derived from the leaf at start and before every W1, a read failure counting as HOLD (C3-5); the standing HOLD flag, read at step 1 and kept by `serve` with any kept child, cleared only by a restart; every `Held` and `CapacityHeld` outcome that wrote a freeze keeps it unreleased, and the broker never writes the leaf again while it holds | DESIGN-HE005 §3.4; seam note §6 (SM-R2-1, SM-R3-1, SM-R3-6) |
+| R324 | **NP-9** (§3.6): one bracket after W4, holding `frozen 1` for at least `NP9_HOLD_MS` 70,000 ms; skipped when fewer than the hold and `NP9_RESERVE_MS` remain before the deadline; it thaws only its own freeze and never past the deadline; a failure goes to W6. In C it runs in the window before the worker's end, with no frame (C3-8) | DESIGN-HE005 §3.6, O9; R126 |
+| R325 | **W6 and its bound:** entry on the deadline, a failure from step 5 on, or the worker's early end; freeze, kill through `cgroup.kill` only, then the `populated 0` wait and the WNOHANG reap together within `W6_BOUND_MS` 10,000 ms from W6's entry, never from the operation's deadline; the release; `Held` with the standing HOLD when the leaf cannot be shown empty, the reap misses the bound or the release fails | DESIGN-HE005 §3.3 step 13; seam note §6 (SM-R2-8 (a)); O5 |
+| R326 | **The mapping choices, R10-defined:** W1's non-`domain` type maps to `W1NotEmpty`; C's NP-9 bracket runs after W4, in the window before the worker's end, with no frame; the clock's origin is the startup run's start; `POLL_MS` 100, `FREEZE_WAIT_MS` 2,000 (2 s), `NP9_RESERVE_MS` 12,000 (12 s), and 4 KiB reads (`LEAF_READ_LIMIT`, `PROC_READ_LIMIT`) | Addendum 2 §3, the mapping choices = (a) |
+| R327 | **Delta C3's run.** `main` in the configured site form (R341); `serve` opens the leaf (`open_leaf`), derives HOLD (`derive_hold`), runs one startup run (`startup_run`) with C's two stand-ins, `QualifierStandIn` and `BinderStandIn`, each answering `core::hint::black_box(<Unavailable by its full path>)`, then serves A's I02 listener unchanged (every connection closed unanswered); the run's result is never returned. **What changes at runtime against HE-005A (C3-6):** the lifecycle never runs in C (step 2 answers `Unavailable`, so the run ends before step 3 and spawns nothing); C adds, between the stages and before the BROKER filter, a read-only open, `fstat` and read of the configuration directory's two files through gate-sys `openat`; and an exit with 11, 12 or 13 before stage 2, so no BROKER filter is installed and no I02 listener is bound, and a client gets a connect failure where under A its connection was accepted and closed. Both expose strictly less than A; a restart loop is HE-008's | Delta C3 revision 2 (`f7a14996…`), steps 1-4; DESIGN-HE005 §4 HE-005C, H5D-13 |
+| R328 | **Seam §1's lint exceptions:** `raw.rs` joins `UNSAFE_FILES`, `FD_FILES` and `FOREIGN_ITEMS` (`{syscall}` only); `STARTUP_EXCEPTIONS` gains exactly three per-file expressions, `lifecycle/proc.rs`'s `Dir::at(&format!("/proc/{}", pid))` (PEER_DIR), `raw.rs`'s `format!("/proc/{}/fd", pid)` and, through `ROOT_CONSTANTS` (and so `FS_SCAN_EXCEPTIONS`), `lifecycle/leaf.rs`'s `LEAF_PATH`; broker-sys joins `SCANNED_CRATES` and `BROKER_LINKED_CRATES` (the linked, start-up, thread and macro scans), `CRATE_ROOTS` (`#![deny(unsafe_code)]`) and `BROKER_NO_PANIC` with the configuration's two and the lifecycle's fourteen files; `REGISTRY_LINES` gains `crates/broker`. MON-SEAM-E2: `check_role_seal`'s clause (e) blanks proc.rs's one PEER_DIR expression, matched by PEER_DIR's regex, before it reads; nothing else there and no other file is excepted | Seam note §1 (SM-R1-10, SM-R2-12); MON-SEAM-E2 |
+| R329 | **MON-SEAM-E3 and its narrow reading:** G-HE5B-1 (b) reads each broker source with only its own file's path-qualified seam forms blanked (`seam_qualified_blanked`): `type ChannelEnd;` and `Self::ChannelEnd` in `ops.rs`, `S::ChannelEnd` in `run.rs`, `type ChannelEnd = broker_sys::ChannelEnd;` and `broker_sys::ChannelEnd` in `spawn.rs` (whose import U4 rewrote), the one `enum Step`'s unit variant `Bind` in `outcome.rs`, and `Step::Bind` in the lifecycle's files only, never after another `::`. The narrow reading of "elsewhere" refuses more, never less: (b) reads only `crates/broker/src` non-test, where `Step::Bind` occurs only in `run.rs` | MON-SEAM-E3; Q-U4-2 (a) |
+| R330 | **broker-sys joins `POST_SEAL_CRATES`:** its code runs after the seal, under the broker's filter, so it names none of `POST_SEAL_FORBIDDEN`'s std APIs either (`check_post_seal_sources` passes with it over the worktree, light); the G-HE5C-7 list rule names the list. Counts moved: the gate's post-seal count over `LINKED_TREE` 11 → 12 (twice) and over the observer tree 16 → 18, and `check_he005c_lists` 10 → 11 | Q-U4-1 (a) (2026-10-31) |
+| R331 | **G-HE5C-1..3, the span** (`check_child_span`): (1) `clone_span` and `child_path`, each from its attributes to its closing brace as LINK_TOKEN tokens, start `#[inline(never)] fn <name><` and hash to `SPAN_PINS`; (2) the raw calls are exactly `SPAN_CALLS` in order, the reset is the one call in the one `for signal in RESET_SIGNALS {`, `RESET_SIGNALS` is 1..64 without 9 and 19, the unblock directly precedes `setresgid`, clone3's result is `pid` with the child path on its return-0 branch before the restore, and `SPAN_CONSTANTS` hold their values; (3) only `raw.call(<pinned number>, [<six>])` and the one `child_path(raw, values)`, no index, slice, arithmetic, cast, macro or allocation. Scope: `raw.rs`'s code; (1) literals kept, the whole file; (2) and (3) non-test | The plan's G-HE5C-1..3; H5E-3, H5E-16, H5G-3 |
+| R332 | **G-HE5C-4, the measured exec across the seam** (`check_measured_exec`): (a) clone3 and execveat each at one call site of `raw.rs`'s non-test code, in the span (call sites, not names in the numbers modules, the tests or comments); (b) the raw half: the exec's descriptor is the plan's script; (c) the agent half: W5's opened script is the one it measures and the one W2's plan takes, bound once and never rebound. Scope: code, non-test, literal contents emptied | The plan's G-HE5C-4; SM-R1-22; RAW-R1-4 |
+| R333 | **G-HE5C-5, W4's thaw** (`check_w4_thaw`): (a) `w4_thaw` exactly, taking W3's pass and BIND's ticket; (b) `W3Passed` closed and made only by `w3`, and no broker source writes a `BindTicket` literal; (c) one call, in `startup`, after W3's pass and BIND's ticket are bound and before NP-9's bracket, and `LeafWrite::Thaw` written only at its four sites (`w1_failure`, `w4_thaw`, W6's `sequence`, NP-9's `bracket` twice). Scope: `crates/broker/src` code, non-test | The plan's G-HE5C-5; H5D-10 |
+| R334 | **G-HE5C-6, the control opener** (`check_control_opener`): (a) `raw.rs`'s raw text names `cgroup.freeze` and `cgroup.kill` once each, on their pinned const lines; (b) its non-test code holds `CONTROL_FLAGS` exactly (O_WRONLY\|O_CLOEXEC\|O_NOFOLLOW with its compile-time assert), one opener in the function that maps the leaf writes to the two names and their bytes, `O_WRONLY` defined once as 1, and no `O_CREAT`, `O_TRUNC`, `O_RDWR` or `O_TMPFILE`; (c) no other `.rs` file under `crates/broker` or `crates/broker-sys`, src and tests, names either file in its raw text. The `O_TMPFILE` refusal is stricter than the plan's three flags | The plan's G-HE5C-6; H5E-2; RAW-R2-3; MON-HE5C-U4-KEEP |
+| R335 | **G-HE5C-7, broker-sys in the lists and G-D1-3's form** (`check_he005c_lists`, `check_broker_sys_calls`): the memberships of R328 and R330, the three start-up exceptions exactly, and SM-R1-20 (`LEAF_PATH` is `PROBE_WORKER_LEAF`'s leaf under `/sys/fs/cgroup`); the existing scans' rows over broker-sys and the lifecycle (start-up lint, unsafe, foreign items, linked sources, socket modules and threads, the crate root); and the calls as Q-RAW-R1-3 states them: (a) `syscall` declared once and called once, as `syscall(number, first, ..., sixth)`, the trait's number; (b) one numbers module per target holding exactly its 21 pinned call numbers and two open flags; (c) outside them every `raw.call(` and `sys(` passes a pinned `SYS_` name first, and no `SYS_` name or number stands anywhere else in non-test code; (d) no other broker or broker-sys file names `syscall` or a `SYS_` name; and the closure block with broker-sys (five crates). Scope: the gate's lists; code ((a) with tests, (b) literals kept, (c) non-test, (d) src and tests) | The plan's G-HE5C-7; Q-RAW-R1-3 (MON-RAW-R1-KEEP); seam note §1 |
+| R336 | **G-HE5C-8, the key and the includes:** `check_broker_includes` with `BROKER_EMBEDS` gaining `lifecycle/spawn.rs` (the two WORKER programs) and `signed_config.rs` (the key); `check_broker_bytes` admitting outside `seal.rs` only `BROKER_BYTES_ALLOWED`'s named items, once each (the two WORKER statics, `COMPILED_KEY`, `SMALL_ORDER_Y`); `check_signer_key` for the broker's key. R1-3's pin (`check_role_programs`): in the observer's and the broker's `seal.rs`, `fn program` exactly, its two statics named only at their definitions and in its arms, the one RoleSpec literal's program the arch's `program()`, and the argument-free `.program()` once per crate. Scope: code, non-test | The plan's G-HE5C-8; D-U2-1 (a); Q-HE5C-5 (a) |
+| R337 | **G-HE5C-9, the markers** (C3-1). Text (`check_he005c_markers`): each marker, `broker_sys::raw::clone_span`, `child_path` and `measure_verity` (past step 2) and `lifecycle::run::w4_thaw` and `lifecycle::np9::bracket` (past step 7), is `#[inline(never)]`, defined once and called once, from its arm's file, named in no use declaration but `pub use raw::measure_verity;`; the WORKER statics are exactly their pinned lines and named only in `ChildPlan::new`'s argument, exactly the arch's arm. Binary, per built planeon-broker: `check_broker_markers` (each marker by its whole item path, a v0 generic instance read by its own path; a `ring_core_0_17_14_` symbol; a symbol in `planeon_broker::signed_config` or `::config`) and `check_broker_worker` (the WORKER program bytes exactly once), beside A's rules | Delta C3's G-HE5C-9; the plan's G-HE5C-9 |
+| R338 | **G-HE5C-10, the stand-ins** (`check_he005c_seams`, C3-2): (i) `GateQualifier` and `Binder` exactly, one method each, no default body; (ii) `GateTicket`, `GateAnswer`, `BindTicket` and `BindAnswer` exactly (concrete, non-zero-sized, inhabited); (iii) the stand-ins and their `black_box` bodies exactly; (iv) their two impls the only ones naming a trait or a stand-in; (v) no `as` rename, glob or type alias of a trait, a stand-in, `Outcome` or its variants; (vi) no `dyn` of either trait; (vii) `const W6_BOUND_MS: u64 = 10_000;` pinned by text. Scope: code, non-test ((i)-(iii) literals kept; (vii) w6.rs's raw text) | Delta C3's G-HE5C-10 |
+| R339 | **G-HE5C-11, serve** (`check_broker_serve`): (a) `open_leaf`, `derive_hold`, `startup_run`, `status::listener`, `serve_unanswered` and `LinuxI02` named once each, in that order; (b) the body exactly `BROKER_SERVE_BODY`; (c) the lifecycle reached only through serve (`serve_c_isolation`, module_isolation's form): the word only in lib.rs's `pub mod lifecycle;` and main.rs's pinned imports, the three entries named once in main and only by their own `fn` inside the lifecycle | Delta C3's G-HE5C-11 (C3-5) |
+| R340 | **G-HE5C-12, the key through `black_box`** (`check_broker_load`): (a) `load` exactly, the key line exactly, `COMPILED_KEY` only there and in load, `black_box` only in load and the two stand-ins; (b) the file's tokens equal the observer's, `PRODUCTION_DIR`'s value aside | Delta C3's G-HE5C-12 (C3-4); Q-HE5C-2 (a) |
+| R341 | **G-HE5C-13, the configured seal site** (`configured_site_tail` in `check_seal_order`, `BROKER_SEAL_SITE`): stage 1 exactly; then exactly `let <d> = match signed_config::load() {...}` and `let <c> = match BrokerConfig::parse(&<d>) {...}` with their three statuses; nothing else before stage 2; four distinct bindings; then exactly `drop(<d>); ExitCode::from(serve(&<stage-2 binding>, <c>))`, closing main; the before-files `config.rs` and `signed_config.rs`, the one `use gate_sys::Dir;` exception the site's own | Delta C3's G-HE5C-13 (C3-3); Q-HE5C-1 (a) |
+| R342 | **LINKED-EXCEPTIONS-PROOF:** each main's one `use std::process::ExitCode;` is the only `std::process` path the linked scan removes; another `std::process` import beside it, in the gate's, the observer's and the broker's main, refuses, and a loosened allowance would pass each of those rows (the self-test shows it), so the rows test the exception's exactness | HE-005A's carried item (MON-HE005A-U5-2, R1-6); Q-HE5C-5 (a) |
+| R343 | **The rows.** `HE005C_PROOF_RULES`, 23 rules and 125 rows, each refused by its rule and, with every other clause off, by its own clause, read by the build's `mutation_proof.py`: the span 12, the measured exec 8, W4's thaw 7, the opener 8, the lists 2, the start-up lint 4, unsafe 2, foreign items 2, linked sources 2, socket modules and threads 3, the calls 9, the closure 2, the includes 3, the bytes 3, R1-3's pin 4, the markers 8, the stand-ins 12, serve 6, the key 5, the configured site 7, MON-SEAM-E2 3, MON-SEAM-E3 7, LINKED-EXCEPTIONS-PROOF 6. Self-test only: the list memberships dropped one at a time (10), the root's deny, the forms the rules pass, and the binary half (the markers and the WORKER bytes) | The build brief's U4; addenda 1-3 |
+| R344 | **Count pins moved** by broker-sys and the new broker sources: `LINKED_TREE` gains broker-sys's root (+1 in its trees) and `FOREIGN_TREE` `raw.rs` (+2 in its trees); HE-005A's and HE-005B's real-tree pins: `check_broker_bytes` 8 → 24, `check_role_seal`'s clause (e) 10 → 26, `check_broker_never_unlinks` 9 → 25, `check_broker_serve` 3 → 6, `check_broker_includes` 3 → 6, `check_broker_no_panic` 9 → 27, the broker seal site's calls, `BROKER_LINKED_CRATES` with broker-sys (the closure fixtures 7 → 8 and 8 → 9) | The build brief's U4 |
+| R345 | **The tests** under `crates/broker/tests/`: `broker_config.rs`, `broker_signed_config.rs`, `broker_status.rs`'s additions, `lifecycle.rs` (over the fakes: `startup_run_stops_at_gate_qualification`; with C's `Binder` stand-in and a success qualifier fake, the run reaches W3 and ends `Unavailable` through W6 with no thaw; success fakes for both seams through W1-W6 and every failure path) and `lifecycle_text.rs`; broker-sys's own tests (`child_path_signal_order` and the rest) stay in `raw.rs` | Delta C3's tests; seam note §8 |
+
+### Obligations (HE-005C's share)
+
+- **O1:** the WORKER programs embedded once each, in `lifecycle/spawn.rs`, named only in `ChildPlan::new`'s argument and
+  installed by the child at step 7 (R336, R337); the installed filter is T04's.
+- **O3:** W3 refuses any group in the frozen child's `Groups:` line (R322).
+- **O4, the worker's share:** `setresgid`, `setresuid` to the signed uid, `capset` to empty sets and no_new_privs in the
+  child path (R318); the broker's own row is A's and HE-008's.
+- **O5:** W1-W6 as §3.3 orders them, W6's kill through `cgroup.kill` only, and HOLD as §3.4 states (R322-R325).
+- **O6:** the child path makes raw async-signal-safe calls only (R318, R331).
+- **O7:** the WORKER filter installed at step 7 with no TSYNC (R318); its admission of W5's `execveat` form is T04's.
+- **O8:** the broker writes only `cgroup.freeze` and `cgroup.kill` (R334), never `cgroup.type` or
+  `cgroup.subtree_control`, and creates no cgroup; W1 checks `domain` (R322).
+- **O9:** NP-9 (R324).
+- **O11:** the child's pidfd comes from `clone3`'s CLONE_PIDFD, never `pidfd_open` (R317).
+- **O15:** single-threaded: the THREADS rule reads broker-sys too (R335).
+- **O19:** the signed configuration (R319-R321).
+- **O20, C's share:** W6 shows the leaf empty and the worker reaped (R325); TERMINAL is HE-005D's.
+- **O22 and HE5's O-R10-HE005 "W3-W5 as amended", HE-005C's share:** fd 4 is the verity-checked O_RDONLY script, the one
+  W5 measured (R332); `dup3` to 3 and 4 in the child, `close_range` from 5, and no `/proc` read after the exec (R318);
+  the set {0..4} is checked at W3 (R322). HE-005D's share stays carried.
+
+### Binaries
+
+The binary statement (the plan): planeon-broker's bytes change; planeon-gate, planeon-observer, planeon-containment and
+planeon-writer, with their SBOMs, stay byte-identical to the base's (`dc9cbd3e`; HE-GATE-001 changed no binary input).
+The statement at the heavy slot: `<pending heavy step>`. The per-binary lines for planeon-broker (A's rules, the WORKER
+bytes once, the markers, G-HE5B-6): `<pending heavy step>`.
+
+### Superseded and discharged
+
+- **HE-005A's carried "HE-005C"** (§3.1's signed configuration, the HOLD derivation, the WORKER programs embedded for W4,
+  broker-sys and the lifecycle): built (R315-R345).
+- **LINKED-EXCEPTIONS-PROOF and R1-3's pin** (HE-005A's carries, taken by Q-HE5C-5 (a)): R342 and R336.
+- **HE-005B's carried "HE5 citation for C's resumption brief"** (MON-R10-HE005B-U1): cited in C's brief; C's share met
+  (Obligations, O22).
+- **The colon-form fix** on the extract's carried list: discharged earlier by HE-GATE-001 (R308-R314).
+
+### Evidence
+
+At build, light (`python3 -I -B` text checks, no cargo): the brief's, addenda 1-3's, the errata file's, the plan's, the
+design's, delta C3's and the seam note's digests; every source-text check taking only the tree, run over the worktree by
+importing `tools/gate.py` read-only, each passing; each proof row of the three tables built in memory with its anchors
+found once; the privacy scan over each unit's added lines. Their counts: `<pending heavy step>`. U1's cargo results are
+R316's. The heavy evidence (`cargo test`, both musl release builds, `he-gate`, the gate's self-test, the
+mutation proof, `tests/verify`, the binary statement, the sim): `<pending heavy step>`.
+
+### Code and audit
+
+- `crates/broker-sys/` (new; the Build-R10 session's; R315-R318).
+- `crates/broker/Cargo.toml` (ring, getrandom, broker-sys) and `Cargo.lock` (planeon-broker's edges only);
+  `crates/broker/config-signer.pub` (new, 0 bytes); `crates/broker/src/config.rs`, `signed_config.rs` and `lifecycle/`
+  (new; R319-R327); `main.rs` (the configured site and serve's body), `status.rs` (11-13), `lib.rs`
+  (`pub mod config; pub mod signed_config; pub mod lifecycle;`); the tests (R345).
+- `tools/gate.py` and `tools/test_gate.py` (R328-R344); this section. No other file: gate-sys, role-seal, effect-gate's
+  sources, the gate, gate-tls, i05-protocol, the observer, observer-sys, containment, writer, every contract, `ci/` and
+  the vendored crates are untouched.
+
+### Stated residuals
+
+- **R3, the textual reading's limits** (DESIGN-HE005 §8): G-HE5C-1..13 read text, not Rust; a form they do not read stays
+  code review's, beside the span's hash pins.
+- **The run never runs in C** (R327): the code past each stand-in is reachable to the compiler and exercised by the fakes'
+  tests, and its presence in the binary is G-HE5C-9's markers; it runs on Linux first in HE-005D and T04.
+- **The host tests run on macOS:** the Linux-only paths (the `syscall` wrapper and every function calling it) are
+  checked on the musl targets and traced by T04.
+
+### Carried
+
+- **R1, the post-exec state** (DESIGN-HE005 §8; O22): the worker's state after its exec, and **R2, the remaining seal
+  copy** (effect-gate's `seal.rs`), unchanged.
+- **The signed-configuration extraction successor** (Q-HE5C-2 (a)): the third copy of `signed_config.rs` stays until a
+  shared crate replaces the three, carried beside R2.
+- **HE-005A PR review round 1's R1-2 and round 2's R2-1:** carried, unchanged (Q-HE5C-5 (a)).
+- **T04-RAW:** the plan approved by the owner, verbatim "Approve as planned (Recommended)" (plan `feeb6630…`); the harness
+  built by the author; the run sheet sent to the monitor; the owner's run pending, its results recorded after the run.
+- **SM-R1-15 and SM-R2-5** (seam §2), to HE-005D_PLAN's next revision: how each opaque descriptor reaches gate-sys's
+  `from_fd`, and how D both waits and reaps if W6's wait moves onto the Poller. **SM-R3-4**, to HE-008: a HOLD only the
+  flag shows is visible only in the `CAPACITY_HELD` refusals, carried with §3.4's unit health check.
+- **HE-005D** replaces C's two stand-ins and the startup run with the I05 client and DISPATCH; its own rules then take over
+  from G-HE5C-10 and the run (delta C3). On HE-005D's list beside it, from the extract's carried list: SO_PEERSEC;
+  `GateObservation`'s construction confined to the kernel-reading socket file (R1-8); `Transcript::refused` tied to
+  `answer()` (R1-9); the full H5G-4 vector through steps 12-14 after EDGE-V13's no-receipt TERMINAL; getrandom in the
+  BROKER row (R2-3); HE5's O-R10-HE005, D's share; and **MON-HG-BROKER-CARRY**, as widened: C adds no `channel::send`,
+  `.send(` or other client write path anywhere in the broker crate, and `check_broker_serve`'s pin that serve closes every
+  connection unanswered stays in force.
+- **HE-008:** the configuration's key (until then every document is refused), the broker's unit and its restart policy
+  (C3-6), and SM-R3-4.
+
+### Owner and monitor decisions (verbatim as relayed, 2026-10-28 to 2026-10-31)
+
+> Monitor: **OWNER (2026-10-30), verbatim: "Hand-written raw module (Recommended)"** for Q-HE5D-UNBLOCK. It follows the visionary's recommendation, route (b) from Oct 28.
+> - broker-sys's raw module is written by hand, by the owner or a session they direct. **No agent writes it**, and there is no classifier wrapper of any kind (owner rule Oct 16).
+> - Agents build only the safe lifecycle, HOLD, NP-9 and the signed configuration over a seam contract, LeafOps/SpawnOps, which must be fixed first.
+> - The hand-written module gets the same two independent review rounds plus the T04 check as agent code, and its author is named in the PR's carried list.
+
+> Monitor: **OWNER (2026-10-30), verbatim: "Build-R10 session writes it (Recommended)".** You write crates/broker-sys yourself, in your main session, from the frozen seam note. No subagent writes any byte of it. **Stop rule:** if the classifier stops you, stop at once. No retry, rewording, splitting or workaround of any kind (owner rule Oct 16). Report to me and the work goes back to the owner.
+
+> Monitor: HE-005C plan rulings (MON-HE005C-PLAN), recorded as "lane monitor (owner delegation 2026-10-22)". All five are your recommendation (a); no reviewer has disagreed on any security point.
+> - Q-HE5C-1 (a): the config is read between the stages, as §3.1 says. BROKER_SEAL_SITE gains the load, in the gate's form.
+> - Q-HE5C-2 (a): a third copy in the observer's form, plus a text-parity rule; the extraction successor is carried next to R2.
+> - Q-HE5C-3 (a): a narrow design delta, one light independent review round on reachability only, which names the run's trigger and why LTO can't fold it.
+> - Q-HE5C-4 (a): one packet, built in units.
+> - Q-HE5C-5 (a): C takes LINKED-EXCEPTIONS-PROOF and R1-3's pin; R1-2 and R2-1 stay carried.
+
+- **MON-SEAM-E1, -E2 and -E3** (2026-10-31), recorded in the errata file (`eb2b44de…`) under the frozen note `ad6d3a75…`,
+  whose content is unchanged: E1, units 2-5 in parallel with T04 (sequencing only; Q-HE5C-T04-2 (a)); E2, the owner's
+  "Exact one-file exception (Recommended)" for Q-SEAM-E2 (R328); E3, the owner's "Exact qualified-form exception
+  (Recommended)" for Q-U3-1 (R329).
+- **D-U2-1 (a)** (addendum 1 §2), verbatim: "A brief addendum adds the one empty file crates/broker/config-signer.pub to
+  the allowed paths. U3 switches to the observer's include_bytes! line, and G-HE5C-8 pins it as the gate's and observer's
+  keys are pinned." (R321)
+- **The BrokerConfig construction pin = (b)** (addendum 1 §4), verbatim: "No new rule; MODEL_DEFINED records the shape."
+  (R320)
+- **The mapping choices = (a)** (addendum 2 §3), each R10-defined (R326).
+- **Q-U4-1 = (a)** (addendum 3 §3): broker-sys joins `POST_SEAL_CRATES` (R330). **Q-U4-2 = (a)** (addendum 3 §4): E3's
+  narrow reading stands (R329). **MON-HE5C-U4-KEEP:** the stricter `O_TMPFILE` refusal kept (R334).
+- **T04-RAW:** the owner's "Approve as planned (Recommended)" for plan `feeb6630…` (Carried).
+
+Cited by id: MON-HE005A-MERGED and MON-HE005C-LAUNCH (2026-10-28); the owner's "Keep paused (Recommended)" after the
+second classifier stop (2026-10-28), superseded by the hand-written route; MON-SCRATCH-COPY and the owner's "Test it, do
+not ask" (2026-10-29); MON-R10-HE005B-U1 (the HE5 carried note); GO-HE5C-SEAM, GO-SEAM-REVIEW and Q-SEAM-1..5,
+MON-SEAM-FREEZE and GO-HE5C-RAW-TEXT (2026-10-30); MON-RAW-R1-KEEP, its round-1 dispositions and GO-HE5C-U1-CARGO-2;
+MON-RAW-R2-KEEP, Q-HE5C-T04-1 (a) and Q-HE5C-T04-2 (a); MON-HE5C-U2-KEEP, MON-HE5C-U3-KEEP and MON-HE5C-U4-KEEP
+(2026-10-31). The complete messages are recorded in the operator's `tools/w03/he005/OWNER_DECISIONS.md`.

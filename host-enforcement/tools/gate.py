@@ -1301,8 +1301,9 @@ LIFETIME = re.compile(r"'(?:r#)?[^\W\d]\w*")
 # HE-005A (DESIGN-HE005 revision 5 section 4, HE-005A; MON-HE005A-PLAN2): the broker's crate joins the list, so its code,
 # which runs after the BROKER filter, names none of these std APIs either (a list, not a proof of the BROKER row: T04's
 # trace stays the proof).
+# HE-005C, Q-U4-1 (a) (2026-10-31): broker-sys joins too, since its code runs after the seal, under the broker's filter.
 POST_SEAL_CRATES = ("crates/effect-gate", "crates/gate-sys", "crates/i05-protocol", "crates/gate-tls", "crates/gate",
-                    BROKER_CRATE)
+                    BROKER_CRATE, BROKER_SYS_CRATE)
 POST_SEAL_FORBIDDEN = ((r"\bset_nonblocking\b", "set_nonblocking (ioctl FIONBIO)"),
                        (r"\bread_dir\b", "read_dir (getdents64)"),
                        (r"\bcurrent_exe\b", "current_exe (readlink, readlinkat)"),
@@ -4008,12 +4009,15 @@ NUMBERS_FALLBACK = re.compile(r'#\s*\[\s*cfg\s*\(\s*not\s*\(\s*any\s*\(\s*target
 NUMBERS_ITEM = re.compile(r"\bpub\s+const\s+((?:SYS|O)_[A-Z0-9_]+)\s*:\s*c_long\s*=\s*(0[oO][0-7_]+|0[xX][0-9A-Fa-f_]+|[0-9_]+)\s*;")
 SYS_CALL_SITE = re.compile(r"(?:(?<![\w.])raw\.call|(?<![\w.:])sys)\s*\(")
 HE005C_LIST_MEMBERS = (("SCANNED_CRATES", BROKER_SYS_CRATE), ("BROKER_LINKED_CRATES", BROKER_SYS_CRATE),
-                       ("UNSAFE_FILES", BROKER_SYS_RAW), ("FD_FILES", BROKER_SYS_RAW))
+                       ("UNSAFE_FILES", BROKER_SYS_RAW), ("FD_FILES", BROKER_SYS_RAW),
+                       # Q-U4-1 (a) (2026-10-31): the post-seal list too.
+                       ("POST_SEAL_CRATES", BROKER_SYS_CRATE))
 
 
 def check_he005c_lists(base: Path) -> int:
     """HE-005C, the plan's G-HE5C-7 and the frozen seam note section 1: broker-sys is in SCANNED_CRATES and
-    BROKER_LINKED_CRATES (so the linked, start-up, thread and macro scans read it), raw.rs in UNSAFE_FILES and FD_FILES,
+    BROKER_LINKED_CRATES (so the linked, start-up, thread and macro scans read it) and, Q-U4-1 (a), POST_SEAL_CRATES,
+    raw.rs in UNSAFE_FILES and FD_FILES,
     FOREIGN_ITEMS gives raw.rs exactly {syscall}, CRATE_ROOTS gives lib.rs `#![deny(unsafe_code)]`, and BROKER_NO_PANIC
     holds both broker-sys sources, the configuration's two and the lifecycle's; STARTUP_EXCEPTIONS holds, among broker
     and broker-sys files, exactly the three per-file expressions (proc.rs's PEER_DIR, raw.rs's FD_DIR_FORMAT, leaf.rs's
@@ -10427,8 +10431,9 @@ def main() -> int:
             "the leaf writes, and no O_CREAT, O_TRUNC, O_RDWR or O_TMPFILE (b); %d other broker and broker-sys files, "
             "src and tests, raw text, name neither (c)" % (BROKER_SYS_RAW, " and ".join(CONTROL_FILE_LINES),
                                                             check_control_opener(HE)))
-        say("HE-005C broker-sys lists (G-HE5C-7; the seam note section 1): %d memberships: broker-sys in SCANNED_CRATES "
-            "and BROKER_LINKED_CRATES, raw.rs in UNSAFE_FILES and FD_FILES with FOREIGN_ITEMS {syscall}, lib.rs's crate "
+        say("HE-005C broker-sys lists (G-HE5C-7; the seam note section 1): %d memberships: broker-sys in SCANNED_CRATES, "
+            "BROKER_LINKED_CRATES and POST_SEAL_CRATES (Q-U4-1 (a)), raw.rs in UNSAFE_FILES and FD_FILES with "
+            "FOREIGN_ITEMS {syscall}, lib.rs's crate "
             "root #![deny(unsafe_code)], the no-panic list, exactly the three per-file start-up exceptions, and LEAF_PATH "
             "under PROBE_WORKER_LEAF (SM-R1-20)" % check_he005c_lists(HE))
         say("HE-005C broker-sys calls (G-HE5C-7 in G-D1-3's form; Q-RAW-R1-3): %s declares syscall once and calls it once "
