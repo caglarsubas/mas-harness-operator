@@ -11794,12 +11794,16 @@ HEGATE3_FUNCTIONS = {"(d)": "source_text", "(a)": "interior_self_uses", "(b)": "
                      "(c)": "ascii_code"}
 HEGATE3_HEAD = object()
 _EG_TYPES, _EG_LIB = "crates/effect-gate/src/types.rs", "crates/effect-gate/src/lib.rs"
+_BTEST, _CMAIN = "crates/broker/tests/broker_status.rs", "crates/containment/src/main.rs"
+# Packet review r1 (HG3-R1-1, Q-HG3-11 (a)): (c) and (d) read every workspace source, so the fixture holds them all.
+HEGATE3_TREE = {**HE005C_TREE, **{path.relative_to(gate.HE).as_posix(): path.read_text(encoding="utf-8")
+                                  for path in gate.workspace_sources(gate.HE)}}
 HEGATE3_SHEBANG = '#!/x "\nuse gate_sys::*;\npub fn hg3_hidden() { gate_sys::channel::send(); }\n// "\n'
 
 
 def hegate3_tree(changes=()):
-    """HE005C_TREE (every scanned crate's src, check_interior_self's input) with each planting applied once, in order."""
-    texts = dict(HE005C_TREE)
+    """HEGATE3_TREE (every workspace source, check_interior_self's input) with each planting applied once, in order."""
+    texts = dict(HEGATE3_TREE)
     for rel, old, new in changes:
         if old is HEGATE3_HEAD:
             texts[rel] = new + texts[rel]
@@ -11863,12 +11867,18 @@ HEGATE3_ROWS = (
     ("HG3-X35 a bare CR in a line comment", "(d)", ("(d)",),
      ((_EG_TYPES, "", "\n// note\rpub fn hg3_x35() {}\n"),)),
     ("HG3-X36 a leading frontmatter fence", "(d)", ("(d)",), ((_EG_TYPES, HEGATE3_HEAD, "---\n"),)),
+    ("HG3-X37 the shebang shape in a broker test file (F6, live at main)", "(d)", ("(d)",),
+     ((_BTEST, HEGATE3_HEAD, '#!/x "\nfn hg3_x37() { let _ = libc::SYS_getpid; }\n// "\n'),)),
+    ("HG3-X38 the shebang shape in a binary outside SCANNED_CRATES", "(d)", ("(d)",),
+     ((_CMAIN, HEGATE3_HEAD, HEGATE3_SHEBANG),)),
+    ("HG3-X39 a frontmatter fence after blank lines", "(d)", ("(d)",), ((_EG_TYPES, HEGATE3_HEAD, "\n \n---\n"),)),
+    ("HG3-X40 a BOM inside a line comment", "(d)", ("(d)",), ((_EG_TYPES, "", "\n// note \ufeff\n"),)),
 )
 # The live forms at main (MON-HG3-LIVE): each passes the reader it hid from, and R351 refuses it.
 HEGATE3_LIVE = {"HG3-X3": gate.check_socket_modules, "HG3-X11": gate.check_socket_modules,
                 "HG3-X21": gate.check_socket_modules, "HG3-X22": gate.check_socket_modules,
                 "HG3-X23": gate.check_role_seal_stage_calls, "HG3-X31": gate.check_socket_modules,
-                "HG3-X32": gate.check_socket_modules}
+                "HG3-X32": gate.check_socket_modules, "HG3-X37": gate.check_broker_sys_calls}
 HEGATE3_ACCEPTED = (
     (_EG_TYPES, "", "\nuse std::io::{self, Read};\nuse a::{self as b};\nuse a::{b::{self}, self};\nuse self::inner::x;\n"),
     (_EG_TYPES, "", "\nfn hg3_a() { self::f(); super::super::f(); Self::new(); <Self as Tr>::g(); }\n"),
@@ -11888,18 +11898,18 @@ HEGATE3_PROOF_RULES = (
 
 
 class HeGate3Tests(Tree):
-    """HE-GATE-003 over copies of every scanned crate's src (HE005C_TREE): R351 passes the real sources; refuses every
-    row (X1-X36) by its named clause, by each clause of its refusing set alone, and passes it only with the whole set
+    """HE-GATE-003 over copies of every workspace source (HEGATE3_TREE): R351 passes the real sources; refuses every
+    row (X1-X40) by its named clause, by each clause of its refusing set alone, and passes it only with the whole set
     off; passes the accepted forms; and refuses the forms live at main that the readers pass."""
 
-    TREE = HE005C_TREE
+    TREE = HEGATE3_TREE
 
     def planted(self, changes, tree):
         for rel, text in tree(changes).items():
             self.write(rel, text)
 
     def test_the_real_sources_pass(self):
-        self.assertEqual(gate.check_interior_self(self.base), len(gate.linked_sources(self.base)))
+        self.assertEqual(gate.check_interior_self(self.base), len(gate.workspace_sources(self.base)))
 
     def test_the_accepted_forms_pass(self):
         for change in HEGATE3_ACCEPTED:
@@ -11924,7 +11934,7 @@ class HeGate3Tests(Tree):
         order = list(HEGATE3_FUNCTIONS)
         self.assertEqual([row[0].split()[0] for row in HEGATE3_ROWS],
                          ["HG3-X%d" % n for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 21, 22, 23, 24, 25, 26,
-                                                  31, 32, 33, 34, 35, 36)])
+                                                  31, 32, 33, 34, 35, 36, 37, 38, 39, 40)])
         self.assertEqual([rule[0] for rule in HEGATE2_PROOF_RULES],
                          ["HE-GATE-002 (i), interior self", "HE-GATE-002 R1-5 (a), interior self"])
         self.assertEqual(len([row for rule in HEGATE_PROOF_RULES for row in rule[3]]), 5)
