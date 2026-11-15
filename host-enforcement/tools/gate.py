@@ -2440,6 +2440,71 @@ def check_linked_sources(base: Path) -> int:
     return count
 
 
+# HE-GATE-003 (design note DESIGN-HG3 rev 5; design reviews r1 and r2; MON-HG3-RULE, MON-HG3-LIVE, MON-HG3-R1-RULE,
+# MON-HG3-R2-RULE): R351, the interior-self check, run right after check_linked_sources and before every reader of use
+# paths or code text. Its four clauses are named functions (HEGATE3_FUNCTIONS in test_gate.py), (d) first, because
+# (a)-(c) read rust_code, which reads a source as rustc does only when (d) holds.
+INTERIOR_SELF_RULE = "interior-self check, R351"
+INTERIOR_SELF_TEXT = re.compile(r"::self\b")
+SOURCE_SHEBANG = re.compile(rb"#!(?!\s*\[)")
+SOURCE_BARE_CR = re.compile(rb"\r(?!\n)")
+
+
+def source_text(base: Path, sources: list[tuple[str, str]], rule: str) -> None:
+    """HE-GATE-003 R351 (d) (design review r2, G3R2-1/G3R2-2; Q-HG3-9 (a)): read as bytes, no linked source starts with
+    `#!` other than an inner attribute (`#!`, optional whitespace, `[`), starts with a frontmatter fence `---`, holds a
+    BOM or holds a CR not followed by LF. rustc strips a leading shebang and a BOM and keeps a bare CR inside a line
+    comment, where rust_code would read a literal or comment start, a code character or a line end, so the code after
+    could be hidden from every reader of rust_code's text."""
+    for rel, _ in sources:
+        data = (base / rel).read_bytes()
+        require(not SOURCE_SHEBANG.match(data) and not data.startswith(b"---") and b"\xef\xbb\xbf" not in data
+                and not SOURCE_BARE_CR.search(data),
+                "%s has a leading shebang, BOM, bare CR or frontmatter fence that rustc and rust_code read differently "
+                "(%s (d))" % (rel, rule))
+
+
+def interior_self_uses(base: Path, sources: list[tuple[str, str]], rule: str) -> None:
+    """HE-GATE-003 R351 (a) (G2-1, G2-2; the live F2b, `use gate_sys::self::*;` and `use gate_sys::{self::*};`): no use
+    path of a linked source (source_uses) holds `self` other than as its first or last segment. rustc accepts a glob
+    after `self` as the glob of the path before it and rejects every other interior `self`; the readers of use paths
+    take the segment after a crate name, so either form would pass them."""
+    for rel, raw in sources:
+        for path, _ in source_uses(rel, raw):
+            require("self" not in path[1:-1], "%s holds `self` inside a use path (%s (a))" % (rel, rule))
+
+
+def interior_self_text(base: Path, sources: list[tuple[str, str]], rule: str) -> None:
+    """HE-GATE-003 R351 (b) (HG2-R1-1, G2-2's text form): read with comments removed, literal contents emptied and the
+    whitespace around `::` removed, no linked source names `::self` followed by a word boundary, so no expression,
+    type or pattern path such as `role_seal::self::seal_stage1(spec)` hides from ROLE_SEAL_STAGE_PATH or SOCKET_TEXT.
+    It also refuses `::self` inside macro token input (stringify!), which a text tripwire cannot tell from a path."""
+    for rel, raw in sources:
+        require(not INTERIOR_SELF_TEXT.search(PATH_SPACE.sub("::", rust_code(raw))),
+                "%s names `::self` in a path (%s (b))" % (rel, rule))
+
+
+def ascii_code(base: Path, sources: list[tuple[str, str]], rule: str) -> None:
+    """HE-GATE-003 R351 (c) (design review r1, G3-1/G3-4, the live F4; Q-HG3-8 (a)): read with comments removed and
+    literal contents emptied, every linked source is ASCII. rustc reads U+200E and U+200F as whitespace and Python's \\s
+    does not, so a path split by either hid from PATH_SPACE's readers; non-ASCII identifiers are refused with them."""
+    for rel, raw in sources:
+        require(rust_code(raw).isascii(),
+                "%s holds a non-ASCII character outside comments and literals (%s (c))" % (rel, rule))
+
+
+def check_interior_self(base: Path) -> int:
+    """HE-GATE-003 R351 over every non-test source of SCANNED_CRATES (linked_sources), test blocks included: (d) the
+    source's bytes read as rustc reads them, then (a) no interior `self` in a use path, (b) no `::self` in code and (c)
+    ASCII outside comments and literals. The number of sources."""
+    sources = linked_sources(base)
+    source_text(base, sources, INTERIOR_SELF_RULE)
+    interior_self_uses(base, sources, INTERIOR_SELF_RULE)
+    interior_self_text(base, sources, INTERIOR_SELF_RULE)
+    ascii_code(base, sources, INTERIOR_SELF_RULE)
+    return len(sources)
+
+
 def extern_blocks(text: str) -> list[str]:
     """The bodies of a source's extern blocks, read from the source with comments removed and literal contents emptied
     (rust_code), so neither can hide a block or end one early: from each block's opening brace to its matching one.
@@ -10318,6 +10383,9 @@ def main() -> int:
         linked_names = ", ".join(crate.split("/")[1] for crate in SCANNED_CRATES)
         say("linked sources: %d sources of %s name no refused std path, rename or glob no std module or item and do not "
             "name asm (lexical tripwire), crate roots forbid or deny unsafe_code" % (check_linked_sources(HE), linked_names))
+        say("interior self (HE-GATE-003, R351): %d sources of %s hold no leading shebang, BOM, bare CR or frontmatter "
+            "fence (d), no interior `self` in a use path (a), no `::self` in code (b) and only ASCII outside comments "
+            "and literals (c)" % (check_interior_self(HE), linked_names))
         say("foreign items: %d sources of the linked crates, every extern read with comments and "
             "literal contents removed; %s; no other declares a foreign item, none is public or safe, no link_name, no "
             "macro in any of them (lexical tripwire)"

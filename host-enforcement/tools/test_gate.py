@@ -11784,5 +11784,175 @@ class OutputPrefixTests(unittest.TestCase):
         self.assertEqual(lines, [gate.PREFIX + "FAILED: GateError: first", gate.PREFIX + "second"])
 
 
+
+# --- HE-GATE-003 (design note DESIGN-HG3 rev 5; design reviews r1 and r2; MON-HG3-RULE, MON-HG3-LIVE, MON-HG3-R1-RULE,
+# MON-HG3-R2-RULE): R351, check_interior_self, with clauses (d), (a), (b), (c) run in that order. Each row is (label, its
+# named clause, its refusing set, its plantings): the named clause is the first of the set in that order, so it is the
+# clause whose message the rule gives. A planting is (file, anchor, replacement) as in he005c_tree, or (file,
+# HEGATE3_HEAD, prefix), which puts the prefix before the file's first byte. Rows change only fixture copies.
+HEGATE3_FUNCTIONS = {"(d)": "source_text", "(a)": "interior_self_uses", "(b)": "interior_self_text",
+                     "(c)": "ascii_code"}
+HEGATE3_HEAD = object()
+_EG_TYPES, _EG_LIB = "crates/effect-gate/src/types.rs", "crates/effect-gate/src/lib.rs"
+HEGATE3_SHEBANG = '#!/x "\nuse gate_sys::*;\npub fn hg3_hidden() { gate_sys::channel::send(); }\n// "\n'
+
+
+def hegate3_tree(changes=()):
+    """HE005C_TREE (every scanned crate's src, check_interior_self's input) with each planting applied once, in order."""
+    texts = dict(HE005C_TREE)
+    for rel, old, new in changes:
+        if old is HEGATE3_HEAD:
+            texts[rel] = new + texts[rel]
+        elif not old:
+            texts[rel] = texts[rel] + new
+        else:
+            if texts[rel].count(old) != 1:
+                raise ValueError("%s: the anchor %r does not occur once" % (rel, old[:80]))
+            texts[rel] = texts[rel].replace(old, new, 1)
+    return texts
+
+
+HEGATE3_ROWS = (
+    ("HG3-X1 use gate_sys::{self::{self as g}}; in linux_net.rs", "(a)", ("(a)",),
+     ((_HG_NET, "", "\nuse gate_sys::{self::{self as g}};\n"),)),
+    ("HG3-X2 use gate_sys::{self::{self}}; in linux_net.rs", "(a)", ("(a)",),
+     ((_HG_NET, "", "\nuse gate_sys::{self::{self}};\n"),)),
+    ("HG3-X3 use gate_sys::self::*; (F2b, live at main)", "(a)", ("(a)", "(b)"),
+     ((_EG_TYPES, "", "\nuse gate_sys::self::*;\n"),)),
+    ("HG3-X4 use gate_sys::self::channel::Poller;", "(a)", ("(a)", "(b)"),
+     ((_EG_TYPES, "", "\nuse gate_sys::self::channel::Poller;\n"),)),
+    ("HG3-X5 use ::gate_sys::self::channel::Poller; in the broker's lib.rs", "(a)", ("(a)", "(b)"),
+     ((_BLIB, "", "\nuse ::gate_sys::self::channel::Poller;\n"),)),
+    ("HG3-X6 use gate_sys::{channel::{self::{self}}};", "(a)", ("(a)",),
+     ((_EG_TYPES, "", "\nuse gate_sys::{channel::{self::{self}}};\n"),)),
+    ("HG3-X7 role_seal::self::seal_stage1 in an observer module", "(b)", ("(b)",),
+     ((_OCLIENT, "", "\nfn hg3_x7(spec: u8) { role_seal::self::seal_stage1(spec); }\n"),)),
+    ("HG3-X8 a second role_seal::self::seal_stage2 in the observer's seal.rs", "(b)", ("(b)",),
+     ((_OSEAL, "", "\nfn hg3_x8(spec: u8) { role_seal::self::seal_stage2(spec); }\n"),)),
+    ("HG3-X9 gate_sys::self::channel::send()", "(b)", ("(b)",),
+     ((_EG_TYPES, "", "\nfn hg3_x9() { gate_sys::self::channel::send(); }\n"),)),
+    ("HG3-X10 gate_sys :: /* x */ self :: channel", "(b)", ("(b)",),
+     ((_EG_TYPES, "", "\nfn hg3_x10() { gate_sys :: /* x */ self :: channel::send(); }\n"),)),
+    ("HG3-X11 use gate_sys::{self::*}; (F2b, live at main)", "(a)", ("(a)",),
+     ((_EG_TYPES, "", "\nuse gate_sys::{self::*};\n"),)),
+    ("HG3-X12 use gate_sys::channel::self::*;", "(a)", ("(a)", "(b)"),
+     ((_EG_TYPES, "", "\nuse gate_sys::channel::self::*;\n"),)),
+    ("HG3-X13 use std::io::self::*;", "(a)", ("(a)", "(b)"),
+     ((_EG_TYPES, "", "\nuse std::io::self::*;\n"),)),
+    ("HG3-X15 stringify!(gate_sys::self::x)", "(b)", ("(b)",),
+     ((_EG_TYPES, "", "\nconst HG3_S: &str = stringify!(gate_sys::self::x);\n"),)),
+    ("HG3-X21 gate_sys::<U+200E>channel (F4, live at main)", "(c)", ("(c)",),
+     ((_EG_TYPES, "", "\nfn hg3_x21() { gate_sys::‎channel::send(); }\n"),)),
+    ("HG3-X22 gate_sys<U+200E>::channel (F4, live at main)", "(c)", ("(c)",),
+     ((_EG_TYPES, "", "\nfn hg3_x22() { gate_sys‎::channel::send(); }\n"),)),
+    ("HG3-X23 role_seal::<U+200F>seal_stage1 in an observer module (F4, live at main)", "(c)", ("(c)",),
+     ((_OCLIENT, "", "\nfn hg3_x23(spec: u8) { role_seal::‏seal_stage1(spec); }\n"),)),
+    ("HG3-X24 gate_sys::<U+200E>self::channel", "(c)", ("(c)",),
+     ((_EG_TYPES, "", "\nfn hg3_x24() { gate_sys::‎self::channel::send(); }\n"),)),
+    ("HG3-X25 a::self<U+0301>()", "(b)", ("(b)", "(c)"),
+     ((_EG_TYPES, "", "\nfn hg3_x25() { a::self́(); }\n"),)),
+    ("HG3-X26 a non-ASCII identifier", "(c)", ("(c)",),
+     ((_EG_TYPES, "", "\nfn hg3_x26() { let café = 1; let _ = café; }\n"),)),
+    ("HG3-X31 a shebang with a quote hiding a socket import in a crate root (F5, live at main)", "(d)", ("(d)",),
+     ((_EG_LIB, HEGATE3_HEAD, HEGATE3_SHEBANG),)),
+    ("HG3-X32 the same in a module file (F5, live at main)", "(d)", ("(d)",),
+     ((_EG_TYPES, HEGATE3_HEAD, HEGATE3_SHEBANG),)),
+    ("HG3-X33 a shebang with a block comment start", "(d)", ("(d)",),
+     ((_EG_TYPES, HEGATE3_HEAD, "#!/x /*\nuse gate_sys::*;\n// */\n"),)),
+    ("HG3-X34 a BOM", "(d)", ("(d)", "(c)"), ((_EG_TYPES, HEGATE3_HEAD, "﻿"),)),
+    ("HG3-X35 a bare CR in a line comment", "(d)", ("(d)",),
+     ((_EG_TYPES, "", "\n// note\rpub fn hg3_x35() {}\n"),)),
+    ("HG3-X36 a leading frontmatter fence", "(d)", ("(d)",), ((_EG_TYPES, HEGATE3_HEAD, "---\n"),)),
+)
+# The live forms at main (MON-HG3-LIVE): each passes the reader it hid from, and R351 refuses it.
+HEGATE3_LIVE = {"HG3-X3": gate.check_socket_modules, "HG3-X11": gate.check_socket_modules,
+                "HG3-X21": gate.check_socket_modules, "HG3-X22": gate.check_socket_modules,
+                "HG3-X23": gate.check_role_seal_stage_calls, "HG3-X31": gate.check_socket_modules,
+                "HG3-X32": gate.check_socket_modules}
+HEGATE3_ACCEPTED = (
+    (_EG_TYPES, "", "\nuse std::io::{self, Read};\nuse a::{self as b};\nuse a::{b::{self}, self};\nuse self::inner::x;\n"),
+    (_EG_TYPES, "", "\nfn hg3_a() { self::f(); super::super::f(); Self::new(); <Self as Tr>::g(); }\n"),
+    (_EG_TYPES, "", "\nfn hg3_b() { a::self_named(); crate::self_check::run(); }\n"),
+    (_EG_TYPES, "", "\n// gate_sys::self::x\n// café ‎\n"),
+    (_EG_TYPES, "", "\nconst HG3_T: &str = \"gate_sys::self::x\";\nconst HG3_U: &str = \"café\";\n"
+                    "const HG3_R: &str = r\"role_seal::self::seal_stage1\";\n"),
+    (_HG_NET, "", "\nuse gate_sys::{self as g};\n"),
+    (_EG_TYPES, HEGATE3_HEAD, "#![forbid(unsafe_code)]\n"),
+    (_EG_TYPES, HEGATE3_HEAD, "#! [ allow(dead_code) ]\n"),
+)
+HEGATE3_PROOF_RULES = (
+    ("HE-GATE-003 R351, interior self", gate.check_interior_self, tuple(HEGATE3_FUNCTIONS), HEGATE3_ROWS,
+     lambda clause: "(interior-self check, R351 %s)" % clause, r"\(interior-self check, R351 \(",
+     named_patches(HEGATE3_FUNCTIONS), hegate3_tree),
+)
+
+
+class HeGate3Tests(Tree):
+    """HE-GATE-003 over copies of every scanned crate's src (HE005C_TREE): R351 passes the real sources; refuses every
+    row (X1-X36) by its named clause, by each clause of its refusing set alone, and passes it only with the whole set
+    off; passes the accepted forms; and refuses the forms live at main that the readers pass."""
+
+    TREE = HE005C_TREE
+
+    def planted(self, changes, tree):
+        for rel, text in tree(changes).items():
+            self.write(rel, text)
+
+    def test_the_real_sources_pass(self):
+        self.assertEqual(gate.check_interior_self(self.base), len(gate.linked_sources(self.base)))
+
+    def test_the_accepted_forms_pass(self):
+        for change in HEGATE3_ACCEPTED:
+            self.planted((change,), hegate3_tree)
+            try:
+                gate.check_interior_self(self.base)
+            finally:
+                self.planted((), hegate3_tree)
+
+    def test_the_live_forms_pass_their_reader_and_r351_refuses_them(self):
+        rows = {row[0].split()[0]: row for row in HEGATE3_ROWS}
+        for label, reader in HEGATE3_LIVE.items():
+            self.planted(rows[label][3], hegate3_tree)
+            try:
+                reader(self.base)
+                with self.assertRaisesRegex(gate.GateError, r"\(interior-self check, R351 \(", msg=label):
+                    gate.check_interior_self(self.base)
+            finally:
+                self.planted((), hegate3_tree)
+
+    def test_the_proof_table(self):
+        order = list(HEGATE3_FUNCTIONS)
+        self.assertEqual([row[0].split()[0] for row in HEGATE3_ROWS],
+                         ["HG3-X%d" % n for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 21, 22, 23, 24, 25, 26,
+                                                  31, 32, 33, 34, 35, 36)])
+        self.assertEqual([rule[0] for rule in HEGATE2_PROOF_RULES],
+                         ["HE-GATE-002 (i), interior self", "HE-GATE-002 R1-5 (a), interior self"])
+        self.assertEqual(len([row for rule in HEGATE_PROOF_RULES for row in rule[3]]), 5)
+        self.assertEqual(sum(len(rule[3]) for rule in HE005A_PROOF_RULES), 116)
+        for name, check, clauses, rows, tag, any_tag, patches, tree in HEGATE3_PROOF_RULES:
+            for label, clause, refusing, changes in rows:
+                self.assertEqual(clause, min(refusing, key=order.index), label)
+                self.planted(changes, tree)
+                try:
+                    with self.assertRaisesRegex(gate.GateError, re.escape(tag(clause)), msg=label):
+                        check(self.base)
+                    legs = [((each,), ()) for each in refusing] + [((), refusing)]
+                    legs += [((), (each,)) for each in refusing if len(refusing) > 1]
+                    for enabled, disabled in legs:
+                        active = patches(enabled=enabled[0] if enabled else None, disabled=disabled)
+                        for patch in active:
+                            patch.start()
+                        try:
+                            if disabled == refusing:
+                                check(self.base)
+                            else:
+                                with self.assertRaisesRegex(gate.GateError, any_tag, msg=label):
+                                    check(self.base)
+                        finally:
+                            for patch in active:
+                                patch.stop()
+                finally:
+                    self.planted((), tree)
+
 if __name__ == "__main__":
     unittest.main()
