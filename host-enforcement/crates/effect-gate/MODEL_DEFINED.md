@@ -4547,3 +4547,178 @@ HE-GATE-002 name confirmed with Q-HG2-1 (a), Q-HG2-2 (a) and Q-HG2-3 (a), and GO
 with Q-HG2-4 (a), G2-5 approved and GO-HG2-PLAN-R1; GO-HG2-LIGHT-UNIT. The owner's "Push, carry HG-R1-1 (Recommended)" and
 MON-HG-RUSTC-PROBE (2026-10-30) carried the work here. The complete messages are recorded in the operator's
 `tools/w03/hegate/OWNER_DECISIONS.md`.
+
+## HE-GATE-003: R351, the interior-self check (`tools/gate.py`, `tools/test_gate.py`)
+
+HE-GATE-003 is a small R10 gate packet, R10's next after HE-GATE-002's merge (`2908a12d`), ruled by the monitor under the
+owner's delegation (MON-C15-R10, tier FULL) and built as its design note revision 5 (`hegate/DESIGN-HG3.md`, sha256
+`6250939e…`) states it. That revision closed by script-checked claims after two paper design reviews:
+`hegate/reviews/design-review-HG3-round1.json` (`d8362fbc…`) and `-round2.json` (`77e998a7…`), both CHANGES_REQUIRED
+with no MAJOR, and every finding disposed of as ruled. Packet review round 1
+(`hegate/reviews/pr-review-HG3-round1.json`, `3a6e48da…`, CHANGES_REQUIRED with no MAJOR) is folded as ruled
+(MON-HG3-PR1-RULE).
+
+The packet closes HE-GATE-002's carried G2-1 and G2-2 and its PR review's HG2-R1-1. It also closes four gaps found live at
+main (three by the design probes, one by packet review round 1), and folds HE-GATE-002's NOTEs HG2-R1-3 and HG2-R1-5. It changes only `tools/gate.py`,
+`tools/test_gate.py`, this section and its packet YAML: no Rust source, contract, lock, manifest, vendored package,
+`ci/` or `.github/` path, and no other rule. Its rule is R351.
+
+### R10-defined behaviour
+
+| # | Behaviour | Why |
+|---|---|---|
+| R351 | **The interior-self check, `check_interior_self`** (new). It runs right after `check_linked_sources` and before every reader of use paths or code text. (d) and (c) read every workspace source (`workspace_sources`: every .rs outside target/ and vendor/, tests and binaries included, 247 at main); (a) and (b) read every non-test source of SCANNED_CRATES (`linked_sources`, 119), test blocks included. Four named clause functions run in this order. **(d) `source_text`:** read as bytes, no source starts with `#!` other than an inner attribute (`#!`, optional whitespace, `[`), has a frontmatter fence `---` at the start of its first non-blank line, holds a BOM, or holds a CR not followed by LF. **(a) `interior_self_uses`:** no use path (`source_uses`) holds `self` other than as its first or last segment. **(b) `interior_self_text`:** read with comments removed, literal contents emptied and the whitespace around `::` removed, no source names `::self` followed by a word boundary. **(c) `ascii_code`:** read with comments removed and literal contents emptied, every workspace source is ASCII. Each message names its clause: "(interior-self check, R351 (x))". | G2-1, G2-2 (HE-GATE-002 design review) and HG2-R1-1 (its PR review): the readers of use paths take the segment after a crate name, and ROLE_SEAL_STAGE_PATH and SOCKET_TEXT read text, so an interior `self` hid from them. Four gaps were found live at main (F2b, F4 and F5 by probe, F6 by the in-process measurement after packet review round 1): **F2b**, `use gate_sys::self::*;` and `use gate_sys::{self::*};`, which rustc 1.99.0 compiles as the glob of gate_sys; **F4**, a U+200E or U+200F inside a path, which rustc reads as whitespace and Python's `\s` does not; **F5**, a leading shebang line holding `"`, `/*` or `r#"`, which rustc strips and `rust_code` lexes as a literal or comment start, hiding the code before the matching delimiter; **F6**, F5's shape in a broker integration test, which `check_broker_sys_calls` (d) reads and R351's first head did not. (d) runs first because (a)-(c) read `rust_code`, which reads a source as rustc does only when (d) holds. Refusing the class once, before every reader, leaves every reader and its rows unchanged (Q-HG3-1 (a), Q-HG3-8 (a), Q-HG3-9 (a)). |
+
+**R351 deliberately refuses some valid Rust:**
+- the glob after `self` (`a::self::*`, `a::{self::*}`);
+- `::self` inside macro token input, such as `stringify!(gate_sys::self::x)`;
+- non-ASCII identifiers and any other non-ASCII code outside comments and literals;
+- a BOM anywhere (inside a comment or literal included), a bare CR (including one inside a line comment), a leading
+  shebang that is not an inner attribute (including `#!`, a comment, then `[`, which rustc reads as an inner attribute),
+  and a `---` at the start of the first non-blank line;
+- possibly `pub(in crate::inner::self)` (not probed).
+
+At `2908a12d`, SCANNED_CRATES' 119 sources hold none of these. By the packet's script checks (`scan_self.py`,
+`nonascii.py`, `textcheck.py`), there are 0 interior-self use paths, 0 `::self` text hits, 0 non-ASCII code characters
+(all 249 sit in comments and literals), and 0 leading shebangs, `#![` lines, `---` fences, BOMs or bare CRs. Over all
+247 workspace sources (measured after packet review round 1, `F6_SUMMARY.md`): 0 non-ASCII code characters and 0 leading shebangs, `---`
+fences, BOMs or bare CRs.
+
+### The rows
+
+`HEGATE3_PROOF_RULES` is a new table in the 8-field shape. Its rows have four fields: label, named clause, refusing
+set, plantings. The named clause is the first of the set in run order, so its message is the rule's. The 30 rows are
+HG3-X1..X13, X15, X21..X26 and X31..X40.
+- **Single-clause rows:** (a) X1, X2, X6, X11; (b) X7-X10, X15; (c) X21-X24, X26; (d) X31-X33, X35-X40.
+- **Two-clause rows:** X3, X4, X5, X12, X13 carry {(a), (b)}; X25 carries {(b), (c)}; X34 carries {(d), (c)}.
+
+Each row is refused with its named clause's message, by each clause of its set alone, and with any one clause of a
+two-clause set off. It passes only with its whole set off.
+
+`HeGate3Tests`:
+- the real sources pass (every workspace source);
+- the accepted forms pass: last-position and start-position `self`, `Self`, `self_named` identifiers, comments and
+  literals holding `::self` or non-ASCII text, `use gate_sys::{self as g};`, and the inner attributes `#![…]` and
+  `#! [ … ]` on line 1;
+- each live form (X3, X11, X21-X23, X31, X32, X37) passes the reader it hid from (`check_socket_modules`,
+  `check_role_seal_stage_calls` or `check_broker_sys_calls`), and R351 refuses it.
+
+`HEGATE_PROOF_RULES`' 5 rows, `HE005A_PROOF_RULES`' 116 rows and `HEGATE2_PROOF_RULES`' labels do not move.
+
+### The gaps closed
+
+All four were latent at `2908a12d` (the script checks above: F2b over the 119 linked sources, F4-F6 over the 247
+workspace sources). The owner
+was told the same day each was found.
+- **F2b:** `use gate_sys::self::*;` and its brace form compiled and passed `check_socket_modules` in every linked
+  non-socket source, from HE-003D until this packet. In the observer's two socket files, `send_d_use_paths`' glob clause
+  refused them. The other three SOCKET_FILES may glob gate_sys anyway.
+- **F4:** a U+200E or U+200F inside a path hid `gate_sys::channel` from SOCKET_TEXT and `role_seal::seal_stage1` from
+  ROLE_SEAL_STAGE_PATH; rustc 1.99.0 compiles those paths.
+- **F5:** a leading shebang line hid the code before a matching delimiter from every reader of `rust_code`, in crate
+  roots and module files alike; rustc 1.99.0 compiles both.
+- **F6** (packet review round 1, HG3-R1-1): F5's shape in a broker integration test, which is a crate root, hid a SYS_
+  name from `check_broker_sys_calls` (d), which reads every .rs under crates/broker and crates/broker-sys. Measured
+  in-process (`F6_SUMMARY.md`); rustc's side is P1d's crate-root result.
+
+### Correction note (HE-GATE-002's section, which stays unchanged)
+
+- **G2-2's carry** labelled `gate_sys::self::*` "a rustc-rejected form". The probe shows rustc 1.99.0 compiles it (F2b),
+  so the label was wrong.
+- **HE-GATE-002's second stated residual** (HG2-R1-3, folded). HE-GATE-002's text is: "`super` or `crate` in a
+  non-start position is not normalised (design review G2-8); like the interior-self forms, rustc 1.99.0 rejects such
+  paths." It now reads: "`super` or `crate` after a non-keyword segment is not normalised (design review G2-8);
+  rustc 1.99.0 is expected to reject such paths (not probed)." There are three changes: "in a non-start position"
+  becomes "after a non-keyword segment"; the premise "like the interior-self forms" is dropped; and "rejects" becomes
+  "is expected to reject (not probed)". R351 refuses `super` and `crate` in no interior position.
+- **R312's stated bound:** `check_socket_modules`' interior-self limit, carried as G2-2, is closed by R351.
+
+### Binaries
+
+All ten binary lines must equal HE-GATE-002's (`2908a12d`), which equal HE-005C's: the packet changes only the gate's
+tools, this file and its packet YAML. At the re-heavy gate run (2026-11-15), the ten `he-gate:` binary lines
+are byte-identical to HE-GATE-002's, in the same order. They are `cmp` equal to the kit's
+`hegate/hg3-tools/reference-binlines-HE005C.txt` (`d6e8f505…`), HE-005C's lines, which HE-GATE-002's record measured
+equal to its own. They come from the first heavy run's builds; every later change is to the gate's tools and this
+file only.
+
+### Superseded and discharged
+
+- **HE-GATE-002's G2-1 and G2-2** (Q-HG2-4 (a), carried to this packet): closed by R351 (a) and (b).
+- **HE-GATE-002 PR review round 1's HG2-R1-1** (the owner's "Push, carry HG2-R1-1 (Recommended)"): closed by R351 (b).
+- **HE-GATE-002's NOTEs HG2-R1-3 and HG2-R1-5:** folded here. HG2-R1-3 is the correction note above. For HG2-R1-5,
+  HE-GATE-002's decisions also include Q-HG2-SIM2 (a), GO-HG2-SIM2 and GO-HG2-PR-R1.
+
+### Evidence
+
+At build, light, on the worktree of `2908a12d` (MON-HG3-REV5-OK; again after packet review round 1's folds). Light
+means no cargo, no gate run, no test run and no mutation proof; every test run is heavy here, by MON-C15-R10.
+- `gate.py` and `test_gate.py` parse.
+- `check_interior_self`, run in-process from a scratch copy of the changed `gate.py` over git-archive copies of main's
+  tree, passes main's 247 workspace sources. It refuses each live-gap variant by its clause: F2b by (a), F4 by (c), and
+  F5 and F6 by (d).
+- The R10 zero-bill scan, light, passed.
+- The privacy scan over the packet's final 451 added lines: names, the legacy term, absolute paths and e-mails all 0.
+  Closed tokens: 0.
+- This file at `2908a12d` is a byte-identical prefix of this file; the packet deletes no line.
+
+The heavy evidence comes from the kit's `heavy.zsh` (`hegate/hg3-tools`, the author's run), offline. Each step ran
+separately under C17 (`lockf` on the lane-guard heavy lock), inside holdwatch2, after the per-start gate.
+
+**The first run** (MON-HG3-UHEAVY-GO), on `gate.py` `099a1766…` and `test_gate.py` `dacd22b2…`:
+- the targeted tests, 22 OK;
+- the self-test, 485 OK;
+- the mutation proof over every proof table, 496 rows, 0 failures: `HEGATE3_PROOF_RULES` 26 (19, 7); `HEGATE2` 8 (8, 0);
+  `HEGATE` 5 (5, 0); `HE005A` 116 (103, 13); `HE005B` 81 (67, 14); `HE005C` 145 (131, 14); `I01B5` 115 (99, 16);
+- both musl release builds rc 0 (x86_64 24 s, aarch64 21 s), 0 errors;
+- the gate run `he-gate: passed`, 0 FAILED lines;
+- the zero-bill scan passed; `tests/verify` 13 OK;
+- the sim at the first head `779d84b6`: rc 0, `he-gate: passed`, 135 test suites passing, tracked files unchanged,
+  the ten binary lines equal.
+
+**The re-heavy after packet review round 1's folds** (MON-HG3-PR1-RULE), on `gate.py` `49128412…` and `test_gate.py`
+`8a0400e7…`:
+- the targeted tests (`HeGate3Tests`, `HeGate2Tests`, `HeGateTests`), 22 OK (41 s);
+- the self-test, 485 OK (122 s);
+- the mutation proof of `HEGATE3_PROOF_RULES`: 30 rows (23 with a one-clause refusing set, 7 larger), 0 failures
+  (36 s). The other six tables' rules and rows are unchanged since the first run.
+- the gate run: `he-gate: passed`, rc 0, 0 FAILED lines (128 s), contracts 69, with R351's printed line (247 workspace
+  sources, 119 linked). The binary statement is as above.
+
+The sim at the packet YAML's final commit and the verify by the owner-operated verifier follow.
+
+### Code and audit
+
+- `tools/gate.py`: `INTERIOR_SELF_RULE`, `INTERIOR_SELF_TEXT`, `SOURCE_SHEBANG`, `SOURCE_BARE_CR`, `SOURCE_FENCE`, `source_text`,
+  `interior_self_uses`, `interior_self_text`, `ascii_code` and `check_interior_self` (new; R351); `main`'s printed
+  line.
+- `tools/test_gate.py`: `HEGATE3_FUNCTIONS`, `HEGATE3_HEAD`, `_EG_TYPES`, `_EG_LIB`, `_BTEST`, `_CMAIN`,
+  `HEGATE3_TREE`, `HEGATE3_SHEBANG`, `hegate3_tree`, `HEGATE3_ROWS`, `HEGATE3_LIVE`, `HEGATE3_ACCEPTED`,
+  `HEGATE3_PROOF_RULES` and `HeGate3Tests` (new). No existing test changes.
+- This section, and `task-packets/HE-GATE-003.yaml` at the repository root. No other file.
+
+### Stated residuals
+
+- **The textual reading's limits:** (a) reads `use_paths`' tokens and (b) reads text, not Rust. A dependency macro that
+  takes token input could emit a use tree or path that neither clause reads (design review G3-13).
+- **`super` and `crate` in interior positions** (Q-HG3-5 (a)): not refused. The reviewer's reading, not probed, is that
+  rustc's rules for them have no last-position exception.
+- **`pub(in …::self)`:** possibly valid, and refused by (b).
+- **Files outside `workspace_sources`:** target/ and vendor/ are not read; vendor/ is pinned byte for byte by
+  `check_vendor`.
+
+### Owner and monitor decisions
+
+Cited by id, all 2026-11-15, by the lane monitor under the owner's delegation of 2026-10-22, with the owner's "apply A,
+B and D" (C14-C16):
+- MON-C15-R10;
+- MON-HG3-RULE (Q-HG3-1..5 (a), the P1 GO);
+- MON-HG3-LIVE (Q-HG3-6/7 (a); the owner told at once);
+- MON-HG3-R1-RULE (Q-HG3-8 (a), the review r1 dispositions, the G3-4 GO);
+- MON-PACE-HOLD and MON-PACE-RESUME (C17);
+- MON-HG3-R2-RULE (Q-HG3-9/10 (a), the G3R2-2 GO);
+- MON-HG3-REV5-OK (rev 5 accepted, the `---` refusal kept, GO for the light unit);
+- MON-HG3-UHEAVY-GO (the heavy run, the commits, the sim and the packet review);
+- MON-HG3-PR1-RULE (Q-HG3-11/12 (a), the F6 GO, the packet review round 1 folds).
+
+The complete messages are recorded in the operator's HE-GATE decisions record (`hegate/OWNER_DECISIONS.md`).
